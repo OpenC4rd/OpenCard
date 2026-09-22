@@ -39,9 +39,13 @@ export function useShellProjectLifecycle(options: ProjectLifecycleOptions) {
   /** 用户正在回答未保存确认时暂存的打开请求；取消时直接丢弃。 */
   let deferredActivation: { path: string, entryPath?: string } | null = null
 
+  /**
+   * 项目树按需加载：这里只登记到标准前瞻深度，更深的目录在展开时再读。
+   * 以前用 Infinity 深度的全量递归，等于每次激活项目都把整个项目（含被安全软件盯着的目录）走一遍。
+   */
   async function ensureProjectTreeLoaded(): Promise<void> {
     if (!options.project.projectPath.value) return
-    await options.project.readDirectoryEntries('', Number.POSITIVE_INFINITY)
+    await options.project.readDirectoryEntries('')
   }
 
   async function activateNow(path: string, entryPath?: string): Promise<boolean> {

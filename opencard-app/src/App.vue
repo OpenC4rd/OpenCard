@@ -23,7 +23,7 @@ html, body, #app {
   font-family: var(--oc-font-sans);
   font-size: var(--oc-text-base);
   color: var(--oc-fg-default);
-  background: var(--oc-bg-base);
+  background: var(--oc-bg-window, var(--oc-bg-base));
   -webkit-font-smoothing: antialiased;
 }
 

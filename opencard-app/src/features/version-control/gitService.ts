@@ -71,6 +71,8 @@ export const unstagePaths = (projectRoot: string, request: PathRequest) =>
   invokeRequest<RepositorySummary, PathRequest>('git_unstage', projectRoot, request)
 export const unstageAll = (projectRoot: string) =>
   invokeProject<RepositorySummary>('git_unstage_all', projectRoot)
+export const discardPaths = (projectRoot: string, request: PathRequest) =>
+  invokeRequest<RepositorySummary, PathRequest>('git_discard', projectRoot, request)
 
 export const createCommit = (projectRoot: string, request: CommitRequest) =>
   invokeRequest<CommitSummary, CommitRequest>('git_commit', projectRoot, request)

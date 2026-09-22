@@ -191,7 +191,7 @@ function leaveContent(element: Element, done: () => void): void {
 }
 
 .oc-card--variant-surface {
-  border: 1px solid var(--oc-border-default);
+  border: var(--oc-border-width) solid var(--oc-border-default);
   background: var(--oc-bg-surface);
   box-shadow: none;
 }
@@ -199,7 +199,7 @@ function leaveContent(element: Element, done: () => void): void {
 .oc-card--variant-glass {
   --oc-card-content-padding: var(--oc-floating-surface-padding);
 
-  border: 1px solid var(--oc-border-muted);
+  border: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-glass);
   backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
   box-shadow: var(--oc-shadow-md);
@@ -221,7 +221,7 @@ function leaveContent(element: Element, done: () => void): void {
 }
 
 .oc-card__header {
-  border-bottom: 1px solid var(--oc-border-muted);
+  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
 .oc-card--collapsed .oc-card__header,

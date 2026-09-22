@@ -136,7 +136,7 @@ const handleChange = (event: Event) => {
 }
 
 .oc-checkbox--disabled {
-  opacity: 0.5;
+  opacity: var(--oc-opacity-disabled);
   cursor: not-allowed;
 }
 

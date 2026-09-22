@@ -72,7 +72,8 @@ export function getPropertyFieldComponent(definition: PropertyEditorFieldDefinit
     return NumberSliderPropertyField
   }
   if (definition.fieldType === 'string' && definition.richText) return RichTextStringPropertyField
-  if (definition.fieldType === 'string' && !definition.options && definition.completion?.provider) {
+  if (definition.fieldType === 'string' && !definition.options
+    && (definition.completion?.provider || definition.listSeparator)) {
     return ReferenceStringPropertyField
   }
   if (isArrayPropertyFieldType(definition.fieldType)) return ArrayPropertyField

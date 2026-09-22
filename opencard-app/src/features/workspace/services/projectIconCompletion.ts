@@ -55,17 +55,20 @@ function within(range: Range, item: PropertyCompletionItem): PropertyCompletionI
   return { ...item, replaceStart: range.start, replaceEnd: range.end }
 }
 
+/**
+ * 光标只有落在 `[[` 与 `]]` 之间才算正在写这枚图标。
+ * 停在 `]]` 之后说明 token 已经写完，这里直接返回 null：否则菜单会一直弹，
+ * 回车也一直被菜单吃掉，换不了行。
+ */
 function locateRichTextToken(value: string, cursor: number): TokenState | null {
-  const closedAtCursor = value.slice(Math.max(0, cursor - 2), cursor) === ']]'
-  const contentEnd = closedAtCursor ? cursor - 2 : cursor
-  const start = value.lastIndexOf('[[', contentEnd)
-  if (start < 0 || value.slice(0, contentEnd).lastIndexOf(']]') > start) return null
+  const start = value.lastIndexOf('[[', cursor)
+  if (start < 0 || value.slice(0, cursor).lastIndexOf(']]') > start) return null
   const contentStart = start + 2
-  const content = value.slice(contentStart, contentEnd)
-  const inner = { start: contentStart, end: contentEnd }
+  const content = value.slice(contentStart, cursor)
+  const inner = { start: contentStart, end: cursor }
   const token = {
     start,
-    end: closedAtCursor ? cursor : (value.slice(cursor, cursor + 2) === ']]' ? cursor + 2 : cursor),
+    end: value.slice(cursor, cursor + 2) === ']]' ? cursor + 2 : cursor,
   }
   const matched = QUALIFIED_REFERENCE_PATTERN.exec(content)
   if (!matched) {
@@ -73,7 +76,7 @@ function locateRichTextToken(value: string, cursor: number): TokenState | null {
   }
   const rest = matched[2]!
   const packageKey = matched[1] ?? null
-  const body = { start: contentEnd - rest.length, end: contentEnd }
+  const body = { start: cursor - rest.length, end: cursor }
   const slash = rest.indexOf('/')
   if (slash < 0) {
     return { stage: 'series', packageKey, query: rest, body, reference: inner, token }

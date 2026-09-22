@@ -26,6 +26,10 @@
               <OcFieldInput as="textarea" full-width resize="vertical" :value="profile.description ?? ''"
                 @input="updateProfileField('description', $event)" />
             </label>
+            <label class="project-profile-editor__field" data-field-key="author">
+              <OcText as="span" size="sm">{{ t('projectConfig.fields.author') }}</OcText>
+              <OcFieldInput full-width :value="profile.author ?? ''" @input="updateProfileField('author', $event)" />
+            </label>
             <label class="project-profile-editor__field" data-field-key="version">
               <OcText as="span" size="sm">{{ t('projectConfig.fields.version') }}</OcText>
               <OcFieldInput full-width :value="profile.version ?? ''" @input="updateProfileField('version', $event)" />
@@ -230,7 +234,7 @@ watch(() => projectStore.indexedEntries.value, async entries => {
   }))
 }, { immediate: true })
 
-function updateProfileField(fieldKey: 'name' | 'description' | 'version', event: Event) {
+function updateProfileField(fieldKey: 'name' | 'description' | 'version' | 'author', event: Event) {
   if (!profile.value || !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) return
   const value = event.target.value
   const next: ProjectProfile = { ...profile.value, [fieldKey]: value }

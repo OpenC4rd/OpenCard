@@ -22,6 +22,8 @@ import type { StoredResourcePackageStore } from '../../workspace/store/storedRes
 import type { ShellPage } from '../shellPage'
 import {
   IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
+  DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
+  USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
   OPENED_EDITORS_LIST_KEY,
   PROJECT_FILES_LIST_KEY,
   PROJECT_MANAGEMENT_LIST_KEY,
@@ -47,7 +49,7 @@ import type { ShellButton, ShellList, ShellListGroup } from '../shell.types'
  */
 type ShellSidebarListsOptions = {
   /** i18n 翻译函数；部分侧栏文案带内置兜底。 */
-  translate: (key: string, fallback?: string) => string
+  translate: (key: string, paramsOrFallback?: Record<string, unknown> | string) => string
 
   /** 当前页面与互斥的页面模式标记。 */
   shellPage: Readonly<Ref<ShellPage>>
@@ -78,11 +80,22 @@ type ShellSidebarListsOptions = {
   settingsCategoryKey: Readonly<Ref<SettingsCategoryKey>>
   settingsCategoryTreeData: Readonly<Ref<OcNodeCollection>>
 
-  /** 新建项目页的模板与附加包。 */
+  /** 新建项目页的模板与预装的包。两棵树的展开状态都由调用方持有。 */
   selectedTemplateKey: Readonly<Ref<ProjectTemplateKey | null>>
   templateTreeData: Readonly<Ref<OcNodeCollection>>
+  templateExpandedKeys?: Readonly<Ref<readonly string[]>>
+  handleTemplateExpansionChange?: (event: OcNodeExpansionEvent) => void
   resourcePackageStore: Pick<StoredResourcePackageStore, 'isLoading'>
   resourcePackageTreeData: Readonly<Ref<OcNodeCollection>>
+  resourcePackageExpandedKeys?: Readonly<Ref<readonly string[]>>
+  handleResourcePackageExpansionChange?: (event: OcNodeExpansionEvent) => void
+  /** 包的批量操作：树支持多选，列表头部的"使用/禁用选中的包"作用在选中项上。缺失时列表退化为不可选。 */
+  resourcePackageSelection?: {
+    selectedKeys: Readonly<Ref<readonly string[]>>
+    canUse: Readonly<Ref<boolean>>
+    canDisable: Readonly<Ref<boolean>>
+    onChange: (event: OcNodeSelectionEvent) => void
+  }
 
   /** 导出模板页的目录树、已选条目与已选封面。 */
   exportTemplateTreeData: Readonly<Ref<OcNodeCollection>>
@@ -111,7 +124,10 @@ type ShellSidebarListsOptions = {
   timelineTreeData: Readonly<Ref<OcNodeCollection>>
   timelineProjectTreeData: Readonly<Ref<OcNodeCollection>>
   changesTreeData: Readonly<Ref<OcNodeCollection>>
+  /** 勾选进下一次提交的改动数量：决定提交入口是否可用，并显示在按钮上。 */
+  selectedChangeCount: Readonly<Ref<number>>
   versionGraphExpandedKeys: Readonly<Ref<string[]>>
+  changesExpandedKeys: Readonly<Ref<string[]>>
 
   /** 树与列表的动作处理器；列表描述符只引用它们。 */
   handleSettingsCategorySelectionChange: (event: OcNodeSelectionEvent) => void
@@ -134,6 +150,10 @@ type ShellSidebarListsOptions = {
   handleProjectRenameCommit: (event: OcNodeRenameCommitEvent) => Promise<void>
   handleProjectMove: (event: OcNodeMoveEvent) => Promise<void>
   handleProjectExternalDrop: (event: OcNodeExternalDropEvent) => Promise<void>
+  handleChangesExpansionChange: (event: OcNodeExpansionEvent) => void
+  handleChangesExpansionSync: (event: OcNodeExpansionSyncEvent) => void
+  handleChangesNodeActivate: (event: OcNodeActivateEvent) => Promise<void>
+  handleChangesAction: (event: OcNodeActionEvent) => Promise<void>
   handleProjectAction: (event: OcNodeActionEvent) => Promise<void>
   handleProjectNodeActivate: (event: OcNodeActivateEvent) => Promise<void>
   handleTimelineAction: (event: OcNodeActionEvent) => Promise<void>
@@ -170,8 +190,13 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
     settingsCategoryTreeData,
     selectedTemplateKey,
     templateTreeData,
+    templateExpandedKeys,
+    handleTemplateExpansionChange,
     resourcePackageStore,
     resourcePackageTreeData,
+    resourcePackageExpandedKeys,
+    handleResourcePackageExpansionChange,
+    resourcePackageSelection,
     exportTemplateTreeData,
     exportTemplateExpandedKeys,
     exportTemplateEntryTreeData,
@@ -192,7 +217,9 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
     timelineTreeData,
     timelineProjectTreeData,
     changesTreeData,
+    selectedChangeCount,
     versionGraphExpandedKeys,
+    changesExpandedKeys,
     handleSettingsCategorySelectionChange,
     handleTemplateSelectionChange,
     handleTemplateAction,
@@ -217,6 +244,10 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
     handleProjectNodeActivate,
     handleTimelineAction,
     handleVersionGraphExpansionChange,
+    handleChangesExpansionChange,
+    handleChangesExpansionSync,
+    handleChangesNodeActivate,
+    handleChangesAction,
     handleVersionGraphExpansionSync,
   } = options
 
@@ -288,11 +319,12 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
             type: 'tree',
             data: templateTreeData.value,
             selectedKeys: selectedTemplateKey.value ? [selectedTemplateKey.value] : [],
-            expandedKeys: [USER_TEMPLATES_GROUP_KEY],
+            expandedKeys: templateExpandedKeys?.value ?? [USER_TEMPLATES_GROUP_KEY],
             role: 'tree',
             selectionMode: 'single',
             activationMode: 'none',
             onSelectionChange: handleTemplateSelectionChange,
+            onExpansionChange: handleTemplateExpansionChange,
             onAction: handleTemplateAction,
           },
         },
@@ -302,18 +334,38 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
           placeholder: resourcePackageStore.isLoading.value
             ? t('projectTemplates.status.loadingResourcePackages')
             : t('projectTemplates.status.noResourcePackages'),
-          actions: [{
-            key: IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
-            icon: 'action.import',
-            hoverTip: t('projectTemplates.actions.importResourcePackage'),
-            disabled: isProjectTemplateBusy.value || resourcePackageStore.isLoading.value,
-          }],
+          actions: [
+            {
+              key: IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
+              icon: 'action.import',
+              hoverTip: t('projectTemplates.actions.importResourcePackage'),
+              disabled: isProjectTemplateBusy.value || resourcePackageStore.isLoading.value,
+            },
+            {
+              key: USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
+              icon: 'action.check',
+              hoverTip: t('projectTemplates.actions.useSelectedResourcePackages'),
+              disabled: isProjectTemplateBusy.value || resourcePackageStore.isLoading.value
+                || resourcePackageSelection?.canUse.value !== true,
+            },
+            {
+              key: DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
+              icon: 'action.close',
+              hoverTip: t('projectTemplates.actions.disableSelectedResourcePackages'),
+              disabled: isProjectTemplateBusy.value || resourcePackageStore.isLoading.value
+                || resourcePackageSelection?.canDisable.value !== true,
+            },
+          ],
           content: {
             type: 'tree',
             data: resourcePackageTreeData.value,
+            expandedKeys: resourcePackageExpandedKeys?.value ?? [],
             role: 'listbox',
-            selectionMode: 'none',
+            selectionMode: resourcePackageSelection ? 'multiple' : 'none',
+            selectedKeys: resourcePackageSelection?.selectedKeys.value ?? [],
             activationMode: 'none',
+            onSelectionChange: resourcePackageSelection?.onChange,
+            onExpansionChange: handleResourcePackageExpansionChange,
             onAction: handleResourcePackageAction,
           },
         },
@@ -540,7 +592,9 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
                 key: 'publish-version',
                 icon: 'action.publish',
                 title: t('sidebar.commitVersion', 'Commit version'),
-                disabled: changesTreeData.value.rootKeys.length === 0 || isCommittingVersion.value,
+                hoverTip: t('sidebar.commitSelectedCount', { count: selectedChangeCount.value }),
+                badge: selectedChangeCount.value,
+                disabled: selectedChangeCount.value === 0 || isCommittingVersion.value,
               }]
             : [],
         lists: repositoryReady.value
@@ -554,9 +608,16 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
                   type: 'tree',
                   data: changesTreeData.value,
                   selectedKeys: [],
+                  expandedKeys: changesExpandedKeys.value,
                   role: 'tree',
                   selectionMode: 'none',
-                  activationMode: 'none',
+                  activationMode: 'single-click',
+                  // 勾选框常显：提交范围要一眼看得出，不能等悬停才出现。
+                  actionVisibility: 'always',
+                  onExpansionChange: handleChangesExpansionChange,
+                  onExpansionSync: handleChangesExpansionSync,
+                  onNodeActivate: handleChangesNodeActivate,
+                  onAction: handleChangesAction,
                 },
               },
               {

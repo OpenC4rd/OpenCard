@@ -42,6 +42,8 @@ export type OcNodeContextEntry = OcNodeAction | OcActionDivider
 /** Presentation of one node; its identity is the key it is stored under in `OcNodeCollection.items`. */
 export interface OcNode {
   label: string
+  /** 标签使用的 CSS `font-family` 值。只决定标签用哪套字面绘制，不影响色调、省略与节点几何；省略时沿用界面字体。 */
+  labelFont?: string
   /** 标签之前的视觉；所有节点视图都以同样的方式渲染它。 */
   visual?: OcVisual
   /** 相册这类卡片视图独有的封面视觉，绘制在卡片的媒体区域；其余视图忽略它。 */

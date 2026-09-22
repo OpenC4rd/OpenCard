@@ -182,7 +182,7 @@ function treeLabels(tree: VueWrapper): string[] {
 }
 
 function treeBadgeLabels(tree: VueWrapper): string[] {
-  return [...tree.element.querySelectorAll('.oc-tree__tail-badge')]
+  return [...tree.element.querySelectorAll('.oc-node-tail__badge')]
     .map(element => element.getAttribute('aria-label') ?? '')
 }
 

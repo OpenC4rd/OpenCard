@@ -5,7 +5,8 @@
   <OcEnumStepper v-else-if="definition.options?.length && definition.presentation === 'stepper'"
     :model-value="stringValue" :options="enumOptions" @update:model-value="emit('update:value', $event)" />
   <OcOptionGroup v-else-if="definition.options?.length && definition.presentation === 'option-group'"
-    :model-value="stringValue" :options="selectOptions" @update:model-value="emit('update:value', $event)" />
+    :model-value="stringValue" :options="selectOptions" appearance="sliding-outline" fill
+    @update:model-value="emit('update:value', $event)" />
   <OcSelect v-else-if="definition.options?.length" :model-value="stringValue"
     :options="selectOptions" full-width @update:model-value="emit('update:value', $event)" />
   <OcFieldFrame v-else-if="definition.multiline" class="multiline-field" full-width>

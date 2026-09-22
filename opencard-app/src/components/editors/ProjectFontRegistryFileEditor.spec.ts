@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import ProjectFontRegistryFileEditor from './ProjectFontRegistryFileEditor.vue'
 import ProjectFontRegistryEditor from './ProjectFontRegistryEditor.vue'
 import ProjectFontRegistrationDialog from './ProjectFontRegistrationDialog.vue'
+import ProjectFontCompositionDialog from './ProjectFontCompositionDialog.vue'
 import OcButton from '../base/OcButton.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -23,6 +24,23 @@ vi.mock('../../features/workspace/services/projectAssetFileHistory', () => ({
 const fontFiles = (source: string) => ({ files: { normal: { upright: source } } })
 
 describe('ProjectFontRegistryFileEditor', () => {
+  it('opens family registration and composition creation from the tree entry actions', async () => {
+    const wrapper = mount(ProjectFontRegistryFileEditor, {
+      props: { filePath: 'D:/Demo/.opencard/fonts/fonts.json', modelValue: '{}' },
+      global: { stubs: { ProjectFontRegistryEditor: true } },
+    })
+    const workbench = wrapper.getComponent(ProjectFontRegistryEditor)
+
+    workbench.vm.$emit('register-family')
+    await flushPromises()
+    expect(wrapper.getComponent(ProjectFontRegistrationDialog).props('open')).toBe(true)
+    expect(wrapper.getComponent(ProjectFontRegistrationDialog).props('originalKey')).toBeUndefined()
+
+    workbench.vm.$emit('add-composition')
+    await flushPromises()
+    expect(wrapper.getComponent(ProjectFontCompositionDialog).props('open')).toBe(true)
+  })
+
   it('owns independent family and composition edits and targets family configuration', async () => {
     const wrapper = mount(ProjectFontRegistryFileEditor, {
       props: {

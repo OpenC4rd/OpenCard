@@ -22,6 +22,8 @@ export type ProjectProfile = {
   name?: string
   description?: string
   version?: string
+  /** 项目作者：制作资源包时的默认作者。 */
+  author?: string
   /** 项目根相对路径；缺失、越界或指向不存在的文件都按“无封面”处理。 */
   cover?: string
   remoteResources?: ProjectRemoteResourcePolicy
@@ -94,12 +96,13 @@ function parseProjectExportTask(value: unknown): ProjectExportTask | null {
 export function parseProjectMetadata(value: unknown): ProjectProfile | null {
   if (!isRecord(value)) return null
 
-  if (['name', 'description', 'version'].some(key => value[key] !== undefined && typeof value[key] !== 'string')) return null
+  if (['name', 'description', 'version', 'author'].some(key => value[key] !== undefined && typeof value[key] !== 'string')) return null
 
   const profile: ProjectProfile = {}
   if (typeof value.name === 'string' && value.name !== '') profile.name = value.name
   if (typeof value.description === 'string' && value.description !== '') profile.description = value.description
   if (typeof value.version === 'string' && value.version !== '') profile.version = value.version
+  if (typeof value.author === 'string' && value.author !== '') profile.author = value.author
   const cover = normalizeProjectRelativeCoverPath(value.cover)
   if (cover) profile.cover = cover
   if (value.remoteResources !== undefined) {

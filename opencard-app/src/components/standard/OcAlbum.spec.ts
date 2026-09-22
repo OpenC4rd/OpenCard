@@ -129,7 +129,7 @@ describe('OcAlbum', () => {
     })
 
     expect(wrapper.get('.oc-album__tail').text()).toContain('Local')
-    const badge = wrapper.get('.oc-album__tail-badge')
+    const badge = wrapper.get('.oc-node-tail__badge')
     expect(badge.attributes('aria-label')).toBe('Missing')
     expect(badge.attributes('data-tooltip')).toBe('Missing')
     expect(wrapper.find('.oc-album__tail button').exists()).toBe(false)
@@ -173,7 +173,7 @@ describe('OcAlbum', () => {
     const tail = wrapper.get('.oc-album__tail')
     expect(tail.text()).toContain('Local')
     const children = Array.from(tail.element.children)
-    expect(children[children.length - 1]?.classList.contains('oc-album__tail-action')).toBe(true)
+    expect(children[children.length - 1]?.classList.contains('oc-node-tail__action')).toBe(true)
     expect(wrapper.find('button[aria-label="No longer needed"]').exists()).toBe(true)
     // Commands stay in the card's own info row; the node has no separate overlay layer.
     expect(tail.element.closest('.oc-album__info')).not.toBeNull()

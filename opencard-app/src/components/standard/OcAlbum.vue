@@ -6,7 +6,6 @@
     :class="{
       'is-fill': props.fill,
       'is-empty': entries.length === 0,
-      'are-actions-always-visible': props.actionVisibility === 'always',
     }"
     :role="props.selectionMode === 'none' ? 'list' : 'listbox'"
     :aria-multiselectable="props.selectionMode === 'multiple' ? 'true' : undefined"
@@ -55,6 +54,7 @@
               />
               <OcText
                 class="oc-album__label"
+                :style="entry.item.labelFont ? { fontFamily: entry.item.labelFont } : undefined"
                 :tone="entry.item.tone"
                 :truncate="true"
                 :tooltip-on-overflow="entry.item.label"
@@ -63,32 +63,13 @@
               </OcText>
             </span>
             <span class="oc-album__meta">
-              <span v-if="entry.item.tail" class="oc-album__tail" data-tooltip-group>
-                <template
-                  v-for="(part, index) in normalizeNodeTail(entry.item.tail)"
-                  :key="tailPartKey(part, index)"
-                >
-                  <OcText v-if="typeof part === 'string'" tone="muted" size="xs" :truncate="true">{{ part }}</OcText>
-                  <span
-                    v-else-if="part.type === 'badge'"
-                    class="oc-album__tail-badge"
-                    role="img"
-                    :aria-label="part.label"
-                    :data-tooltip="part.label"
-                  >
-                    <OcIcon :name="part.icon" :tone="part.tone" size="sm" />
-                  </span>
-                  <span v-else class="oc-album__tail-action">
-                    <OcActionButton
-                      :action="part"
-                      size="sm"
-                      variant="ghost"
-                      @mousedown.stop
-                      @select="emitActionIntent(entry.key, $event.key)"
-                    />
-                  </span>
-                </template>
-              </span>
+              <OcNodeTail
+                v-if="entry.item.tail"
+                class="oc-album__tail"
+                :tail="entry.item.tail"
+                :action-visibility="props.actionVisibility"
+                @action="emitActionIntent(entry.key, $event.key)"
+              />
             </span>
           </span>
         </div>
@@ -99,12 +80,10 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
-import OcActionButton from './OcActionButton.vue'
 import OcCover from './OcCover.vue'
-import OcIcon from '../base/OcIcon.vue'
+import OcNodeTail from './OcNodeTail.vue'
 import OcText from '../base/OcText.vue'
 import OcVisual from '../base/OcVisual.vue'
-import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
 import type {
   OcNode,
   OcNodeActionEvent,
@@ -112,7 +91,6 @@ import type {
   OcNodeCollection,
   OcNodeKey,
   OcNodeSelectionEvent,
-  OcNodeTailPart,
 } from '../../shared/ui/node/node.types'
 
 type OcAlbumSelectionMode = 'none' | 'single' | 'multiple'
@@ -169,10 +147,6 @@ const entries = computed<AlbumEntry[]>(() => props.data.rootKeys.flatMap((key) =
 
 function isSelected(key: OcNodeKey): boolean {
   return selectedKeySet.value.has(key)
-}
-
-function tailPartKey(part: OcNodeTailPart, index: number): string {
-  return typeof part === 'string' ? `text:${index}` : isNodeTailAction(part) ? `action:${part.key}` : `badge:${index}`
 }
 
 function setCardRef(key: OcNodeKey): (element: Element | ComponentPublicInstance | null) => void {
@@ -393,6 +367,8 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   /* Reserve the command height so revealing a command on hover never reflows the card. */
   min-height: var(--oc-size-sm);
 }
+
+/* 尾部行由 OcNodeTail 渲染，卡片只给它自己的行几何。 */
 .oc-album__tail {
   display: inline-flex;
   flex: 0 1 auto;
@@ -401,23 +377,13 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   gap: var(--oc-space-1);
 }
 
-.oc-album__tail-badge {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
-
-.oc-album__tail-action {
-  display: none;
-  flex: 0 0 auto;
-  align-items: center;
-}
-
-.oc-album__node:hover .oc-album__tail-action,
-.oc-album__card:focus-within .oc-album__tail-action,
-.oc-album__card.is-selected .oc-album__tail-action,
-.oc-album__tail-action:has(.oc-action-button.is-menu-open),
-.oc-album.are-actions-always-visible .oc-album__tail-action {
-  display: inline-flex;
+/*
+ * 命令平时不显示：卡片被交互时由变量揭示，常显由 OcNodeTail 的 actionVisibility 负责。
+ * 变量按继承生效，所以这一条只需写在卡片上。
+ */
+.oc-album__node:hover,
+.oc-album__card:focus-within,
+.oc-album__card.is-selected {
+  --oc-node-tail-action-display: inline-flex;
 }
 </style>

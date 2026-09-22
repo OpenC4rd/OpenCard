@@ -1,14 +1,17 @@
 /** Global application settings truth with serialized persistence writes. */
 import { readonly, ref, type DeepReadonly, type Ref } from 'vue'
 import type { OcEditableThemeColorKey, OcThemeId } from '../../../shared/ui/foundation'
+import { OC_EDITABLE_THEME_COLOR_KEYS } from '../../../shared/ui/foundation'
 import {
-  DEFAULT_APP_SETTINGS,
+  APP_THEME_PRESETS,
   createDefaultAppSettings,
   getThemePreset,
   normalizeAppSettings,
+  resolveThemeDefinition,
   type AppThemeDefinition,
   type AppSettingKey,
   type AppSettings,
+  type AppUserThemePreset,
 } from '../model/appSettings'
 import {
   createSettingsPersistence,
@@ -30,9 +33,10 @@ export interface AppSettingsStore {
   updateThemeAngle(themeId: OcThemeId, value: number): void
   updateThemeFont(themeId: OcThemeId, value: string): void
   applyThemePreset(themeId: OcThemeId, presetId: string): void
-  importThemePreset(themeId: OcThemeId, name: string, definition: AppThemeDefinition): void
+  /** 导入一套主题预设；已经有一模一样的预设时不再新增，返回 false。 */
+  importThemePreset(themeId: OcThemeId, name: string, definition: AppThemeDefinition): boolean
+  saveThemePreset(themeId: OcThemeId, name: string): void
   deleteThemePreset(themeId: OcThemeId, presetId: string): void
-  resetThemes(): void
   updateShell(patch: Partial<AppSettings['shell']>): void
   updateProjectCreation(patch: Partial<AppSettings['projectCreation']>): void
   rememberRecentProject(path: string): void
@@ -103,14 +107,19 @@ export function createAppSettingsStore(
 
   function applySetting(candidate: AppSettings, key: AppSettingKey, value: unknown): void {
     if (key === 'identity.publisherKey') candidate.identity.publisherKey = value as string
-    else if (key === 'appearance.theme') candidate.appearance.theme = value as AppSettings['appearance']['theme']
+    else if (key === 'versionControl.committerName') candidate.versionControl.committerName = value as string
+    else if (key === 'versionControl.committerEmail') candidate.versionControl.committerEmail = value as string
+    else if (key === 'versionControl.createInitialCommit') {
+      candidate.versionControl.createInitialCommit = value === true
+    } else if (key === 'appearance.theme') candidate.appearance.theme = value as AppSettings['appearance']['theme']
     else if (key === 'appearance.locale') candidate.appearance.locale = value as AppSettings['appearance']['locale']
     else if (key === 'appearance.glassIntensity') candidate.appearance.glassIntensity = value as number
     else if (key === 'appearance.baseFontSize') candidate.appearance.baseFontSize = value as number
     else if (key === 'appearance.phaseImageSpeed') candidate.appearance.phaseImageSpeed = value as number
+    else if (key === 'appearance.micaBackground') candidate.appearance.micaBackground = value === true
     else if (key === 'shell.titleBarNoticeHistoryLimit') candidate.shell.titleBarNoticeHistoryLimit = value as number
-    else if (key === 'updates.suppressReleaseNotesAfterUpdate') {
-      candidate.updates.suppressReleaseNotesAfterUpdate = value as boolean
+    else if (key === 'updates.showReleaseNotesAfterUpdate') {
+      candidate.updates.showReleaseNotesAfterUpdate = value === true
     } else if (key === 'exporting.openCdeWorkbookAfterExport') {
       candidate.exporting.openCdeWorkbookAfterExport = value as boolean
     } else if (key === 'workspace.structureTreeSelectionBehavior') {
@@ -227,6 +236,7 @@ export function createAppSettingsStore(
   ): void {
     const candidate = normalizeAppSettings(settings.value)
     applyThemeColor(candidate, themeId, token, value)
+    forgetThemePresetIdIfChanged(candidate, themeId)
     commit(candidate)
   }
 
@@ -243,37 +253,132 @@ export function createAppSettingsStore(
   function updateThemeAngle(themeId: OcThemeId, value: number): void {
     const candidate = normalizeAppSettings(settings.value)
     applyThemeAngle(candidate, themeId, value)
+    forgetThemePresetIdIfChanged(candidate, themeId)
     commit(candidate)
   }
 
   function updateThemeFont(themeId: OcThemeId, value: string): void {
     const candidate = normalizeAppSettings(settings.value)
     candidate.appearance.fontFamilies[themeId] = value
+    forgetThemePresetIdIfChanged(candidate, themeId)
     commit(candidate)
   }
 
-  function applyThemePreset(themeId: OcThemeId, presetId: string): void {
-    const preset = getThemePreset(themeId, presetId, settings.value.appearance.userThemePresets[themeId])
-    if (!preset) return
-    const candidate = normalizeAppSettings(settings.value)
+  /** 写入一条自定义预设：同名覆盖，必要时顶掉被改名的那条，并保持数量上限。 */
+  function writeUserThemePreset(
+    candidate: AppSettings,
+    themeId: OcThemeId,
+    name: string,
+    definition: AppThemeDefinition,
+    replacedName = '',
+  ): void {
+    const kept = candidate.appearance.userThemePresets[themeId].filter(preset => (
+      preset.name !== replacedName
+      && preset.name.toLocaleLowerCase() !== name.toLocaleLowerCase()
+    ))
+    candidate.appearance.userThemePresets[themeId] = [...kept.slice(-31), { name, definition }]
+  }
+
+  /** 把一套预设的配色、角度与字体应用到候选设置上，同时记住选中的是哪一条。 */
+  function applyThemePresetTo(candidate: AppSettings, themeId: OcThemeId, presetId: string): boolean {
+    const preset = getThemePreset(themeId, presetId, candidate.appearance.userThemePresets[themeId])
+    if (!preset) return false
     candidate.appearance.themeOverrides[themeId] = presetId === 'default' ? {} : { ...preset.colors }
     candidate.appearance.accentNeighborAngles[themeId] = preset.accentNeighborAngle
     candidate.appearance.fontFamilies[themeId] = preset.fontFamily
-    commit(candidate)
+    candidate.appearance.themePresetIds[themeId] = presetId
+    return true
   }
 
-  function importThemePreset(themeId: OcThemeId, name: string, definition: AppThemeDefinition): void {
+  function applyThemePreset(themeId: OcThemeId, presetId: string): void {
     const candidate = normalizeAppSettings(settings.value)
-    const presets = candidate.appearance.userThemePresets[themeId].filter(preset => (
-      preset.name.toLocaleLowerCase() !== name.trim().toLocaleLowerCase()
+    if (applyThemePresetTo(candidate, themeId, presetId)) commit(candidate)
+  }
+
+  /** 手改过配色、角度或字体之后，这套主题不再等于它原来的预设，选中项回落到"自定义"。 */
+  function forgetThemePresetIdIfChanged(candidate: AppSettings, themeId: OcThemeId): void {
+    const presetId = candidate.appearance.themePresetIds[themeId]
+    if (!presetId) return
+    const preset = getThemePreset(themeId, presetId, candidate.appearance.userThemePresets[themeId])
+    if (!preset || !isSameThemeDefinition(preset, resolveThemeDefinition(
+      themeId,
+      candidate.appearance.themeOverrides[themeId],
+      candidate.appearance.accentNeighborAngles[themeId],
+      candidate.appearance.fontFamilies[themeId],
+    ))) {
+      candidate.appearance.themePresetIds[themeId] = ''
+    }
+  }
+
+  function isSameThemeDefinition(left: AppThemeDefinition, right: AppThemeDefinition): boolean {
+    return OC_EDITABLE_THEME_COLOR_KEYS.every(token => (
+      left.colors[token].toUpperCase() === right.colors[token].toUpperCase()
     ))
-    candidate.appearance.userThemePresets[themeId] = [
-      ...presets.slice(-31),
-      { name: name.trim(), definition },
-    ]
+      && left.accentNeighborAngle === right.accentNeighborAngle
+      && left.fontFamily === right.fontFamily
+  }
+
+  /** 已有完全同款的预设时找出它：导入这种主题不该再新增一条重复的。 */
+  function findIdenticalThemePresetId(
+    candidate: AppSettings,
+    themeId: OcThemeId,
+    definition: AppThemeDefinition,
+  ): string {
+    for (const presetId of APP_THEME_PRESETS[themeId]) {
+      const preset = getThemePreset(themeId, presetId)
+      if (preset && isSameThemeDefinition(preset, definition)) return presetId
+    }
+    const userPreset = candidate.appearance.userThemePresets[themeId]
+      .find(preset => isSameThemeDefinition(preset.definition, definition))
+    return userPreset ? `user:${userPreset.name}` : ''
+  }
+
+  /** 导入时给重名的预设让路：基名被占用就依次加序号，免得后一次导入顶掉前一次。 */
+  function uniqueThemePresetName(baseName: string, presets: readonly AppUserThemePreset[]): string {
+    const taken = new Set(presets.map(preset => preset.name.toLocaleLowerCase()))
+    if (!taken.has(baseName.toLocaleLowerCase())) return baseName
+    for (let index = 2; ; index += 1) {
+      const candidate = `${baseName} ${index}`
+      if (!taken.has(candidate.toLocaleLowerCase())) return candidate
+    }
+  }
+
+  function importThemePreset(themeId: OcThemeId, name: string, definition: AppThemeDefinition): boolean {
+    const candidate = normalizeAppSettings(settings.value)
+    const identicalId = findIdenticalThemePresetId(candidate, themeId, definition)
+    if (identicalId) {
+      if (applyThemePresetTo(candidate, themeId, identicalId)) commit(candidate)
+      return false
+    }
+    const presetName = uniqueThemePresetName(name.trim(), candidate.appearance.userThemePresets[themeId])
+    writeUserThemePreset(candidate, themeId, presetName, definition)
     candidate.appearance.themeOverrides[themeId] = { ...definition.colors }
     candidate.appearance.accentNeighborAngles[themeId] = definition.accentNeighborAngle
     candidate.appearance.fontFamilies[themeId] = definition.fontFamily
+    candidate.appearance.themePresetIds[themeId] = `user:${presetName}`
+    commit(candidate)
+    return true
+  }
+
+  /**
+   * 给当前这套主题命名：把现在的配色、角度与字体存成一条同名自定义预设；
+   * 当前选中的已经是自定义预设时，改名的同时顶掉旧名字。
+   */
+  function saveThemePreset(themeId: OcThemeId, name: string): void {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const candidate = normalizeAppSettings(settings.value)
+    const appearance = candidate.appearance
+    const presetId = appearance.themePresetIds[themeId]
+    const replacedName = presetId.startsWith('user:') ? presetId.slice('user:'.length) : ''
+    if (replacedName === trimmed) return
+    writeUserThemePreset(candidate, themeId, trimmed, resolveThemeDefinition(
+      themeId,
+      appearance.themeOverrides[themeId],
+      appearance.accentNeighborAngles[themeId],
+      appearance.fontFamilies[themeId],
+    ), replacedName)
+    appearance.themePresetIds[themeId] = `user:${trimmed}`
     commit(candidate)
   }
 
@@ -283,14 +388,9 @@ export function createAppSettingsStore(
     const candidate = normalizeAppSettings(settings.value)
     candidate.appearance.userThemePresets[themeId] = candidate.appearance.userThemePresets[themeId]
       .filter(preset => preset.name !== name)
-    commit(candidate)
-  }
-
-  function resetThemes(): void {
-    const candidate = normalizeAppSettings(settings.value)
-    candidate.appearance.themeOverrides = { dark: {}, light: {} }
-    candidate.appearance.accentNeighborAngles = { ...DEFAULT_APP_SETTINGS.appearance.accentNeighborAngles }
-    candidate.appearance.fontFamilies = { ...DEFAULT_APP_SETTINGS.appearance.fontFamilies }
+    if (candidate.appearance.themePresetIds[themeId] === presetId) {
+      candidate.appearance.themePresetIds[themeId] = ''
+    }
     commit(candidate)
   }
 
@@ -325,8 +425,8 @@ export function createAppSettingsStore(
     updateThemeFont,
     applyThemePreset,
     importThemePreset,
+    saveThemePreset,
     deleteThemePreset,
-    resetThemes,
     updateShell,
     updateProjectCreation,
     rememberRecentProject,

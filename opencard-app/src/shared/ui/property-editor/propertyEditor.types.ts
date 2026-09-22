@@ -66,6 +66,10 @@ export type PropertyFieldConstraintMap = {
     placeholder?: string
     multiline?: boolean
     richText?: boolean
+    /** 多项输入的分隔符。设置后这个字段按分隔符分项编辑：回车或该分隔符成一项，值仍是单个字符串。 */
+    listSeparator?: 'semicolon' | 'comma' | 'newline'
+    /** 判断一项是否可用；不可用项会被标出，输入框也带 aria-invalid。 */
+    listInvalid?: (token: string) => boolean
   }
   filePath: {
     minLength?: number
@@ -212,6 +216,8 @@ export type EditorItemPart = string | EditorItemEditorPart | EditorItemActionPar
 export interface EditorItem {
   key: string
   title: string
+  /** 标题下的次要说明：标题保持简短，解释放这里。 */
+  subtitle?: string
   content?: readonly EditorItemPart[]
   children?: readonly EditorItem[]
 }

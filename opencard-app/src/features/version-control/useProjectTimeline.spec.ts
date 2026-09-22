@@ -75,8 +75,9 @@ describe('useProjectTimeline', () => {
     await vi.waitFor(() => expect(state.projectTreeData.value.children.get('project-timeline:project1')).toHaveLength(3))
 
     const childKeys = state.projectTreeData.value.children.get('project-timeline:project1')!
+    // 标题只显示文件名，完整路径只留在节点 key 里。
     expect(childKeys.map(key => state.projectTreeData.value.items.get(key)?.label))
-      .toEqual(['cards/main.ocdocument', 'assets/cover.png', 'notes/old.md'])
+      .toEqual(['main.ocdocument', 'cover.png', 'old.md'])
     expect(childKeys.map(key => state.projectTreeData.value.items.get(key)?.tail)).toEqual([
       { type: 'badge', label: 'Added', icon: 'action.add', tone: 'success' },
       { type: 'badge', label: 'Modified', icon: 'status.circle-medium', tone: 'warning' },
@@ -94,16 +95,16 @@ describe('useProjectTimeline', () => {
     ] }))
     const state = useTimeline(ref('D:/Cards/demo'))
     await vi.waitFor(() => expect(state.changesTreeData.value.rootKeys).toEqual([
-      'change:cards/worktree.ocdocument',
-      'change:cards/index.ocdocument',
-      'change:cards/conflict.ocdocument',
+      'cards/worktree.ocdocument',
+      'cards/index.ocdocument',
+      'cards/conflict.ocdocument',
     ]))
     expect(state.statusEntries.value).toHaveLength(4)
     expect(state.statusEntries.value.find(entry => entry.path === 'cards/index.ocdocument')?.indexNew).toBe(true)
     expect(state.statusUpdatedAt.value).not.toBeNull()
     expect(state.statusStale.value).toBe(false)
-    expect(state.changesTreeData.value.items.get('change:cards/worktree.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Modified', icon: 'status.circle-medium', tone: 'warning' })
-    expect(state.changesTreeData.value.items.get('change:cards/index.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Added', icon: 'action.add', tone: 'success' })
+    expect(state.changesTreeData.value.items.get('cards/worktree.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Modified', icon: 'status.circle-medium', tone: 'warning' })
+    expect(state.changesTreeData.value.items.get('cards/index.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Added', icon: 'action.add', tone: 'success' })
     const historyCalls = mocks.readHistory.mock.calls.length
     mocks.readStatus.mockResolvedValueOnce(ok({
       entries: [statusEntry('cards/new.ocdocument', { worktreeNew: true })],
@@ -111,7 +112,7 @@ describe('useProjectTimeline', () => {
 
     await state.refreshStatus()
 
-    expect(state.changesTreeData.value.rootKeys).toEqual(['change:cards/new.ocdocument'])
+    expect(state.changesTreeData.value.rootKeys).toEqual(['cards/new.ocdocument'])
     expect(mocks.readHistory).toHaveBeenCalledTimes(historyCalls)
   })
 
@@ -136,7 +137,7 @@ describe('useProjectTimeline', () => {
     const second = state.refreshStatus()
     await Promise.all([first, second])
     expect(mocks.readStatus).toHaveBeenCalledTimes(2)
-    expect(state.changesTreeData.value.rootKeys).toEqual(['change:cards/rapid.ocdocument'])
+    expect(state.changesTreeData.value.rootKeys).toEqual(['cards/rapid.ocdocument'])
   })
 
   it('shows only commits that edited the selected document in the timeline', async () => {

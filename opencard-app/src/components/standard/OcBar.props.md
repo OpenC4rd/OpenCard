@@ -36,5 +36,5 @@
 
 ## 迁移备注
 
-- [x] `OcBar` 只保留结构语义：`leading(icon/title)`、`main(default slot)`、`append(append slot)`。
+- [x] `OcBar` 只保留结构语义：`leading(icon/title)`、`append`、`append-hover`。
 - [x] 顶栏/状态栏/分节栏差异统一迁移到调用方样式层。

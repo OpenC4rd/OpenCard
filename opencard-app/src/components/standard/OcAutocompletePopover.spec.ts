@@ -66,7 +66,7 @@ describe('OcAutocompletePopover', () => {
     wrapper.unmount()
   })
 
-  it('splits labels and details evenly and activates both overflow texts', () => {
+  it('renders the detail as the row subtitle and activates both overflow texts', () => {
     const anchor = document.createElement('input')
     document.body.appendChild(anchor)
     const wrapper = mount(OcAutocompletePopover, {
@@ -77,8 +77,9 @@ describe('OcAutocompletePopover', () => {
       },
     })
 
-    expect(document.body.querySelector('.oc-autocomplete-popover__option')?.classList)
-      .toContain('has-detail')
+    const option = document.body.querySelector('.oc-autocomplete-popover__option')!
+    expect(option.classList).toContain('oc-row')
+    expect(option.querySelector('.oc-row__subtitle')?.textContent).toContain('Long subtitle')
     const textControls = wrapper.findAllComponents(OcOverflowText)
     expect(textControls.map(control => control.props('text'))).toEqual(['Long title', 'Long subtitle'])
     expect(textControls.every(control => control.props('active') === true)).toBe(true)

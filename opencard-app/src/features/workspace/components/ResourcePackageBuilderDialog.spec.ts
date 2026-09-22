@@ -25,6 +25,8 @@ const projectStore = vi.hoisted(() => ({
   projectIconSeries: { value: [
     { key: 'status', name: 'Status', source: 'icons/status.png', icons: [] },
   ] },
+  projectResourcePackages: { value: new Map() },
+  projectProfile: { value: { author: 'publisher-test' } },
 }))
 
 const settings = vi.hoisted(() => ({
@@ -47,6 +49,7 @@ vi.mock('../services/buildResourcePackage', () => ({ buildResourcePackageFromPro
 vi.mock('../services/fileSystemService', () => ({ fileSystemService: { pickSavePath } }))
 vi.mock('../services/projectCoverService', () => ({ readProjectCover }))
 vi.mock('../../notifications/titlebarNotices', () => notifications)
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async () => () => {}) }))
 
 const imageEntries = [
   'images/card.png', 'images/nested/banner.svg', 'images/notes.txt',
@@ -247,6 +250,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
           fontFamilyKeys: ['cjk'],
           fontCompositionKeys: [],
           iconSeriesKeys: [],
+          packageKeys: [],
           imagePaths: ['images/nested/banner.svg'],
         },
       },
@@ -291,10 +295,12 @@ describe('ResourcePackageBuilderDialog selection', () => {
     expect(updateProjectCreation).toHaveBeenCalledTimes(1)
     expect(currentStates['/project']?.packageBuilder).toEqual({
       name: 'Project',
+      author: 'publisher-test',
       version: '1.0.0',
       fontFamilyKeys: ['cjk'],
       fontCompositionKeys: [],
       iconSeriesKeys: [],
+      packageKeys: [],
       imagePaths: ['images/nested/banner.svg'],
     })
 

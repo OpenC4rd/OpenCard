@@ -13,7 +13,7 @@ const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_UNPACKED_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_ENTRIES: usize = 10_000;
-const MAX_PATH_BYTES: usize = 512;
+pub(crate) const MAX_PATH_BYTES: usize = 512;
 const MAX_PATH_DEPTH: usize = 32;
 const MAX_COMPRESSION_RATIO: u64 = 200;
 const MANIFEST_PATH: &str = ".opencard/manifest.json";
@@ -111,7 +111,7 @@ fn portable_segment(segment: &str) -> bool {
         | "LPT3" | "LPT4" | "LPT5" | "LPT6" | "LPT7" | "LPT8" | "LPT9")
 }
 
-fn normalize_archive_path(raw: &[u8]) -> Result<String, String> {
+pub(crate) fn normalize_archive_path(raw: &[u8]) -> Result<String, String> {
     let path = std::str::from_utf8(raw)
         .map_err(|_| "Package paths must use UTF-8".to_string())?;
     if path.is_empty() || path.starts_with('/') || path.contains('\\') || path.len() > MAX_PATH_BYTES {
@@ -282,7 +282,7 @@ fn validate_existing_target(root: &Path, target: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn inspect_installed_resource_package(request: InspectInstalledResourcePackageRequest) -> Result<NativeInstalledResourcePackageInspection, String> {
+pub async fn inspect_installed_resource_package(request: InspectInstalledResourcePackageRequest) -> Result<NativeInstalledResourcePackageInspection, String> {
     let root = canonical_project_root(&request.project_root_path)?;
     let key = normalize_package_key(&request.package_key)?;
     let target = package_target(&root, &key);
@@ -335,7 +335,7 @@ fn collect_installed_files(base: &Path, current: &Path, result: &mut Vec<(String
 }
 
 #[tauri::command]
-pub fn recover_resource_package_transactions(project_root_path: String) -> Result<(), String> {
+pub async fn recover_resource_package_transactions(project_root_path: String) -> Result<(), String> {
     let _guard = PACKAGE_MUTATION_LOCK.get_or_init(|| Mutex::new(())).lock().map_err(|_| "Package mutation lock is poisoned".to_string())?;
     let root = canonical_project_root(&project_root_path)?;
     let packages = root.join(".opencard").join("packages");
@@ -354,7 +354,7 @@ pub fn recover_resource_package_transactions(project_root_path: String) -> Resul
 }
 
 #[tauri::command]
-pub fn inspect_resource_package(request: InspectResourcePackageRequest) -> Result<NativeResourcePackageInspection, String> {
+pub async fn inspect_resource_package(request: InspectResourcePackageRequest) -> Result<NativeResourcePackageInspection, String> {
     let root = canonical_project_root(&request.project_root_path)?;
     let source = std::fs::canonicalize(&request.source_path).map_err(|e| format!("Cannot access package: {e}"))?;
     let mut projection = open_archive(&source)?;
@@ -378,16 +378,35 @@ pub fn inspect_resource_package(request: InspectResourcePackageRequest) -> Resul
     Ok(NativeResourcePackageInspection { manifest_json, content_hash, existing_manifest_json, existing_fingerprint, entry_count: projection.entries.len() + 1, unpacked_bytes: projection.unpacked_bytes, entry_paths, fonts_json, icons_json })
 }
 
+/// Windows 上刚写出成百上千个文件后立刻换目录/删目录，会被杀毒软件或索引器的短暂占住挡成
+/// "拒绝访问"（os error 5）；稍等重试通常就过去了。其它错误直接返回，不掩盖真实问题。
+fn retry_access_denied<T>(mut operation: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    let mut denied = None;
+    for attempt in 0..5 {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                denied = Some(error);
+                std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(denied.expect("a denied attempt was recorded"))
+}
+
 #[tauri::command]
-pub fn install_resource_package(request: InstallResourcePackageRequest) -> Result<NativeResourcePackageInstallResult, String> {
-    let _guard = PACKAGE_MUTATION_LOCK.get_or_init(|| Mutex::new(())).lock().map_err(|_| "Package mutation lock is poisoned".to_string())?;
+pub async fn install_resource_package(request: InstallResourcePackageRequest) -> Result<NativeResourcePackageInstallResult, String> {
+    // 先做只读检查（这里没有锁，因为 await 不能跨越 std::sync 的锁）；
+    // 真正改动项目之前再上锁，锁内会重新校验一次哈希，所以不会放松一致性。
     let target_key = normalize_package_key(&request.target_key)?;
-    let inspected = inspect_resource_package(InspectResourcePackageRequest { project_root_path: request.project_root_path.clone(), source_path: request.source_path.clone(), target_key: Some(target_key.clone()) })?;
+    let inspected = inspect_resource_package(InspectResourcePackageRequest { project_root_path: request.project_root_path.clone(), source_path: request.source_path.clone(), target_key: Some(target_key.clone()) }).await?;
     if inspected.content_hash != request.expected_content_hash { return Err("Package source changed since inspection".to_string()); }
     if inspected.existing_fingerprint != request.expected_existing_fingerprint { return Err("Installed package changed since inspection".to_string()); }
     let (canonical_key, _) = manifest_identity(&request.manifest_json)?;
     let canonical_value: serde_json::Value = serde_json::from_str(&request.manifest_json).map_err(|_| "Validated manifest is invalid JSON".to_string())?;
     if canonical_key != target_key || canonical_value.get("contentHash").and_then(|value| value.as_str()) != Some(inspected.content_hash.as_str()) { return Err("Validated manifest does not match the inspected package".to_string()); }
+    let _guard = PACKAGE_MUTATION_LOCK.get_or_init(|| Mutex::new(())).lock().map_err(|_| "Package mutation lock is poisoned".to_string())?;
     let root = canonical_project_root(&request.project_root_path)?;
     let packages = root.join(".opencard").join("packages"); std::fs::create_dir_all(&packages).map_err(|e| e.to_string())?;
     let canonical_packages = std::fs::canonicalize(&packages).map_err(|e| e.to_string())?;
@@ -398,18 +417,18 @@ pub fn install_resource_package(request: InstallResourcePackageRequest) -> Resul
     let backup = packages.join(format!("{}.backup-{}", target_key, stamp));
     let mut projection = open_archive(&std::fs::canonicalize(&request.source_path).map_err(|e| e.to_string())?)?;
     if hash_projection(&mut projection)? != request.expected_content_hash { return Err("Package source changed before extraction".to_string()); }
-    std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
-    let manifest_path = staging.join(MANIFEST_PATH); std::fs::create_dir_all(manifest_path.parent().unwrap()).map_err(|e| e.to_string())?;
-    std::fs::write(&manifest_path, request.manifest_json.as_bytes()).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&staging).map_err(|e| format!("Cannot create the package staging directory: {e}"))?;
+    let manifest_path = staging.join(MANIFEST_PATH); std::fs::create_dir_all(manifest_path.parent().unwrap()).map_err(|e| format!("Cannot create the package staging directory: {e}"))?;
+    std::fs::write(&manifest_path, request.manifest_json.as_bytes()).map_err(|e| format!("Cannot write the staged manifest: {e}"))?;
     for entry in projection.entries.clone() {
         let mut zip_file = projection.archive.by_index(entry.index).map_err(|e| e.to_string())?;
-        let destination = staging.join(&entry.path); if let Some(parent) = destination.parent() { std::fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
-        let mut out = File::create(&destination).map_err(|e| e.to_string())?; std::io::copy(&mut zip_file, &mut out).map_err(|e| e.to_string())?;
+        let destination = staging.join(&entry.path); if let Some(parent) = destination.parent() { std::fs::create_dir_all(parent).map_err(|e| format!("Cannot create the directory for {}: {e}", entry.path))?; }
+        let mut out = File::create(&destination).map_err(|e| format!("Cannot write {}: {e}", entry.path))?; std::io::copy(&mut zip_file, &mut out).map_err(|e| format!("Cannot write {}: {e}", entry.path))?;
     }
     let replaced = target.exists();
-    if replaced { std::fs::rename(&target, &backup).map_err(|e| e.to_string())?; }
-    if let Err(error) = std::fs::rename(&staging, &target) { if replaced { let _ = std::fs::rename(&backup, &target); } return Err(error.to_string()); }
-    if replaced { std::fs::remove_dir_all(&backup).map_err(|e| e.to_string())?; }
+    if replaced { retry_access_denied(|| std::fs::rename(&target, &backup)).map_err(|e| format!("Cannot move the installed package aside: {e}"))?; }
+    if let Err(error) = std::fs::rename(&staging, &target) { if replaced { let _ = std::fs::rename(&backup, &target); } return Err(format!("Cannot move the staged package into place: {error}")); }
+    if replaced { retry_access_denied(|| std::fs::remove_dir_all(&backup)).map_err(|e| format!("Cannot remove the previous package: {e}"))?; }
     let installed_fingerprint = fingerprint(&target)?.0;
     Ok(NativeResourcePackageInstallResult { target_path: target.to_string_lossy().to_string(), replaced, fingerprint: installed_fingerprint })
 }

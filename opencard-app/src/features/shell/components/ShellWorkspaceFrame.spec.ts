@@ -54,6 +54,7 @@ describe('ShellWorkspaceFrame', () => {
 
     const labels = wrapper.findAll('.workspace-action-text')
     expect(labels.map(label => label.text())).toEqual(['abc1234', 'def5678'])
+    expect(labels.every(label => !label.classes().includes('oc-text--mono'))).toBe(true)
     expect(wrapper.find('button[aria-label="abc1234"]').exists()).toBe(false)
   })
 

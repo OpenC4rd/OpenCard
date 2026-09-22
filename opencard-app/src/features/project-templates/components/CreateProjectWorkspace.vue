@@ -43,27 +43,6 @@
               </dd>
             </div>
           </dl>
-          <div v-if="selectedTemplate.source === 'user'" class="create-project__details-actions">
-            <div v-if="pendingDeleteKey === selectedTemplate.key" class="create-project__delete-confirm">
-              <span>{{ t('projectTemplates.confirmDelete') }}</span>
-              <OcButton size="sm" variant="solid" :disabled="isBusy" @click="deleteTemplate(selectedTemplate)">
-                {{ t('projectTemplates.actions.delete') }}
-              </OcButton>
-              <OcButton size="sm" variant="ghost" :disabled="isBusy" @click="pendingDeleteKey = null">
-                {{ t('projectTemplates.actions.cancel') }}
-              </OcButton>
-            </div>
-            <OcButton
-              v-else
-              size="sm"
-              variant="ghost"
-              icon="action.delete"
-              :disabled="isBusy"
-              @click="pendingDeleteKey = selectedTemplate.key"
-            >
-              {{ t('projectTemplates.actions.delete') }}
-            </OcButton>
-          </div>
         </article>
         <p v-else class="create-project__status">
           {{ t('projectTemplates.status.selectTemplate') }}
@@ -243,10 +222,8 @@ const parentPath = ref(appSettingsStore.settings.value.projectCreation.lastParen
 const isCreating = ref(false)
 const isImporting = ref(false)
 const isSavingTemplate = ref(false)
-const isDeleting = ref(false)
 const isInspecting = ref(false)
 const isChoosingParent = ref(false)
-const pendingDeleteKey = ref<ProjectTemplateKey | null>(null)
 const templateInspection = ref<TemplateProjectInspection | null>(null)
 const templateName = ref('')
 const templateDescription = ref('')
@@ -291,7 +268,6 @@ const localBusy = computed(() => (
   isCreating.value
   || isImporting.value
   || isSavingTemplate.value
-  || isDeleting.value
   || isInspecting.value
   || isChoosingParent.value
 ))
@@ -321,7 +297,6 @@ const canSaveTemplate = computed(() => Boolean(
 ))
 
 watch(() => props.selectedKey, () => {
-  pendingDeleteKey.value = null
   selectedEntry.value = selectedTemplateEntries.value[0] ?? ''
 }, { immediate: true })
 
@@ -446,21 +421,6 @@ async function confirmCreateTemplate(): Promise<void> {
     reportFailure(cause)
   } finally {
     isSavingTemplate.value = false
-  }
-}
-
-async function deleteTemplate(template: ProjectTemplate): Promise<void> {
-  isDeleting.value = true
-  try {
-    await store.deleteUserTemplate(template)
-    pendingDeleteKey.value = null
-    if (props.selectedKey === template.key) {
-      emit('update:selectedKey', store.templates.value[0]?.key ?? null)
-    }
-  } catch (cause) {
-    reportFailure(cause)
-  } finally {
-    isDeleting.value = false
   }
 }
 
@@ -697,32 +657,27 @@ function resolveErrorMessage(cause: unknown): string {
   font-size: var(--oc-text-sm);
 }
 
+/* 预装的包显示成 chips：一行放不下就换行，单个名字过宽时省略号截断。 */
 .create-project__resource-package-list {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.create-project__details-actions,
-.create-project__delete-confirm {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--oc-space-2);
-}
-
-.create-project__delete-confirm {
-  width: 100%;
-}
-
-.create-project__delete-confirm span {
-  margin-right: auto;
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-sm);
+.create-project__resource-package-list li {
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--oc-space-1) var(--oc-space-2);
+  border-radius: var(--oc-radius-sm);
+  background: var(--oc-bg-hover);
+  color: var(--oc-fg-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .create-project__template-editor {
@@ -892,8 +847,7 @@ function resolveErrorMessage(cause: unknown): string {
     flex-direction: column;
   }
 
-  .create-project__inline-actions,
-  .create-project__delete-confirm {
+  .create-project__inline-actions {
     flex-wrap: wrap;
   }
 

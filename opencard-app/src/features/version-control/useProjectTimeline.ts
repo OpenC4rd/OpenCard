@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 
 import type { OcNode, OcNodeAction, OcNodeBadge, OcNodeCollection } from '../../shared/ui/node/node.types'
+import { createChangedPathTree } from './changedPathTree'
 import { inspectRepository, readFileHistory, readHistory, readStatus } from './gitService'
 import { formatRelativeTime } from '../../shared/i18n/relativeTime'
 import type { CommitChangedFile, CommitSummary, GitErrorKind, GitStatusEntry } from './git.types'
@@ -81,16 +82,21 @@ export function useProjectTimeline(
       })
       const changedFiles = Array.isArray(commit.changedFiles) ? commit.changedFiles : []
       if (!includeChangedPaths || changedFiles.length === 0) continue
-      const childKeys = changedFiles.map((file, index) => `${key}:file:${index}:${file.path}`)
-      children.set(key, childKeys)
-      changedFiles.forEach((file, index) => {
+      const fileTree = createChangedPathTree(changedFiles.map(file => {
         const presentation = resolveEntryIcon(file.path, false)
-        items.set(childKeys[index]!, {
-          label: file.path,
-          visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
-          tail: changedFileTail(file),
-        })
-      })
+        return {
+          path: file.path,
+          node: {
+            label: file.path,
+            visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
+            tail: changedFileTail(file),
+          } satisfies OcNode,
+        }
+      }), key)
+      children.set(key, fileTree.rootKeys)
+      // 点目录分组本身也要挂到 commit 下面，所以连它自己的父子关系一起并进来。
+      for (const [fileKey, node] of fileTree.items) items.set(fileKey, node)
+      for (const [parentKey, childKeys] of fileTree.children) children.set(parentKey, childKeys)
     }
     return { rootKeys, items, children }
   }
@@ -121,19 +127,21 @@ export function useProjectTimeline(
     || entry.conflicted
   )))
 
-  const changesTreeData = computed<OcNodeCollection>(() => {
-    const items = new Map<string, OcNode>()
-    const rootKeys = changeEntries.value.map(entry => `change:${entry.path}`)
-    for (const entry of changeEntries.value) {
+  /** 更改列表的节点 key 就是项目相对路径。 */
+  const changesTreeData = computed<OcNodeCollection>(() => createChangedPathTree(
+    changeEntries.value.map(entry => {
       const presentation = resolveEntryIcon(entry.path, false)
-      items.set(`change:${entry.path}`, {
-        label: entry.path,
-        visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
-        tail: statusTail(entry),
-      })
-    }
-    return { rootKeys, items, children: new Map() }
-  })
+      return {
+        path: entry.path,
+        node: {
+          label: entry.path,
+          visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
+          tail: statusTail(entry),
+        } satisfies OcNode,
+      }
+    }),
+    '',
+  ))
 
   const revisionOptions = computed<DiffRevisionOption[]>(() => [
     { commitId: null, label: locale.value === 'zh-CN' ? '磁盘版本' : 'Disk version' },

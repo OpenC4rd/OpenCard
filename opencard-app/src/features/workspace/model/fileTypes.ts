@@ -6,6 +6,7 @@ export { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from './resourceP
  * - 只返回文件语义结果 不处理编辑器渲染流程
  */
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
+import { PROJECT_ICON_DIRECTORY, PROJECT_INTERNAL_DIRECTORY_NAME, PROJECT_PACKAGE_DIRECTORY } from './projectStructure'
 import { INSTALLED_RESOURCE_PACKAGE_MANIFEST_GLOB } from './resourcePackage'
 
 export const CARD_DOCUMENT_EXTENSION = 'ocdocument'
@@ -369,6 +370,32 @@ export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryI
   }
 }
 
+/**
+ * 项目里成"套"的资源各自占固定目录下的一层，并共用清单文件的配色：
+ * 包在 `.opencard/packages/<Key>`，图标集合在 `.opencard/icons/<Key>`。
+ */
+const MANAGED_DIRECTORY_PRESENTATIONS: readonly (readonly [string, EntryIconPresentation])[] = [
+  [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`, { icon: 'file.package', tone: iconTone.config }],
+  [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_ICON_DIRECTORY}`, { icon: 'file.project-icon', tone: iconTone.config }],
+]
+
+/**
+ * 落在这些目录里一层深的目录，按它们的内容显示：包目录显示包，图标集合目录显示图标，
+ * 于是"更改"列表里一眼能认出哪一条是刚装的包、哪一条是刚导入的图标包；再深一层就按普通文件夹或文件显示。
+ * 只有目录才套用这套呈现：图标集合与图标文件同处一层（`.opencard/icons/status.svg`），
+ * 而改动列表里未跟踪的目录是一条以 `/` 结尾的整体条目，那里拿不到目录信息，所以把尾部的 `/` 也算作目录。
+ */
+function managedDirectoryPresentation(path: string, isDirectory: boolean): EntryIconPresentation | null {
+  const normalized = path.replace(/\\/g, '/')
+  const isDirectoryPath = isDirectory || normalized.endsWith('/')
+  const segments = normalized.replace(/\/+$/, '').split('/').map(segment => segment.toLocaleLowerCase())
+  for (const [marker, presentation] of MANAGED_DIRECTORY_PRESENTATIONS) {
+    if (segments.slice(-2).join('/') === marker) return presentation
+    if (isDirectoryPath && segments.slice(-3, -1).join('/') === marker) return presentation
+  }
+  return null
+}
+
 export function resolveEntryIcon(
   path: string,
   isDirectory: boolean,
@@ -377,6 +404,9 @@ export function resolveEntryIcon(
   registeredFontSources?: ReadonlySet<string>,
   registeredIconSources?: ReadonlySet<string>,
 ): EntryIconPresentation {
+  const managed = managedDirectoryPresentation(path, isDirectory)
+  if (managed) return managed
+
   if (isDirectory) {
     return resolveDirectoryIcon(path, isExpanded)
   }

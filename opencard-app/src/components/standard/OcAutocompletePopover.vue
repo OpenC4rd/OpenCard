@@ -11,31 +11,32 @@
     :id="id"
   >
     <div class="oc-autocomplete-popover__scroll">
-      <div
+      <OcRow
         v-for="item in items"
         :id="getOptionId(item.key)"
         :key="item.key"
         :ref="(element) => setOptionElement(item.key, element)"
         class="oc-autocomplete-popover__option"
-        :class="{
-          'is-active': item.key === activeKey,
-          'has-detail': Boolean(item.detail),
-        }"
+        :class="{ 'is-active': item.key === activeKey }"
         role="option"
         :aria-selected="item.key === activeKey"
         @pointerdown.prevent="emit('select', item.key)"
       >
-        <span class="oc-autocomplete-popover__main">
+        <template v-if="item.icon || item.thumbnailStyle" #leading>
           <OcIcon v-if="item.icon" :name="item.icon" size="sm" />
-          <span v-else-if="item.thumbnailStyle" class="oc-autocomplete-popover__thumbnail"
-            :class="{ 'oc-project-icon': isProjectIconStyle(item.thumbnailStyle) }"
+          <span v-else class="oc-autocomplete-popover__thumbnail"
+            :class="{ 'oc-project-icon': isProjectIconStyle(item.thumbnailStyle!) }"
             :style="item.thumbnailStyle" role="img" :aria-label="item.thumbnailLabel ?? item.label" />
+        </template>
+        <template #title>
           <OcOverflowText class="oc-autocomplete-popover__label" :text="item.label"
             :active="item.key === activeKey" :content-style="item.labelStyle" />
-        </span>
-        <OcOverflowText v-if="item.detail" class="oc-autocomplete-popover__detail"
-          :text="item.detail" :active="item.key === activeKey" align="right" />
-      </div>
+        </template>
+        <template v-if="item.detail" #subtitle>
+          <OcOverflowText class="oc-autocomplete-popover__detail"
+            :text="item.detail" :active="item.key === activeKey" align="right" />
+        </template>
+      </OcRow>
     </div>
   </OcFloatingLayer>
 </template>
@@ -48,6 +49,7 @@ import { isProjectIconStyle } from '../../shared/ui/visual/projectIconStyle'
 import OcIcon from '../base/OcIcon.vue'
 import OcFloatingLayer from './OcFloatingLayer.vue'
 import OcOverflowText from './OcOverflowText.vue'
+import OcRow from './OcRow.vue'
 
 export type OcAutocompleteItem = {
   key: string
@@ -86,13 +88,14 @@ function getOptionId(key: string): string {
   return `${props.id}-option-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 }
 
+/** 行现在由 OcRow 渲染，组件实例要把根元素取出来才能用于滚动定位。 */
 function setOptionElement(key: string, element: Element | ComponentPublicInstance | null): void {
-  if (element instanceof HTMLElement) {
-    optionElements.set(key, element)
-    return
-  }
+  const root = element instanceof HTMLElement
+    ? element
+    : (element as ComponentPublicInstance | null)?.$el
 
-  optionElements.delete(key)
+  if (root instanceof HTMLElement) optionElements.set(key, root)
+  else optionElements.delete(key)
 }
 
 watch(
@@ -121,49 +124,11 @@ watch(
   overflow-y: auto;
 }
 
-.oc-autocomplete-popover__option {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  gap: var(--oc-space-2);
-  min-height: var(--oc-size-md);
-  padding: var(--oc-space-1) var(--oc-space-2);
-  border-radius: var(--oc-radius-sm);
-  color: var(--oc-fg-default);
-  cursor: default;
-}
-
-.oc-autocomplete-popover__option.has-detail {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.oc-autocomplete-popover__option.is-active,
-.oc-autocomplete-popover__option:hover {
-  background: var(--oc-bg-active);
-}
-
-.oc-autocomplete-popover__main {
-  display: flex;
-  align-items: center;
-  gap: var(--oc-space-2);
-  min-width: 0;
-}
-
-.oc-autocomplete-popover__label {
-  flex: 1 1 auto;
-}
-
 .oc-autocomplete-popover__thumbnail {
   display: inline-block;
   flex: none;
   font-size: var(--oc-size-sm);
   background-repeat: no-repeat;
   vertical-align: text-bottom;
-}
-
-.oc-autocomplete-popover__detail {
-  min-width: 0;
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-sm);
 }
 </style>

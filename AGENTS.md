@@ -57,6 +57,10 @@
 - Promotion requires a **stable contract**. Early-Stage Compatibility allows persisted formats to be rewritten outright, so a guard freezes the module's inputs and outputs, never a file format.
 - When dismantling scaffolding, re-derive the module's intended contract and confirm that any **cross-module** contract it carried is still guarded at the seam. Otherwise a refactor can change behaviour with nothing left to detect it.
 - This section governs deliberate design changes. Production-First Debugging still governs bug reports: there, identify the production root cause before touching a spec. Weakening an assertion so that something passes is forbidden under both.
+- Do not write a test for something a reader can see at a glance (a rename, a constant, a one-line mapping, a label's wording). If a behaviour needs no explanation to be understood, it needs no test either.
+- Do not create a new spec file for a small helper. Cover it inside the spec that already owns the feature, and only when the behaviour is not obvious.
+- Verification is spent, not performed. Run only the specs your change actually touches; a full-suite run is for a change whose blast radius is unknown, not a habit.
+- Every change is expected to pay for itself in diff size. Adding a feature is not a licence to add scaffolding, helpers, or assertions around it; prefer folding logic into the existing path and deleting what it replaces. A run of net-growing diffs is a signal to stop and cut, not to continue.
 
 ## Release Notes
 

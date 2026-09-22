@@ -3,14 +3,6 @@
   <section ref="workspaceRef" class="settings-workspace" :aria-label="viewModel.title"
     @scroll.passive="schedulePreviewPresentation">
   <div class="settings-workspace__content" :class="{ 'has-preview': previewContent }">
-    <PagePropertyEditor
-      :items="viewModel.items"
-      @editor-preview="handleEditorPreview"
-      @editor-commit="handleEditorCommit"
-      @editor-cancel="handleEditorCancel"
-      @action="handleEditorAction"
-    >
-      <template #before>
       <template v-if="previewContent">
         <div ref="previewStageRef" class="settings-workspace__preview-stage" aria-hidden="true">
           <div ref="previewGlassRef" class="settings-workspace__preview-glass" />
@@ -77,10 +69,27 @@
           </div>
         </div>
         <div ref="previewSpacerRef" class="settings-workspace__preview-spacer" aria-hidden="true" />
-      </template>
-      </template>
+    </template>
 
-    </PagePropertyEditor>
+    <div class="settings-workspace__cards">
+      <OcCard
+        v-for="card in viewModel.cards"
+        :key="card.key"
+        class="settings-workspace__card"
+        variant="plain"
+        :title="card.title"
+        :icon="card.icon"
+        :actions="card.actions"
+        @action="handleCardAction(card, $event.key)"
+      >
+        <PagePropertyEditor
+          :items="card.items"
+          @editor-preview="intent => handleEditorPreview(card, intent)"
+          @editor-commit="intent => handleEditorCommit(card, intent)"
+          @editor-cancel="intent => handleEditorCancel(card, intent)"
+        />
+      </OcCard>
+    </div>
     </div>
   </section>
 </template>
@@ -88,11 +97,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import previewLogoPhase from '../../../assets/opencard-logo-phase-map.png'
+import OcCard from '../../../components/standard/OcCard.vue'
 import OcPhaseImage from '../../../components/standard/OcPhaseImage.vue'
+import { reducedMotionQuery } from '../../../shared/ui/foundation'
 import PagePropertyEditor from '../../../shared/ui/property-editor/PagePropertyEditor.vue'
 import type {
   EditorItem,
-  EditorItemActionIntent,
   EditorItemCancelIntent,
   EditorItemEditorPart,
   EditorItemValueIntent,
@@ -100,10 +110,15 @@ import type {
 import type { OcEditableThemeColorKey, OcThemeId } from '../../../shared/ui/foundation'
 import AppearanceShaderPreview from './AppearanceShaderPreview.vue'
 import type { AppSettingKey, SettingsIntent } from '../model/appSettings'
-import type { SettingsCategoryViewModel } from '../composables/useSettingsWorkspace'
+import type {
+  SettingsCardViewModel,
+  SettingsCategoryViewModel,
+} from '../composables/useSettingsWorkspace'
 
 const props = defineProps<{
   viewModel: SettingsCategoryViewModel
+  /** 要带到前台的设置项 key：进入/切换分类后把它滚入视野并高亮一次。 */
+  focusKey?: string
 }>()
 
 const emit = defineEmits<{
@@ -209,12 +224,43 @@ onBeforeUnmount(() => {
   previewResizeObserver?.disconnect()
   if (previewPresentationFrame !== null) cancelAnimationFrame(previewPresentationFrame)
   if (previewMeasureFrame !== null) cancelAnimationFrame(previewMeasureFrame)
+  if (focusHighlightTimer !== null) window.clearTimeout(focusHighlightTimer)
+  focusHighlightedRow?.classList.remove('is-settings-focus')
+  focusHighlightedRow = null
 })
+
+const FOCUS_HIGHLIGHT_MS = 1600
+let focusHighlightTimer: number | null = null
+let focusHighlightedRow: HTMLElement | null = null
+
+/** 把带 focusKey 的那一行滚进视野并高亮一会儿；只对当前分类里存在的行生效。 */
+function revealFocusedRow(key: string): void {
+  const root = workspaceRef.value
+  if (!root) return
+  const row = root.querySelector<HTMLElement>(`[data-item-key="${key}"]`)
+  if (!row) return
+  const reducedMotion = reducedMotionQuery()?.matches ?? false
+  row.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' })
+  focusHighlightedRow?.classList.remove('is-settings-focus')
+  focusHighlightedRow = row
+  row.classList.add('is-settings-focus')
+  if (focusHighlightTimer !== null) window.clearTimeout(focusHighlightTimer)
+  focusHighlightTimer = window.setTimeout(() => {
+    focusHighlightTimer = null
+    focusHighlightedRow?.classList.remove('is-settings-focus')
+    focusHighlightedRow = null
+  }, FOCUS_HIGHLIGHT_MS)
+}
+
+watch(() => [props.focusKey, props.viewModel.key] as const, async ([key]) => {
+  if (!key) return
+  await nextTick()
+  revealFocusedRow(key)
+}, { immediate: true })
 
 function emitSettingChange(key: Extract<SettingsIntent, { type: 'setting.change' }>['key'], value: unknown): void {
   emit('intent', { type: 'setting.change', key, value })
 }
-
 function emitSettingPreview(key: Extract<SettingsIntent, { type: 'setting.preview' }>['key'], value: unknown): void {
   emit('intent', { type: 'setting.preview', key, value })
 }
@@ -228,16 +274,20 @@ function findItem(items: readonly EditorItem[], path: readonly string[]): Editor
   return findItem(item.children ?? [], remaining)
 }
 
-function findEditor(path: readonly string[], editorKey: string): EditorItemEditorPart | undefined {
-  return findItem(props.viewModel.items, path)?.content?.find((part): part is EditorItemEditorPart => (
+function findEditor(
+  items: readonly EditorItem[],
+  path: readonly string[],
+  editorKey: string,
+): EditorItemEditorPart | undefined {
+  return findItem(items, path)?.content?.find((part): part is EditorItemEditorPart => (
     typeof part !== 'string' && part.type === 'editor' && part.key === editorKey
   ))
 }
 
-function themeContext(path: readonly string[]): { themeId: OcThemeId; childKey: string } | null {
-  const match = path[0]?.match(/^theme:(dark|light)$/)
-  if (!match || !path[1]) return null
-  return { themeId: match[1] as OcThemeId, childKey: path[1] }
+/** 主题 card 的行直接就是主题的子项，所以 card key 决定这套改动落到哪套主题。 */
+function themeIdOfCard(card: SettingsCardViewModel): OcThemeId | null {
+  const match = card.key.match(/^theme:(dark|light)$/)
+  return match ? match[1] as OcThemeId : null
 }
 
 function colorToken(childKey: string): OcEditableThemeColorKey | null {
@@ -248,80 +298,86 @@ function snapshotKey(themeId: OcThemeId, token: OcEditableThemeColorKey): string
   return `${themeId}:${token}`
 }
 
-function handleEditorPreview(intent: EditorItemValueIntent): void {
-  const context = themeContext(intent.itemPath)
-  if (!context) {
+function handleEditorPreview(card: SettingsCardViewModel, intent: EditorItemValueIntent): void {
+  const themeId = themeIdOfCard(card)
+  if (!themeId) {
     emitSettingPreview(intent.itemPath[0] as AppSettingKey, intent.value)
     return
   }
-  if (context.childKey === 'angle') {
-    emit('intent', { type: 'theme-angle.preview', themeId: context.themeId, value: intent.value as number })
+  const childKey = intent.itemPath[0]
+  if (childKey === 'angle') {
+    emit('intent', { type: 'theme-angle.preview', themeId, value: intent.value as number })
     return
   }
-  const token = colorToken(context.childKey)
+  const token = colorToken(childKey)
   if (!token) return
-  const key = snapshotKey(context.themeId, token)
+  const key = snapshotKey(themeId, token)
   if (!themeColorSnapshots.has(key)) {
-    const editor = findEditor(intent.itemPath, intent.editorKey)
+    const editor = findEditor(card.items, intent.itemPath, intent.editorKey)
     themeColorSnapshots.set(key, typeof editor?.definition.defaultValue === 'string'
       ? editor.definition.defaultValue
       : null)
   }
-  emit('intent', { type: 'theme-color.preview', themeId: context.themeId, token, value: intent.value as string })
+  emit('intent', { type: 'theme-color.preview', themeId, token, value: intent.value as string })
 }
 
-function handleEditorCommit(intent: EditorItemValueIntent): void {
-  const context = themeContext(intent.itemPath)
-  if (!context) {
+function handleEditorCommit(card: SettingsCardViewModel, intent: EditorItemValueIntent): void {
+  const themeId = themeIdOfCard(card)
+  if (!themeId) {
     emitSettingChange(intent.itemPath[0] as AppSettingKey, intent.value)
     return
   }
-  if (context.childKey === 'preset') {
-    if (intent.value) emit('intent', { type: 'theme-preset.change', themeId: context.themeId, presetId: String(intent.value) })
+  const childKey = intent.itemPath[0]
+  if (childKey === 'name') {
+    const name = String(intent.value).trim()
+    if (name) emit('intent', { type: 'theme-name.change', themeId, name })
     return
   }
-  if (context.childKey === 'font') {
-    emit('intent', { type: 'theme-font.change', themeId: context.themeId, value: String(intent.value).trim() || 'system' })
+  if (childKey === 'preset') {
+    if (intent.value) emit('intent', { type: 'theme-preset.change', themeId, presetId: String(intent.value) })
     return
   }
-  if (context.childKey === 'angle') {
-    emit('intent', { type: 'theme-angle.change', themeId: context.themeId, value: intent.value as number })
+  if (childKey === 'font') {
+    emit('intent', { type: 'theme-font.change', themeId, value: String(intent.value).trim() || 'system' })
     return
   }
-  const token = colorToken(context.childKey)
+  if (childKey === 'angle') {
+    emit('intent', { type: 'theme-angle.change', themeId, value: intent.value as number })
+    return
+  }
+  const token = colorToken(childKey)
   if (!token) return
-  themeColorSnapshots.delete(snapshotKey(context.themeId, token))
-  emit('intent', { type: 'theme-color.change', themeId: context.themeId, token, value: intent.value as string })
+  themeColorSnapshots.delete(snapshotKey(themeId, token))
+  emit('intent', { type: 'theme-color.change', themeId, token, value: intent.value as string })
 }
 
-function handleEditorCancel(intent: EditorItemCancelIntent): void {
-  const context = themeContext(intent.itemPath)
-  if (!context) return
-  const token = colorToken(context.childKey)
+function handleEditorCancel(card: SettingsCardViewModel, intent: EditorItemCancelIntent): void {
+  const themeId = themeIdOfCard(card)
+  if (!themeId) return
+  const token = colorToken(intent.itemPath[0])
   if (!token) return
-  const key = snapshotKey(context.themeId, token)
+  const key = snapshotKey(themeId, token)
   const snapshot = themeColorSnapshots.get(key)
   themeColorSnapshots.delete(key)
-  emit('intent', { type: 'theme-color.cancel', themeId: context.themeId, token, value: snapshot ?? null })
+  emit('intent', { type: 'theme-color.cancel', themeId, token, value: snapshot ?? null })
 }
 
-function handleEditorAction(intent: EditorItemActionIntent): void {
-  const context = themeContext(intent.itemPath)
-  if (context?.childKey === 'preset') {
-    if (intent.actionKey === 'import' || intent.actionKey === 'export') {
-      emit('intent', { type: `theme.${intent.actionKey}`, themeId: context.themeId })
-    } else if (intent.actionKey === 'delete') {
-      const presetId = String(findEditor(intent.itemPath, 'value')?.value ?? '')
-      if (presetId.startsWith('user:')) emit('intent', { type: 'theme-preset.delete', themeId: context.themeId, presetId })
-    }
+function handleCardAction(card: SettingsCardViewModel, actionKey: string): void {
+  const themeId = themeIdOfCard(card)
+  if (themeId && (actionKey === 'theme.copy' || actionKey === 'theme.read')) {
+    emit('intent', { type: actionKey, themeId })
     return
   }
-  const rootKey = intent.itemPath[0]
-  if (rootKey === 'identity.publisherKey' && intent.actionKey === 'regenerate') {
+  if (themeId && actionKey === 'theme-preset.delete') {
+    const presetId = String(findEditor(card.items, ['preset'], 'value')?.value ?? '')
+    if (presetId.startsWith('user:')) emit('intent', { type: 'theme-preset.delete', themeId, presetId })
+    return
+  }
+  if (actionKey === 'identity.regenerate') {
     emit('intent', { type: 'identity.regenerate' })
     return
   }
-  if (rootKey === 'themes.reset' || rootKey === 'project-workspace.reset') emit('intent', { type: rootKey })
+  if (actionKey === 'project-workspace.reset') emit('intent', { type: 'project-workspace.reset' })
 }
 </script>
 
@@ -343,6 +399,32 @@ function handleEditorAction(intent: EditorItemActionIntent): void {
 }
 
 .settings-workspace__content.has-preview { padding-top: 0; }
+
+.settings-workspace__cards {
+  display: grid;
+  gap: var(--oc-space-5);
+}
+
+/* 跳转落点：短暂勾一圈主题色，提示"就是这一行"。 */
+.settings-workspace :deep(.is-settings-focus) {
+  border-radius: var(--oc-radius-sm);
+  outline: 2px solid var(--oc-accent);
+  outline-offset: 2px;
+  animation: settings-focus-pulse var(--oc-duration-slow) var(--oc-ease) 1;
+}
+
+@keyframes settings-focus-pulse {
+  from { outline-color: transparent; }
+  to { outline-color: var(--oc-accent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-workspace :deep(.is-settings-focus) { animation: none; }
+}
+
+/* 卡片只负责包裹与分组：行的左右留白由卡片给，最后一行不再重复底边框。 */
+.settings-workspace__card { --oc-card-content-padding: 0 var(--oc-space-3); }
+.settings-workspace__card :deep(.page-property-editor-item__row:last-child) { border-bottom: 0; }
 
 .settings-workspace__fields {
   display: grid;

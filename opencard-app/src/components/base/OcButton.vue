@@ -182,7 +182,7 @@ const stateClasses = computed(() => ({
 }
 
 .oc-button:disabled {
-  opacity: 0.5;
+  opacity: var(--oc-opacity-disabled);
   pointer-events: none;
 }
 

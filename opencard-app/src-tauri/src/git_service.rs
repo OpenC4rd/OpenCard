@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, TryLockError};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_GITIGNORE: &str = ".opencard-init-*\n";
@@ -83,21 +83,13 @@ impl GitServiceError {
 pub type GitServiceResult<T> = Result<T, GitServiceError>;
 
 fn run_exclusive<T>(operation: impl FnOnce() -> GitServiceResult<T>) -> GitServiceResult<T> {
-    let _guard = match GIT_OPERATION_LOCK.try_lock() {
-        Ok(guard) => guard,
-        Err(TryLockError::WouldBlock) => {
-            return Err(GitServiceError::new(
-                GitErrorKind::Locked,
-                "Another Git operation is already running",
-            ));
-        }
-        Err(TryLockError::Poisoned(_)) => {
-            return Err(GitServiceError::new(
-                GitErrorKind::Locked,
-                "Git operation lock is unavailable",
-            ));
-        }
-    };
+    // 命令是并发执行的（`#[tauri::command(async)]`），同一时刻会有多个 git 操作在飞：
+    // 打开项目时界面就并行读状态、历史、文件历史。这里必须排队等待，不能直接报
+    // "另一个操作正在运行"——那等于用界面自己的读取把界面顶掉，协作侧栏会整块空着。
+    // 持锁线程 panic 只污染锁本身，取回内层值继续用，别让一次失败让所有 git 命令永久不可用。
+    let _guard = GIT_OPERATION_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     operation()
 }
 
@@ -698,7 +690,10 @@ pub fn read_status(project_root: &str) -> GitServiceResult<GitStatusResult> {
     let mut options = StatusOptions::new();
     options
         .include_untracked(true)
-        .recurse_untracked_dirs(true)
+        // 不递归列出未跟踪目录的内容：项目里一旦放进成百上千个资源文件（导入图标包、装资源包），
+        // 逐文件扫描会让状态查询要好几秒，界面上就是"更改列表半天出不来"。
+        // 未跟踪目录仍会作为一个条目出现，点开或提交时再逐文件处理。
+        .recurse_untracked_dirs(false)
         .include_ignored(false)
         .renames_head_to_index(true)
         .renames_index_to_workdir(true);
@@ -713,13 +708,13 @@ pub fn read_status(project_root: &str) -> GitServiceResult<GitStatusResult> {
             Some(GitStatusEntry {
                 path,
                 index_new: status.contains(Status::INDEX_NEW),
-                index_modified: status.contains(
+                index_modified: status.intersects(
                     Status::INDEX_MODIFIED | Status::INDEX_RENAMED | Status::INDEX_TYPECHANGE,
                 ),
                 index_deleted: status.contains(Status::INDEX_DELETED),
                 worktree_new: status.contains(Status::WT_NEW),
                 worktree_modified: status
-                    .contains(Status::WT_MODIFIED | Status::WT_RENAMED | Status::WT_TYPECHANGE),
+                    .intersects(Status::WT_MODIFIED | Status::WT_RENAMED | Status::WT_TYPECHANGE),
                 worktree_deleted: status.contains(Status::WT_DELETED),
                 conflicted: status.is_conflicted(),
                 ignored: status.is_ignored(),
@@ -799,7 +794,11 @@ pub fn stage_paths(
     let (root, repository) = open_exact_repository(project_root)?;
     let mut index = repository.index().map_err(GitServiceError::from_git)?;
     for raw_path in &request.paths {
-        let path = validate_relative_path(raw_path)?;
+        // 更改列表里未跟踪的目录是一条以 `/` 结尾的整体条目，索引与工作区里的路径都不带它。
+        let relative = raw_path
+            .trim_end_matches(|character| character == '/' || character == '\\')
+            .replace('\\', "/");
+        let path = validate_relative_path(&relative)?;
         if index.get_path(path, 0).is_none()
             && repository
                 .status_should_ignore(path)
@@ -813,6 +812,14 @@ pub fn stage_paths(
         let status = repository.status_file(path).unwrap_or(Status::CURRENT);
         if status.contains(Status::WT_DELETED) {
             index.remove_path(path).map_err(GitServiceError::from_git)?;
+        } else if root.join(path).is_dir() {
+            // 一个目录（整条未跟踪目录）要递归加入：`add_path` 只认单个文件。
+            index
+                .add_all([relative.as_str()].iter(), IndexAddOption::DEFAULT, None)
+                .map_err(GitServiceError::from_git)?;
+            index
+                .update_all([relative.as_str()].iter(), None)
+                .map_err(GitServiceError::from_git)?;
         } else {
             index.add_path(path).map_err(GitServiceError::from_git)?;
         }
@@ -886,6 +893,62 @@ pub fn unstage_all(project_root: &str) -> GitServiceResult<RepositorySummary> {
             index.write().map_err(GitServiceError::from_git)?;
         }
         Err(error) => return Err(GitServiceError::from_git(error)),
+    }
+    repository_summary(&root, &repository)
+}
+
+/**
+ * 放弃更改：把给定路径的索引与工作区一起恢复到 HEAD，等价于 `git checkout HEAD -- <path>`。
+ * HEAD 里不存在的路径（新增的文件）没有可恢复的版本，只把它从索引里摘掉，磁盘上的文件由调用方处理；
+ * 一个路径都不匹配时什么都不做——绝不能退化成"整棵工作区重置"。
+ */
+pub fn discard_paths(
+    project_root: &str,
+    request: &PathRequest,
+) -> GitServiceResult<RepositorySummary> {
+    let (root, mut repository) = open_exact_repository(project_root)?;
+    let head_tree = repository
+        .head()
+        .ok()
+        .and_then(|head| head.peel_to_tree().ok());
+    let mut checkout = CheckoutBuilder::new();
+    checkout.force();
+    let mut matched = false;
+    let mut unstaged: Vec<PathBuf> = Vec::new();
+    for raw_path in &request.paths {
+        let relative = raw_path
+            .trim_end_matches(|character| character == '/' || character == '\\')
+            .replace('\\', "/");
+        let path = validate_relative_path(&relative)?;
+        if head_tree
+            .as_ref()
+            .is_some_and(|tree| tree.get_path(path).is_ok())
+        {
+            matched = true;
+            checkout.path(path);
+        } else {
+            unstaged.push(path.to_path_buf());
+        }
+    }
+    if matched {
+        repository
+            .checkout_head(Some(&mut checkout))
+            .map_err(GitServiceError::from_git)?;
+    }
+    if !unstaged.is_empty() {
+        let mut index = repository.index().map_err(GitServiceError::from_git)?;
+        let mut changed = false;
+        for path in &unstaged {
+            if index.get_path(path, 0).is_some() {
+                index
+                    .remove_path(path)
+                    .map_err(GitServiceError::from_git)?;
+                changed = true;
+            }
+        }
+        if changed {
+            index.write().map_err(GitServiceError::from_git)?;
+        }
     }
     repository_summary(&root, &repository)
 }
@@ -2172,12 +2235,12 @@ pub fn write_repository_config(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_inspect(project_root: String) -> GitCommandResult<RepositorySummary> {
     run_exclusive(|| inspect_repository(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_initialize(
     project_root: String,
     identity: GitIdentity,
@@ -2185,14 +2248,14 @@ pub fn git_initialize(
     run_exclusive(|| initialize_repository(&project_root, &identity)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_status(project_root: String) -> GitCommandResult<GitStatusResult> {
     command_result_with_conflicts(run_exclusive(|| read_status(&project_root)), |value| {
         value.repository.has_conflicts
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stage(
     project_root: String,
     request: PathRequest,
@@ -2200,12 +2263,12 @@ pub fn git_stage(
     run_exclusive(|| stage_paths(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stage_all(project_root: String) -> GitCommandResult<RepositorySummary> {
     run_exclusive(|| stage_all(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_unstage(
     project_root: String,
     request: PathRequest,
@@ -2213,22 +2276,30 @@ pub fn git_unstage(
     run_exclusive(|| unstage_paths(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_unstage_all(project_root: String) -> GitCommandResult<RepositorySummary> {
     run_exclusive(|| unstage_all(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
+pub fn git_discard(
+    project_root: String,
+    request: PathRequest,
+) -> GitCommandResult<RepositorySummary> {
+    run_exclusive(|| discard_paths(&project_root, &request)).into()
+}
+
+#[tauri::command(async)]
 pub fn git_commit(project_root: String, request: CommitRequest) -> GitCommandResult<CommitSummary> {
     run_exclusive(|| create_commit(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_amend(project_root: String, request: CommitRequest) -> GitCommandResult<CommitSummary> {
     run_exclusive(|| amend_commit(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_history(
     project_root: String,
     request: HistoryRequest,
@@ -2236,7 +2307,7 @@ pub fn git_history(
     run_exclusive(|| read_history(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_commit_summary(
     project_root: String,
     request: RevisionRequest,
@@ -2244,17 +2315,17 @@ pub fn git_commit_summary(
     run_exclusive(|| read_commit_summary(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_diff(project_root: String, request: DiffRequest) -> GitCommandResult<DiffResult> {
     run_exclusive(|| read_diff(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_branches(project_root: String) -> GitCommandResult<Vec<BranchSummary>> {
     run_exclusive(|| list_branches(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_create_branch(
     project_root: String,
     request: CreateBranchRequest,
@@ -2262,7 +2333,7 @@ pub fn git_create_branch(
     run_exclusive(|| create_branch(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_checkout(
     project_root: String,
     request: CheckoutRequest,
@@ -2270,7 +2341,7 @@ pub fn git_checkout(
     run_exclusive(|| checkout_revision(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_branch(
     project_root: String,
     request: NamedRequest,
@@ -2278,7 +2349,7 @@ pub fn git_delete_branch(
     run_exclusive(|| delete_branch(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_rename_branch(
     project_root: String,
     request: RenameRequest,
@@ -2286,12 +2357,12 @@ pub fn git_rename_branch(
     run_exclusive(|| rename_branch(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_tags(project_root: String) -> GitCommandResult<Vec<TagSummary>> {
     run_exclusive(|| list_tags(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_create_tag(
     project_root: String,
     request: CreateTagRequest,
@@ -2299,7 +2370,7 @@ pub fn git_create_tag(
     run_exclusive(|| create_tag(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_tag(
     project_root: String,
     request: NamedRequest,
@@ -2307,12 +2378,12 @@ pub fn git_delete_tag(
     run_exclusive(|| delete_tag(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stashes(project_root: String) -> GitCommandResult<Vec<StashSummary>> {
     run_exclusive(|| list_stashes(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_create_stash(
     project_root: String,
     request: CreateStashRequest,
@@ -2320,7 +2391,7 @@ pub fn git_create_stash(
     run_exclusive(|| create_stash(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_apply_stash(
     project_root: String,
     request: StashIndexRequest,
@@ -2328,7 +2399,7 @@ pub fn git_apply_stash(
     run_exclusive(|| apply_stash(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_drop_stash(
     project_root: String,
     request: StashIndexRequest,
@@ -2336,7 +2407,7 @@ pub fn git_drop_stash(
     run_exclusive(|| drop_stash(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_reset(
     project_root: String,
     request: ResetRequest,
@@ -2344,7 +2415,7 @@ pub fn git_reset(
     run_exclusive(|| reset_repository(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_cherry_pick(
     project_root: String,
     request: RevisionRequest,
@@ -2355,7 +2426,7 @@ pub fn git_cherry_pick(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_revert(
     project_root: String,
     request: RevisionRequest,
@@ -2366,17 +2437,17 @@ pub fn git_revert(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_cleanup_state(project_root: String) -> GitCommandResult<RepositorySummary> {
     run_exclusive(|| cleanup_operation_state(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_remotes(project_root: String) -> GitCommandResult<Vec<RemoteSummary>> {
     run_exclusive(|| list_remotes(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_add_remote(
     project_root: String,
     request: AddRemoteRequest,
@@ -2384,7 +2455,7 @@ pub fn git_add_remote(
     run_exclusive(|| add_remote(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_remote(
     project_root: String,
     request: NamedRequest,
@@ -2392,7 +2463,7 @@ pub fn git_delete_remote(
     run_exclusive(|| delete_remote(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_rename_remote(
     project_root: String,
     request: RenameRequest,
@@ -2400,7 +2471,7 @@ pub fn git_rename_remote(
     run_exclusive(|| rename_remote(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_fetch(
     project_root: String,
     request: FetchRequest,
@@ -2408,7 +2479,7 @@ pub fn git_fetch(
     run_exclusive(|| fetch_remote(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_push(
     project_root: String,
     request: PushRequest,
@@ -2416,7 +2487,7 @@ pub fn git_push(
     run_exclusive(|| push_remote(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_pull(
     project_root: String,
     request: PullRequest,
@@ -2427,7 +2498,7 @@ pub fn git_pull(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_clone(
     project_root: String,
     request: CloneRequest,
@@ -2435,12 +2506,12 @@ pub fn git_clone(
     run_exclusive(|| clone_repository(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_read_config(project_root: String) -> GitCommandResult<Vec<ConfigEntry>> {
     run_exclusive(|| read_repository_config(&project_root)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_write_config(
     project_root: String,
     request: ConfigRequest,
@@ -2448,7 +2519,7 @@ pub fn git_write_config(
     run_exclusive(|| write_repository_config(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_file_history(
     project_root: String,
     request: FileHistoryRequest,
@@ -2456,7 +2527,7 @@ pub fn git_file_history(
     run_exclusive(|| read_file_history(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_read_file_at_revision(
     project_root: String,
     request: RevisionFileRequest,
@@ -2464,7 +2535,7 @@ pub fn git_read_file_at_revision(
     run_exclusive(|| read_file_at_revision(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_materialize_revision(
     project_root: String,
     request: MaterializeRevisionRequest,
@@ -2472,14 +2543,14 @@ pub fn git_materialize_revision(
     run_exclusive(|| materialize_revision(&project_root, &request)).into()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_conflicts(project_root: String) -> GitCommandResult<Vec<ConflictEntry>> {
     command_result_with_conflicts(run_exclusive(|| read_conflicts(&project_root)), |value| {
         !value.is_empty()
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_merge(project_root: String, request: MergeRequest) -> GitCommandResult<OperationState> {
     command_result_with_conflicts(
         run_exclusive(|| merge_revision(&project_root, &request)),
@@ -2487,7 +2558,7 @@ pub fn git_merge(project_root: String, request: MergeRequest) -> GitCommandResul
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_rebase_start(
     project_root: String,
     request: RebaseRequest,
@@ -2498,14 +2569,14 @@ pub fn git_rebase_start(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_rebase_continue(project_root: String) -> GitCommandResult<OperationState> {
     command_result_with_conflicts(run_exclusive(|| continue_rebase(&project_root)), |value| {
         value.repository.has_conflicts
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_abort_operation(project_root: String) -> GitCommandResult<RepositorySummary> {
     run_exclusive(|| abort_operation(&project_root)).into()
 }
@@ -2536,6 +2607,125 @@ mod tests {
         )
         .unwrap();
         directory
+    }
+
+    #[test]
+    fn stage_paths_adds_a_whole_untracked_directory() {
+        let directory = initialized_repository();
+        let root = directory.path().to_str().unwrap();
+        std::fs::create_dir_all(directory.path().join("assets/nested")).unwrap();
+        std::fs::write(directory.path().join("assets/one.txt"), "one\n").unwrap();
+        std::fs::write(directory.path().join("assets/nested/two.txt"), "two\n").unwrap();
+
+        // 更改列表里未跟踪的目录是一条以 `/` 结尾的整体条目。
+        stage_paths(
+            root,
+            &PathRequest {
+                paths: vec!["assets/".into()],
+            },
+        )
+        .unwrap();
+        create_commit(
+            root,
+            &CommitRequest {
+                message: "assets".into(),
+            },
+        )
+        .unwrap();
+
+        let repository = Repository::open(directory.path()).unwrap();
+        let tree = repository
+            .head()
+            .unwrap()
+            .peel_to_commit()
+            .unwrap()
+            .tree()
+            .unwrap();
+        assert!(tree.get_path(Path::new("assets/one.txt")).is_ok());
+        assert!(tree.get_path(Path::new("assets/nested/two.txt")).is_ok());
+    }
+
+    #[test]
+    fn discard_paths_restores_tracked_files_and_unstages_new_ones() {
+        let directory = initialized_repository();
+        let root = directory.path().to_str().unwrap();
+        std::fs::write(directory.path().join("card.txt"), "second\n").unwrap();
+        std::fs::write(directory.path().join("added.txt"), "new\n").unwrap();
+        stage_paths(
+            root,
+            &PathRequest {
+                paths: vec!["card.txt".into(), "added.txt".into()],
+            },
+        )
+        .unwrap();
+
+        discard_paths(
+            root,
+            &PathRequest {
+                paths: vec!["card.txt".into(), "added.txt".into()],
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join("card.txt"))
+                .unwrap()
+                // 检出时平台可能按 core.autocrlf 换行，这里只比内容。
+                .replace("\r\n", "\n"),
+            "first\n"
+        );
+        // 新增的文件 HEAD 里没有，只退出索引，磁盘上的文件留给调用方处理。
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join("added.txt")).unwrap(),
+            "new\n"
+        );
+        let entries = read_status(root).unwrap().entries;
+        assert!(!entries.iter().any(|entry| entry.path == "card.txt"));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.path == "added.txt" && entry.worktree_new));
+    }
+
+    #[test]
+    fn committing_selected_paths_leaves_the_rest_uncommitted() {
+        let directory = initialized_repository();
+        let root = directory.path().to_str().unwrap();
+        std::fs::write(directory.path().join("card.txt"), "second\n").unwrap();
+        std::fs::write(directory.path().join("new.txt"), "new\n").unwrap();
+
+        // 更改列表的提交：索引先回到 HEAD，只暂存勾选的路径，然后提交。
+        unstage_all(root).unwrap();
+        stage_paths(
+            root,
+            &PathRequest {
+                paths: vec!["card.txt".into()],
+            },
+        )
+        .unwrap();
+        create_commit(
+            root,
+            &CommitRequest {
+                message: "selected".into(),
+            },
+        )
+        .unwrap();
+
+        let repository = Repository::open(directory.path()).unwrap();
+        let tree = repository
+            .head()
+            .unwrap()
+            .peel_to_commit()
+            .unwrap()
+            .tree()
+            .unwrap();
+        assert!(tree.get_path(Path::new("card.txt")).is_ok());
+        assert!(tree.get_path(Path::new("new.txt")).is_err());
+        // 没勾的改动原样留在工作区。
+        assert!(read_status(root)
+            .unwrap()
+            .entries
+            .iter()
+            .any(|entry| entry.path == "new.txt" && entry.worktree_new));
     }
 
     #[test]
@@ -2596,11 +2786,26 @@ mod tests {
         assert!(status
             .entries
             .iter()
-            .any(|entry| entry.path == "visible.txt"));
+            .any(|entry| entry.path == "visible.txt" && entry.worktree_new));
         assert!(!status
             .entries
             .iter()
             .any(|entry| entry.path.contains("hidden")));
+    }
+
+    /// 已跟踪文件的修改必须带 modified 标志：这种多位判定要用 `intersects`，
+    /// 用 `contains` 只有当"同时修改、重命名并改了类型"才成立——界面上就是改过的文件一条都不显示。
+    #[test]
+    fn status_reports_modified_tracked_files() {
+        let directory = initialized_repository();
+        let root = directory.path().to_str().unwrap();
+        std::fs::write(directory.path().join("card.txt"), "second\n").unwrap();
+
+        let status = read_status(root).unwrap();
+        assert!(status
+            .entries
+            .iter()
+            .any(|entry| entry.path == "card.txt" && entry.worktree_modified));
     }
 
     #[test]
@@ -2989,10 +3194,26 @@ mod tests {
     }
 
     #[test]
-    fn command_lock_reports_a_retryable_locked_error() {
-        let error = run_exclusive(|| run_exclusive(|| Ok(()))).unwrap_err();
-        assert_eq!(error.kind, GitErrorKind::Locked);
-        assert!(error.retryable);
+    fn command_lock_serializes_concurrent_operations() {
+        // 命令是并发执行的：同时发起的两个 git 操作都必须成功。
+        // 界面打开项目时就是并行读状态、历史、文件历史，一个被"另一个操作正在运行"顶掉，
+        // 协作侧栏就会空着。
+        let completed = std::sync::Arc::new(Mutex::new(0usize));
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let completed = completed.clone();
+                std::thread::spawn(move || {
+                    run_exclusive(|| {
+                        *completed.lock().unwrap() += 1;
+                        Ok(())
+                    })
+                })
+            })
+            .collect();
+        for handle in handles {
+            assert!(handle.join().unwrap().is_ok());
+        }
+        assert_eq!(*completed.lock().unwrap(), 2);
     }
 
     #[test]

@@ -178,6 +178,9 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-list-max-height-md',
   '--oc-list-max-height-lg',
 
+  // 需要自持滚动的列表（虚拟滚动）的固定高度
+  '--oc-list-height-md',
+
   // 页面内容宽度
   '--oc-content-width-md',
   '--oc-settings-preview-height-lg',

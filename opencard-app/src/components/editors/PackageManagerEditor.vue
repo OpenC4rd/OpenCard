@@ -22,19 +22,14 @@
       <OcOptionGroup v-model="addMode" :options="addModeOptions" />
       <div v-if="addMode === 'local'" class="package-manager__field">
         <OcButton icon="action.folder-plus" @click="choosePackage">{{ t('packageManager.choosePackages') }}</OcButton>
-        <OcText>{{ localPaths.length ? t('packageManager.selectedFiles', { count: localPaths.length }) : t('packageManager.noFile') }}</OcText>
+        <OcText v-if="localPaths.length">{{ t('packageManager.selectedFiles', { count: localPaths.length }) }}</OcText>
       </div>
       <div v-else class="package-manager__field">
-        <label class="package-manager__source">
-          <OcText as="span" size="sm">{{ t('packageManager.source') }}</OcText>
-          <OcFieldInput as="textarea" resize="vertical" full-width mono :value="remoteSource"
-            :aria-invalid="invalidRemoteEntries.length > 0" :placeholder="t('packageManager.sourcePlaceholder')"
-            @input="updateRemoteSource" @change="updateRemoteSource" />
-        </label>
+        <ReferenceStringPropertyField :definition="remoteSourceDefinition" :value="remoteSource"
+          @update:value="updateRemoteSource" />
         <OcText v-if="invalidRemoteEntries.length" tone="danger" size="sm" role="alert">
           {{ t('packageManager.invalidSource', { source: invalidRemoteEntries[0] }) }}
         </OcText>
-        <OcText v-else tone="muted" size="sm">{{ t('packageManager.sourceHint') }}</OcText>
       </div>
       <template #footer><OcButton variant="ghost" @click="addOpen = false">{{ t('packageManager.cancel') }}</OcButton><OcButton variant="solid" :disabled="!canAdd" @click="addPackage">{{ t('packageManager.add') }}</OcButton></template>
     </OcDialog>
@@ -55,11 +50,11 @@ import { useProjectStore } from '../../features/workspace/store/projectStore'
 import OcButton from '../base/OcButton.vue'
 import OcEmpty from '../base/OcEmpty.vue'
 import OcText from '../base/OcText.vue'
-import OcFieldInput from '../base/OcFieldInput.vue'
 import OcDialog from '../standard/OcDialog.vue'
 import OcTree from '../standard/OcTree.vue'
 import OcAlbum from '../standard/OcAlbum.vue'
 import OcOptionGroup, { type OcOption } from '../standard/OcOptionGroup.vue'
+import ReferenceStringPropertyField from '../../shared/ui/property-editor/fields/ReferenceStringPropertyField.vue'
 import { useAppSettingsStore } from '../../features/settings/store/appSettingsStore'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
 import { notifyError, notifySuccess } from '../../features/notifications/titlebarNotices'
@@ -82,6 +77,15 @@ const addOpen = ref(false)
 const addMode = ref<'local' | 'remote'>('local')
 const localPaths = ref<string[]>([])
 const remoteSource = ref('')
+/** 远程来源是"分号分隔的多项字符串"字段：回车或分号成一项，不合法的项当场标出。 */
+const remoteSourceDefinition = computed(() => ({
+  fieldType: 'string' as const,
+  title: t('packageManager.source'),
+  placeholder: t('packageManager.sourcePlaceholder'),
+  multiline: true,
+  listSeparator: 'semicolon' as const,
+  listInvalid: (token: string) => parseRemotePackageEntry(token) === null,
+}))
 const addModeOptions = computed<readonly OcOption[]>(() => [
   { value: 'local', label: t('packageManager.local') },
   { value: 'remote', label: t('packageManager.remote') },
@@ -285,8 +289,8 @@ async function synchronizePackages(): Promise<void> {
     busy.value = false
   }
 }
-function updateRemoteSource(event: Event): void {
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) remoteSource.value = event.target.value
+function updateRemoteSource(value: string): void {
+  remoteSource.value = value
 }
 async function choosePackage(): Promise<void> {
   if (!projectStore.projectPath.value) return
@@ -364,5 +368,4 @@ async function addPackage(): Promise<void> {
 }
 .package-manager__view { flex: 1 1 auto; min-height: 0; }
 .package-manager__field { display: grid; gap: var(--oc-space-2); margin-block: var(--oc-space-3); }
-.package-manager__source { display: grid; gap: var(--oc-space-2); }
 </style>

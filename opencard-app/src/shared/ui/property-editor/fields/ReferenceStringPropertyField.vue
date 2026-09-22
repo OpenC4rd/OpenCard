@@ -1,5 +1,8 @@
 <template>
-  <div class="reference-string-field">
+  <ReferenceStringTokenField v-if="definition.listSeparator" :definition="definition" :value="value"
+    @update:value="emit('update:value', $event)" />
+
+  <div v-else class="reference-string-field">
     <OcFieldFrame v-if="definition.multiline" class="reference-string-field__multiline" full-width
       :readonly="definition.isReadonly">
       <OcFieldInput
@@ -83,6 +86,7 @@ import type {
 import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+import ReferenceStringTokenField from './ReferenceStringTokenField.vue'
 
 type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
 type TextControl = HTMLInputElement | HTMLTextAreaElement

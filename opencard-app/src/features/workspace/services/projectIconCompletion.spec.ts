@@ -91,6 +91,20 @@ describe('project icon completion', () => {
     expect(result?.items[0]).toMatchObject({ label: 'Status icons', insertText: 'icon:status/', keepOpen: true })
   })
 
+  it('stops completing once the cursor sits after the closing brackets', async () => {
+    const provider = createProjectIconCompletionProvider(sources)
+    const value = 'Use [[icon:status/warning]] here'
+    const closing = value.indexOf(']]')
+
+    // 光标停在 `]]` 之后：这枚图标已经写完，不再弹补全，回车交还给换行。
+    expect(await provider({ value, cursor: closing + 2 })).toBeNull()
+
+    // 光标还在 token 里，照旧给候选，替换范围盖住右侧的 `]]`。
+    const inside = await provider({ value, cursor: closing })
+    expect(inside?.items[0]).toMatchObject({ insertText: '[[icon:status/warning]]' })
+    expect(inside).toMatchObject({ replaceStart: 4, replaceEnd: closing + 2 })
+  })
+
   it('writes the canonical token for a package icon', async () => {
     const provider = createProjectIconCompletionProvider(sources)
     const value = '[[theme@icon:mark/'

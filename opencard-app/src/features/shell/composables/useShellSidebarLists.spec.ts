@@ -4,6 +4,7 @@ import type { OcNodeCollection } from '../../../shared/ui/node/node.types'
 import type { ProjectTemplateKey } from '../../project-templates/model/projectTemplate'
 import type { SettingsCategoryKey } from '../../settings/model/appSettings'
 import {
+  DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
   IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
   OPENED_EDITORS_LIST_KEY,
   PROJECT_FILES_LIST_KEY,
@@ -15,6 +16,7 @@ import {
   RECENT_PROJECTS_LIST_KEY,
   RESOURCE_PACKAGES_LIST_KEY,
   SETTINGS_CATEGORIES_LIST_KEY,
+  USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
   TEMPLATES_LIST_KEY,
   TEMPLATE_COVERS_LIST_KEY,
   TEMPLATE_ENTRIES_LIST_KEY,
@@ -62,7 +64,7 @@ function createSidebarLists(
   overrides: Partial<SidebarListsOptions> = {},
 ) {
   const options: SidebarListsOptions = {
-    translate: (key, fallback) => fallback ?? key,
+    translate: (key, paramsOrFallback) => typeof paramsOrFallback === 'string' ? paramsOrFallback : key,
     ...pageState(page),
     isProjectTemplateBusy: ref(false),
     isExportTemplateBusy: ref(false),
@@ -100,7 +102,13 @@ function createSidebarLists(
     timelineTreeData: ref(tree()),
     timelineProjectTreeData: ref(tree()),
     changesTreeData: ref(tree()),
+    selectedChangeCount: ref(0),
     versionGraphExpandedKeys: ref<string[]>([]),
+    changesExpandedKeys: ref<string[]>([]),
+    handleChangesExpansionChange: vi.fn(),
+    handleChangesExpansionSync: vi.fn(),
+    handleChangesNodeActivate: vi.fn(),
+    handleChangesAction: vi.fn(),
     handleSettingsCategorySelectionChange: vi.fn(),
     handleTemplateSelectionChange: vi.fn(),
     handleTemplateAction: vi.fn(),
@@ -230,12 +238,27 @@ describe('useShellSidebarLists', () => {
 
     const resourcePackages = listOf(groups, RESOURCE_PACKAGES_LIST_KEY)
     expect(resourcePackages.placeholder).toBe('projectTemplates.status.noResourcePackages')
-    expect(resourcePackages.actions).toEqual([{
-      key: IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
-      icon: 'action.import',
-      hoverTip: 'projectTemplates.actions.importResourcePackage',
-      disabled: false,
-    }])
+    expect(resourcePackages.actions).toEqual([
+      {
+        key: IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
+        icon: 'action.import',
+        hoverTip: 'projectTemplates.actions.importResourcePackage',
+        disabled: false,
+      },
+      // 没有接入选中的包时，两个批量动作保持不可用。
+      {
+        key: USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
+        icon: 'action.check',
+        hoverTip: 'projectTemplates.actions.useSelectedResourcePackages',
+        disabled: true,
+      },
+      {
+        key: DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
+        icon: 'action.close',
+        hoverTip: 'projectTemplates.actions.disableSelectedResourcePackages',
+        disabled: true,
+      },
+    ])
   })
 
   it('reports loading resource packages through the placeholder and the import action', () => {
@@ -476,12 +499,14 @@ describe('useShellSidebarLists', () => {
 
     const unpublished = createSidebarLists('workbench', {
       repositoryReady: ref(true),
-      changesTreeData: ref(tree(['cards/main.ocdocument'])),
+      selectedChangeCount: ref(2),
     })
     expect(groupOf(unpublished.sidebar.sidebarBodyGroups.value, 'version-control').headButtons).toEqual([{
       key: 'publish-version',
       icon: 'action.publish',
       title: 'Commit version',
+      hoverTip: 'sidebar.commitSelectedCount',
+      badge: 2,
       disabled: false,
     }])
 

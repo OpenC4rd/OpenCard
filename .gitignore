@@ -9,6 +9,9 @@
 /artifacts/
 *.log
 
+# Downloaded third-party icon libraries (staging area, not part of the product)
+/icon-library/
+
 # Ignore OpenCard cache files at any directory level
 .opencard-cache
 .opencard

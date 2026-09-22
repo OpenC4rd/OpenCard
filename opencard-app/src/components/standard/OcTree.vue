@@ -12,7 +12,6 @@
       'is-dragging': Boolean(draggedKey) || isExternalDropActive,
       'is-root-drop': (Boolean(draggedKey) || isExternalDropActive)
         && dropTargetKey === null && dropPosition === 'inside',
-      'are-actions-always-visible': props.actionVisibility === 'always',
     }"
     :role="props.role"
     :aria-multiselectable="props.selectionMode === 'multiple' ? 'true' : undefined"
@@ -48,10 +47,10 @@
         class="oc-tree__branch-connector"
         aria-hidden="true"
       />
-      <div
+      <OcRow
         :ref="(element) => setRowRef(entry.key, element)"
         class="oc-tree__row"
-        :class="{ 'is-disabled': entry.item.disabled }"
+        :class="{ 'is-selected': isSelected(entry.key), 'is-disabled': entry.item.disabled }"
         :data-actions-overflowed="collapsedActionKeys.has(entry.key) || undefined"
         :data-tooltip="entry.item.disabledReason"
         :role="rowRole"
@@ -69,85 +68,77 @@
         @keydown="handleRowKeydown($event, entry.key, entry.index)"
         @contextmenu="handleRowContextMenu($event, entry.key)"
       >
-        <span
-          class="oc-tree__icon-slot"
-          :class="{ 'is-expandable': isExpandable(entry.key) }"
-          data-tree-interactive="true"
-          @mousedown="handleIconMouseDown($event, entry.key)"
-          @click="handleIconClick($event, entry.key)"
-        >
-          <OcVisual
-            v-if="entry.item.visual"
-            class="oc-tree__node-visual"
-            :class="{ 'is-expanded': entry.item.visual.type === 'icon' && isExpandable(entry.key) && isExpanded(entry.key) }"
-            :visual="entry.item.visual"
-            :label="entry.item.label"
-            size="md"
-          />
-          <OcIcon v-else
-            :name="'tree.chevron-right'"
-            size="md"
-            class="oc-tree__node-icon"
-            :class="{ 'is-expanded': isExpandable(entry.key) && isExpanded(entry.key) }"
-          />
+        <template #leading>
           <span
-            v-if="isExpandable(entry.key)"
-            class="oc-tree__child-count oc-number-badge oc-number-badge--neutral"
-            :class="{ 'is-expanded': isExpanded(entry.key) }"
-            aria-hidden="true"
+            class="oc-tree__icon-slot"
+            :class="{ 'is-expandable': isExpandable(entry.key) }"
+            data-tree-interactive="true"
+            @mousedown="handleIconMouseDown($event, entry.key)"
+            @click="handleIconClick($event, entry.key)"
           >
-            {{ formatChildCount(entry.key) }}
+            <OcVisual
+              v-if="entry.item.visual"
+              class="oc-tree__node-visual"
+              :class="{ 'is-expanded': entry.item.visual.type === 'icon' && isExpandable(entry.key) && isExpanded(entry.key) }"
+              :visual="entry.item.visual"
+              :label="entry.item.label"
+              size="md"
+            />
+            <OcIcon v-else
+              :name="'tree.chevron-right'"
+              size="md"
+              class="oc-tree__node-icon"
+              :class="{ 'is-expanded': isExpandable(entry.key) && isExpanded(entry.key) }"
+            />
+            <span
+              v-if="isExpandable(entry.key)"
+              class="oc-tree__child-count oc-number-badge oc-number-badge--neutral"
+              :class="{ 'is-expanded': isExpanded(entry.key) }"
+              aria-hidden="true"
+            >
+              {{ formatChildCount(entry.key) }}
+            </span>
           </span>
-        </span>
+        </template>
 
-        <OcFieldInput
-          v-if="renamingKey === entry.key"
-          :ref="(element) => setRenameInputRef(entry.key, element)"
-          as="input"
-          class="oc-tree__rename-input"
-          type="text"
-          :value="renameDraft"
-          data-tree-interactive="true"
-          @mousedown.stop
-          @click.stop
-          @dblclick.stop
-          @input="handleRenameInput"
-          @keydown.stop="handleRenameKeydown($event, entry.key)"
-          @blur="commitRename(entry.key)"
-        />
-        <OcText
-          v-else
-          class="oc-tree__label"
-          :tone="entry.item.tone"
-          :truncate="true"
-          :tooltip-on-overflow="entry.item.label"
-        >
-          {{ entry.item.label }}
-        </OcText>
+        <template #title>
+          <OcFieldInput
+            v-if="renamingKey === entry.key"
+            :ref="(element) => setRenameInputRef(entry.key, element)"
+            as="input"
+            class="oc-tree__rename-input"
+            type="text"
+            :value="renameDraft"
+            data-tree-interactive="true"
+            @mousedown.stop
+            @click.stop
+            @dblclick.stop
+            @input="handleRenameInput"
+            @keydown.stop="handleRenameKeydown($event, entry.key)"
+            @blur="commitRename(entry.key)"
+          />
+          <OcText
+            v-else
+            class="oc-tree__label"
+            :style="labelStyle(entry.item)"
+            :tone="entry.item.tone"
+            :truncate="true"
+            :tooltip-on-overflow="entry.item.label"
+          >
+            {{ entry.item.label }}
+          </OcText>
+        </template>
 
-        <span
-          v-if="entry.item.tail"
-          class="oc-tree__tail"
-          data-tooltip-group
-        >
-          <template v-for="(part, index) in resolveTailParts(entry.key, entry.item.tail)" :key="tailPartKey(part, index)">
-            <OcText v-if="typeof part === 'string'" class="oc-tree__tail-text" tone="muted" size="xs" :truncate="true">{{ part }}</OcText>
-            <span v-else-if="part.type === 'badge'" class="oc-tree__tail-badge" role="img" :aria-label="part.label" :data-tooltip="part.label">
-              <OcIcon :name="part.icon" :tone="part.tone" size="sm" />
-            </span>
-            <span v-else class="oc-tree__tail-action" data-tree-interactive="true">
-              <OcActionButton
-                :action="part"
-                size="sm"
-                variant="ghost"
-                :button-tabindex="props.tabNavigation === 'none' ? -1 : undefined"
-                @mousedown.stop
-                @select="emitActionIntent(entry.key, $event.key)"
-              />
-            </span>
-          </template>
-        </span>
-      </div>
+        <template v-if="entry.item.tail" #append>
+          <OcNodeTail
+            class="oc-tree__tail"
+            :tail="resolveTailParts(entry.key, entry.item.tail)"
+            :action-visibility="props.actionVisibility"
+            :button-tabindex="props.tabNavigation === 'none' ? -1 : undefined"
+            @action="emitActionIntent(entry.key, $event.key)"
+          />
+        </template>
+      </OcRow>
     </div>
     </div>
   </div>
@@ -157,9 +148,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect,
   type ComponentPublicInstance, type CSSProperties } from 'vue'
 import type { OcActionButtonAction } from './OcActionButton.vue'
-import OcActionButton from './OcActionButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
+import OcNodeTail from './OcNodeTail.vue'
+import OcRow from './OcRow.vue'
 import OcText from '../base/OcText.vue'
 import OcVisual from '../base/OcVisual.vue'
 import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
@@ -399,6 +391,16 @@ function resolveNodeStyle(entry: VisibleEntry): CSSProperties {
   } as CSSProperties
 }
 
+/** 标签字体由调用方给完整的 `font-family` 值（含引号与回退），节点只负责套用。 */
+function labelStyle(item: OcNode): CSSProperties | undefined {
+  return item.labelFont ? { fontFamily: item.labelFont } : undefined
+}
+
+/** jsdom 不实现 FontFaceSet，缺失时也就没有字体加载完成事件可等。 */
+function fontFaceSet(): FontFaceSet | undefined {
+  return document.fonts as FontFaceSet | undefined
+}
+
 function handleTreeScroll(event: Event): void {
   if (!props.virtualized || !(event.currentTarget instanceof HTMLElement)) return
   virtualScrollTop.value = event.currentTarget.scrollTop
@@ -418,7 +420,7 @@ function syncVirtualMetrics(): void {
  * as the "collapsed" width the projected-title calculation needs.
  */
 function measureTailActionWidth(row: HTMLElement): number {
-  const parts = [...row.querySelectorAll<HTMLElement>('.oc-tree__tail-action')]
+  const parts = [...row.querySelectorAll<HTMLElement>('.oc-node-tail__action')]
   if (parts.length === 0) return 0
   const gap = resolveOcPixelToken('--oc-space-1', treeRootElement.value)
   return parts.reduce((total, part) => total + part.getBoundingClientRect().width, 0)
@@ -427,7 +429,7 @@ function measureTailActionWidth(row: HTMLElement): number {
 
 /** Width the node's trailing text occupies right now; the row trades it away before the title. */
 function measureTailTextWidth(row: HTMLElement): number {
-  return [...row.querySelectorAll<HTMLElement>('.oc-tree__tail-text')]
+  return [...row.querySelectorAll<HTMLElement>('.oc-node-tail__text')]
     .reduce((total, part) => total + part.getBoundingClientRect().width, 0)
 }
 
@@ -465,7 +467,7 @@ function syncActionOverflow(): void {
         continue
       }
       const label = row.querySelector<HTMLElement>('.oc-tree__label')
-      if (!label || row.querySelector('.oc-tree__tail-action') === null) continue
+      if (!label || row.querySelector('.oc-node-tail__action') === null) continue
       // Width the title holds once the trailing text has given up everything it can, and the width
       // it needs to be shown in full.
       const titleWidth = label.getBoundingClientRect().width + measureTailTextWidth(row)
@@ -711,10 +713,6 @@ function tailActionParts(key: OcNodeKey): OcActionButtonAction[] {
   return normalizeNodeTail(props.data.items.get(key)?.tail).filter(isNodeTailAction)
 }
 
-function tailPartKey(part: OcNodeTailPart, index: number): string {
-  return typeof part === 'string' ? `text:${index}` : isNodeTailAction(part) ? `action:${part.key}` : `badge:${index}`
-}
-
 /**
  * The node's trailing line in order. When the row runs out of label space, its commands are
  * replaced by one overflow menu placed at the first command's position.
@@ -876,8 +874,13 @@ function handleRowKeydown(event: KeyboardEvent, key: OcNodeKey, index: number): 
   }
 }
 
+/** 行由 OcRow 渲染，组件实例要取出根元素，行高测量、聚焦与拖放命中才拿到真实行盒。 */
 function setRowRef(key: OcNodeKey, element: Element | ComponentPublicInstance | null): void {
-  if (element instanceof HTMLElement) rowRefs.set(key, element)
+  const row = element instanceof HTMLElement
+    ? element
+    : (element as ComponentPublicInstance | null)?.$el
+
+  if (row instanceof HTMLElement) rowRefs.set(key, row)
   else rowRefs.delete(key)
 }
 
@@ -995,7 +998,6 @@ function syncExternalDropZone(): void {
 function resolveNodeClass(key: OcNodeKey): Record<string, boolean> {
   const draggingSelection = Boolean(draggedKey.value && isSelected(draggedKey.value))
   return {
-    'is-selected': isSelected(key),
     'is-drag-source': draggedKey.value === key || (draggingSelection && isSelected(key)),
     'is-drop-before': dropTargetKey.value === key && dropPosition.value === 'before',
     'is-drop-inside': dropTargetKey.value === key && dropPosition.value === 'inside',
@@ -1020,6 +1022,8 @@ watch([renderedEntries, () => props.data], async () => {
 onMounted(() => {
   window.addEventListener('mousemove', handleGlobalMouseMove)
   window.addEventListener('mouseup', handleGlobalMouseUp)
+  // 标签字体是异步加载的：装好后标签宽度会变，而 ResizeObserver 只看容器，不看文本，必须在这里补一次重测。
+  fontFaceSet()?.addEventListener('loadingdone', syncTreeMetrics)
   syncTreeMetrics()
   syncExternalDropZone()
   if (typeof ResizeObserver !== 'undefined' && treeRootElement.value) {
@@ -1031,6 +1035,7 @@ onMounted(() => {
 watch(() => props.externalDrop, syncExternalDropZone)
 
 onBeforeUnmount(() => {
+  fontFaceSet()?.removeEventListener('loadingdone', syncTreeMetrics)
   treeResizeObserver?.disconnect()
   externalDropZoneDispose?.()
   externalDropZoneDispose = null
@@ -1123,36 +1128,12 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.oc-tree__row {
-  display: flex;
-  align-items: center;
-  gap: var(--oc-space-2);
-  width: 100%;
-  height: var(--oc-size-md);
-  min-width: 0;
-  padding: 0 var(--oc-space-3) 0 calc(var(--oc-space-3) + var(--oc-tree-indent, 0px));
-  border: 0;
-  border-radius: var(--oc-radius-sm);
-  outline: 0;
-  background: transparent;
-  color: var(--oc-fg-default);
-  font: var(--oc-text-base);
-  text-align: left;
-  cursor: default;
-  transition: background-color var(--oc-duration-fast) var(--oc-ease);
-}
-
-.oc-tree__row:hover:not(.is-disabled),
-.oc-tree__row:focus-visible {
-  background: var(--oc-bg-hover);
-}
-
-.oc-tree__node.is-selected .oc-tree__row {
-  background: var(--oc-bg-selected);
-}
-
-.oc-tree__row.is-disabled {
-  opacity: var(--oc-opacity-disabled);
+/*
+ * 行的盒模型与状态外观由 OcRow 提供；缩进是树的几何，只补起始内边距。
+ * 选择器带上节点容器，避免与 OcRow 自己的 `.oc-row` 规则同权重而依赖样式表顺序。
+ */
+.oc-tree__node > .oc-tree__row {
+  padding-inline-start: calc(var(--oc-space-3) + var(--oc-tree-indent, 0px));
 }
 
 .oc-tree__icon-slot {
@@ -1199,51 +1180,36 @@ onBeforeUnmount(() => {
 }
 
 /*
- * A row spends its width in one order: the title keeps what it needs, the trailing text gives up
- * its own width first, and only a title that still does not fit is truncated. The trailing line is
- * therefore not a box of its own competing with the title — its parts are laid out on the row's own
- * flex line, where the text can shrink to nothing and the chips and commands keep their full width.
+ * 标题内容住在 OcRow 的标题位里：标签必须是块盒，单行省略与溢出提示才量得到真实宽度。
  */
 .oc-tree__label {
-  flex: 1 1 auto;
+  display: block;
   min-width: 0;
 }
 
+/*
+ * 尾部行由 OcNodeTail 渲染，根元素不参与盒模型：命令、徽标与文本继续作为行尾的直接 flex 项，
+ * 让位顺序与命令宽度测量都和以前一致。
+ */
 .oc-tree__tail {
   display: contents;
 }
 
-/* Squeezed before the title: the weight is far above the title's 1, so the text bottoms out first. */
-.oc-tree__tail-text {
-  flex: 0 1000 auto;
-}
-
-/* The trailing line keeps its own tighter rhythm inside the row, which spaces its parts wider. */
-.oc-tree__tail > *:not(:last-child) {
-  margin-inline-end: calc(var(--oc-space-1) - var(--oc-space-2));
-}
-
-.oc-tree__tail-badge { display: inline-flex; align-items: center; flex: 0 0 auto; }
-
 .oc-tree__rename-input {
-  flex: 1 1 auto;
-  min-width: 0;
+  display: block;
+  width: 100%;
   height: calc(var(--oc-size-md) - var(--oc-space-1));
 }
 
-.oc-tree__tail-action {
-  display: none;
-  flex: 0 0 auto;
-  align-items: center;
-}
-
-.oc-tree__row:hover .oc-tree__tail-action,
-.oc-tree__row:focus-within .oc-tree__tail-action,
-.oc-tree__node.is-selected .oc-tree__tail-action,
-.oc-tree__tail-action:has(.oc-action-button.is-menu-open),
-.oc-tree.are-actions-always-visible .oc-tree__tail-action,
-.oc-tree.are-commands-revealed .oc-tree__tail-action {
-  display: inline-flex;
+/*
+ * 命令平时不显示：行被交互或正在测量时由变量揭示，常显由 OcNodeTail 的 actionVisibility 负责。
+ * 变量按继承生效，所以这一条只需写在行上。
+ */
+.oc-tree__row:hover,
+.oc-tree__row:focus-within,
+.oc-tree__row.is-selected,
+.oc-tree.are-commands-revealed {
+  --oc-node-tail-action-display: inline-flex;
 }
 
 .oc-tree__node.is-drag-source {

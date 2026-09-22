@@ -317,6 +317,17 @@ export function setOcGlassIntensity(value: number): void {
   root.dataset.ocGlassIntensity = String(intensity)
 }
 
+/**
+ * 云母由 Windows 绘制在窗口底层：开启时让窗口基色透明，材质才透得上来。
+ * 仅在效果确认应用成功后调用，避免留下一个没有任何材质的透明窗口。
+ */
+export function setOcMicaBackdrop(enabled: boolean): void {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  root.style.setProperty('--oc-bg-window', enabled ? 'transparent' : 'var(--oc-bg-base)')
+  root.dataset.ocMicaBackdrop = enabled ? 'on' : 'off'
+}
+
 export function setOcPhaseImageSpeedMultiplier(value: number): void {
   if (typeof document === 'undefined') return
   const multiplier = Number.isFinite(value) ? Math.max(0.01, value) : 1

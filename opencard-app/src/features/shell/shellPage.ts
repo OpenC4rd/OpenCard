@@ -1,4 +1,4 @@
-import type { SettingsCategoryKey } from '../settings/model/appSettings'
+import type { AppSettingKey, SettingsCategoryKey } from '../settings/model/appSettings'
 
 export type PrimaryShellPage = 'welcome' | 'workbench'
 export type ProjectCloseDestination = 'current' | 'welcome' | 'create-project'
@@ -9,7 +9,13 @@ export type ShellPage =
   | { type: 'create-project'; returnPage: PrimaryShellPage }
   | { type: 'export-template'; returnPage: PrimaryShellPage }
   | { type: 'about'; returnPage: PrimaryShellPage }
-  | { type: 'settings'; categoryKey: SettingsCategoryKey; returnPage: PrimaryShellPage }
+  | {
+      type: 'settings'
+      categoryKey: SettingsCategoryKey
+      returnPage: PrimaryShellPage
+      /** 要带到前台的设置项 key；进入设置页后该行会滚入视野并高亮一次。 */
+      focusKey?: AppSettingKey
+    }
 
 export function getPrimaryShellPage(page: ShellPage): PrimaryShellPage {
   return page.type === 'welcome' || page.type === 'workbench'

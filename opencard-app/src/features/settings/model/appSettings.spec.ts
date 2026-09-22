@@ -6,6 +6,7 @@ import {
   getThemePreset,
   normalizeAppSettings,
   parseAppTheme,
+  resolveCommitterIdentity,
   resolveThemePresetId,
   serializeAppTheme,
 } from './appSettings'
@@ -34,14 +35,17 @@ describe('appSettings', () => {
         glassIntensity: 100,
         baseFontSize: 12,
         phaseImageSpeed: 400,
+        micaBackground: false,
         themeOverrides: { dark: {}, light: {} },
         accentNeighborAngles: { dark: -50, light: -50 },
         fontFamilies: { dark: 'system', light: 'system' },
+        themePresetIds: { dark: 'default', light: 'default' },
         userThemePresets: { dark: [], light: [] },
       },
       shell: { sidebarWidth: 420, sidebarCollapsed: true, titleBarNoticeHistoryLimit: 128 },
-      updates: { suppressReleaseNotesAfterUpdate: false },
+      updates: { showReleaseNotesAfterUpdate: true },
       exporting: { openCdeWorkbookAfterExport: true },
+      versionControl: { committerName: '', committerEmail: '', createInitialCommit: true },
       workspace: {
         autoSave: true,
         autoSaveIntervalSeconds: 30,
@@ -56,6 +60,44 @@ describe('appSettings', () => {
         alignmentSnappingEnabledByDefault: true,
       },
       projectCreation: { lastParentPath: '', recentProjects: [], workspaceStates: {} },
+    })
+  })
+
+  it('normalizes the committer identity and drops illegal signature characters', () => {
+    expect(normalizeAppSettings({
+      version: APP_SETTINGS_VERSION,
+      versionControl: { committerName: '  张三  ', committerEmail: '', createInitialCommit: false },
+    }).versionControl).toEqual({ committerName: '张三', committerEmail: '', createInitialCommit: false })
+
+    expect(normalizeAppSettings({
+      version: APP_SETTINGS_VERSION,
+      versionControl: { committerName: 'A<b>\nc', committerEmail: 'x@y.example' },
+    }).versionControl).toEqual({ committerName: 'A b c', committerEmail: 'x@y.example', createInitialCommit: true })
+
+    expect(normalizeAppSettings({ version: APP_SETTINGS_VERSION }).versionControl)
+      .toEqual({ committerName: '', committerEmail: '', createInitialCommit: true })
+  })
+
+  it('derives the committer email from the name with the key slug algorithm', () => {
+    const settings = createDefaultAppSettings()
+    settings.versionControl.committerName = '张三'
+    expect(resolveCommitterIdentity(settings)).toEqual({
+      name: '张三',
+      email: 'zhang-san@noreply.example',
+    })
+
+    settings.versionControl.committerEmail = 'author@example.com'
+    expect(resolveCommitterIdentity(settings)).toEqual({
+      name: '张三',
+      email: 'author@example.com',
+    })
+
+    // 名称留空就退回作者身份 ID，邮箱再按它推导——初始化仓库因此不需要再问任何东西。
+    settings.versionControl.committerName = ''
+    settings.versionControl.committerEmail = ''
+    expect(resolveCommitterIdentity(settings)).toEqual({
+      name: settings.identity.publisherKey,
+      email: `${settings.identity.publisherKey}@noreply.example`,
     })
   })
 
@@ -149,10 +191,12 @@ describe('appSettings', () => {
       expandedDirectories: [],
       packageBuilder: {
         name: 'Theme',
+        author: '',
         version: '2.1.0',
         fontFamilyKeys: ['latin'],
         fontCompositionKeys: ['body'],
         iconSeriesKeys: [],
+        packageKeys: [],
         imagePaths: ['images/card.png'],
       },
     })
@@ -222,9 +266,39 @@ describe('appSettings', () => {
     expect(parseAppTheme('{"format":"opencard-theme","version":1}')).toBeNull()
   })
 
-  it('provides five built-in presets for each color scheme', () => {
-    expect(APP_THEME_PRESETS.dark).toHaveLength(5)
-    expect(APP_THEME_PRESETS.light).toHaveLength(5)
+  it('derives the graphite preset from the OpenCard theme with a pure theme color', () => {
+    expect(getThemePreset('dark', 'graphite')).toEqual({
+      colors: {
+        '--oc-accent': '#FFFFFF',
+        '--oc-bg-base': '#1E1E1E',
+        '--oc-fg-default': '#CCCCCC',
+      },
+      accentNeighborAngle: -50,
+      fontFamily: 'system',
+    })
+    expect(getThemePreset('light', 'graphite')).toEqual({
+      colors: {
+        '--oc-accent': '#000000',
+        '--oc-bg-base': '#F5F6FB',
+        '--oc-fg-default': '#1F2430',
+      },
+      accentNeighborAngle: -50,
+      fontFamily: 'system',
+    })
+
+    const graphite = getThemePreset('dark', 'graphite')!
+    expect(resolveThemePresetId('dark', graphite.colors, -50, 'system')).toBe('graphite')
+    expect(resolveThemePresetId('light', graphite.colors, -50, 'system')).not.toBe('graphite')
+  })
+
+  it('keeps resolving the OpenCard default preset from untouched color overrides', () => {
+    expect(resolveThemePresetId('dark', {}, -50, 'system')).toBe('default')
+    expect(resolveThemePresetId('light', {}, -50, 'system')).toBe('default')
+  })
+
+  it('provides six built-in presets for each color scheme', () => {
+    expect(APP_THEME_PRESETS.dark).toHaveLength(6)
+    expect(APP_THEME_PRESETS.light).toHaveLength(6)
     expect(APP_THEME_PRESETS.dark.every(id => getThemePreset('dark', id))).toBe(true)
     expect(APP_THEME_PRESETS.light.every(id => getThemePreset('light', id))).toBe(true)
   })
@@ -258,6 +332,38 @@ describe('appSettings', () => {
       'Inter; SimSun',
       settings.appearance.userThemePresets.dark,
     )).toBe('user:Forest')
+  })
+
+  it('keeps the selected preset id and derives it only when the data has none', () => {
+    expect(normalizeAppSettings({
+      version: APP_SETTINGS_VERSION,
+      appearance: {},
+    }).appearance.themePresetIds).toEqual({ dark: 'default', light: 'default' })
+
+    // 显式记下的 id 不按颜色重新推导：颜色一样、名字不同的预设靠它区分。
+    const explicit = normalizeAppSettings({
+      version: APP_SETTINGS_VERSION,
+      appearance: {
+        themePresetIds: { dark: 'graphite', light: 'user:Forest' },
+        userThemePresets: {
+          light: [{
+            name: 'Forest',
+            definition: {
+              colors: { '--oc-accent': '#75FF53', '--oc-bg-base': '#34251A', '--oc-fg-default': '#CCCCCC' },
+              accentNeighborAngle: -50,
+              fontFamily: 'system',
+            },
+          }],
+        },
+      },
+    })
+    expect(explicit.appearance.themePresetIds).toEqual({ dark: 'graphite', light: 'user:Forest' })
+
+    // 认不出来的 id（预设已被删除或来自更早的数据）退化成"自定义"。
+    expect(normalizeAppSettings({
+      version: APP_SETTINGS_VERSION,
+      appearance: { themePresetIds: { dark: 'user:Gone', light: 'nope' } },
+    }).appearance.themePresetIds).toEqual({ dark: '', light: '' })
   })
 
   it('clamps the base font size and normalizes per-theme font choices', () => {

@@ -95,6 +95,7 @@
             <SettingsWorkspace
               v-else-if="isSettingsMode"
               :view-model="activeSettingsCategory"
+              :focus-key="settingsFocusKey"
               @intent="handleSettingsIntent"
             />
             <AboutWorkspace
@@ -207,13 +208,6 @@
       @close="closeCommitVersionDialog"
       @submit="commitVersion"
     />
-    <InitializeRepositoryDialog
-      :open="initializeRepositoryDialogOpen"
-      :busy="isInitializingRepository"
-      :error="initializeRepositoryError"
-      @close="closeInitializeRepositoryDialog"
-      @submit="initializeProjectRepository"
-    />
 
     <div
       v-if="isExternalFileDragActive && !isExternalFileDragOverZone"
@@ -276,21 +270,15 @@
       @close="feedbackCenterPage = null"
     />
 
-    <OcDialog :open="themeExchangeDialog !== null"
-      :title="t('settings.actions.importTheme')"
-      :description="t('settings.themeExchange.description')"
-      size="lg" height-mode="fixed" height="md" :scrollable="false"
-      close-on-backdrop @request-close="closeThemeExchangeDialog">
-      <label class="theme-exchange-dialog__field">
-        <span>{{ t('settings.themeExchange.pasteLabel') }}</span>
-        <OcFieldInput class="theme-exchange-dialog__input" as="textarea" full-width mono resize="none"
-          :value="themeExchangeText" spellcheck="false"
-          @input="themeExchangeText = ($event.target as HTMLTextAreaElement).value" />
-      </label>
-      <p v-if="themeExchangeError" class="theme-exchange-dialog__error">{{ themeExchangeError }}</p>
+    <OcDialog :open="Boolean(confirmationRequest)" :title="confirmationRequest?.title ?? ''"
+      :description="confirmationRequest?.message ?? ''" size="sm" @close="resolveConfirmation(false)">
       <template #footer>
-        <OcButton type="button" @click="closeThemeExchangeDialog">{{ t('settings.themeExchange.cancel') }}</OcButton>
-        <OcButton type="button" variant="solid" @click="confirmThemeExchange">{{ t('settings.themeExchange.importButton') }}</OcButton>
+        <OcButton variant="ghost" @click="resolveConfirmation(false)">
+          {{ t('projectTemplates.actions.cancel') }}
+        </OcButton>
+        <OcButton variant="solid" @click="resolveConfirmation(true)">
+          {{ confirmationRequest?.confirmLabel ?? '' }}
+        </OcButton>
       </template>
     </OcDialog>
 
@@ -309,12 +297,12 @@ import { projectFontSources } from '../workspace/model/projectFontRegistry'
 import {
   createDefaultOpenCardContent,
   useEditorSessionStore,
+  type EditorSession,
 } from '../workspace/store/editorSessionStore'
 import FloatingMenuHost from '../../components/ui/FloatingMenuHost.vue'
 import type { OcActionMenuEntry } from '../../components/standard/OcActionMenu.vue'
 import OcIcon from '../../components/base/OcIcon.vue'
 import OcButton from '../../components/base/OcButton.vue'
-import OcFieldInput from '../../components/base/OcFieldInput.vue'
 import OcDialog from '../../components/standard/OcDialog.vue'
 import { normalizeNodeTail } from '../../shared/ui/node/node.types'
 import { getPathDirectory } from '../../shared/model/filePath'
@@ -371,12 +359,16 @@ import { resolveProjectTemplateName } from '../project-templates/model/projectTe
 import { useProjectTemplateStore } from '../project-templates/store/projectTemplateStore'
 import type { StoredResourcePackage } from '../workspace/model/storedResourcePackage'
 import { useStoredResourcePackageStore } from '../workspace/store/storedResourcePackageStore'
+import { loadBuiltinResourcePackages } from '../workspace/services/builtinResourcePackageCatalog'
 import { useSettingsWorkspace } from '../settings/composables/useSettingsWorkspace'
 import { useAppSettingsStore } from '../settings/store/appSettingsStore'
+import { registerSettingsNavigator } from '../settings/settingsNavigation'
 import {
   createPublisherKey,
+  isSettingsCategoryKey,
   parseAppTheme,
   serializeAppTheme,
+  type AppSettingKey,
   type SettingsCategoryKey,
   type SettingsIntent,
 } from '../settings/model/appSettings'
@@ -393,7 +385,6 @@ import { useProjectExport } from './composables/useProjectExport'
 import ProjectExportDialog from '../exporting/components/ProjectExportDialog.vue'
 import ResourcePackageBuilderDialog from '../workspace/components/ResourcePackageBuilderDialog.vue'
 import CommitVersionDialog from '../version-control/components/CommitVersionDialog.vue'
-import InitializeRepositoryDialog from '../version-control/components/InitializeRepositoryDialog.vue'
 import type { ExportDocumentCandidate } from '../../components/editors/ProjectExportTaskEditor.vue'
 import {
   createDefaultProjectExportTask,
@@ -445,6 +436,9 @@ import {
 } from './shellPage'
 import { useShellSidebarLists } from './composables/useShellSidebarLists'
 import {
+  BUILTIN_RESOURCE_PACKAGES_GROUP_KEY,
+  BUILTIN_TEMPLATES_GROUP_KEY,
+  DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
   IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
   PROJECT_FILES_LIST_KEY,
   PROJECT_NEW_FOLDER_ACTION_KEY,
@@ -452,11 +446,23 @@ import {
   PROJECT_REVEAL_ACTION_KEY,
   RESOURCE_PACKAGES_LIST_KEY,
   SHELL_SIDEBAR_COLLAPSE_THRESHOLD,
+  STORED_RESOURCE_PACKAGES_GROUP_KEY,
   TIMELINE_LIST_KEY,
   TIMELINE_REFRESH_ACTION_KEY,
   USER_TEMPLATES_GROUP_KEY,
+  USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
 } from './shellSidebarConfig'
 import { TIMELINE_COMPARE_WITH_DISK_ACTION_KEY } from '../version-control/useProjectTimeline'
+import { CHANGED_FOLDER_KEY_MARK } from '../version-control/changedPathTree'
+import {
+  CHANGE_DESELECT_ACTION_KEY,
+  CHANGE_DISCARD_ACTION_KEY,
+  CHANGE_IGNORE_EXTENSION_ACTION_KEY,
+  CHANGE_IGNORE_FILE_ACTION_KEY,
+  CHANGE_IGNORE_FOLDER_PREFIX,
+  CHANGE_SELECT_ACTION_KEY,
+  resolveDiscardTargets,
+} from '../version-control/changedPathActions'
 import { useOcdocumentDiffSession } from '../version-control/useOcdocumentDiffSession'
 
 const { t, locale } = useI18n()
@@ -464,6 +470,7 @@ const DIFF_EXIT_ACTION_KEY = 'diff.exit'
 const DIFF_BEFORE_ACTION_KEY = 'diff.before'
 const DIFF_AFTER_ACTION_KEY = 'diff.after'
 const IMPORT_TEMPLATE_ACTION_KEY = 'import-template'
+const TEMPLATE_REMOVE_ACTION_KEY = 'template.remove'
 const ATTACH_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.attach'
 const ATTACHED_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.attached'
 const REMOVE_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.remove'
@@ -554,10 +561,52 @@ function getCurrentPrimaryShellPage(): PrimaryShellPage {
 function showPrimaryShellPage(page: PrimaryShellPage): void {
   shellPage.value = { type: page }
 }
+
+/**
+ * 应用内确认对话框：调用方 await 结果，取消/关闭都算拒绝。
+ * 破坏性操作走它而不是系统对话框，样式与其余弹窗一致；confirmLabel 由调用方给出动词。
+ */
+function requestConfirmation(options: { title: string; message: string; confirmLabel: string }): Promise<boolean> {
+  return new Promise((resolve) => {
+    confirmationRequest.value = { ...options, resolve }
+  })
+}
+
+function resolveConfirmation(accepted: boolean): void {
+  const request = confirmationRequest.value
+  confirmationRequest.value = null
+  request?.resolve(accepted)
+}
 const selectedTemplateKey = ref<ProjectTemplateKey | null>(null)
+/** 应用内确认：移除包、删除模板这类破坏性操作统一走这里，不再用系统对话框。 */
+const confirmationRequest = ref<{
+  title: string
+  message: string
+  confirmLabel: string
+  resolve: (accepted: boolean) => void
+} | null>(null)
 const attachedResourcePackagePaths = ref<string[]>([])
+/** 随应用发布的内置包：和软件存储里的包一起列在「预装的包」里，只是不能从存储移除。 */
+const builtinResourcePackages = ref<readonly StoredResourcePackage[]>([])
+const selectedResourcePackageKeys = ref<readonly string[]>([])
+/** 两棵树的展开状态都是受控的：默认两组都展开，用户折叠后由这里记住。 */
+const templateExpandedKeys = ref<string[]>([BUILTIN_TEMPLATES_GROUP_KEY, USER_TEMPLATES_GROUP_KEY])
+const resourcePackageExpandedKeys = ref<string[]>([
+  BUILTIN_RESOURCE_PACKAGES_GROUP_KEY,
+  STORED_RESOURCE_PACKAGES_GROUP_KEY,
+])
+const allResourcePackages = computed(() => [...builtinResourcePackages.value, ...resourcePackageStore.packs.value])
+/** 选中项里真正是包的 Key（分组节点与空态节点也在同一棵树里被选中，但不是包）。 */
+const selectedResourcePackagePaths = computed(() => {
+  const paths = new Set(allResourcePackages.value.map((pack) => pack.path))
+  return selectedResourcePackageKeys.value.filter((key) => paths.has(key))
+})
+const canUseSelectedResourcePackages = computed(() => selectedResourcePackagePaths.value
+  .some((path) => !attachedResourcePackagePaths.value.includes(path)))
+const canDisableSelectedResourcePackages = computed(() => selectedResourcePackagePaths.value
+  .some((path) => attachedResourcePackagePaths.value.includes(path)))
 const attachedResourcePackages = computed(() => attachedResourcePackagePaths.value
-  .map((path) => resourcePackageStore.findPackage(path))
+  .map((path) => allResourcePackages.value.find((pack) => pack.path === path))
   .filter((pack): pack is StoredResourcePackage => Boolean(pack)))
 const createProjectWorkspaceRef = ref<InstanceType<typeof CreateProjectWorkspace> | null>(null)
 const exportTemplateWorkspaceRef = ref<InstanceType<typeof ExportTemplateWorkspace> | null>(null)
@@ -641,15 +690,32 @@ const isProjectTemplateBusy = computed(() => (
 const settingsCategoryKey = computed<SettingsCategoryKey>(() =>
   shellPage.value.type === 'settings' ? shellPage.value.categoryKey : 'general'
 )
+const settingsFocusKey = computed(() => (
+  shellPage.value.type === 'settings' ? shellPage.value.focusKey : undefined
+))
 const projectOpen = computed(() => Boolean(projectPath.value))
 const systemFontFamilies = ref<readonly string[]>([])
-const { categoryTreeData: settingsCategoryTreeData, activeCategory: activeSettingsCategory } = useSettingsWorkspace({
+const { categoryTreeData: settingsCategoryTreeData, activeCategory: activeSettingsCategory, settingsAnchorFor } = useSettingsWorkspace({
   settings: settingsStore.settings,
   categoryKey: settingsCategoryKey,
   projectOpen,
   systemFontFamilies,
   translate: t,
 })
+
+/**
+ * 跳转到某个设置项：切到它所在的分类并把该行带到前台。
+ * 供 shell 内部与 settingsNavigation 的通用入口共用同一实现。
+ */
+function openSettingsAt(key: AppSettingKey): void {
+  const anchor = settingsAnchorFor(key)
+  shellPage.value = {
+    type: 'settings',
+    categoryKey: anchor?.category ?? settingsCategoryKey.value,
+    returnPage: getCurrentPrimaryShellPage(),
+    focusKey: key,
+  }
+}
 
 const {
   sidebarCollapsed,
@@ -700,9 +766,6 @@ const {
 const releaseNotesDialogMode = ref<'current' | 'available' | null>(null)
 const feedbackDialogKind = ref<FeedbackKind>('suggestion')
 const feedbackCenterPage = ref<FeedbackPage | null>(null)
-const themeExchangeDialog = ref<{ themeId: 'dark' | 'light' } | null>(null)
-const themeExchangeText = ref('')
-const themeExchangeError = ref('')
 const { latestDiagnostics: latestFeedbackDiagnostics } = useFeedbackDiagnostics()
 const {
   unreadReplyCount: unreadFeedbackReplyCount,
@@ -721,9 +784,9 @@ const displayedReleaseNotes = computed(() => (
 ))
 
 watch(
-  [hasUnseenCurrentReleaseNotes, () => settingsStore.settings.value.updates.suppressReleaseNotesAfterUpdate],
-  ([unseen, suppress]) => {
-    if (unseen && !suppress && releaseNotesDialogMode.value === null) {
+  [hasUnseenCurrentReleaseNotes, () => settingsStore.settings.value.updates.showReleaseNotesAfterUpdate],
+  ([unseen, showReleaseNotes]) => {
+    if (unseen && showReleaseNotes && releaseNotesDialogMode.value === null) {
       releaseNotesDialogMode.value = 'current'
     }
   },
@@ -815,27 +878,33 @@ const {
   commitVersionDialogOpen,
   isCommittingVersion,
   commitVersionError,
-  initializeRepositoryDialogOpen,
   isInitializingRepository,
-  initializeRepositoryError,
-  repositoryInitializedDuringDialog,
   timelineFilePath,
   timelineFileName,
   timelineTreeData,
   timelineProjectTreeData,
   changesTreeData,
+  selectedChangeCount,
+  selectChangeNode,
+  discardChanges,
+  ignoreChangePath,
+  ignoreChangeExtension,
+  statusEntries,
   timelineLoading,
   timelineRevisionOptions,
+  latestCommitIdForPath,
   refreshTimeline,
   refreshTimelineStatus,
   timelinePlaceholder,
   versionGraphExpandedKeys,
+  changesExpandedKeys,
   repositoryReady,
   repositoryNeedsInitialization,
   handleVersionGraphExpansionChange,
   handleVersionGraphExpansionSync,
+  handleChangesExpansionChange,
+  handleChangesExpansionSync,
   closeCommitVersionDialog,
-  closeInitializeRepositoryDialog,
   initializeProjectRepository,
   commitVersion,
 } = useShellVersionControl({
@@ -845,6 +914,8 @@ const {
   translate: t,
   fileChangeRevision,
   getRelativeProjectPath,
+  moveProjectEntryToTrash: trashFile,
+  settings: settingsStore.settings,
 })
 const diffSessionState = useOcdocumentDiffSession({
   projectRoot: projectPath,
@@ -879,25 +950,98 @@ const editorComparison = computed(() => {
     after: { ...session.after, revisionId: session.after.commitId, resourceRootPath: diffSessionState.afterSnapshotRoot.value },
   }
 })
+/**
+ * 进入"某个版本 ↔ 磁盘"的差异模式：两边的快照都取到之后才切换会话。
+ * 任何一边取不到（或期间用户切走了别的文件）就保持原来的编辑状态，编辑器不会停在一个空白的对比上。
+ */
+async function enterDiffComparison(sessionId: string, beforeCommitId: string): Promise<void> {
+  await diffSessionState.selectComparison(beforeCommitId, null)
+  if (
+    diffSessionState.error.value
+    || diffSessionState.before.value?.commitId !== beforeCommitId
+    || diffSessionState.after.value?.commitId !== null
+    || activeSession.value?.id !== sessionId
+  ) return
+
+  synchronizedDiffSessionKey = `${sessionId}|${beforeCommitId}|current`
+  setSessionMode(sessionId, 'diff', {
+    beforeRevisionId: beforeCommitId,
+    afterRevisionId: null,
+  })
+}
+
 async function handleTimelineAction(event: OcNodeActionEvent) {
   if (event.actionKey !== TIMELINE_COMPARE_WITH_DISK_ACTION_KEY || !timelineFilePath.value) return
   const commitId = event.key.startsWith('timeline:') ? event.key.slice('timeline:'.length) : null
   const sessionId = activeSession.value?.id
   if (!commitId || !sessionId) return
 
-  await diffSessionState.selectComparison(commitId, null)
-  if (
-    diffSessionState.error.value
-    || diffSessionState.before.value?.commitId !== commitId
-    || diffSessionState.after.value?.commitId !== null
-    || activeSession.value?.id !== sessionId
-  ) return
+  await enterDiffComparison(sessionId, commitId)
+}
 
-  synchronizedDiffSessionKey = `${sessionId}|${commitId}|current`
-  setSessionMode(sessionId, 'diff', {
-    beforeRevisionId: commitId,
-    afterRevisionId: null,
-  })
+/**
+ * 更改列表点击：打开这条改动对应的文件，并直接进入"它最后一次提交 ↔ 磁盘"的差异模式。
+ * 与时间线的"与磁盘版本对比"走同一条落差流程，只是左半边固定成该文件最新的那个提交。
+ * 新增的文件还没有可比的版本（照常打开原文），已经删掉的文件磁盘上没有内容（这一条不响应）。
+ */
+async function handleChangesNodeActivate(event: OcNodeActivateEvent): Promise<void> {
+  if (event.key.startsWith(CHANGED_FOLDER_KEY_MARK)) {
+    handleChangesExpansionChange({
+      key: event.key,
+      expanded: !changesExpandedKeys.value.includes(event.key),
+    })
+    return
+  }
+
+  // 未跟踪的目录在更改列表里是一条以 `/` 结尾的整体条目，它没有可以打开的文件。
+  const relativePath = event.key
+  if (relativePath.endsWith('/')) return
+  const entry = statusEntries.value.find(candidate => candidate.path === relativePath)
+  if (!entry || entry.indexDeleted || entry.worktreeDeleted) return
+
+  const session = await handleOpenFile(resolveProjectPath(relativePath))
+  if (!session || timelineFilePath.value !== relativePath) return
+
+  const beforeCommitId = await latestCommitIdForPath(relativePath)
+  if (!beforeCommitId) return
+
+  await enterDiffComparison(session.id, beforeCommitId)
+}
+
+/**
+ * 更改列表的行内与右键动作：勾选、放弃更改、忽略此文件/此文件夹/这一类扩展名。
+ * 放弃会改动磁盘，所以先确认；忽略只是往 `.gitignore` 写一行，随时可以改回来。
+ */
+async function handleChangesAction(event: OcNodeActionEvent): Promise<void> {
+  if (event.actionKey === CHANGE_SELECT_ACTION_KEY || event.actionKey === CHANGE_DESELECT_ACTION_KEY) {
+    selectChangeNode(event.key, event.actionKey === CHANGE_SELECT_ACTION_KEY)
+    return
+  }
+  if (event.actionKey === CHANGE_DISCARD_ACTION_KEY) {
+    const targets = resolveDiscardTargets(changesTreeData.value, statusEntries.value, event.key)
+    if (targets.tracked.length === 0 && targets.untracked.length === 0) return
+    const name = changesTreeData.value.items.get(event.key)?.label ?? event.key
+    const accepted = await requestConfirmation({
+      title: t('sidebar.changesDiscard'),
+      message: targets.untracked.length > 0
+        ? t('sidebar.changesConfirmDiscardWithNew', { name })
+        : t('sidebar.changesConfirmDiscard', { name }),
+      confirmLabel: t('sidebar.changesDiscard'),
+    })
+    if (accepted) await discardChanges(targets)
+    return
+  }
+  if (event.actionKey === CHANGE_IGNORE_FILE_ACTION_KEY) {
+    await ignoreChangePath(event.key, 'file')
+    return
+  }
+  if (event.actionKey === CHANGE_IGNORE_EXTENSION_ACTION_KEY) {
+    await ignoreChangeExtension(event.key)
+    return
+  }
+  if (event.actionKey.startsWith(CHANGE_IGNORE_FOLDER_PREFIX)) {
+    await ignoreChangePath(event.actionKey.slice(CHANGE_IGNORE_FOLDER_PREFIX.length), 'folder')
+  }
 }
 
 const {
@@ -1183,12 +1327,20 @@ const {
     : null),
 })
 
-function createTemplateItems(templates: readonly ProjectTemplate[]): Map<string, OcNode> {
+/** 模板节点：用户模板自带"删除"尾部动作，内置模板不能删。 */
+function createTemplateItems(templates: readonly ProjectTemplate[], removable: boolean): Map<string, OcNode> {
   const items = new Map<string, OcNode>()
+  const removeAction: OcNodeAction = {
+    key: TEMPLATE_REMOVE_ACTION_KEY,
+    title: t('projectTemplates.actions.delete'),
+    icon: 'action.delete',
+    iconTone: 'danger',
+  }
   for (const template of templates) {
     items.set(template.key, {
       label: resolveProjectTemplateName(template, locale.value),
       visual: { type: 'icon', icon: 'file.opencard' },
+      ...(removable ? { tail: [removeAction] } : {}),
     })
   }
   return items
@@ -1246,32 +1398,47 @@ function createRecentProjectTreeData(
   return { rootKeys, items, children: new Map() }
 }
 
+/** 模板树：内置模板与我的模板各成一个分组，导入动作挂在"我的模板"上（和包那棵树同一套结构）。 */
 const templateTreeData = computed<OcNodeCollection>(() => {
-  const builtinKeys = templateStore.builtinTemplates.value.map(template => template.key)
-  const userKeys = templateStore.userTemplates.value.map(template => template.key)
-  const userChildren = userKeys.length > 0 ? userKeys : ['template-empty:user']
-  const items = new Map<string, OcNode>([
-    [USER_TEMPLATES_GROUP_KEY, {
-      label: t('projectTemplates.sections.user'),
-      visual: { type: 'icon', icon: 'file.package' },
-      tail: [{
+  const groups: [string, string, readonly ProjectTemplate[], boolean, OcNodeAction[]][] = [
+    [BUILTIN_TEMPLATES_GROUP_KEY, t('projectTemplates.sections.builtinTemplates'),
+      templateStore.builtinTemplates.value, false, []],
+    [USER_TEMPLATES_GROUP_KEY, t('projectTemplates.sections.user'),
+      templateStore.userTemplates.value, true, [{
         key: IMPORT_TEMPLATE_ACTION_KEY,
         title: t('projectTemplates.actions.import'),
         icon: 'action.import',
-      }],
-    }],
-    ...createTemplateItems(templateStore.templates.value),
-    ...(!userKeys.length ? [createEmptyCatalogItem('template-empty:user', t('projectTemplates.status.noUserTemplates'))] : []),
-  ])
+      }]],
+  ]
+  const items = new Map<string, OcNode>()
+  const children = new Map<string, readonly string[]>()
+  for (const [groupKey, label, templates, removable, actions] of groups) {
+    items.set(groupKey, {
+      label,
+      visual: { type: 'icon', icon: 'file.package' },
+      ...(actions.length ? { tail: actions } : {}),
+    })
+    if (templates.length === 0) {
+      const emptyKey = `${groupKey}:empty`
+      const [key, node] = createEmptyCatalogItem(emptyKey, groupKey === USER_TEMPLATES_GROUP_KEY
+        ? t('projectTemplates.status.noUserTemplates')
+        : t('projectTemplates.status.noBuiltinTemplates'))
+      items.set(key, node)
+      children.set(groupKey, [emptyKey])
+      continue
+    }
+    children.set(groupKey, templates.map(template => template.key))
+    for (const [key, node] of createTemplateItems(templates, removable)) items.set(key, node)
+  }
   return {
-    rootKeys: [...builtinKeys, USER_TEMPLATES_GROUP_KEY],
+    rootKeys: [BUILTIN_TEMPLATES_GROUP_KEY, USER_TEMPLATES_GROUP_KEY],
     items,
-    children: new Map([
-      [USER_TEMPLATES_GROUP_KEY, userChildren],
-    ]),
+    children,
   }
 })
-const resourcePackageTreeData = computed<OcNodeCollection>(() => createResourcePackageTreeData(resourcePackageStore.packs.value))
+const resourcePackageTreeData = computed<OcNodeCollection>(() => (
+  createResourcePackageTreeData(builtinResourcePackages.value, resourcePackageStore.packs.value)
+))
 const recentProjectSnapshots = useRecentProjectSnapshots({
   recentProjects: computed(() => settingsStore.settings.value.projectCreation.recentProjects),
 })
@@ -1318,12 +1485,22 @@ watch(
   { immediate: true },
 )
 
-/** 进入新建项目页时读取软件存储里的附加包；被跳过的包只上报一次，具体原因留在输出里。 */
+/** 进入新建项目页时读取软件存储里的包与随应用发布的内置包；被跳过的包只上报一次。 */
 watch(isCreateProjectMode, (active) => {
   if (active) void loadStoredResourcePackages()
 }, { immediate: true })
 
 async function loadStoredResourcePackages(): Promise<void> {
+  const builtin = await loadBuiltinResourcePackages().catch(() => null)
+  if (builtin) {
+    builtinResourcePackages.value = builtin.packs
+    reportCatalogWarnings({
+      warnings: builtin.warnings,
+      summaryKey: 'projectTemplates.status.unreadableResourcePackages',
+      itemKey: 'projectTemplates.status.unreadableResourcePackage',
+      translate: t,
+    })
+  }
   try {
     await resourcePackageStore.load()
     reportCatalogWarnings({
@@ -1606,8 +1783,18 @@ const { sidebarTailButtons, sidebarBodyGroups } = useShellSidebarLists({
   settingsCategoryTreeData,
   selectedTemplateKey,
   templateTreeData,
+  templateExpandedKeys,
+  handleTemplateExpansionChange,
   resourcePackageStore,
   resourcePackageTreeData,
+  resourcePackageExpandedKeys,
+  handleResourcePackageExpansionChange,
+  resourcePackageSelection: {
+    selectedKeys: selectedResourcePackageKeys,
+    canUse: canUseSelectedResourcePackages,
+    canDisable: canDisableSelectedResourcePackages,
+    onChange: handleResourcePackageSelectionChange,
+  },
   exportTemplateTreeData,
   exportTemplateExpandedKeys,
   exportTemplateEntryTreeData,
@@ -1628,7 +1815,9 @@ const { sidebarTailButtons, sidebarBodyGroups } = useShellSidebarLists({
   timelineTreeData,
   timelineProjectTreeData,
   changesTreeData,
+  selectedChangeCount,
   versionGraphExpandedKeys,
+  changesExpandedKeys,
   handleSettingsCategorySelectionChange,
   handleTemplateSelectionChange,
   handleTemplateAction,
@@ -1654,6 +1843,10 @@ const { sidebarTailButtons, sidebarBodyGroups } = useShellSidebarLists({
   handleTimelineAction,
   handleVersionGraphExpansionChange,
   handleVersionGraphExpansionSync,
+  handleChangesExpansionChange,
+  handleChangesExpansionSync,
+  handleChangesNodeActivate,
+  handleChangesAction,
 })
 
 const developerModeMenuActions = computed<readonly OcActionMenuEntry[]>(() => (
@@ -2020,20 +2213,62 @@ async function handleTemplateSelectionChange(event: OcNodeSelectionEvent): Promi
   if (key && templateStore.findTemplate(key)) selectedTemplateKey.value = key
 }
 
+function handleTemplateExpansionChange(event: OcNodeExpansionEvent): void {
+  templateExpandedKeys.value = event.expanded
+    ? [...templateExpandedKeys.value, event.key]
+    : templateExpandedKeys.value.filter((key) => key !== event.key)
+}
+
 async function handleTemplateAction(event: OcNodeActionEvent): Promise<void> {
+  if (isProjectTemplateBusy.value) return
+  if (event.actionKey === TEMPLATE_REMOVE_ACTION_KEY) {
+    await removeUserTemplate(event.key as ProjectTemplateKey)
+    return
+  }
   if (event.key !== USER_TEMPLATES_GROUP_KEY || event.actionKey !== IMPORT_TEMPLATE_ACTION_KEY
-    || isProjectTemplateBusy.value || templateStore.isLoading.value) return
+    || templateStore.isLoading.value) return
   await createProjectWorkspaceRef.value?.beginImport()
 }
 
+/** 用户模板的删除入口在列表里（模板节点尾部的删除动作），确认后才真正移除。 */
+async function removeUserTemplate(key: ProjectTemplateKey): Promise<void> {
+  const template = templateStore.findTemplate(key)
+  if (!template) return
+  const accepted = await requestConfirmation({
+    title: t('projectTemplates.actions.delete'),
+    message: t('projectTemplates.confirmDelete'),
+    confirmLabel: t('projectTemplates.actions.delete'),
+  })
+  if (!accepted) return
+  try {
+    await templateStore.deleteUserTemplate(template)
+    if (selectedTemplateKey.value === template.key) {
+      selectedTemplateKey.value = templateStore.templates.value[0]?.key ?? null
+    }
+  } catch (cause) {
+    reportUncodedFailure(t('projectTemplates.errors.unknown'), cause)
+  }
+}
+
 /**
- * 附加包列表里的一行同时表达三件事：当前是否附加到新项目、切换附加、以及从软件存储移除。
- * 节点 Key 就是归档在存储中的路径，因此动作不需要再拼上路径。
+ * 「预装的包」树里的一行同时表达三件事：当前是否预装到新项目、切换预装、以及从软件存储移除。
+ * 节点 Key 就是归档的路径（内置包是资源目录里的路径），因此动作不需要再拼上路径。
+ * 列表头部的三个动作作用在同一批选中项上：导入、使用选中的包、禁用选中的包。
  */
+function handleResourcePackageSelectionChange(event: OcNodeSelectionEvent): void {
+  selectedResourcePackageKeys.value = event.selectedKeys
+}
+
+function handleResourcePackageExpansionChange(event: OcNodeExpansionEvent): void {
+  resourcePackageExpandedKeys.value = event.expanded
+    ? [...resourcePackageExpandedKeys.value, event.key]
+    : resourcePackageExpandedKeys.value.filter((key) => key !== event.key)
+}
+
 function handleResourcePackageAction(event: OcNodeActionEvent): void {
   if (isProjectTemplateBusy.value) return
   const path = event.key
-  const pack = resourcePackageStore.findPackage(path)
+  const pack = allResourcePackages.value.find((candidate) => candidate.path === path)
   if (!pack) return
   if (event.actionKey === ATTACH_RESOURCE_PACKAGE_ACTION_KEY) {
     if (!attachedResourcePackagePaths.value.includes(path)) {
@@ -2047,7 +2282,9 @@ function handleResourcePackageAction(event: OcNodeActionEvent): void {
     return
   }
   if (event.actionKey === REMOVE_RESOURCE_PACKAGE_ACTION_KEY) {
-    void removeStoredResourcePackage(pack)
+    // 内置包不在软件存储里，没有可移除的对象。
+    const stored = resourcePackageStore.findPackage(path)
+    if (stored) void removeStoredResourcePackage(stored)
   }
 }
 
@@ -2101,10 +2338,11 @@ async function importDroppedResourcePackage(path: string): Promise<void> {
 }
 
 async function removeStoredResourcePackage(pack: StoredResourcePackage): Promise<void> {
-  const accepted = await showConfirm(
-    t('projectTemplates.confirmRemoveResourcePackage', { name: pack.name }),
-    { title: t('projectTemplates.sections.resourcePackages'), kind: 'warning' },
-  )
+  const accepted = await requestConfirmation({
+    title: t('projectTemplates.sections.resourcePackages'),
+    message: t('projectTemplates.confirmRemoveResourcePackage', { name: pack.name }),
+    confirmLabel: t('projectTemplates.actions.removeResourcePackage'),
+  })
   if (!accepted) return
   try {
     await resourcePackageStore.removePackage(pack.path)
@@ -2209,6 +2447,19 @@ async function handleSidebarListAction(listKey: string, actionKey: string): Prom
     await importStoredResourcePackage()
     return
   }
+  if (listKey === RESOURCE_PACKAGES_LIST_KEY && actionKey === USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY) {
+    attachedResourcePackagePaths.value = [...new Set([
+      ...attachedResourcePackagePaths.value,
+      ...selectedResourcePackagePaths.value,
+    ])]
+    return
+  }
+  if (listKey === RESOURCE_PACKAGES_LIST_KEY && actionKey === DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY) {
+    const disabled = new Set(selectedResourcePackagePaths.value)
+    attachedResourcePackagePaths.value = attachedResourcePackagePaths.value
+      .filter((path) => !disabled.has(path))
+    return
+  }
 }
 
 function getProjectEntryParentPath(): string {
@@ -2248,33 +2499,27 @@ async function createProjectEntry(kind: 'folder' | 'opencard'): Promise<void> {
 
 function handleSettingsCategorySelectionChange(event: OcNodeSelectionEvent): void {
   const categoryKey = event.selectedKeys[0]
-  if (categoryKey === 'general' || categoryKey === 'appearance' || categoryKey === 'workspace') {
+  if (isSettingsCategoryKey(categoryKey)) {
     const returnPage = getCurrentPrimaryShellPage()
     shellPage.value = { type: 'settings', categoryKey, returnPage }
   }
 }
 
-function openThemeImportDialog(themeId: 'dark' | 'light'): void {
-  themeExchangeDialog.value = { themeId }
-  themeExchangeText.value = ''
-  themeExchangeError.value = ''
-}
-function closeThemeExchangeDialog(): void {
-  themeExchangeDialog.value = null
-  themeExchangeText.value = ''
-  themeExchangeError.value = ''
-}
-function confirmThemeExchange(): void {
-  const dialog = themeExchangeDialog.value
-  if (!dialog) return
-  const definition = parseAppTheme(themeExchangeText.value)
-  if (!definition) {
-    themeExchangeError.value = t('settings.errors.invalidThemeJson')
+/** 主题预设的读取走剪贴板：与复制对称，也不再需要中间对话框。 */
+async function readThemeFromClipboard(themeId: 'dark' | 'light'): Promise<void> {
+  const text = await navigator.clipboard.readText().catch(() => '')
+  if (!text.trim()) {
+    notifyError(t('settings.themeExchange.emptyClipboard'))
     return
   }
-  settingsStore.importThemePreset(dialog.themeId, t('settings.values.importedTheme'), definition)
-  notifySuccess(t('settings.themeExchange.imported'), 'action.import')
-  closeThemeExchangeDialog()
+  const definition = parseAppTheme(text)
+  if (!definition) {
+    notifyError(t('settings.errors.invalidThemeJson'))
+    return
+  }
+  const imported = settingsStore.importThemePreset(themeId, t('settings.values.importedTheme'), definition)
+  if (imported) notifySuccess(t('settings.themeExchange.imported'), 'action.import')
+  else notifyWarning(t('settings.themeExchange.duplicate'))
 }
 
 async function copyThemeJson(themeId: 'dark' | 'light'): Promise<void> {
@@ -2334,18 +2579,18 @@ async function handleSettingsIntent(intent: SettingsIntent): Promise<void> {
     return
   }
 
-  if (intent.type === 'theme.import') {
-    openThemeImportDialog(intent.themeId)
+  if (intent.type === 'theme-name.change') {
+    settingsStore.saveThemePreset(intent.themeId, intent.name)
     return
   }
 
-  if (intent.type === 'theme.export') {
+  if (intent.type === 'theme.copy') {
     await copyThemeJson(intent.themeId)
     return
   }
 
-  if (intent.type === 'themes.reset') {
-    settingsStore.resetThemes()
+  if (intent.type === 'theme.read') {
+    await readThemeFromClipboard(intent.themeId)
     return
   }
 
@@ -2831,9 +3076,7 @@ async function runShellCommand(actionKey: string) {
 
   if (actionKey === 'initialize-repository') {
     if (projectPath.value && repositoryNeedsInitialization.value) {
-      initializeRepositoryError.value = ''
-      repositoryInitializedDuringDialog.value = false
-      initializeRepositoryDialogOpen.value = true
+      void initializeProjectRepository()
     }
     return
   }
@@ -2854,40 +3097,69 @@ async function runShellCommand(actionKey: string) {
   return
 }
 
-function createResourcePackageTreeData(packs: readonly StoredResourcePackage[]): OcNodeCollection {
+/**
+ * 「预装的包」树：内置包与软件存储里的包各成一个分组，包节点自身表达"是否预装 / 切换 / 移除"。
+ * 内置包不在软件存储里，所以它没有"从软件存储移除"这个动作。
+ */
+function createResourcePackageTreeData(
+  builtinPacks: readonly StoredResourcePackage[],
+  storedPacks: readonly StoredResourcePackage[],
+): OcNodeCollection {
   const items = new Map<string, OcNode>()
-  for (const pack of packs) {
-    const isAttached = attachedResourcePackagePaths.value.includes(pack.path)
-    items.set(pack.path, {
-      label: pack.name,
-      visual: { type: 'icon', icon: 'file.package' },
-      tail: [
-        pack.version,
-        isAttached
-          ? {
-              key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY,
-              title: t('projectTemplates.actions.detachResourcePackage'),
-              icon: 'action.check',
-              iconTone: 'success',
-            }
-          : {
-              key: ATTACH_RESOURCE_PACKAGE_ACTION_KEY,
-              title: t('projectTemplates.actions.attachResourcePackage'),
-              icon: 'action.add',
-            },
-        {
-          key: REMOVE_RESOURCE_PACKAGE_ACTION_KEY,
-          title: t('projectTemplates.actions.removeResourcePackage'),
-          icon: 'action.delete',
-          iconTone: 'danger',
-        },
-      ],
-    })
+  const groups: [string, string, readonly StoredResourcePackage[], boolean][] = [
+    [BUILTIN_RESOURCE_PACKAGES_GROUP_KEY, t('projectTemplates.sections.builtinPackages'), builtinPacks, false],
+    [STORED_RESOURCE_PACKAGES_GROUP_KEY, t('projectTemplates.sections.userPackages'), storedPacks, true],
+  ]
+  const children = new Map<string, readonly string[]>()
+  const removeResourcePackageAction: OcNodeAction = {
+    key: REMOVE_RESOURCE_PACKAGE_ACTION_KEY,
+    title: t('projectTemplates.actions.removeResourcePackage'),
+    icon: 'action.delete',
+    iconTone: 'danger',
+  }
+  for (const [groupKey, label, packs, removable] of groups) {
+    items.set(groupKey, { label, visual: { type: 'icon', icon: 'file.package' } })
+    if (packs.length === 0) {
+      const emptyKey = `${groupKey}:empty`
+      items.set(emptyKey, {
+        label: removable
+          ? t('projectTemplates.status.noStoredResourcePackages')
+          : t('projectTemplates.status.noBuiltinResourcePackages'),
+        visual: { type: 'icon', icon: 'file.generic' },
+        disabled: true,
+      })
+      children.set(groupKey, [emptyKey])
+      continue
+    }
+    children.set(groupKey, packs.map((pack) => pack.path))
+    for (const pack of packs) {
+      const isAttached = attachedResourcePackagePaths.value.includes(pack.path)
+      items.set(pack.path, {
+        label: pack.name,
+        visual: { type: 'icon', icon: 'file.package' },
+        tail: [
+          pack.version,
+          isAttached
+            ? {
+                key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY,
+                title: t('projectTemplates.actions.detachResourcePackage'),
+                icon: 'action.check',
+                iconTone: 'success',
+              }
+            : {
+                key: ATTACH_RESOURCE_PACKAGE_ACTION_KEY,
+                title: t('projectTemplates.actions.attachResourcePackage'),
+                icon: 'action.add',
+              },
+          ...(removable ? [removeResourcePackageAction] : []),
+        ],
+      })
+    }
   }
   return {
-    rootKeys: packs.map((pack) => pack.path),
+    rootKeys: [BUILTIN_RESOURCE_PACKAGES_GROUP_KEY, STORED_RESOURCE_PACKAGES_GROUP_KEY],
     items,
-    children: new Map(),
+    children,
   }
 }
 
@@ -3115,11 +3387,12 @@ async function handleWindowControl(actionKey: string) {
   }
 }
 
-async function handleOpenFile(path: string) {
+async function handleOpenFile(path: string): Promise<EditorSession | null> {
   try {
-    await openEditorSession(path)
+    return await openEditorSession(path)
   } catch (error) {
     notifyAppError('OC-E2003', { path, error }, locale.value)
+    return null
   }
 }
 
@@ -3211,6 +3484,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('focus', handleWindowFocus)
   disposeUnhandledExternalDrop = registerUnhandledExternalDrop((paths) => { void handleExternalOpenPaths(paths) })
+  registerSettingsNavigator(openSettingsAt)
   void startShellWindow()
   void startAppUpdater()
   void startFeedbackInbox()
@@ -3224,6 +3498,7 @@ onUnmounted(() => {
   stopDebugTestMessages()
   removeShellProgressTask(UPDATE_PROGRESS_TASK_KEY)
   disposeEditorHost()
+  registerSettingsNavigator(null)
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   disposeUnhandledExternalDrop?.()
@@ -3248,24 +3523,6 @@ async function openResourcePackageBuilder(): Promise<void> {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
-}
-
-.theme-exchange-dialog__field {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
-  gap: var(--oc-space-2);
-  color: var(--oc-fg-muted);
-}
-
-.theme-exchange-dialog__input {
-  height: 100%;
-  min-height: 0;
-}
-
-.theme-exchange-dialog__error {
-  margin: var(--oc-space-2) 0 0;
-  color: var(--oc-fg-danger);
 }
 
 .open-card-shell__workbench {

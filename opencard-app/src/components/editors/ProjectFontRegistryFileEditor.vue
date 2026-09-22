@@ -9,7 +9,8 @@
       :read-font-bytes="readFontBytes"
       :load-errors="projectStore.projectFontLoadErrors.value"
       :error="importError" @update:families="updateFamilies" @update:compositions="updateCompositions"
-      @configure-family="openRegistrationDialog" @remove-family="openFamilyRemovalDialog"
+      @register-family="openRegistrationDialog" @configure-family="openRegistrationDialog"
+      @remove-family="openFamilyRemovalDialog" @add-composition="openCompositionDialog"
       @configure-composition="openCompositionDialog" />
 
     <ProjectRegistryRepairEditor v-else :model-value="props.modelValue ?? ''" :theme-id="themeId"
@@ -19,7 +20,6 @@
     <ProjectFontRegistrationDialog :open="registrationDialogOpen" :registry="fontRegistry"
       :reserved-keys="(document?.compositions ?? []).map(composition => composition.key)"
       :original-key="registrationOriginalKey" :busy="importBusy" :error="importError"
-      :select-files-on-open="!registrationOriginalKey"
       :default-open-path="fontDirectory" :get-managed-font-source="getManagedFontSource"
       :resolve-import-conflict="projectStore.getProjectFontImportConflict"
       @close="closeRegistrationDialog" @submit="registerFont" />
@@ -55,7 +55,6 @@ import MonacoEditor from './MonacoEditor.vue'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { ContentHistoryOperationMeta } from '../../features/editor-runtime/history/contentHistory'
 import type { EditorIssue, EditorIssueSnapshot, EditorNavigationResult, SessionNavigationToken } from '../../features/editor-runtime/model/editorIssue'
-import type { ShellWorkspaceAction } from '../../features/shell/shell.types'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { reportAppError } from '../../features/logging/appErrorCatalog'
 import {
@@ -413,35 +412,5 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'file.font',
 }))
 
-const WORKSPACE_ADD_FAMILY_ACTION_KEY = 'project-font-registry.add-family'
-const WORKSPACE_ADD_COMPOSITION_ACTION_KEY = 'project-font-registry.add-composition'
-
-const workspaceActions = computed<ShellWorkspaceAction[]>(() => [
-  {
-    key: WORKSPACE_ADD_FAMILY_ACTION_KEY,
-    icon: 'action.add',
-    hoverTip: t('projectConfig.fonts.addFont'),
-    disabled: !document.value,
-  },
-  {
-    key: WORKSPACE_ADD_COMPOSITION_ACTION_KEY,
-    icon: 'action.add',
-    hoverTip: t('projectConfig.fonts.addSet'),
-    disabled: !document.value,
-  },
-])
-
-async function runWorkspaceAction(actionKey: string): Promise<boolean> {
-  if (actionKey === WORKSPACE_ADD_FAMILY_ACTION_KEY) {
-    openRegistrationDialog()
-    return true
-  }
-  if (actionKey === WORKSPACE_ADD_COMPOSITION_ACTION_KEY) {
-    openCompositionDialog()
-    return true
-  }
-  return false
-}
-
-defineExpose({ save, navigate, workspaceActions, runWorkspaceAction, presentation })
+defineExpose({ save, navigate, presentation })
 </script>

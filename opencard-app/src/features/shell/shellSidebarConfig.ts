@@ -13,13 +13,19 @@ export const SETTINGS_CATEGORIES_LIST_KEY = 'settings-categories'
 export const TEMPLATES_LIST_KEY = 'templates'
 export const RESOURCE_PACKAGES_LIST_KEY = 'resource-packages'
 export const USER_TEMPLATES_GROUP_KEY = 'template-group:user'
+export const BUILTIN_TEMPLATES_GROUP_KEY = 'template-group:builtin'
+export const BUILTIN_RESOURCE_PACKAGES_GROUP_KEY = 'resource-package-group:builtin'
+export const STORED_RESOURCE_PACKAGES_GROUP_KEY = 'resource-package-group:stored'
 export const TEMPLATE_ENTRIES_LIST_KEY = 'template-entries'
 export const TEMPLATE_COVERS_LIST_KEY = 'template-covers'
 
 /** 侧栏列表动作键；同样由侧栏描述符与列表动作分发共用。 */
 export const TIMELINE_REFRESH_ACTION_KEY = 'timeline.refresh'
-/** 把软件存储里的附加包导入存储、附加到新项目、或从存储里移除。 */
+/** 把包导入软件存储、预装到新项目、或从存储里移除。 */
 export const IMPORT_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.import'
+/** 对选中的包批量预装 / 批量取消预装。 */
+export const USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY = 'resource-package.use-selected'
+export const DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY = 'resource-package.disable-selected'
 export const PROJECT_NEW_FILE_ACTION_KEY = 'project.new-file'
 export const PROJECT_NEW_OPENCARD_ACTION_KEY = 'project.new-file.ocdocument'
 export const PROJECT_NEW_FOLDER_ACTION_KEY = 'project.new-folder'

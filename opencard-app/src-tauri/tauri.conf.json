@@ -14,11 +14,11 @@
       {
         "title": "OpenCard",
         "decorations": false,
+        "transparent": true,
         "minWidth": 1280,
         "minHeight": 720,
         "width": 1280,
-        "height": 720,
-        "backgroundColor": "#1e1e1e"
+        "height": 720
       }
     ],
     "security": {
@@ -127,7 +127,22 @@
       }
     ],
     "resources": {
+      "icons/ocpack.ico": "icons/ocpack.ico",
+      "resources/packages/": "packages/",
       "resources/templates/": "templates/"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/installer-hooks.nsh"
+      },
+      "wix": {
+        "fragmentPaths": [
+          "windows/file-type-icons.wxs"
+        ],
+        "componentGroupRefs": [
+          "OpenCardFileTypeIcons"
+        ]
+      }
     }
   },
   "plugins": {

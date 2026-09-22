@@ -282,8 +282,8 @@ function formatDate(value: string): string {
 
 .feedback-history__item:hover { background: var(--oc-bg-hover); }
 .feedback-history__item.is-active {
-  background: var(--oc-bg-raised);
-  box-shadow: inset 2px 0 var(--oc-border-accent);
+  background: var(--oc-bg-selected);
+  box-shadow: inset 2px 0 0 var(--oc-fg-accent);
 }
 
 .feedback-history__item-heading {

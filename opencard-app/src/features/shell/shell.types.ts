@@ -32,6 +32,8 @@ export interface ShellButton {
   hoverTip?: string;
   key: string;
   disabled?: boolean;
+  /** 紧跟标题的数字徽标（例如"这次提交会带上几条改动"）。 */
+  badge?: number;
 }
 
 export type ShellWorkspaceAction = ShellAction | string

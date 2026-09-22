@@ -13,7 +13,11 @@
       @change="handleChange"
     />
     <span class="oc-switch__track" aria-hidden="true">
-      <span class="oc-switch__thumb" />
+      <span
+        class="oc-switch__thumb"
+        :class="{ 'is-toggling': toggling }"
+        @animationend="toggling = false"
+      />
     </span>
     <span v-if="label || $slots.default" class="oc-switch__label">
       <slot>{{ label }}</slot>
@@ -22,7 +26,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useAttrs } from 'vue'
+import { computed, nextTick, ref, useAttrs, watch } from 'vue'
+import { prefersReducedMotion } from '../../shared/ui/foundation'
 
 defineOptions({ name: 'OcSwitch', inheritAttrs: false })
 
@@ -32,9 +37,22 @@ interface Props {
   label?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   checked: false,
   disabled: false,
+})
+
+/** 切换时给小圆挂上"先拉长再滑过去"的动画类；动画结束就摘掉，方便下次重播。 */
+const toggling = ref(false)
+
+watch(() => props.checked, async () => {
+  if (prefersReducedMotion()) return
+  // 连点也要重播：先让浏览器算一次没有动画的样式，再在下一帧把动画类加回来。
+  toggling.value = false
+  await nextTick()
+  requestAnimationFrame(() => {
+    toggling.value = true
+  })
 })
 
 const attrs = useAttrs()
@@ -118,12 +136,36 @@ function handleChange(event: Event): void {
   transform: translateX(14px);
 }
 
+/**
+ * 切换时小圆先朝行进方向拉长一点，再滑过去收成正圆：
+ * 往右走时保住左边长出去，往左走时保住右边长回来，收尾都落回 12px。
+ */
+@keyframes oc-switch-thumb-on {
+  0% { width: 12px; transform: translateX(0); }
+  45% { width: 18px; transform: translateX(0); }
+  100% { width: 12px; transform: translateX(14px); }
+}
+
+@keyframes oc-switch-thumb-off {
+  0% { width: 12px; transform: translateX(14px); }
+  45% { width: 18px; transform: translateX(8px); }
+  100% { width: 12px; transform: translateX(0); }
+}
+
+.oc-switch__input:checked + .oc-switch__track .oc-switch__thumb.is-toggling {
+  animation: oc-switch-thumb-on var(--oc-duration-slow) var(--oc-ease);
+}
+
+.oc-switch__input:not(:checked) + .oc-switch__track .oc-switch__thumb.is-toggling {
+  animation: oc-switch-thumb-off var(--oc-duration-slow) var(--oc-ease);
+}
+
 .oc-switch__label {
   user-select: none;
 }
 
 .oc-switch--disabled {
-  opacity: 0.5;
+  opacity: var(--oc-opacity-disabled);
   cursor: not-allowed;
 }
 

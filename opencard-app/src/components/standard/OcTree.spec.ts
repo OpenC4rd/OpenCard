@@ -87,7 +87,7 @@ describe('OcTree', () => {
     })
 
     expect(wrapper.findAll('[data-oc-tree-key]')).toHaveLength(2)
-    expect(wrapper.get('[data-oc-tree-key="second"]').classes()).toContain('is-selected')
+    expect(wrapper.get('[data-oc-tree-key="second"] .oc-tree__row').classes()).toContain('is-selected')
 
     await wrapper.get('[data-oc-tree-key="first"] .oc-tree__row').trigger('click')
     expect(wrapper.emitted('selection-change')?.[0]).toEqual([{
@@ -108,12 +108,16 @@ describe('OcTree', () => {
       },
     })
 
-    // The trailing line shares the row's flex line, so the chip carries its own width next to the
-    // title instead of being squeezed inside a box of its own.
+    // The trailing line lives in the row's append container, so the chip carries its own width next
+    // to the title instead of being squeezed inside a box of its own. The tree's tail line is
+    // layout-transparent (`display: contents`), so the chip stays a direct flex item of the append.
+    const append = wrapper.get('.oc-tree__row .oc-row__append')
     const tail = wrapper.get('.oc-tree__tail')
-    expect(Array.from(tail.element.children).map(child => child.className)).toEqual(['oc-tree__tail-badge'])
-    expect(wrapper.get('.oc-tree__tail-badge').attributes('aria-label')).toBe('Added')
-    expect(wrapper.get('.oc-tree__tail-badge').attributes('data-tooltip')).toBe('Added')
+    expect(append.element.children).toHaveLength(1)
+    expect(tail.element.className).toContain('oc-tree__tail')
+    expect(Array.from(tail.element.children).map(child => child.className)).toEqual(['oc-node-tail__badge'])
+    expect(wrapper.get('.oc-node-tail__badge').attributes('aria-label')).toBe('Added')
+    expect(wrapper.get('.oc-node-tail__badge').attributes('data-tooltip')).toBe('Added')
     expect(wrapper.get('.oc-tree__label').attributes('data-tooltip')).toBe('A long changed file name')
     expect(wrapper.get('.oc-tree__label').attributes()).toHaveProperty('data-tooltip-overflow')
   })
@@ -323,7 +327,7 @@ describe('OcTree', () => {
     })
 
     expect(wrapper.findAll('.oc-tree__row').map(row => row.attributes('tabindex'))).toEqual(['-1', '-1'])
-    expect(wrapper.findAll('.oc-tree__tail-action button').map(button => button.attributes('tabindex'))).toEqual(['-1', '-1'])
+    expect(wrapper.findAll('.oc-node-tail__action button').map(button => button.attributes('tabindex'))).toEqual(['-1', '-1'])
     await wrapper.get('[data-oc-tree-key="child"] .oc-tree__row').trigger('click')
     expect(document.activeElement).toBe(wrapper.get('[data-oc-tree-key="child"] .oc-tree__row').element)
     wrapper.unmount()
@@ -722,7 +726,7 @@ describe('OcTree', () => {
     })
 
     await wrapper.get('button[aria-label="Duplicate"]').trigger('click')
-    expect(wrapper.get('.oc-tree__tail').text()).toBe('Metadata')
+    expect(wrapper.get('.oc-tree__row .oc-row__append').text()).toBe('Metadata')
     expect(wrapper.get('button[aria-label="Delete: Protected"]').attributes('disabled')).toBeDefined()
     expect(wrapper.emitted('action')).toEqual([[
       { key: 'root', actionKey: 'duplicate', source: 'inline' },
@@ -752,7 +756,7 @@ describe('OcTree', () => {
     const row = wrapper.get('.oc-tree__row').element as HTMLElement
     const label = wrapper.get('.oc-tree__label').element as HTMLElement
     const revealClass = vi.spyOn(wrapper.get('.oc-tree').element.classList, 'add')
-    let actionParts = [...wrapper.findAll('.oc-tree__tail-action')]
+    let actionParts = [...wrapper.findAll('.oc-node-tail__action')]
     Object.defineProperty(row, 'clientWidth', { configurable: true, value: 160 })
     // The row leaves the title 40px while the title needs 100px, so its commands go into one menu.
     Object.defineProperty(label, 'scrollWidth', { configurable: true, value: 100 })
@@ -777,7 +781,7 @@ describe('OcTree', () => {
     expect(revealClass).toHaveBeenCalledWith('are-commands-revealed')
     expect(wrapper.classes()).not.toContain('are-commands-revealed')
 
-    actionParts = [...wrapper.findAll('.oc-tree__tail-action')]
+    actionParts = [...wrapper.findAll('.oc-node-tail__action')]
     vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(rect(220, 28))
     for (const part of actionParts) {
       vi.spyOn(part.element as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(10, 22))
@@ -811,14 +815,14 @@ describe('OcTree', () => {
     })
     const row = wrapper.get('.oc-tree__row').element as HTMLElement
     const label = wrapper.get('.oc-tree__label').element as HTMLElement
-    const tailText = wrapper.get('.oc-tree__tail-text').element as HTMLElement
+    const tailText = wrapper.get('.oc-node-tail__text').element as HTMLElement
     Object.defineProperty(row, 'clientWidth', { configurable: true, value: 120 })
     // The title needs 60px and holds 50px, but the 30px its trailing text still occupies already
     // counts towards the room the title can get back, so no command has to be given up.
     Object.defineProperty(label, 'scrollWidth', { configurable: true, value: 60 })
     vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(rect(50, 28))
     vi.spyOn(tailText, 'getBoundingClientRect').mockReturnValue(rect(30, 20))
-    for (const part of wrapper.findAll('.oc-tree__tail-action')) {
+    for (const part of wrapper.findAll('.oc-node-tail__action')) {
       vi.spyOn(part.element as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(20, 22))
     }
 
@@ -838,8 +842,8 @@ describe('OcTree', () => {
       },
     })
 
-    expect(wrapper.get('.oc-tree__tail').text()).toContain('2 weeks')
-    expect(wrapper.find('.oc-tree__tail-action').exists()).toBe(false)
+    expect(wrapper.get('.oc-tree__row .oc-row__append').text()).toContain('2 weeks')
+    expect(wrapper.find('.oc-node-tail__action').exists()).toBe(false)
   })
 
   it('can keep inline actions visible without row interaction', () => {
@@ -855,14 +859,15 @@ describe('OcTree', () => {
       },
     })
 
-    expect(wrapper.classes()).toContain('are-actions-always-visible')
+    // The always-visible state now lives on the shared tail line, which reveals its commands itself.
+    expect(wrapper.get('.oc-node-tail').classes()).toContain('oc-node-tail--always')
     // jsdom does not evaluate the scoped stylesheet, so assert the structure the rule targets:
     // the command is the trailing part of the node's own line.
     const tail = wrapper.get('.oc-tree__tail')
-    const actionPart = wrapper.get('.oc-tree__tail-action')
+    const actionPart = wrapper.get('.oc-node-tail__action')
     expect(tail.element.contains(actionPart.element)).toBe(true)
     const tailChildren = Array.from(tail.element.children)
-    expect(tailChildren[tailChildren.length - 1]?.classList.contains('oc-tree__tail-action')).toBe(true)
+    expect(tailChildren[tailChildren.length - 1]?.classList.contains('oc-node-tail__action')).toBe(true)
   })
 
   it('keeps revealed commands mounted while their floating menu is open', async () => {
@@ -877,7 +882,7 @@ describe('OcTree', () => {
         }),
       },
     })
-    const actionPart = wrapper.get('.oc-tree__tail-action')
+    const actionPart = wrapper.get('.oc-node-tail__action')
     const actionButton = wrapper.getComponent(OcActionButton)
 
     await actionButton.trigger('pointerenter')

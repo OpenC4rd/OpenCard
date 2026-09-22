@@ -53,10 +53,11 @@
       :data-oc-select-owner="selectId"
     >
       <div :id="listboxId" class="oc-select__listbox" role="listbox">
-        <button
+        <OcRow
           v-for="(option, index) in options"
           :id="optionId(index)"
           :key="option.value"
+          as="button"
           type="button"
           class="oc-select__option"
           :class="{
@@ -71,14 +72,13 @@
           @mousedown.prevent
           @click="selectOption(option)"
         >
-          <span class="oc-select__option-label" :style="option.labelStyle">{{ option.label }}</span>
-          <OcIcon
-            v-if="option.value === modelValue"
-            name="action.check"
-            size="sm"
-            tone="active"
-          />
-        </button>
+          <template #title>
+            <span class="oc-select__option-label" :style="option.labelStyle">{{ option.label }}</span>
+          </template>
+          <template v-if="option.value === modelValue" #append>
+            <OcIcon name="action.check" size="sm" tone="active" />
+          </template>
+        </OcRow>
         <div v-if="options.length === 0" class="oc-select__empty">{{ emptyText }}</div>
       </div>
     </OcFloatingLayer>
@@ -99,6 +99,7 @@ import { computed, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } fro
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcFloatingLayer from './OcFloatingLayer.vue'
+import OcRow from './OcRow.vue'
 
 defineOptions({ name: 'OcSelect', inheritAttrs: false })
 
@@ -354,42 +355,6 @@ function handleDocumentPointerDown(event: PointerEvent): void {
   max-height: inherit;
   padding: var(--oc-space-1);
   overflow-y: auto;
-}
-
-.oc-select__option {
-  display: flex;
-  width: 100%;
-  min-height: var(--oc-size-md);
-  align-items: center;
-  gap: var(--oc-space-2);
-  padding: 0 var(--oc-space-2);
-  border: 0;
-  border-radius: var(--oc-radius-sm);
-  background: transparent;
-  color: var(--oc-fg-default);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-
-.oc-select__option.is-active {
-  background: var(--oc-bg-hover);
-}
-
-.oc-select__option.is-selected {
-  color: var(--oc-fg-accent);
-}
-
-.oc-select__option:disabled {
-  color: var(--oc-fg-disabled);
-  cursor: not-allowed;
-}
-
-.oc-select__option-label {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .oc-select__empty {

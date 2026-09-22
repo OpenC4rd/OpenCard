@@ -103,9 +103,6 @@ import {
   serializeProjectPackageManifest,
   type RequiredPackage,
 } from '../model/projectPackageManifest'
-import {
-  resolveInstalledResourcePackageRootPath,
-} from '../model/resourcePackage'
 import { toKeySlug } from '../../../shared/model/keySlug'
 import { resolveAppDownloadPath } from '../../../shared/storage/appStoragePaths'
 import {
@@ -152,7 +149,7 @@ export type ProjectAssetImportConflict = {
 export type ProjectAssetImportResolution = 'rename-copy' | 'use-existing'
 
 interface FileChangedPayload {
-  kind: string
+  /** 后端会把一段时间内的变化合并成一批，所以这里只关心路径。 */
   paths: string[]
 }
 
@@ -659,17 +656,21 @@ function isMetadataPath(path: string): boolean {
 }
 
 /**
- * The managed asset directories (`.opencard/fonts`, `.opencard/icons`, `.opencard/packages`) store one
- * file per asset, so walking them puts thousands of files into the index that no index consumer ever
- * reads: the tree hides dot paths by default, the package builder excludes `.opencard/`, and assets
- * themselves are rendered through their registries.
+ * Directories the file index never walks:
+ * - the managed asset directories (`.opencard/fonts`, `.opencard/icons`, `.opencard/packages`) hold one
+ *   file per asset, and no index consumer reads them: the tree hides dot paths by default, the package
+ *   builder excludes `.opencard/`, and assets are rendered through their registries;
+ * - `.git` belongs to version control, which reads the repository itself. A repository with a large
+ *   history makes one recursive listing there cost seconds — measured at 4.9s for a single `.git` read —
+ *   and that cost lands on every project open and every workbench re-layout.
  *
  * Recursion stops at these directories rather than at every dot path, so the index stays independent
  * of the "hide dot files" display setting. Each directory keeps its own registered depth, so a set
  * folder or an installed package stays listed while its contents are not enumerated.
  */
-function isManagedAssetDirectory(relativePath: string): boolean {
+function isIndexSkippedDirectory(relativePath: string): boolean {
   const identity = relativePath.replace(/\\/g, '/').replace(/\/+$/, '').toLocaleLowerCase()
+  if (identity === '.git' || identity.startsWith('.git/')) return true
   return PROJECT_INTERNAL_DIRECTORIES.some((directory) => {
     const managed = directory.toLocaleLowerCase()
     return identity === managed || identity.startsWith(`${managed}/`)
@@ -682,6 +683,14 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
   try {
     const nextEntries = new Map<string, DirEntry>()
     const unavailableDirectories = new Set<string>()
+    // 托管目录（.opencard/fonts、.opencard/icons、.opencard/packages）的内容永远不进索引：
+    // 它们只作为条目被父目录列出。若这里还按登记去列一次，装了大包之后每次打开项目都要重新
+    // 读那个装了上千个文件的目录（实测单次 5 秒），所以登记里的托管目录直接丢掉。
+    const managedRegistrations = [...registeredDirectories.value.keys()].filter(isIndexSkippedDirectory)
+    if (managedRegistrations.length > 0) {
+      registeredDirectories.value = new Map([...registeredDirectories.value]
+        .filter(([relativePath]) => !isIndexSkippedDirectory(relativePath)))
+    }
     const registrations = Array.from(registeredDirectories.value.entries())
       .sort(([leftPath], [rightPath]) => leftPath.length - rightPath.length)
 
@@ -690,7 +699,7 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
       let entries: DirEntry[]
       try {
         entries = await fileSystemService.readDirectoryEntries(directoryPath, depth, relativePath, {
-          skipDirectory: isManagedAssetDirectory,
+          skipDirectory: isIndexSkippedDirectory,
         })
       } catch (error) {
         if (!relativePath || await fileSystemService.fileExists(directoryPath)) throw error
@@ -721,6 +730,8 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
 
 async function readDirectoryEntries(path: string = '', depth: number = PROJECT_TREE_LOOKAHEAD_DEPTH) {
   const relativePath = toRelativeProjectPath(path)
+  // 托管目录的内容不进索引，也不登记，否则会在大包上退化成每次打开项目都重列一遍。
+  if (isIndexSkippedDirectory(relativePath)) return
   const normalizedDepth = Number.isFinite(depth) ? Math.max(1, Math.floor(depth)) : Number.POSITIVE_INFINITY
   const currentDepth = registeredDirectories.value.get(relativePath) ?? 0
 
@@ -733,7 +744,8 @@ async function readDirectoryEntries(path: string = '', depth: number = PROJECT_T
 
 function setDirectoryExpanded(path: string, expanded: boolean) {
   const relativePath = toRelativeProjectPath(path)
-  if (!relativePath) {
+  // 托管目录的内容不进索引，展开与否都不登记。
+  if (!relativePath || isIndexSkippedDirectory(relativePath)) {
     return
   }
 
@@ -771,7 +783,17 @@ async function startWatching() {
 
   try {
     unlistenFn = await listen<FileChangedPayload>('file-changed', (event: Event<FileChangedPayload>) => {
-      const changedPaths = event.payload.paths.map((path) => normalizePath(path))
+      // 装包/更新包会一次写入成百上千个文件，这些落盘由安装流程自己收尾（它会重载资源环境并刷新索引）。
+      // 逐个事件去跑字体/图标扫描只会把这些文件数变成主线程的卡顿，所以这里直接不看包内部的变化；
+      // 包索引本身仍要跟，它决定有哪些包可用。
+      const changedPaths = event.payload.paths
+        .map((path) => normalizePath(path))
+        .filter((path) => {
+          const relative = toRelativeProjectPath(path).toLocaleLowerCase()
+          if (relative === PROJECT_PACKAGE_MANIFEST_FILE_NAME.toLocaleLowerCase()) return true
+          return !relative.startsWith(`${PROJECT_INTERNAL_DIRECTORY_NAME}/packages/`)
+        })
+      if (changedPaths.length === 0) return
       fileChangeRevision.value += 1
       if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_PROFILE_FILE_NAME)))) {
         void reloadProjectProfile()
@@ -895,7 +917,7 @@ async function setProjectPath(path: string) {
   }
   scheduleProjectMetadataSave()
   openTimer.step('tail')
-  openTimer.done(`entries ${walk.entries}, worst dir read ${walk.worstMs.toFixed(1)}ms`)
+  openTimer.done(`entries ${walk.entries}, worst dir read ${walk.worstMs.toFixed(1)}ms ${walk.worstPath}`)
 }
 
 async function chooseProjectDirectory(title: string): Promise<string | null> {
@@ -1129,8 +1151,9 @@ async function installResourcePackageFile(
     const accepted = await options.confirmReplacement(preview.manifest, preview.existingManifest)
     if (!accepted) throw new Error('Package installation was cancelled')
   }
-  await persistProjectPackageIndex(preview.manifest)
+  // 先装再写索引：反过来会留下"索引里声明了、磁盘上却没有"的幽灵条目。
   const installed = await installResourcePackage({ preview })
+  await persistProjectPackageIndex(installed.manifest)
   await reloadProjectResourceEnvironment()
   await refreshIndexedEntries()
   return installed
@@ -1226,12 +1249,21 @@ async function writeProjectPackageIndex(manifests: ReadonlyMap<string, RequiredP
 async function removeResourcePackage(packageKey: string): Promise<boolean> {
   const projectRootPath = ensureProjectOpen()
   const key = packageKey.trim().toLocaleLowerCase()
-  const manifestEntry = [...projectPackageManifests.value].find(([candidate]) => candidate.toLocaleLowerCase() === key)
-  const storedKey = manifestEntry?.[0] ?? key
-  const packageRootPath = resolveInstalledResourcePackageRootPath(projectRootPath, storedKey)
-  const exists = await fileSystemService.fileExists(packageRootPath)
-  if (!manifestEntry && !exists) return false
-  if (exists) await fileSystemService.deleteFile(packageRootPath)
+  const packagesRoot = `${projectRootPath}/.opencard/packages`
+  // 按磁盘上真实存在的目录来删：只按索引里的 Key 去算路径时，一旦 Key 对不上就会
+  // "索引清空、目录还在"，而扫描目录的加载逻辑会把它当已安装包读回来。
+  const entries = await fileSystemService.readDirectoryEntries(packagesRoot, 1).catch(() => [])
+  const directories = entries
+    .filter(entry => entry.isDirectory && !entry.isSymlink)
+    .map(entry => entry.name)
+  const matches = directories.filter(name => name.toLocaleLowerCase() === key)
+  for (const name of matches) {
+    await fileSystemService.deleteFile(`${packagesRoot}/${name}`)
+    if (await fileSystemService.fileExists(`${packagesRoot}/${name}`)) {
+      throw new Error(`Could not remove the installed package: ${name}`)
+    }
+  }
+  if (matches.length === 0 && !projectPackageManifests.value.has(key)) return false
 
   const next = new Map(projectPackageManifests.value)
   for (const candidate of next.keys()) {

@@ -201,13 +201,14 @@ describe('useShellProjectLifecycle', () => {
     expect(harness.setProjectPath).toHaveBeenCalledTimes(1)
   })
 
-  it('loads the complete project tree only when explicitly requested', async () => {
+  it('loads the project tree only when explicitly requested', async () => {
     const harness = createHarness()
 
     await harness.lifecycle.ensureProjectTreeLoaded()
 
     expect(harness.readDirectoryEntries).toHaveBeenCalledOnce()
-    expect(harness.readDirectoryEntries).toHaveBeenCalledWith('', Number.POSITIVE_INFINITY)
+    // 只登记标准前瞻深度：更深的目录在展开时再读，避免激活项目就把整个项目递归走一遍。
+    expect(harness.readDirectoryEntries).toHaveBeenCalledWith('')
   })
 
   it('clears busy and reports an immediate notice when project loading fails', async () => {

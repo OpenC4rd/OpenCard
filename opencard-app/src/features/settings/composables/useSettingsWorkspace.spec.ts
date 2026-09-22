@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import type { EditorItem, EditorItemEditorPart } from '../../../shared/ui/property-editor/propertyEditor.types'
 import { createDefaultAppSettings, type SettingsCategoryKey } from '../model/appSettings'
-import { useSettingsWorkspace } from './useSettingsWorkspace'
+import { useSettingsWorkspace, type SettingsCategoryViewModel } from './useSettingsWorkspace'
 
 function editor(item: EditorItem, key = 'value'): EditorItemEditorPart {
   return item.content?.find((part): part is EditorItemEditorPart => (
@@ -10,41 +10,47 @@ function editor(item: EditorItem, key = 'value'): EditorItemEditorPart {
   ))!
 }
 
+function cardOf(category: SettingsCategoryViewModel, key: string) {
+  return category.cards.find(card => card.key === key)!
+}
+
+function rowOf(category: SettingsCategoryViewModel, key: string): EditorItem {
+  return category.cards.flatMap(card => card.items).find(item => item.key === key)!
+}
+
 describe('useSettingsWorkspace', () => {
-  it('projects general settings as root editor items', () => {
+  it('projects general settings as cards of single-value rows', () => {
     const categoryKey = ref<SettingsCategoryKey>('general')
     const { categoryTreeData, activeCategory } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
       translate: (_key, fallback) => fallback,
     })
 
-    expect(categoryTreeData.value.rootKeys).toEqual(['general', 'appearance', 'workspace'])
+    expect(categoryTreeData.value.rootKeys).toEqual(['general', 'appearance', 'workspace', 'versionControl'])
     // Every category row shows its own icon: the tree paints a row's leading visual from `visual`,
     // and a node that carries none falls back to the expand chevron.
     expect(categoryTreeData.value.rootKeys.map(key => categoryTreeData.value.items.get(key)?.visual)).toEqual([
       { type: 'icon', icon: 'tool.settings' },
       { type: 'icon', icon: 'data.symbol-color' },
-      { type: 'icon', icon: 'nav.files' },
+      { type: 'icon', icon: 'tool.workspace' },
+      { type: 'icon', icon: 'nav.collaboration' },
     ])
-    expect(activeCategory.value.items.map(item => item.key)).toEqual([
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting'])
+    expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([
       'appearance.locale',
       'shell.titleBarNoticeHistoryLimit',
-      'updates.suppressReleaseNotesAfterUpdate',
-      'exporting.openCdeWorkbookAfterExport',
-      'identity.publisherKey',
     ])
-    const publisherKey = activeCategory.value.items[4]!
-    expect(editor(publisherKey)).toMatchObject({
-      value: createDefaultAppSettings().identity.publisherKey,
-      definition: { fieldType: 'string', commitMode: 'blur' },
-    })
-    expect(publisherKey.content?.filter(part => typeof part !== 'string' && part.type === 'action'))
-      .toMatchObject([{ key: 'regenerate', icon: 'action.refresh', iconOnly: true }])
-    expect(editor(activeCategory.value.items[0]!)).toMatchObject({
+    expect(cardOf(activeCategory.value, 'updates').items.map(item => item.key)).toEqual([
+      'updates.showReleaseNotesAfterUpdate',
+    ])
+    expect(cardOf(activeCategory.value, 'exporting').items.map(item => item.key)).toEqual([
+      'exporting.openCdeWorkbookAfterExport',
+    ])
+    expect(editor(rowOf(activeCategory.value, 'appearance.locale'))).toMatchObject({
       value: 'system',
       definition: { fieldType: 'string', presentation: 'option-group' },
     })
-    expect(editor(activeCategory.value.items[1]!)).toMatchObject({
+    expect(editor(rowOf(activeCategory.value, 'shell.titleBarNoticeHistoryLimit'))).toMatchObject({
       value: 128,
       definition: {
         fieldType: 'number', presentation: 'slider', min: 1, max: 512,
@@ -53,7 +59,7 @@ describe('useSettingsWorkspace', () => {
     })
   })
 
-  it('projects appearance preview, sliders, and recursive theme items', async () => {
+  it('projects appearance preview, sliders, and one card per theme', async () => {
     const settings = createDefaultAppSettings()
     settings.appearance.userThemePresets.dark = [{
       name: 'Forest',
@@ -66,6 +72,7 @@ describe('useSettingsWorkspace', () => {
     settings.appearance.themeOverrides.dark = { ...settings.appearance.userThemePresets.dark[0]!.definition.colors }
     settings.appearance.accentNeighborAngles.dark = -70
     settings.appearance.fontFamilies.dark = 'Inter'
+    settings.appearance.themePresetIds.dark = 'user:Forest'
     const categoryKey = ref<SettingsCategoryKey>('appearance')
     const { activeCategory } = useSettingsWorkspace({
       settings: ref(settings), categoryKey, projectOpen: ref(false),
@@ -74,23 +81,36 @@ describe('useSettingsWorkspace', () => {
     })
 
     expect(activeCategory.value.preview).toEqual({ glassIntensity: 60 })
-    expect(editor(activeCategory.value.items.find(item => item.key === 'appearance.baseFontSize')!))
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['theme:dark', 'theme:light', 'interface'])
+    expect(editor(rowOf(activeCategory.value, 'appearance.baseFontSize')))
       .toMatchObject({ definition: { presentation: 'slider', ticks: [10, 11, 12, 13, 14, 15, 16] } })
-    const darkTheme = activeCategory.value.items.find(item => item.key === 'theme:dark')!
-    const lightTheme = activeCategory.value.items.find(item => item.key === 'theme:light')!
-    expect(darkTheme.children?.map(item => item.key)).toEqual([
-      'preset', 'color:--oc-accent', 'color:--oc-bg-base', 'color:--oc-fg-default', 'font', 'angle',
+
+    const darkTheme = cardOf(activeCategory.value, 'theme:dark')
+    const lightTheme = cardOf(activeCategory.value, 'theme:light')
+    expect(darkTheme.items.map(item => item.key)).toEqual([
+      'preset', 'name', 'color:--oc-accent', 'color:--oc-bg-base', 'color:--oc-fg-default', 'font', 'angle',
     ])
-    expect(lightTheme.children).toHaveLength(6)
-    const preset = darkTheme.children?.[0]!
+    expect(lightTheme.items).toHaveLength(7)
+    // 主题不再有嵌套分组：card 自己就是那层分组。
+    expect(darkTheme.items.every(item => !item.children)).toBe(true)
+    expect(darkTheme.actions.map(action => action.key)).toEqual([
+      'theme.copy', 'theme.read', 'theme-preset.delete',
+    ])
+    expect(darkTheme.actions.find(action => action.key === 'theme-preset.delete'))
+      .toMatchObject({ disabled: false })
+
+    const preset = darkTheme.items[0]!
     expect(editor(preset).value).toBe('user:Forest')
-    expect(preset.content?.filter(part => typeof part !== 'string' && part.type === 'action')).toHaveLength(3)
-    const font = darkTheme.children?.find(item => item.key === 'font')!
+    // 预设行只剩选择器本身：删除、复制、读取都是 card 级操作。
+    expect(preset.content).toHaveLength(1)
+    const name = darkTheme.items.find(item => item.key === 'name')!
+    expect(editor(name).value).toBe('Forest')
+    const font = darkTheme.items.find(item => item.key === 'font')!
     expect((await editor(font).definition.completion?.provider?.({ value: 'Mic', cursor: 3 }))?.items[0]?.label)
       .toBe('Microsoft YaHei UI')
   })
 
-  it('projects workspace settings and updates reset availability reactively', () => {
+  it('projects workspace cards and updates reset availability reactively', () => {
     const categoryKey = ref<SettingsCategoryKey>('workspace')
     const projectOpen = ref(false)
     const { activeCategory } = useSettingsWorkspace({
@@ -98,10 +118,15 @@ describe('useSettingsWorkspace', () => {
       translate: (_key, fallback) => fallback,
     })
 
-    expect(activeCategory.value.items.map(item => item.key)).toContain('workspace.autoSave')
-    expect(activeCategory.value.items[activeCategory.value.items.length - 1]?.content?.[0]).toMatchObject({ type: 'action', disabled: true })
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['save-and-history', 'file-tree', 'canvas-assist'])
+    expect(cardOf(activeCategory.value, 'save-and-history').items.map(item => item.key)).toContain('workspace.autoSave')
+    expect(cardOf(activeCategory.value, 'file-tree').actions).toMatchObject([
+      { key: 'project-workspace.reset', disabled: true },
+    ])
     projectOpen.value = true
-    expect(activeCategory.value.items[activeCategory.value.items.length - 1]?.content?.[0]).toMatchObject({ type: 'action', disabled: false })
+    expect(cardOf(activeCategory.value, 'file-tree').actions).toMatchObject([
+      { key: 'project-workspace.reset', disabled: false },
+    ])
   })
 
   it('projects useful ticks for workspace numeric settings', () => {
@@ -111,12 +136,80 @@ describe('useSettingsWorkspace', () => {
       translate: (_key, fallback) => fallback,
     })
 
-    const definitionFor = (key: string) => editor(activeCategory.value.items.find(item => item.key === key)!).definition
+    const definitionFor = (key: string) => editor(rowOf(activeCategory.value, key)).definition
     expect(definitionFor('workspace.autoSaveIntervalSeconds')).toMatchObject({
       ticks: [5, 15, 30, 60, 120, 300],
     })
     expect(definitionFor('workspace.historyEntryLimit')).toMatchObject({
       ticks: [10, 50, 100, 250, 500, 1000],
+    })
+    // 结构树选中行为用下拉枚举编辑器，而不是滑动选项组。
+    expect(definitionFor('workspace.structureTreeSelectionBehavior')).toMatchObject({
+      presentation: 'select',
+      options: ['expand-exclusive', 'expand', 'none'],
+    })
+  })
+
+  it('projects the commit identity category with the author identity alongside it', () => {
+    const settings = createDefaultAppSettings()
+    settings.identity.publisherKey = 'publisher-a1b2c3'
+    const settingsRef = ref(settings)
+    const categoryKey = ref<SettingsCategoryKey>('versionControl')
+    const { activeCategory } = useSettingsWorkspace({
+      settings: settingsRef, categoryKey, projectOpen: ref(false),
+      translate: (_key, fallback) => fallback,
+    })
+
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['identity', 'committer'])
+    // 作者身份搬到了这里：一行一个值，重新生成是这张 card 的操作。
+    const publisherKey = rowOf(activeCategory.value, 'identity.publisherKey')
+    expect(editor(publisherKey)).toMatchObject({
+      value: 'publisher-a1b2c3',
+      definition: { fieldType: 'string', commitMode: 'blur' },
+    })
+    expect(publisherKey.content).toHaveLength(1)
+    expect(cardOf(activeCategory.value, 'identity').actions).toMatchObject([
+      { key: 'identity.regenerate', icon: 'action.refresh', disabled: false },
+    ])
+
+    expect(cardOf(activeCategory.value, 'committer').items.map(item => item.key)).toEqual([
+      'versionControl.committerName',
+      'versionControl.committerEmail',
+      'versionControl.createInitialCommit',
+    ])
+    // 名称为空就是这位作者 ID，邮箱再按名称归一化推导。
+    expect(editor(rowOf(activeCategory.value, 'versionControl.committerName')).definition.placeholder)
+      .toBe('publisher-a1b2c3')
+    expect(editor(rowOf(activeCategory.value, 'versionControl.committerEmail')).definition.placeholder)
+      .toBe('publisher-a1b2c3@noreply.example')
+    expect(editor(rowOf(activeCategory.value, 'versionControl.createInitialCommit')).value).toBe(true)
+
+    settingsRef.value.versionControl.committerName = '张三'
+    expect(editor(rowOf(activeCategory.value, 'versionControl.committerEmail')).definition.placeholder)
+      .toBe('zhang-san@noreply.example')
+  })
+
+  it('resolves the anchor of any setting key without switching to its category first', () => {
+    const categoryKey = ref<SettingsCategoryKey>('general')
+    const { settingsAnchorFor } = useSettingsWorkspace({
+      settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
+      translate: (_key, fallback) => fallback,
+    })
+
+    expect(settingsAnchorFor('versionControl.committerName')).toEqual({
+      category: 'versionControl',
+      cardKey: 'committer',
+      itemKey: 'versionControl.committerName',
+    })
+    expect(settingsAnchorFor('workspace.autoSave')).toEqual({
+      category: 'workspace',
+      cardKey: 'save-and-history',
+      itemKey: 'workspace.autoSave',
+    })
+    expect(settingsAnchorFor('identity.publisherKey')).toEqual({
+      category: 'versionControl',
+      cardKey: 'identity',
+      itemKey: 'identity.publisherKey',
     })
   })
 })

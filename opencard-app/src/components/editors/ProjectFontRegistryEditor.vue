@@ -121,8 +121,10 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:families': [families: ProjectFont[]]
   'update:compositions': [compositions: ProjectFontComposition[]]
+  'register-family': []
   'configure-family': [familyKey: string]
   'remove-family': [familyKey: string]
+  'add-composition': []
   'configure-composition': [compositionKey: string]
 }>()
 const { t } = useI18n()
@@ -147,6 +149,12 @@ const referencedFamilyKeys = computed(() => new Set(
   props.compositions.flatMap(composition => composition.members.map(member => member.fontKey.toLocaleLowerCase())),
 ))
 const treeData = computed<OcNodeCollection>(() => {
+  const addFamilyAction: OcNodeAction = {
+    key: 'add-family', title: t('projectConfig.fonts.addFont'), icon: 'action.add',
+  }
+  const addCompositionAction: OcNodeAction = {
+    key: 'add-composition', title: t('projectConfig.fonts.addSet'), icon: 'action.add',
+  }
   const configureFamilyAction: OcNodeAction = {
     key: 'configure-family', title: t('projectConfig.fonts.configure'), icon: 'tool.settings',
   }
@@ -162,12 +170,23 @@ const treeData = computed<OcNodeCollection>(() => {
   const familyKeys = props.families.map(entry => treeKey('families', entry.key))
   const compositionKeys = props.compositions.map(entry => treeKey('compositions', entry.key))
   const items = new Map<string, OcNode>([
-    ['families', { label: t('projectConfig.fonts.projectFonts'), visual: { type: 'icon', icon: 'file.font' } }],
-    ['compositions', { label: t('projectConfig.fonts.compositions'), visual: { type: 'icon', icon: 'data.layers' } }],
+    ['families', {
+      label: t('projectConfig.fonts.projectFonts'),
+      visual: { type: 'icon', icon: 'file.font' },
+      tail: [addFamilyAction],
+      contextActions: [addFamilyAction],
+    }],
+    ['compositions', {
+      label: t('projectConfig.fonts.compositions'),
+      visual: { type: 'icon', icon: 'data.layers' },
+      tail: [addCompositionAction],
+      contextActions: [addCompositionAction],
+    }],
     ...props.families.map((entry): [string, OcNode] => {
       const referenced = referencedFamilyKeys.value.has(entry.key.toLocaleLowerCase())
       return [treeKey('families', entry.key), {
         label: entry.name,
+        labelFont: JSON.stringify(createProjectFontCssFamily(entry.key)),
         visual: { type: 'icon', icon: 'file.font' },
         tail: referenced ? [configureFamilyAction] : [configureFamilyAction, removeFamilyAction],
         contextActions: referenced ? [configureFamilyAction] : [
@@ -179,6 +198,7 @@ const treeData = computed<OcNodeCollection>(() => {
     }),
     ...props.compositions.map((entry): [string, OcNode] => [treeKey('compositions', entry.key), {
       label: entry.name,
+      labelFont: compositionLabelFont(entry),
       visual: { type: 'icon', icon: 'data.layers' },
       tail: [configureCompositionAction, removeCompositionAction],
       contextActions: [
@@ -305,6 +325,11 @@ watch(
 )
 
 function treeKey(page: 'families' | 'compositions', key: string): string { return `${page}:${key}` }
+/** 字体组合没有自己的字面，按成员回退顺序拼成一套 font-family，标签就用它自己的组合顺序绘制。 */
+function compositionLabelFont(composition: ProjectFontComposition): string | undefined {
+  const families = composition.members.map(member => JSON.stringify(createProjectFontCssFamily(member.fontKey)))
+  return families.length ? families.join(', ') : undefined
+}
 function entryKey(key: string): string { return key.slice(key.indexOf(':') + 1) }
 function entryPage(key: string): 'families' | 'compositions' | null {
   if (key === 'families' || key.startsWith('families:')) return 'families'
@@ -339,7 +364,9 @@ function handleNodeActivate(event: OcNodeActivateEvent): void {
 }
 function handleNodeAction(event: OcNodeActionEvent): void {
   const key = entryKey(event.key)
-  if (event.actionKey === 'configure-family') configureEntry('families', key)
+  if (event.actionKey === 'add-family') emit('register-family')
+  else if (event.actionKey === 'configure-family') configureEntry('families', key)
+  else if (event.actionKey === 'add-composition') emit('add-composition')
   else if (event.actionKey === 'configure-composition') configureEntry('compositions', key)
   else if (event.actionKey === 'delete-family') removeEntry('families', key)
   else if (event.actionKey === 'delete-composition') removeEntry('compositions', key)

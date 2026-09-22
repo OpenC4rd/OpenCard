@@ -8,16 +8,22 @@ const mocks = vi.hoisted(() => ({
   readStatus: vi.fn(),
   initializeRepository: vi.fn(),
   stageAll: vi.fn(),
+  stagePaths: vi.fn(),
+  unstageAll: vi.fn(),
+  unstagePaths: vi.fn(),
+  discardPaths: vi.fn(),
   createCommit: vi.fn(),
 }))
 vi.mock('../../version-control/gitService', () => mocks)
 
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import { createDefaultAppSettings, defaultCommitterEmail } from '../../settings/model/appSettings'
+import { registerSettingsNavigator } from '../../settings/settingsNavigation'
+import { titleBarNotices } from '../../notifications/titlebarNotices'
 import { useShellVersionControl } from './useShellVersionControl'
 
 const PROJECT_ROOT = 'D:/Cards/demo'
 const DOCUMENT_PATH = 'cards/main.ocdocument'
-const IDENTITY = { name: 'Author', email: 'author@example.com' }
 
 const ok = <T>(value: T) => ({
   ok: true,
@@ -30,10 +36,10 @@ const ok = <T>(value: T) => ({
   abortable: false,
 })
 
-const failure = (message: string) => ({
+const failure = (message: string, kind = 'git') => ({
   ok: false,
   value: null,
-  error: { kind: 'git' as const, message, retryable: false, authenticationRequired: false },
+  error: { kind, message, retryable: false, authenticationRequired: false },
   retryable: false,
   authenticationRequired: false,
   conflicted: false,
@@ -82,10 +88,16 @@ function workspaceSession(): EditorSession {
   }
 }
 
-function createVersionControl() {
+function createVersionControl(
+  committer: Partial<{ committerName: string; committerEmail: string; createInitialCommit: boolean }> = {},
+) {
   const projectPath = ref('')
   const activeSession = ref<EditorSession | null>(null)
   const fileChangeRevision = ref(0)
+  const settings = ref({
+    ...createDefaultAppSettings(),
+    versionControl: { ...createDefaultAppSettings().versionControl, ...committer },
+  })
   const versionControl = useShellVersionControl({
     projectPath,
     activeSession,
@@ -93,8 +105,27 @@ function createVersionControl() {
     translate: key => key,
     fileChangeRevision,
     getRelativeProjectPath: path => path.slice(`${PROJECT_ROOT}/`.length),
+    moveProjectEntryToTrash: vi.fn(),
+    settings,
   })
-  return { versionControl, projectPath, activeSession, fileChangeRevision }
+  return { versionControl, projectPath, activeSession, fileChangeRevision, settings }
+}
+
+/** 未提交状态条目：默认按"工作区已修改"造，够用来驱动更改列表。 */
+const statusEntry = (path: string) => ({
+  path,
+  indexNew: false,
+  indexModified: false,
+  indexDeleted: false,
+  worktreeNew: false,
+  worktreeModified: true,
+  worktreeDeleted: false,
+  conflicted: false,
+})
+
+/** 通知是共享列表：只比对本次动作新追加的那几条。 */
+function noticesAfter(count: number): string[] {
+  return titleBarNotices.value.slice(count).map(notice => notice.message)
 }
 
 describe('useShellVersionControl', () => {
@@ -106,6 +137,10 @@ describe('useShellVersionControl', () => {
     mocks.readStatus.mockResolvedValue(ok({ entries: [] }))
     mocks.initializeRepository.mockResolvedValue(ok(true))
     mocks.stageAll.mockResolvedValue(ok(true))
+    mocks.stagePaths.mockResolvedValue(ok(true))
+    mocks.unstageAll.mockResolvedValue(ok(true))
+    mocks.unstagePaths.mockResolvedValue(ok(true))
+    mocks.discardPaths.mockResolvedValue(ok(true))
     mocks.createCommit.mockResolvedValue(ok({ id: 'commit-1' }))
   })
 
@@ -200,13 +235,15 @@ describe('useShellVersionControl', () => {
   })
 
   it('keeps the commit dialog open while a commit runs and closes it on success', async () => {
+    mocks.readStatus.mockResolvedValue(ok({ entries: [statusEntry(DOCUMENT_PATH)] }))
     const { versionControl, projectPath } = createVersionControl()
     projectPath.value = PROJECT_ROOT
+    await vi.waitFor(() => expect(versionControl.selectedChangeCount.value).toBe(1))
     versionControl.commitVersionDialogOpen.value = true
     versionControl.commitVersionError.value = 'stale error'
 
     let releaseStage: ((value: unknown) => void) | undefined
-    mocks.stageAll.mockImplementationOnce(() => new Promise(resolve => { releaseStage = resolve }))
+    mocks.stagePaths.mockImplementationOnce(() => new Promise(resolve => { releaseStage = resolve }))
 
     const pending = versionControl.commitVersion({ summary: 'Publish', description: 'Details' })
     expect(versionControl.isCommittingVersion.value).toBe(true)
@@ -215,19 +252,25 @@ describe('useShellVersionControl', () => {
     versionControl.closeCommitVersionDialog()
     expect(versionControl.commitVersionDialogOpen.value).toBe(true)
 
+    await vi.waitFor(() => expect(releaseStage).toBeTypeOf('function'))
     releaseStage?.(ok(true))
     await pending
 
     expect(versionControl.isCommittingVersion.value).toBe(false)
     expect(versionControl.commitVersionDialogOpen.value).toBe(false)
+    // 只暂存勾选项：索引先回到 HEAD，再放上这一条改动。
+    expect(mocks.unstageAll).toHaveBeenCalledWith(PROJECT_ROOT)
+    expect(mocks.stagePaths).toHaveBeenCalledWith(PROJECT_ROOT, { paths: [DOCUMENT_PATH] })
     expect(mocks.createCommit).toHaveBeenCalledWith(PROJECT_ROOT, { message: 'Publish\n\nDetails' })
   })
 
   it('reports a failed commit without closing the dialog', async () => {
+    mocks.readStatus.mockResolvedValue(ok({ entries: [statusEntry(DOCUMENT_PATH)] }))
     const { versionControl, projectPath } = createVersionControl()
     projectPath.value = PROJECT_ROOT
+    await vi.waitFor(() => expect(versionControl.selectedChangeCount.value).toBe(1))
     versionControl.commitVersionDialogOpen.value = true
-    mocks.stageAll.mockResolvedValue(failure('nothing staged'))
+    mocks.stagePaths.mockResolvedValue(failure('nothing staged'))
 
     await versionControl.commitVersion({ summary: 'Publish', description: '' })
 
@@ -237,52 +280,104 @@ describe('useShellVersionControl', () => {
     expect(mocks.createCommit).not.toHaveBeenCalled()
   })
 
-  it('keeps the initialize dialog open while initialization runs and closes it on success', async () => {
-    const { versionControl, projectPath } = createVersionControl()
+  it('initializes with the configured identity and creates the first commit by default', async () => {
+    const { versionControl, projectPath } = createVersionControl({ committerName: '张三' })
     projectPath.value = PROJECT_ROOT
-    versionControl.initializeRepositoryDialogOpen.value = true
 
-    let releaseInitialize: ((value: unknown) => void) | undefined
-    mocks.initializeRepository.mockImplementationOnce(() => new Promise(resolve => { releaseInitialize = resolve }))
+    await versionControl.initializeProjectRepository()
 
-    const pending = versionControl.initializeProjectRepository({ identity: IDENTITY, createInitialCommit: false })
-    expect(versionControl.isInitializingRepository.value).toBe(true)
-
-    versionControl.closeInitializeRepositoryDialog()
-    expect(versionControl.initializeRepositoryDialogOpen.value).toBe(true)
-
-    releaseInitialize?.(ok(true))
-    await pending
-
+    // 邮箱留空：按名称走 key 用的同一套归一化算法。
+    expect(mocks.initializeRepository).toHaveBeenCalledWith(PROJECT_ROOT, {
+      name: '张三',
+      email: 'zhang-san@noreply.example',
+    })
+    expect(mocks.stageAll).toHaveBeenCalledWith(PROJECT_ROOT)
+    expect(mocks.createCommit).toHaveBeenCalledWith(PROJECT_ROOT, { message: 'sidebar.initialCommitMessage' })
     expect(versionControl.isInitializingRepository.value).toBe(false)
-    expect(versionControl.initializeRepositoryDialogOpen.value).toBe(false)
-    expect(versionControl.repositoryInitializedDuringDialog.value).toBe(false)
+  })
+
+  it('skips the first commit when the setting is off and keeps an explicit email', async () => {
+    const { versionControl, projectPath } = createVersionControl({
+      committerName: 'Author',
+      committerEmail: 'author@example.com',
+      createInitialCommit: false,
+    })
+    projectPath.value = PROJECT_ROOT
+
+    await versionControl.initializeProjectRepository()
+
+    expect(mocks.initializeRepository).toHaveBeenCalledWith(PROJECT_ROOT, {
+      name: 'Author',
+      email: 'author@example.com',
+    })
+    expect(mocks.stageAll).not.toHaveBeenCalled()
     expect(mocks.createCommit).not.toHaveBeenCalled()
   })
 
-  it('reports an initial commit failure as such once the repository was initialized', async () => {
+  it('falls back to the author identity when no committer name is configured', async () => {
     const { versionControl, projectPath } = createVersionControl()
     projectPath.value = PROJECT_ROOT
-    versionControl.initializeRepositoryDialogOpen.value = true
-    mocks.stageAll.mockRejectedValueOnce('initial commit exploded')
 
-    await versionControl.initializeProjectRepository({ identity: IDENTITY, createInitialCommit: true })
+    await versionControl.initializeProjectRepository()
 
-    expect(versionControl.initializeRepositoryError.value).toBe('sidebar.initializeDialog.initialCommitFailed')
-    expect(versionControl.initializeRepositoryDialogOpen.value).toBe(true)
-    expect(versionControl.isInitializingRepository.value).toBe(false)
+    const publisherKey = createDefaultAppSettings().identity.publisherKey
+    expect(mocks.initializeRepository).toHaveBeenCalledWith(PROJECT_ROOT, {
+      name: publisherKey,
+      email: defaultCommitterEmail(publisherKey),
+    })
   })
 
-  it('reports a plain initialization failure when the repository was never created', async () => {
-    const { versionControl, projectPath } = createVersionControl()
+  it('opens the committer setting when git rejects the identity', async () => {
+    const navigator = vi.fn()
+    registerSettingsNavigator(navigator)
+    const noticeCount = titleBarNotices.value.length
+    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
     projectPath.value = PROJECT_ROOT
-    versionControl.initializeRepositoryDialogOpen.value = true
+    mocks.initializeRepository.mockResolvedValueOnce(failure('bad identity', 'invalid-input'))
+
+    await versionControl.initializeProjectRepository()
+
+    expect(navigator).toHaveBeenCalledWith('versionControl.committerName')
+    expect(noticesAfter(noticeCount)).toEqual(['bad identity'])
+    expect(mocks.stageAll).not.toHaveBeenCalled()
+    registerSettingsNavigator(null)
+  })
+
+  it('reports an initialization failure without leaving the busy state on', async () => {
+    const noticeCount = titleBarNotices.value.length
+    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
+    projectPath.value = PROJECT_ROOT
+    mocks.initializeRepository.mockRejectedValueOnce(new Error('initialization exploded'))
+
+    await versionControl.initializeProjectRepository()
+
+    expect(versionControl.isInitializingRepository.value).toBe(false)
+    expect(noticesAfter(noticeCount)).toEqual(['initialization exploded'])
+    expect(mocks.stageAll).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the generic message when initialization throws a non-error', async () => {
+    const noticeCount = titleBarNotices.value.length
+    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
+    projectPath.value = PROJECT_ROOT
     mocks.initializeRepository.mockRejectedValueOnce('initialization exploded')
 
-    await versionControl.initializeProjectRepository({ identity: IDENTITY, createInitialCommit: true })
+    await versionControl.initializeProjectRepository()
 
-    expect(versionControl.initializeRepositoryError.value).toBe('sidebar.initializeDialog.failed')
-    expect(versionControl.initializeRepositoryDialogOpen.value).toBe(true)
+    expect(noticesAfter(noticeCount)).toEqual(['sidebar.initializeFailed'])
+  })
+
+  it('reports a failed first commit as such once the repository exists', async () => {
+    const noticeCount = titleBarNotices.value.length
+    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
+    projectPath.value = PROJECT_ROOT
+    mocks.stageAll.mockRejectedValueOnce('initial commit exploded')
+
+    await versionControl.initializeProjectRepository()
+
+    expect(mocks.initializeRepository).toHaveBeenCalled()
+    expect(versionControl.isInitializingRepository.value).toBe(false)
+    expect(noticesAfter(noticeCount)).toEqual(['sidebar.initialCommitFailed'])
   })
 
   it('refreshes repository status for a file change only while a project is open', async () => {

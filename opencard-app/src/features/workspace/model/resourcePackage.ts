@@ -44,6 +44,13 @@ export type ResourcePackagePublicResources = {
   iconSeries: readonly ResourcePackagePublicIconSeries[]
 }
 
+/** 包里自带的子包（不是依赖）：它们整包躺在包的 `.opencard/packages/<Key>/` 下。 */
+export type ResourcePackageIncludedPackage = {
+  key: string
+  name: string
+  version: string
+}
+
 export type ResourcePackageManifest = {
   type: typeof RESOURCE_PACKAGE_TYPE
   key: string
@@ -53,6 +60,7 @@ export type ResourcePackageManifest = {
   cover?: string
   contentHash: string
   public: ResourcePackagePublicResources
+  packages?: readonly ResourcePackageIncludedPackage[]
 }
 
 export type ResourcePackageManifestIssue = {
@@ -139,6 +147,40 @@ function normalizePublicIconSeries(
   return result
 }
 
+function normalizeIncludedPackages(
+  value: unknown,
+  issues: ResourcePackageManifestIssue[],
+): ResourcePackageIncludedPackage[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    addIssue(issues, 'packages', 'Expected an array; used an empty list')
+    return []
+  }
+  const result: ResourcePackageIncludedPackage[] = []
+  const keys = new Set<string>()
+  for (const [index, candidate] of value.entries()) {
+    const path = `packages[${index}]`
+    if (!isRecord(candidate)) {
+      addIssue(issues, path, 'Expected a package object; ignored the entry')
+      continue
+    }
+    const key = typeof candidate.key === 'string' ? normalizeKeySlug(candidate.key) : null
+    if (!key) {
+      addIssue(issues, path, 'Included package Key is required; ignored the entry')
+      continue
+    }
+    if (keys.has(key)) {
+      addIssue(issues, `${path}.key`, 'Duplicate included package Key was ignored')
+      continue
+    }
+    keys.add(key)
+    const name = typeof candidate.name === 'string' && candidate.name.trim() ? candidate.name.trim() : key
+    const version = typeof candidate.version === 'string' ? candidate.version.trim() : ''
+    result.push({ key, name, version })
+  }
+  return result
+}
+
 function normalizeVersion(
   value: unknown,
   fallback: string,
@@ -174,6 +216,7 @@ export function normalizeResourcePackageManifest(
   if (name === resolvedKey && source.name !== undefined) addIssue(issues, 'name', 'Missing package name used the package Key')
   const version = normalizeVersion(source.version, '0.0.0', issues, 'version')
   const cover = normalizeProjectRelativeCoverPath(source.cover)
+  const packages = normalizeIncludedPackages(source.packages, issues)
   const publicSource = isRecord(source.public) ? source.public : {}
   if (!isRecord(source.public) && source.public !== undefined) addIssue(issues, 'public', 'Expected an object; used empty public indexes')
   return {
@@ -188,6 +231,7 @@ export function normalizeResourcePackageManifest(
         fonts: normalizePublicFonts(publicSource.fonts, issues),
         iconSeries: normalizePublicIconSeries(publicSource.iconSeries, issues),
       },
+      ...(packages.length ? { packages } : {}),
     },
     issues,
   }

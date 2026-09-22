@@ -1,23 +1,31 @@
 <template>
-  <div class="page-property-editor-item">
+  <div class="page-property-editor-item" :data-item-key="item.key">
     <div
       class="page-property-editor-item__row"
       :class="{ 'is-group': !item.content?.length }"
       :style="rowStyle"
     >
-      <OcText class="page-property-editor-item__title" as="span" size="sm" :bold="!item.content?.length">
-        {{ item.title }}
-      </OcText>
+      <div class="page-property-editor-item__label">
+        <OcText class="page-property-editor-item__title" as="span" size="sm" :bold="!item.content?.length">
+          {{ item.title }}
+        </OcText>
+        <OcText
+          v-if="item.subtitle"
+          class="page-property-editor-item__subtitle"
+          as="span"
+          size="xs"
+          tone="muted"
+        >
+          {{ item.subtitle }}
+        </OcText>
+      </div>
       <div v-if="item.content?.length" class="page-property-editor-item__content">
         <template v-for="(part, index) in item.content" :key="partKey(part, index)">
           <OcText v-if="typeof part === 'string'" as="span" size="sm">{{ part }}</OcText>
           <PropertyFieldRenderer
             v-else-if="part.type === 'editor'"
             class="page-property-editor-item__editor"
-            :class="{
-              'is-expansive': part.definition.fieldType === 'number' && part.definition.presentation === 'slider',
-              'is-compact': !(part.definition.fieldType === 'number' && part.definition.presentation === 'slider'),
-            }"
+            :class="{ 'is-compact': part.definition.fieldType === 'boolean' }"
             :definition="part.definition"
             :value="encodeValue(part)"
             editor-id="field"
@@ -140,8 +148,19 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.page-property-editor-item__label {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
 .page-property-editor-item__title {
   min-width: 0;
+}
+
+.page-property-editor-item__subtitle {
+  min-width: 0;
+  line-height: 1.4;
 }
 
 .page-property-editor-item__content {
@@ -154,16 +173,19 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
   gap: var(--oc-space-2);
 }
 
+/* 所有编辑器统一占满同一个宽度：值区宽度由 --oc-page-editor-value-width 决定，
+   不再按字段类型各撑各的（枚举贴标签、滑块占满整列）。同一行里的操作按钮优先占位。 */
 .page-property-editor-item__editor {
   min-width: 0;
-  width: max-content;
-  max-width: 100%;
-  flex: 0 1 auto;
+  flex: 1 1 0;
+  max-width: var(--oc-page-editor-value-width);
 }
 
-.page-property-editor-item__editor.is-expansive {
-  width: 100%;
-  flex: 1 1 auto;
+/* 开关没有"宽度"可言：保持自身尺寸，靠值区的右对齐贴着行的右边。 */
+.page-property-editor-item__editor.is-compact {
+  width: max-content;
+  max-width: 100%;
+  flex: 0 0 auto;
 }
 
 .page-property-editor-item__editor.is-compact :deep(> *) {

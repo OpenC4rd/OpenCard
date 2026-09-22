@@ -4,11 +4,17 @@ import { i18n, setAppLocale } from "./i18n";
 import { setupGlobalTooltip } from "./shared/ui/tooltip/globalTooltip";
 import {
   setOcGlassIntensity,
+  setOcMicaBackdrop,
   setOcPhaseImageSpeedMultiplier,
   setOcTheme,
 } from "./shared/ui/foundation";
 import { useAppSettingsStore } from "./features/settings/store/appSettingsStore";
-import { addTitleBarNotice } from "./features/notifications/titlebarNotices";
+import { addTitleBarNotice, notifyWarning } from "./features/notifications/titlebarNotices";
+import {
+  applyMicaBackdrop,
+  clearMicaBackdrop,
+  isMicaBackdropAvailable,
+} from "./features/shell/services/windowBackdropMaterial";
 import { warmCodeEditorOnIdle } from "./features/editor-runtime/services/warmCodeEditor";
 import "./features/shell/shell.css";
 import "./styles.css";
@@ -28,6 +34,23 @@ function recordStartupTiming(label: string): void {
 }
 
 recordStartupTiming("main module ready");
+
+/*
+ * 开发期探针：只报告"主线程被占住多久"，不涉及任何 await 等待。
+ * 目录遍历那条计时量的是墙上时间，主线程被占用时会把等待算成慢 IO，这里用来区分两者。
+ */
+if (import.meta.env.DEV && typeof PerformanceObserver !== "undefined") {
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration < 120) continue;
+        console.warn(`[OpenCard/LongTask] ${Math.round(entry.duration)}ms at ${Math.round(entry.startTime)}ms`);
+      }
+    }).observe({ entryTypes: ["longtask"] });
+  } catch {
+    // 不支持 longtask 的环境（例如部分 webview 版本）忽略即可。
+  }
+}
 
 function dismissStartupCover(): void {
   const cover = document.getElementById("oc-startup-cover");
@@ -49,6 +72,7 @@ async function bootstrap(): Promise<void> {
   recordStartupTiming("settings load started");
   await settingsStore.initialize();
   recordStartupTiming("settings ready");
+  const micaBackdropAvailable = await isMicaBackdropAvailable();
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
   let lastAppliedTheme: "dark" | "light" | null = null;
 
@@ -76,6 +100,51 @@ async function bootstrap(): Promise<void> {
     }
     lastAppliedTheme = theme;
   };
+
+  // 云母只由系统绘制，应用失败或平台不支持时窗口底必须保持不透明。
+  let backdropGeneration = 0;
+  let micaUnsupportedNotified = false;
+
+  const applyBackdropMaterial = async (): Promise<void> => {
+    const generation = ++backdropGeneration;
+    const enabled = settingsStore.settings.value.appearance.micaBackground;
+
+    if (!enabled || !micaBackdropAvailable) {
+      await clearMicaBackdrop();
+      if (generation !== backdropGeneration) return;
+      setOcMicaBackdrop(false);
+      if (enabled && !micaUnsupportedNotified) {
+        micaUnsupportedNotified = true;
+        notifyWarning(i18n.global.t("app.notifications.micaUnsupported"));
+      }
+      return;
+    }
+
+    const applied = await applyMicaBackdrop(resolveTheme());
+    if (generation !== backdropGeneration) return;
+    setOcMicaBackdrop(applied);
+  };
+
+  // Windows 在窗口重新显示时（切换虚拟桌面、最小化恢复）会重算窗口材质，
+  // 明暗变体会退回系统设置；窗口重新可见或获得焦点时重新声明一次。
+  const reassertBackdropMaterial = (): void => {
+    if (document.visibilityState !== "visible") return;
+    if (!settingsStore.settings.value.appearance.micaBackground) return;
+    void applyBackdropMaterial();
+  };
+  document.addEventListener("visibilitychange", reassertBackdropMaterial);
+  window.addEventListener("focus", reassertBackdropMaterial);
+
+  watch(
+    () => [
+      settingsStore.settings.value.appearance.micaBackground,
+      resolveTheme(),
+    ] as const,
+    () => {
+      void applyBackdropMaterial();
+    },
+    { immediate: true },
+  );
 
   watch(
     () => {
@@ -106,7 +175,10 @@ async function bootstrap(): Promise<void> {
     { immediate: true },
   );
   systemTheme.addEventListener("change", () => {
-    if (settingsStore.settings.value.appearance.theme === "system") applyThemeAppearance();
+    if (settingsStore.settings.value.appearance.theme !== "system") return;
+    applyThemeAppearance();
+    // 系统明暗不是响应式数据，跟随系统时云母的明暗变体要在这里一并重设。
+    void applyBackdropMaterial();
   });
   watch(
     () => settingsStore.settings.value.appearance.locale,

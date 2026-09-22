@@ -52,6 +52,12 @@ function validateProjection(native: NativeInspection, manifest: ResourcePackageM
     const series = (icons?.iconSeries ?? []).find(candidate => candidate.key.toLocaleLowerCase() === item.key.toLocaleLowerCase())
     if (!series || series.icons.length !== item.count) throw new Error(`Invalid public icon series summary: ${item.key}`)
   }
+  for (const included of manifest.packages ?? []) {
+    const prefix = `.opencard/packages/${included.key}/`.toLocaleLowerCase()
+    if (!native.entryPaths.some(path => path.toLocaleLowerCase().startsWith(prefix))) {
+      throw new Error(`Missing packaged sub-package: ${included.key}`)
+    }
+  }
 }
 
 function archivePathForReference(sourceFilePath: string, reference: string): string {

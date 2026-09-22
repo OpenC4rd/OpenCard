@@ -1,5 +1,5 @@
 /** Versioned application settings contract and normalization boundary. */
-import { normalizeKeySlug } from '../../../shared/model/keySlug'
+import { normalizeKeySlug, toKeySlug } from '../../../shared/model/keySlug'
 import {
   OC_EDITABLE_THEME_COLOR_KEYS,
   OC_THEME_REGISTRY,
@@ -26,9 +26,23 @@ export type AppLocale = 'system' | 'zh-CN' | 'en-US'
 export type AppThemePreference = OcThemeId | 'system'
 export type StructureTreeSelectionBehavior = 'none' | 'expand' | 'expand-exclusive'
 export type PackageManagerView = 'tree' | 'album'
-export type SettingsCategoryKey = 'general' | 'appearance' | 'workspace'
+export type SettingsCategoryKey = 'general' | 'appearance' | 'workspace' | 'versionControl'
+/** 设置页分类的唯一清单：侧栏树、分类投影与跳转都从这里取，避免各处各抄一份。 */
+export const SETTINGS_CATEGORY_KEYS: readonly SettingsCategoryKey[] = [
+  'general',
+  'appearance',
+  'workspace',
+  'versionControl',
+]
+export function isSettingsCategoryKey(value: unknown): value is SettingsCategoryKey {
+  return typeof value === 'string' && (SETTINGS_CATEGORY_KEYS as readonly string[]).includes(value)
+}
+/** 提交者邮箱留空时使用的域名：`<归一化后的提交者名称>@noreply.example`。 */
+export const COMMITTER_EMAIL_DOMAIN = 'noreply.example'
+export const MAX_COMMITTER_FIELD_LENGTH = 128
 export type AppThemePresetId =
   | 'default'
+  | 'graphite'
   | 'grass-block'
   | 'deep-sea'
   | 'ember'
@@ -50,10 +64,12 @@ export type ProjectWorkspaceSidebarState = {
 /** Last package-builder input for one project; absent means "no build was made yet". */
 export type ProjectPackageBuilderState = {
   name: string
+  author: string
   version: string
   fontFamilyKeys: string[]
   fontCompositionKeys: string[]
   iconSeriesKeys: string[]
+  packageKeys: string[]
   imagePaths: string[]
 }
 
@@ -71,61 +87,86 @@ export type AppUserThemePreset = {
 }
 
 export const APP_THEME_PRESETS: Readonly<Record<OcThemeId, readonly AppThemePresetId[]>> = {
-  dark: ['default', 'grass-block', 'deep-sea', 'ember', 'ink-bamboo'],
-  light: ['default', 'morning-mist', 'sakura-paper', 'dune', 'mint'],
+  dark: ['default', 'graphite', 'grass-block', 'deep-sea', 'ember', 'ink-bamboo'],
+  light: ['default', 'graphite', 'morning-mist', 'sakura-paper', 'dune', 'mint'],
 }
 
-const BUILTIN_THEME_DEFINITIONS: Partial<Record<AppThemePresetId, AppThemeDefinition>> = {
-  'grass-block': {
-    colors: { '--oc-accent': '#75FF53', '--oc-bg-base': '#34251A', '--oc-fg-default': '#CCCCCC' },
-    accentNeighborAngle: -50,
-    fontFamily: 'system',
+/**
+ * OpenCard 默认主题的预设定义。十六进制统一为大写，与存储中的覆盖色保持一致；
+ * 传入主题色即得到"石墨"这类只换主题色的派生预设。
+ */
+function openCardThemeDefinition(
+  themeId: OcThemeId,
+  accentColor = OC_THEME_REGISTRY[themeId]['--oc-accent'],
+): AppThemeDefinition {
+  return resolveThemeDefinition(themeId, { '--oc-accent': accentColor }, DEFAULT_ACCENT_NEIGHBOR_ANGLE, 'system')
+}
+
+const BUILTIN_THEME_DEFINITIONS: Readonly<
+  Record<OcThemeId, Partial<Record<AppThemePresetId, AppThemeDefinition>>>
+> = {
+  dark: {
+    default: openCardThemeDefinition('dark'),
+    graphite: openCardThemeDefinition('dark', '#FFFFFF'),
+    'grass-block': {
+      colors: { '--oc-accent': '#75FF53', '--oc-bg-base': '#34251A', '--oc-fg-default': '#CCCCCC' },
+      accentNeighborAngle: -50,
+      fontFamily: 'system',
+    },
+    'deep-sea': {
+      colors: { '--oc-accent': '#4CC9F0', '--oc-bg-base': '#071A2B', '--oc-fg-default': '#D9EDF7' },
+      accentNeighborAngle: -40,
+      fontFamily: 'system',
+    },
+    ember: {
+      colors: { '--oc-accent': '#FF7A45', '--oc-bg-base': '#241713', '--oc-fg-default': '#E8D8D0' },
+      accentNeighborAngle: 35,
+      fontFamily: 'system',
+    },
+    'ink-bamboo': {
+      colors: { '--oc-accent': '#78C091', '--oc-bg-base': '#101A16', '--oc-fg-default': '#D5E2DA' },
+      accentNeighborAngle: -110,
+      fontFamily: 'system',
+    },
   },
-  'deep-sea': {
-    colors: { '--oc-accent': '#4CC9F0', '--oc-bg-base': '#071A2B', '--oc-fg-default': '#D9EDF7' },
-    accentNeighborAngle: -40,
-    fontFamily: 'system',
-  },
-  ember: {
-    colors: { '--oc-accent': '#FF7A45', '--oc-bg-base': '#241713', '--oc-fg-default': '#E8D8D0' },
-    accentNeighborAngle: 35,
-    fontFamily: 'system',
-  },
-  'ink-bamboo': {
-    colors: { '--oc-accent': '#78C091', '--oc-bg-base': '#101A16', '--oc-fg-default': '#D5E2DA' },
-    accentNeighborAngle: -110,
-    fontFamily: 'system',
-  },
-  'morning-mist': {
-    colors: { '--oc-accent': '#5879FA', '--oc-bg-base': '#F2F5FB', '--oc-fg-default': '#283044' },
-    accentNeighborAngle: -35,
-    fontFamily: 'system',
-  },
-  'sakura-paper': {
-    colors: { '--oc-accent': '#DE4285', '--oc-bg-base': '#FFF6FA', '--oc-fg-default': '#3D2933' },
-    accentNeighborAngle: 40,
-    fontFamily: 'system',
-  },
-  dune: {
-    colors: { '--oc-accent': '#B27328', '--oc-bg-base': '#FFF8E9', '--oc-fg-default': '#3B3022' },
-    accentNeighborAngle: -45,
-    fontFamily: 'system',
-  },
-  mint: {
-    colors: { '--oc-accent': '#1B916F', '--oc-bg-base': '#F1FBF7', '--oc-fg-default': '#203A33' },
-    accentNeighborAngle: 45,
-    fontFamily: 'system',
+  light: {
+    default: openCardThemeDefinition('light'),
+    graphite: openCardThemeDefinition('light', '#000000'),
+    'morning-mist': {
+      colors: { '--oc-accent': '#5879FA', '--oc-bg-base': '#F2F5FB', '--oc-fg-default': '#283044' },
+      accentNeighborAngle: -35,
+      fontFamily: 'system',
+    },
+    'sakura-paper': {
+      colors: { '--oc-accent': '#DE4285', '--oc-bg-base': '#FFF6FA', '--oc-fg-default': '#3D2933' },
+      accentNeighborAngle: 40,
+      fontFamily: 'system',
+    },
+    dune: {
+      colors: { '--oc-accent': '#B27328', '--oc-bg-base': '#FFF8E9', '--oc-fg-default': '#3B3022' },
+      accentNeighborAngle: -45,
+      fontFamily: 'system',
+    },
+    mint: {
+      colors: { '--oc-accent': '#1B916F', '--oc-bg-base': '#F1FBF7', '--oc-fg-default': '#203A33' },
+      accentNeighborAngle: 45,
+      fontFamily: 'system',
+    },
   },
 }
 export type AppSettingKey =
   | 'identity.publisherKey'
+  | 'versionControl.committerName'
+  | 'versionControl.committerEmail'
+  | 'versionControl.createInitialCommit'
   | 'appearance.theme'
   | 'appearance.locale'
   | 'appearance.glassIntensity'
   | 'appearance.baseFontSize'
   | 'appearance.phaseImageSpeed'
+  | 'appearance.micaBackground'
   | 'shell.titleBarNoticeHistoryLimit'
-  | 'updates.suppressReleaseNotesAfterUpdate'
+  | 'updates.showReleaseNotesAfterUpdate'
   | 'exporting.openCdeWorkbookAfterExport'
   | 'workspace.structureTreeSelectionBehavior'
   | 'workspace.structureTreeScrollToSelection'
@@ -144,15 +185,26 @@ export interface AppSettings {
   identity: {
     publisherKey: string
   }
+  /** Git 提交者身份与初始化行为：初始化仓库时直接取用，不再逐次询问。 */
+  versionControl: {
+    committerName: string
+    /** 留空即按 committerName 归一化后拼成 `@noreply.example`。 */
+    committerEmail: string
+    createInitialCommit: boolean
+  }
   appearance: {
     theme: AppThemePreference
     locale: AppLocale
     glassIntensity: number
     baseFontSize: number
     phaseImageSpeed: number
+    /** 窗口底层的系统云母材质（仅 Windows 11 可用）。 */
+    micaBackground: boolean
     themeOverrides: Record<OcThemeId, OcThemeColorOverrides>
     accentNeighborAngles: Record<OcThemeId, number>
     fontFamilies: Record<OcThemeId, string>
+    /** 当前选中的预设 id（'' 表示这套配色已被改过、不属于任何预设）；颜色相同的预设靠它区分。 */
+    themePresetIds: Record<OcThemeId, string>
     userThemePresets: Record<OcThemeId, AppUserThemePreset[]>
   }
   shell: {
@@ -161,7 +213,8 @@ export interface AppSettings {
     titleBarNoticeHistoryLimit: number
   }
   updates: {
-    suppressReleaseNotesAfterUpdate: boolean
+    /** 更新后是否自动弹出版本说明。 */
+    showReleaseNotesAfterUpdate: boolean
   }
   exporting: {
     openCdeWorkbookAfterExport: boolean
@@ -217,8 +270,8 @@ export type SettingsIntent =
     }
   | { type: 'theme-preset.delete'; themeId: OcThemeId; presetId: string }
   | { type: 'theme-font.change'; themeId: OcThemeId; value: string }
-  | { type: 'theme.import' | 'theme.export'; themeId: OcThemeId }
-  | { type: 'themes.reset' }
+  | { type: 'theme.copy' | 'theme.read'; themeId: OcThemeId }
+  | { type: 'theme-name.change'; themeId: OcThemeId; name: string }
   | { type: 'identity.regenerate' }
   | {
       type: 'project-workspace.reset'
@@ -228,18 +281,25 @@ const DEFAULT_PUBLISHER_KEY = createPublisherKey()
 export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
   version: APP_SETTINGS_VERSION,
   identity: Object.freeze({ publisherKey: DEFAULT_PUBLISHER_KEY }),
+  versionControl: Object.freeze({
+    committerName: '',
+    committerEmail: '',
+    createInitialCommit: true,
+  }),
   appearance: Object.freeze({
     theme: 'system',
     locale: 'system',
     glassIntensity: 60,
     baseFontSize: 12,
     phaseImageSpeed: 100,
+    micaBackground: false,
     themeOverrides: Object.freeze({ dark: Object.freeze({}), light: Object.freeze({}) }),
     accentNeighborAngles: Object.freeze({
       dark: DEFAULT_ACCENT_NEIGHBOR_ANGLE,
       light: DEFAULT_ACCENT_NEIGHBOR_ANGLE,
     }),
     fontFamilies: Object.freeze({ dark: 'system', light: 'system' }),
+    themePresetIds: Object.freeze({ dark: 'default', light: 'default' }),
     userThemePresets: { dark: [], light: [] },
   }),
   shell: Object.freeze({
@@ -248,7 +308,7 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     titleBarNoticeHistoryLimit: 128,
   }),
   updates: Object.freeze({
-    suppressReleaseNotesAfterUpdate: false,
+    showReleaseNotesAfterUpdate: true,
   }),
   exporting: Object.freeze({
     openCdeWorkbookAfterExport: true,
@@ -307,6 +367,39 @@ function clampTitleBarNoticeHistoryLimit(value: unknown): number {
 function clampAutoSaveIntervalSeconds(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_APP_SETTINGS.workspace.autoSaveIntervalSeconds
   return Math.min(MAX_AUTO_SAVE_INTERVAL_SECONDS, Math.max(MIN_AUTO_SAVE_INTERVAL_SECONDS, Math.round(value)))
+}
+
+/**
+ * 提交者名称/邮箱的归一化：去掉控制字符与 git 签名里非法的 `<>`，
+ * 折叠空白并限制长度；空串表示"没填"，交给 resolveCommitterIdentity 兜底。
+ */
+function normalizeCommitterField(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value
+    .replace(/[\u0000-\u001F\u007F<>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_COMMITTER_FIELD_LENGTH)
+}
+
+/** 邮箱留空时的默认值：提交者名称按 key 生成用的同一套归一化算法转写成 slug。 */
+export function defaultCommitterEmail(name: string): string {
+  return `${toKeySlug(name)}@${COMMITTER_EMAIL_DOMAIN}`
+}
+
+/**
+ * 设置里真正用于提交的身份：名称留空就退回作者身份 ID，邮箱留空再按名称推导。
+ * 两者都能兜底，所以初始化仓库不需要再问用户任何东西。
+ */
+export function resolveCommitterIdentity(settings: {
+  identity: { publisherKey: string }
+  versionControl: { committerName: string; committerEmail: string }
+}): { name: string; email: string } {
+  const name = settings.versionControl.committerName.trim() || settings.identity.publisherKey
+  return {
+    name,
+    email: settings.versionControl.committerEmail.trim() || defaultCommitterEmail(name),
+  }
 }
 
 function normalizeRecentProjects(value: unknown): string[] {
@@ -386,16 +479,23 @@ export function getThemePreset(
     return userPresets.find(preset => `user:${preset.name}` === presetId)?.definition ?? null
   }
   if (!APP_THEME_PRESETS[themeId].includes(presetId as AppThemePresetId)) return null
-  if (presetId === 'default') return {
-    colors: {
-      '--oc-accent': OC_THEME_REGISTRY[themeId]['--oc-accent'],
-      '--oc-bg-base': OC_THEME_REGISTRY[themeId]['--oc-bg-base'],
-      '--oc-fg-default': OC_THEME_REGISTRY[themeId]['--oc-fg-default'],
-    },
-    accentNeighborAngle: DEFAULT_ACCENT_NEIGHBOR_ANGLE,
-    fontFamily: 'system',
-  }
-  return BUILTIN_THEME_DEFINITIONS[presetId as AppThemePresetId] ?? null
+  return BUILTIN_THEME_DEFINITIONS[themeId][presetId as AppThemePresetId] ?? null
+}
+
+/** 主题色比较只看颜色本身：存储与预设各自的十六进制大小写不重要。 */
+function sameThemeColor(left: string, right: string): boolean {
+  return left.toUpperCase() === right.toUpperCase()
+}
+
+function matchesThemeColors(
+  themeId: OcThemeId,
+  overrides: OcThemeColorOverrides,
+  colors: Required<OcThemeColorOverrides>,
+): boolean {
+  return OC_EDITABLE_THEME_COLOR_KEYS.every(token => sameThemeColor(
+    overrides[token] ?? OC_THEME_REGISTRY[themeId][token],
+    colors[token],
+  ))
 }
 
 export function resolveThemePresetId(
@@ -407,22 +507,68 @@ export function resolveThemePresetId(
 ): string {
   for (const presetId of APP_THEME_PRESETS[themeId]) {
     const preset = getThemePreset(themeId, presetId)!
-    const matchesColors = OC_EDITABLE_THEME_COLOR_KEYS.every(token => (
-      (overrides[token] ?? OC_THEME_REGISTRY[themeId][token]) === preset.colors[token]
-    ))
-    if (matchesColors
+    if (matchesThemeColors(themeId, overrides, preset.colors)
       && accentNeighborAngle === preset.accentNeighborAngle
       && fontFamily === preset.fontFamily) return presetId
   }
   for (const preset of userPresets) {
-    const matchesColors = OC_EDITABLE_THEME_COLOR_KEYS.every(token => (
-      (overrides[token] ?? OC_THEME_REGISTRY[themeId][token]) === preset.definition.colors[token]
-    ))
-    if (matchesColors
+    if (matchesThemeColors(themeId, overrides, preset.definition.colors)
       && accentNeighborAngle === preset.definition.accentNeighborAngle
       && fontFamily === preset.definition.fontFamily) return `user:${preset.name}`
   }
   return ''
+}
+
+/**
+ * 预设 id 只认当前存在的预设：认不出来或是空串就当作"改过的自定义配色"。
+ * 老数据没有这个字段，那时才按颜色推导一次，保持升级前的选中项。
+ */
+function normalizeThemePresetIds(
+  value: unknown,
+  themeOverrides: Record<OcThemeId, OcThemeColorOverrides>,
+  accentNeighborAngles: Record<OcThemeId, number>,
+  fontFamilies: Record<OcThemeId, string>,
+  userThemePresets: Record<OcThemeId, AppUserThemePreset[]>,
+): Record<OcThemeId, string> {
+  const source = isRecord(value) ? value : {}
+  const resolve = (themeId: OcThemeId): string => {
+    const id = source[themeId]
+    if (typeof id !== 'string') {
+      return resolveThemePresetId(
+        themeId,
+        themeOverrides[themeId],
+        accentNeighborAngles[themeId],
+        fontFamilies[themeId],
+        userThemePresets[themeId],
+      )
+    }
+    const trimmed = id.trim()
+    if (!trimmed) return ''
+    if (APP_THEME_PRESETS[themeId].includes(trimmed as AppThemePresetId)) return trimmed
+    return userThemePresets[themeId].some(preset => `user:${preset.name}` === trimmed) ? trimmed : ''
+  }
+  return { dark: resolve('dark'), light: resolve('light') }
+}
+
+/**
+ * 当前这套主题的完整定义：没被覆盖的颜色取主题注册表里的值，十六进制统一为大写。
+ * 内置预设、导出到剪贴板、把当前配色命名成自定义预设都从这里取同一个形状。
+ */
+export function resolveThemeDefinition(
+  themeId: OcThemeId,
+  overrides: OcThemeColorOverrides,
+  accentNeighborAngle: number,
+  fontFamily: string,
+): AppThemeDefinition {
+  return {
+    colors: {
+      '--oc-accent': (overrides['--oc-accent'] ?? OC_THEME_REGISTRY[themeId]['--oc-accent']).toUpperCase(),
+      '--oc-bg-base': (overrides['--oc-bg-base'] ?? OC_THEME_REGISTRY[themeId]['--oc-bg-base']).toUpperCase(),
+      '--oc-fg-default': (overrides['--oc-fg-default'] ?? OC_THEME_REGISTRY[themeId]['--oc-fg-default']).toUpperCase(),
+    },
+    accentNeighborAngle,
+    fontFamily,
+  }
 }
 
 export function serializeAppTheme(
@@ -431,16 +577,17 @@ export function serializeAppTheme(
   accentNeighborAngle: number,
   fontFamily: string,
 ): string {
+  const definition = resolveThemeDefinition(themeId, overrides, accentNeighborAngle, fontFamily)
   return `${JSON.stringify({
     format: 'opencard-theme',
     version: 1,
     colors: {
-      accent: overrides['--oc-accent'] ?? OC_THEME_REGISTRY[themeId]['--oc-accent'],
-      background: overrides['--oc-bg-base'] ?? OC_THEME_REGISTRY[themeId]['--oc-bg-base'],
-      foreground: overrides['--oc-fg-default'] ?? OC_THEME_REGISTRY[themeId]['--oc-fg-default'],
+      accent: definition.colors['--oc-accent'],
+      background: definition.colors['--oc-bg-base'],
+      foreground: definition.colors['--oc-fg-default'],
     },
-    accentNeighborAngle,
-    fontFamily,
+    accentNeighborAngle: definition.accentNeighborAngle,
+    fontFamily: definition.fontFamily,
   }, null, 2)}\n`
 }
 
@@ -530,10 +677,12 @@ function normalizePackageBuilderState(value: unknown): ProjectPackageBuilderStat
   if (!isRecord(value)) return null
   return {
     name: normalizeText(value.name),
+    author: normalizeText(value.author),
     version: normalizeText(value.version),
     fontFamilyKeys: normalizeTextList(value.fontFamilyKeys),
     fontCompositionKeys: normalizeTextList(value.fontCompositionKeys),
     iconSeriesKeys: normalizeTextList(value.iconSeriesKeys),
+    packageKeys: normalizeTextList(value.packageKeys),
     imagePaths: normalizeTextList(value.imagePaths),
   }
 }
@@ -586,11 +735,13 @@ export function createDefaultAppSettings(): AppSettings {
   return {
     version: APP_SETTINGS_VERSION,
     identity: { ...DEFAULT_APP_SETTINGS.identity },
+    versionControl: { ...DEFAULT_APP_SETTINGS.versionControl },
     appearance: {
       ...DEFAULT_APP_SETTINGS.appearance,
       themeOverrides: { dark: {}, light: {} },
       accentNeighborAngles: { ...DEFAULT_APP_SETTINGS.appearance.accentNeighborAngles },
       fontFamilies: { ...DEFAULT_APP_SETTINGS.appearance.fontFamilies },
+      themePresetIds: { ...DEFAULT_APP_SETTINGS.appearance.themePresetIds },
       userThemePresets: { dark: [], light: [] },
     },
     shell: { ...DEFAULT_APP_SETTINGS.shell },
@@ -611,6 +762,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
   }
 
   const identity = isRecord(value.identity) ? value.identity : {}
+  const versionControl = isRecord(value.versionControl) ? value.versionControl : {}
   const appearance = isRecord(value.appearance) ? value.appearance : {}
   const legacyAccentNeighborAngle = clampAngle(appearance.accentNeighborAngle)
   const shell = isRecord(value.shell) ? value.shell : {}
@@ -619,12 +771,50 @@ export function normalizeAppSettings(value: unknown): AppSettings {
   const workspace = isRecord(value.workspace) ? value.workspace : {}
   const projectCreation = isRecord(value.projectCreation) ? value.projectCreation : {}
 
+  const themeOverrides: Record<OcThemeId, OcThemeColorOverrides> = {
+    dark: normalizeThemeColorOverrides(isRecord(appearance.themeOverrides)
+      ? appearance.themeOverrides.dark
+      : undefined),
+    light: normalizeThemeColorOverrides(isRecord(appearance.themeOverrides)
+      ? appearance.themeOverrides.light
+      : undefined),
+  }
+  const accentNeighborAngles: Record<OcThemeId, number> = {
+    dark: clampAngle(
+      isRecord(appearance.accentNeighborAngles) ? appearance.accentNeighborAngles.dark : undefined,
+      legacyAccentNeighborAngle,
+    ),
+    light: clampAngle(
+      isRecord(appearance.accentNeighborAngles) ? appearance.accentNeighborAngles.light : undefined,
+      legacyAccentNeighborAngle,
+    ),
+  }
+  const fontFamilies: Record<OcThemeId, string> = {
+    dark: normalizeUiFontFamily(isRecord(appearance.fontFamilies) ? appearance.fontFamilies.dark : undefined),
+    light: normalizeUiFontFamily(isRecord(appearance.fontFamilies) ? appearance.fontFamilies.light : undefined),
+  }
+  const userThemePresets: Record<OcThemeId, AppUserThemePreset[]> = {
+    dark: normalizeUserThemePresets(isRecord(appearance.userThemePresets)
+      ? appearance.userThemePresets.dark
+      : undefined),
+    light: normalizeUserThemePresets(isRecord(appearance.userThemePresets)
+      ? appearance.userThemePresets.light
+      : undefined),
+  }
+
   return {
     version: APP_SETTINGS_VERSION,
     identity: {
       publisherKey: typeof identity.publisherKey === 'string'
         ? normalizeKeySlug(identity.publisherKey) ?? DEFAULT_APP_SETTINGS.identity.publisherKey
         : DEFAULT_APP_SETTINGS.identity.publisherKey,
+    },
+    versionControl: {
+      committerName: normalizeCommitterField(versionControl.committerName),
+      committerEmail: normalizeCommitterField(versionControl.committerEmail),
+      createInitialCommit: typeof versionControl.createInitialCommit === 'boolean'
+        ? versionControl.createInitialCommit
+        : DEFAULT_APP_SETTINGS.versionControl.createInitialCommit,
     },
     appearance: {
       theme: appearance.theme === 'system' || appearance.theme === 'light' || appearance.theme === 'dark'
@@ -641,36 +831,18 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       ),
       baseFontSize: clampBaseFontSize(appearance.baseFontSize),
       phaseImageSpeed: clampPhaseImageSpeed(appearance.phaseImageSpeed),
-      themeOverrides: {
-        dark: normalizeThemeColorOverrides(isRecord(appearance.themeOverrides)
-          ? appearance.themeOverrides.dark
-          : undefined),
-        light: normalizeThemeColorOverrides(isRecord(appearance.themeOverrides)
-          ? appearance.themeOverrides.light
-          : undefined),
-      },
-      accentNeighborAngles: {
-        dark: clampAngle(
-          isRecord(appearance.accentNeighborAngles) ? appearance.accentNeighborAngles.dark : undefined,
-          legacyAccentNeighborAngle,
-        ),
-        light: clampAngle(
-          isRecord(appearance.accentNeighborAngles) ? appearance.accentNeighborAngles.light : undefined,
-          legacyAccentNeighborAngle,
-        ),
-      },
-      fontFamilies: {
-        dark: normalizeUiFontFamily(isRecord(appearance.fontFamilies) ? appearance.fontFamilies.dark : undefined),
-        light: normalizeUiFontFamily(isRecord(appearance.fontFamilies) ? appearance.fontFamilies.light : undefined),
-      },
-      userThemePresets: {
-        dark: normalizeUserThemePresets(isRecord(appearance.userThemePresets)
-          ? appearance.userThemePresets.dark
-          : undefined),
-        light: normalizeUserThemePresets(isRecord(appearance.userThemePresets)
-          ? appearance.userThemePresets.light
-          : undefined),
-      },
+      micaBackground: appearance.micaBackground === true,
+      themeOverrides,
+      accentNeighborAngles,
+      fontFamilies,
+      themePresetIds: normalizeThemePresetIds(
+        appearance.themePresetIds,
+        themeOverrides,
+        accentNeighborAngles,
+        fontFamilies,
+        userThemePresets,
+      ),
+      userThemePresets,
     },
     shell: {
       sidebarWidth: clampSidebarWidth(shell.sidebarWidth),
@@ -680,9 +852,9 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       titleBarNoticeHistoryLimit: clampTitleBarNoticeHistoryLimit(shell.titleBarNoticeHistoryLimit),
     },
     updates: {
-      suppressReleaseNotesAfterUpdate: typeof updates.suppressReleaseNotesAfterUpdate === 'boolean'
-        ? updates.suppressReleaseNotesAfterUpdate
-        : DEFAULT_APP_SETTINGS.updates.suppressReleaseNotesAfterUpdate,
+      showReleaseNotesAfterUpdate: typeof updates.showReleaseNotesAfterUpdate === 'boolean'
+        ? updates.showReleaseNotesAfterUpdate
+        : DEFAULT_APP_SETTINGS.updates.showReleaseNotesAfterUpdate,
     },
     exporting: {
       openCdeWorkbookAfterExport: typeof exporting.openCdeWorkbookAfterExport === 'boolean'

@@ -22,6 +22,7 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-toggle-maximize",
     "core:window:allow-internal-toggle-maximize",
+    "core:window:allow-set-effects",
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [

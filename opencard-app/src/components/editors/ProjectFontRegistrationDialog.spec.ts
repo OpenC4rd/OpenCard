@@ -16,7 +16,6 @@ vi.mock('../../features/workspace/services/projectFontMetadata', () => ({
 }))
 const baseProps = {
   open: true,
-  selectFilesOnOpen: false,
   getManagedFontSource: () => 'fonts/Regular.ttf',
   resolveImportConflict: async () => null,
 }

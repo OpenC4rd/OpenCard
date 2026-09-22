@@ -337,7 +337,7 @@ function handleActionKeydown(event: KeyboardEvent, action: OcActionDefinition): 
 }
 
 .oc-action-menu__button:disabled {
-  opacity: 0.5;
+  opacity: var(--oc-opacity-disabled);
   cursor: not-allowed;
 }
 

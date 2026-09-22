@@ -33,10 +33,6 @@ export interface GitCommandResult<T> {
 }
 
 export interface GitIdentity { name: string; email: string }
-export interface RepositoryInitializationInput {
-  identity: GitIdentity
-  createInitialCommit: boolean
-}
 
 export interface RepositorySummary {
   initialized: boolean

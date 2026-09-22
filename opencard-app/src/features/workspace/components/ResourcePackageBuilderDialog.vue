@@ -55,6 +55,12 @@
                 :value="projectCover?.relativePath ?? t('resourcePackage.coverNone')" :disabled="busy" />
             </label>
           </div>
+          <div v-if="contentSummary.length" class="resource-package-builder__contents">
+            <OcText v-for="row in contentSummary" :key="row.label" as="div" size="xs">
+              <span class="resource-package-builder__contents-label">{{ row.label }}</span>
+              <span class="resource-package-builder__contents-value">{{ row.value }}</span>
+            </OcText>
+          </div>
           <OcText v-if="errorText" class="resource-package-builder__error" tone="danger" role="alert">{{ errorText }}</OcText>
         </aside>
       </div>
@@ -98,6 +104,10 @@ import type { ProjectCover } from '../model/projectCover'
 import { useProjectStore } from '../store/projectStore'
 import { notifyError, notifySuccess } from '../../notifications/titlebarNotices'
 import { useShellProgressTasks } from '../../shell/composables/useShellProgressTasks'
+import { listen } from '@tauri-apps/api/event'
+
+/** Rust 侧打包时按文件回报的事件名，与 resource_package_builder.rs 保持一致。 */
+const PACKAGE_BUILD_PROGRESS_EVENT = 'resource-package-build-progress'
 
 const props = defineProps<{ open: boolean, projectRootPath: string, projectName: string, entries: readonly string[] }>()
 const emit = defineEmits<{ close: [] }>()
@@ -110,6 +120,7 @@ const version = ref('1.0.0')
 const selectedFamilyKeys = ref<Set<string>>(new Set())
 const selectedCompositionKeys = ref<Set<string>>(new Set())
 const selectedIconSeriesKeys = ref<Set<string>>(new Set())
+const selectedPackageKeys = ref<Set<string>>(new Set())
 const selectedImageIds = ref<Set<string>>(new Set())
 const busy = ref(false)
 const errorText = ref('')
@@ -133,6 +144,7 @@ type PackageBuildRequest = {
   familyKeys: readonly string[]
   compositionKeys: readonly string[]
   iconSeriesKeys: readonly string[]
+  packageKeys: readonly string[]
 }
 
 type PackageCandidate = {
@@ -196,8 +208,18 @@ const packageKey = computed(() => {
   return createPackageKey({ source: 'local', author: packageAuthor, name: packageName })
 })
 const selectedCount = computed(() => selectedFamilyKeys.value.size
-  + selectedCompositionKeys.value.size + selectedIconSeriesKeys.value.size + selectedImageIds.value.size)
+  + selectedCompositionKeys.value.size + selectedIconSeriesKeys.value.size
+  + selectedPackageKeys.value.size + selectedImageIds.value.size)
 const canBuild = computed(() => Boolean(packageKey.value && version.value.trim() && selectedCount.value > 0))
+
+/** 包摘要只列数量：具体带了哪些在左边那棵树里看得见。 */
+const contentSummary = computed<readonly { label: string, value: string }[]>(() => [
+  { label: t('resourcePackage.projectFonts'), count: selectedFamilyKeys.value.size },
+  { label: t('resourcePackage.fontCompositions'), count: selectedCompositionKeys.value.size },
+  { label: t('resourcePackage.icons'), count: selectedIconSeriesKeys.value.size },
+  { label: t('resourcePackage.packages'), count: selectedPackageKeys.value.size },
+  { label: t('resourcePackage.images'), count: selectedImageIds.value.size },
+].filter(row => row.count > 0).map(row => ({ label: row.label, value: String(row.count) })))
 
 const treeData = computed<OcNodeCollection>(() => {
   const items = new Map<string, OcNode>()
@@ -266,6 +288,32 @@ const treeData = computed<OcNodeCollection>(() => {
       return key
     }))
   }
+  // 子包这一类始终显示：没有安装包时给一条禁用的提示，而不是让这一类凭空消失。
+  const packages = [...projectStore.projectResourcePackages.value.values()]
+  const packageCategoryKey = 'category:packages'
+  rootKeys.push(packageCategoryKey)
+  items.set(packageCategoryKey, {
+    label: t('resourcePackage.packages'), visual: { type: 'icon', icon: 'file.package', iconTone: 'config' },
+  })
+  if (packages.length === 0) {
+    children.set(packageCategoryKey, ['packages-empty'])
+    items.set('packages-empty', {
+      label: t('resourcePackage.noPackages'),
+      visual: { type: 'icon', icon: 'file.package', iconTone: 'muted' },
+      disabled: true,
+    })
+  } else {
+    children.set(packageCategoryKey, packages.map(pkg => {
+      const key = `package:${pkg.manifest.key}`
+      const selected = selectedPackageKeys.value.has(pkg.manifest.key)
+      items.set(key, {
+        label: pkg.manifest.name, tail: [pkg.manifest.key, pkg.manifest.version, ...toggleSelection(selected)],
+        visual: { type: 'icon', icon: 'file.package', iconTone: selected ? 'active' : 'muted' },
+        contextActions: toggleSelection(selected),
+      })
+      return key
+    }))
+  }
   if (imageCandidates.value.length > 0) {
     const categoryKey = 'category:images'
     rootKeys.push(categoryKey)
@@ -301,7 +349,8 @@ watch(() => props.open, open => {
   if (!open) return
   const cached = packageBuilderCache()
   name.value = cached?.name || props.projectName
-  author.value = appSettingsStore.settings.value.identity.publisherKey
+  // 作者默认取项目作者，不再和设置里的作者 ID 联动。
+  author.value = cached?.author || projectStore.projectProfile.value?.author || ''
   version.value = cached?.version || '1.0.0'
   selectedFamilyKeys.value = restoreSelection(
     projectStore.projectFontFamilies.value.map(family => family.key),
@@ -319,8 +368,12 @@ watch(() => props.open, open => {
     imageCandidates.value.map(candidate => candidate.id),
     cached?.imagePaths.map(imageSelectionId),
   )
+  selectedPackageKeys.value = restoreSelection(
+    [...projectStore.projectResourcePackages.value.keys()],
+    cached?.packageKeys,
+  )
   expandedKeySet.value = new Set([
-    'category:fonts', 'font-group:families', 'font-group:compositions', 'category:icons', 'category:images',
+    'category:fonts', 'font-group:families', 'font-group:compositions', 'category:icons', 'category:packages', 'category:images',
   ])
   errorText.value = ''
   void refreshProjectCover()
@@ -376,6 +429,14 @@ function handleTreeAction(event: OcNodeActionEvent): void {
     selectedIconSeriesKeys.value = nextSeries
     return
   }
+  if (event.key.startsWith('package:')) {
+    const packageKey = event.key.slice('package:'.length)
+    const nextPackages = new Set(selectedPackageKeys.value)
+    if (selected) nextPackages.add(packageKey)
+    else nextPackages.delete(packageKey)
+    selectedPackageKeys.value = nextPackages
+    return
+  }
   const nextImages = new Set(selectedImageIds.value)
   if (selected) nextImages.add(event.key)
   else nextImages.delete(event.key)
@@ -393,7 +454,6 @@ async function build(): Promise<void> {
   errorText.value = ''
   let request: PackageBuildRequest | null = null
   try {
-    appSettingsStore.updateSetting('identity.publisherKey', toKeySlug(author.value.trim(), 'publisher'))
     const selected = imageCandidates.value.filter(candidate => selectedImageIds.value.has(candidate.id))
     const imagePaths = selected.map(candidate => candidate.detail ?? candidate.label)
     const outputPath = await fileSystemService.pickSavePath({
@@ -411,6 +471,7 @@ async function build(): Promise<void> {
       familyKeys: [...selectedFamilyKeys.value],
       compositionKeys: [...selectedCompositionKeys.value],
       iconSeriesKeys: [...selectedIconSeriesKeys.value],
+      packageKeys: [...selectedPackageKeys.value],
     }
   } catch (cause) {
     errorText.value = cause instanceof Error ? cause.message : String(cause)
@@ -435,6 +496,16 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
     progress: 0,
     cancellable: false,
   })
+  // 打包在 Rust 侧按文件回报进度，这样进度条会走而不是一直停在 0。
+  const unlisten = await listen<{ done: number, total: number }>(PACKAGE_BUILD_PROGRESS_EVENT, event => {
+    if (event.payload.total <= 0) return
+    setTask({
+      key: PACKAGE_BUILD_TASK_KEY,
+      title: t('resourcePackage.building'),
+      progress: event.payload.done / event.payload.total,
+      cancellable: false,
+    })
+  })
   try {
     const result = await buildResourcePackageFromProject({
       fs: fileSystemService, projectRootPath: props.projectRootPath, key: request.packageKey,
@@ -445,6 +516,7 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
         compositionKeys: request.compositionKeys,
       },
       iconSelection: { seriesKeys: request.iconSeriesKeys },
+      packageSelection: { keys: request.packageKeys },
       outputPath: request.outputPath,
     })
     const builtPath = result.outputPath ?? request.outputPath
@@ -452,6 +524,7 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
   } catch (cause) {
     notifyError(cause instanceof Error ? cause.message : String(cause))
   } finally {
+    unlisten()
     removeTask(PACKAGE_BUILD_TASK_KEY)
   }
 }
@@ -459,10 +532,12 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
 function rememberBuildInputs(imagePaths: readonly string[]): void {
   const cache: ProjectPackageBuilderState = {
     name: name.value.trim(),
+    author: author.value.trim(),
     version: version.value.trim(),
     fontFamilyKeys: [...selectedFamilyKeys.value],
     fontCompositionKeys: [...selectedCompositionKeys.value],
     iconSeriesKeys: [...selectedIconSeriesKeys.value],
+    packageKeys: [...selectedPackageKeys.value],
     imagePaths: [...imagePaths],
   }
   appSettingsStore.updateProjectCreation({
@@ -491,5 +566,9 @@ function rememberBuildInputs(imagePaths: readonly string[]): void {
 .resource-package-builder__section-heading > div { display: grid; gap: var(--oc-space-1); min-width: 0; }
 .resource-package-builder__section-heading h3 { margin: 0; }
 .resource-package-builder__error { margin-top: var(--oc-space-5); }
+.resource-package-builder__contents { display: grid; gap: var(--oc-space-2); margin-top: var(--oc-space-5); }
+.resource-package-builder__contents > * { display: flex; justify-content: space-between; gap: var(--oc-space-3); min-width: 0; }
+.resource-package-builder__contents-label { color: var(--oc-fg-muted); }
+.resource-package-builder__contents-value { min-width: 0; text-align: right; overflow-wrap: anywhere; }
 @media (max-width: 760px) { .resource-package-builder__fields, .resource-package-builder__workspace { grid-template-columns: 1fr; } .resource-package-builder__workspace { overflow: auto; } .resource-package-builder__selection { min-height: 22rem; border-right: 0; border-bottom: var(--oc-border-width) solid var(--oc-border-muted); } }
 </style>

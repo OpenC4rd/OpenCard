@@ -6,6 +6,7 @@ export {
   resolveOcPixelToken,
   resolveOcThemeTokens,
   setOcGlassIntensity,
+  setOcMicaBackdrop,
   setOcPhaseImageSpeedMultiplier,
   setOcTheme,
 } from './theme'

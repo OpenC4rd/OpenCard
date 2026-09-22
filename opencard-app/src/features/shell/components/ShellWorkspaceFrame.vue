@@ -49,7 +49,7 @@ function toActionDefinition(action: ShellAction): OcActionButtonAction {
       </div>
       <div class="workspace-actions">
         <template v-for="(action, index) in props.actions" :key="typeof action === 'string' ? `text:${index}:${action}` : action.key ?? action.icon">
-          <OcText v-if="typeof action === 'string'" class="workspace-action-text" size="xs" tone="muted" mono>
+          <OcText v-if="typeof action === 'string'" class="workspace-action-text" size="xs" tone="muted">
             {{ action }}
           </OcText>
           <OcActionButton v-else :action="toActionDefinition(action)" size="sm" variant="ghost"

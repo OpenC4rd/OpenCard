@@ -6,6 +6,12 @@
   color-scheme: light;
 }
 
+/* 云母开启时窗口底层交给系统材质：界面里的 base 层统一撤下颜色。
+   只落在 body 上，html 仍保留主题基色，窗口层由 --oc-bg-window 负责透明。 */
+:root[data-oc-mica-backdrop='on'] body {
+  --oc-bg-base: transparent;
+}
+
 @property --oc-scrollbar-thumb { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-scrollbar-thumb-hover { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-bg-base { syntax: '<color>'; inherits: true; initial-value: transparent; }
@@ -204,7 +210,7 @@ html.oc-theme-transitioning {
 }
 
 body {
-  background: var(--oc-bg-base);
+  background: var(--oc-bg-window, var(--oc-bg-base));
   color: var(--oc-fg-default);
   font-family: var(--oc-font-sans);
 }

@@ -772,12 +772,6 @@ function clamp(value: number, minimum: number, maximum: number): number {
   transition: none;
 }
 
-.oc-color-picker__panel .oc-color-picker__channel-slider:hover .oc-slider__thumb,
-.oc-color-picker__panel .oc-color-picker__channel-slider.is-dragging .oc-slider__thumb {
-  transform: translate(-50%, -50%);
-  transition: none;
-}
-
 .oc-color-picker__mode-row {
   display: grid;
   grid-template-columns: var(--oc-size-md) minmax(0, 1fr);

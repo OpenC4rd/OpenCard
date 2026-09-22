@@ -27,9 +27,9 @@ import { invoke } from '@tauri-apps/api/core'
  * per directory and the recursion itself runs here rather than in Rust, so "how many reads and how
  * long" is the difference between a slow disk and a slow walk.
  */
-export type DirectoryWalkMetrics = { reads: number, entries: number, totalMs: number, worstMs: number }
+export type DirectoryWalkMetrics = { reads: number, entries: number, totalMs: number, worstMs: number, worstPath: string }
 
-const directoryWalkMetrics: DirectoryWalkMetrics = { reads: 0, entries: 0, totalMs: 0, worstMs: 0 }
+const directoryWalkMetrics: DirectoryWalkMetrics = { reads: 0, entries: 0, totalMs: 0, worstMs: 0, worstPath: '' }
 
 /** Reads and resets the directory-walk counters, so a caller can measure just its own window. */
 export function takeDirectoryWalkMetrics(): DirectoryWalkMetrics {
@@ -38,6 +38,7 @@ export function takeDirectoryWalkMetrics(): DirectoryWalkMetrics {
   directoryWalkMetrics.entries = 0
   directoryWalkMetrics.totalMs = 0
   directoryWalkMetrics.worstMs = 0
+  directoryWalkMetrics.worstPath = ''
   return taken
 }
 
@@ -231,7 +232,10 @@ class FileSystemServiceImpl implements FileSystemService {
       directoryWalkMetrics.reads += 1
       directoryWalkMetrics.entries += entries.length
       directoryWalkMetrics.totalMs += readMs
-      if (readMs > directoryWalkMetrics.worstMs) directoryWalkMetrics.worstMs = readMs
+      if (readMs > directoryWalkMetrics.worstMs) {
+        directoryWalkMetrics.worstMs = readMs
+        directoryWalkMetrics.worstPath = dirPath
+      }
 
       for (const entry of entries) {
         const relativePath = currentBasePath ? `${currentBasePath}/${entry.name}` : entry.name
