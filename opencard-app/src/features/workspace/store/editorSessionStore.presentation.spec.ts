@@ -49,7 +49,7 @@ describe('editorSessionStore presentation', () => {
 
   it('opens a file under its own identity and carries no presentation', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/packages.json')
 
     expect(session.name).toBe('packages.json')
     expect(session.presentation).toBeUndefined()
@@ -57,7 +57,7 @@ describe('editorSessionStore presentation', () => {
 
   it('holds the presentation its editor declares, and every reader sees that one', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/packages.json')
 
     store.setSessionPresentation(session.id, PACKAGE_PRESENTATION)
 
@@ -68,7 +68,7 @@ describe('editorSessionStore presentation', () => {
 
   it('leaves the session object alone when the same presentation is declared again', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/packages.json')
     store.setSessionPresentation(session.id, PACKAGE_PRESENTATION)
     const before = store.sessions.value.find(candidate => candidate.id === session.id)
 
@@ -79,7 +79,7 @@ describe('editorSessionStore presentation', () => {
 
   it('ignores a declaration for a session that is not open', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/packages.json')
 
     store.setSessionPresentation('missing-session', PACKAGE_PRESENTATION)
 
@@ -101,7 +101,7 @@ describe('editorSessionStore presentation', () => {
 
   it('drops the declaration when a rename rewrites the file name', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/project/cards/main.ocdocument')
+    const session = await store.open('D:/project/cards/main.ocdocument')
     store.setSessionPresentation(session.id, { title: '主卡', description: '', icon: 'file.opencard' })
 
     store.remapSessionPaths('D:/project/cards', 'D:/project/archive')
@@ -114,7 +114,7 @@ describe('editorSessionStore presentation', () => {
 
   it('keeps the declaration when an existing file is saved in place', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/project/.opencard/locale.json')
+    const session = await store.open('D:/project/.opencard/locale.json')
     store.setSessionPresentation(session.id, { title: '字典', description: '维护词条', icon: 'file.dictionary' })
     store.updateDraftContent(session.id, '{"entries":[]}')
 

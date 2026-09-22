@@ -322,12 +322,9 @@ export function useEditorSessionStore() {
     return session
   }
 
-  async function openFile(path: string, options?: OpenSessionOptions) {
+  /** 打开一份工作；`preview` 表示它会被下一次预览替换。入口只有一个，名字不再随入口变化。 */
+  async function open(path: string, options?: OpenSessionOptions) {
     return await openSession(path, options)
-  }
-
-  async function openPreviewFile(path: string, options?: OpenSessionOptions) {
-    return await openSession(path, { preview: true, ...options })
   }
 
   function createDraftSession(options: CreateDraftSessionOptions = {}) {
@@ -362,14 +359,6 @@ export function useEditorSessionStore() {
   function activateSession(sessionId: string) {
     if (sessions.value.some((session) => session.id === sessionId)) {
       activeSessionId.value = sessionId
-    }
-  }
-
-  function activatePath(path: string) {
-    const normalizedPath = normalizePath(path)
-    const session = sessions.value.find((candidate) => candidate.path === normalizedPath)
-    if (session) {
-      activeSessionId.value = session.id
     }
   }
 
@@ -454,14 +443,21 @@ export function useEditorSessionStore() {
       : session)
   }
 
+  /** 会话结束时要清掉的附属状态（自动保存任务与编辑历史）只在这里实现一次，三条关闭路径都调它。 */
+  function disposeSessions(sessionIds: readonly string[]): void {
+    for (const sessionId of sessionIds) {
+      taskScheduler.cancel(projectConfigurationAutosaveKey(sessionId))
+    }
+    editorHistoryManager.releaseMany(sessionIds)
+  }
+
   function closeSession(sessionId: string) {
     const index = sessions.value.findIndex((session) => session.id === sessionId)
     if (index === -1) {
       return
     }
 
-    taskScheduler.cancel(projectConfigurationAutosaveKey(sessionId))
-    editorHistoryManager.release(sessionId)
+    disposeSessions([sessionId])
 
     const nextSessions = [...sessions.value]
     nextSessions.splice(index, 1)
@@ -476,12 +472,7 @@ export function useEditorSessionStore() {
   }
 
   function closeWorkspaceSessions() {
-    for (const session of sessions.value) {
-      if (session.resourceKind === 'workspace') {
-        taskScheduler.cancel(projectConfigurationAutosaveKey(session.id))
-      }
-    }
-    editorHistoryManager.releaseMany(sessions.value
+    disposeSessions(sessions.value
       .filter(session => session.resourceKind === 'workspace')
       .map(session => session.id))
     const activeSessionWasClosed = sessions.value.some(
@@ -503,10 +494,7 @@ export function useEditorSessionStore() {
     )
     if (closedSessionIds.size === 0) return
 
-    for (const sessionId of closedSessionIds) {
-      taskScheduler.cancel(projectConfigurationAutosaveKey(sessionId))
-    }
-    editorHistoryManager.releaseMany([...closedSessionIds])
+    disposeSessions([...closedSessionIds])
 
     const activeSessionWasClosed = closedSessionIds.has(activeSessionId.value)
     sessions.value = sessions.value.filter((session) => !closedSessionIds.has(session.id))
@@ -614,54 +602,11 @@ export function useEditorSessionStore() {
     return 'saved'
   }
 
-  async function saveActiveSession(): Promise<SessionSaveResult> {
-    if (!activeSessionId.value) {
-      return 'skipped'
-    }
-
-    return await saveSession(activeSessionId.value)
-  }
-
   async function saveDirtySessions(): Promise<string[]> {
     const dirtySessions = sessions.value
       .filter(session => session.isDirty && Boolean(session.path) && session.resourceKind !== 'draft')
     await Promise.all(dirtySessions.map(session => saveSession(session.id)))
     return dirtySessions.map(session => session.name)
-  }
-
-  async function refreshSessionFromDisk(sessionId: string) {
-    const session = sessions.value.find((candidate) => candidate.id === sessionId)
-    if (!session || !session.path) {
-      return
-    }
-
-    if (CONTENTLESS_EDITOR_IDS.has(session.editorId) || session.resourceKind === 'draft') {
-      return
-    }
-
-    const content = session.resourceKind === 'workspace'
-      ? await readFile(session.path)
-      : await fileSystemService.readFile(session.path)
-
-    sessions.value = sessions.value.map((candidate) =>
-      candidate.id === sessionId
-        ? {
-          ...candidate,
-          savedContent: content,
-          draftContent: content,
-          isDirty: false,
-        }
-        : candidate
-    )
-    editorHistoryManager.syncExternalContent(sessionId, content, true)
-  }
-
-  async function refreshActiveSessionFromDisk() {
-    if (!activeSessionId.value) {
-      return
-    }
-
-    await refreshSessionFromDisk(activeSessionId.value)
   }
 
   function remapSessionPaths(oldPath: string, newPath: string) {
@@ -694,11 +639,9 @@ export function useEditorSessionStore() {
     sessions: readonly(sessions),
     activeSessionId: readonly(activeSessionId),
     activeSession,
-    openFile,
-    openPreviewFile,
+    open,
     createDraftSession,
     activateSession,
-    activatePath,
     updateDraftContent,
     setSessionDirtyState,
     setSessionPresentation,
@@ -709,10 +652,7 @@ export function useEditorSessionStore() {
     closeWorkspaceSessions,
     closeSessionsByPath,
     saveSession,
-    saveActiveSession,
     saveDirtySessions,
-    refreshSessionFromDisk,
-    refreshActiveSessionFromDisk,
     remapSessionPaths,
   }
 }

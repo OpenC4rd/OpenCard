@@ -19,7 +19,7 @@ type ProjectLifecycleOptions = {
   }
   sessions: {
     closeWorkspaceSessions: () => void
-    openFile: (path: string) => Promise<unknown>
+    open: (path: string) => Promise<unknown>
   }
   /** 按“关闭项目”流程收尾当前项目（含未保存确认）；返回是否已经完成。 */
   closeCurrentProject: () => Promise<'completed' | 'prompted'>
@@ -57,7 +57,7 @@ export function useShellProjectLifecycle(options: ProjectLifecycleOptions) {
       await options.project.setProjectPath(path)
       options.settings.rememberRecentProject(options.project.projectPath.value)
       if (entryPath) {
-        await options.sessions.openFile(entryPath)
+        await options.sessions.open(entryPath)
       }
       options.shellPage.value = { type: 'workbench' }
       return true

@@ -43,7 +43,7 @@ function createHost(session = createSession()) {
   const setSessionDirtyState = vi.fn()
   const setSessionPresentation = vi.fn()
   const updateSessionUiState = vi.fn()
-  const saveActiveSession = vi.fn(async () => 'saved' as const)
+  const saveSession = vi.fn(async () => 'saved' as const)
   editorHistoryManager.initialize(
     session.id,
     resolveEditorHistoryKind(session.editorId),
@@ -66,7 +66,7 @@ function createHost(session = createSession()) {
       setSessionDirtyState,
       setSessionPresentation,
       updateSessionUiState,
-      saveActiveSession,
+      saveSession,
     },
   })
   return {
@@ -76,7 +76,7 @@ function createHost(session = createSession()) {
     setSessionDirtyState,
     setSessionPresentation,
     updateSessionUiState,
-    saveActiveSession,
+    saveSession,
   }
 }
 
@@ -276,7 +276,7 @@ describe('useShellEditorHost', () => {
   })
 
   it('auto-saves structured font and icon registry draft updates', async () => {
-    const { host, saveActiveSession } = createHost(createSession({
+    const { host, saveSession } = createHost(createSession({
       editorId: 'font-registry',
       fileTypeId: 'opencard-font-registry',
       name: 'fonts.json',
@@ -287,7 +287,7 @@ describe('useShellEditorHost', () => {
     update('{"families":[]}')
     await nextTick()
 
-    expect(saveActiveSession).toHaveBeenCalledTimes(1)
+    expect(saveSession).toHaveBeenCalledTimes(1)
     host.dispose()
   })
 
@@ -398,7 +398,7 @@ describe('useShellEditorHost', () => {
   })
 
   it('routes save, flush, dirty, undo and redo through the editor boundary', async () => {
-    const { host, setSessionDirtyState, saveActiveSession, updateDraftContent } = createHost()
+    const { host, setSessionDirtyState, saveSession, updateDraftContent } = createHost()
     const save = vi.fn()
     const flush = vi.fn()
     host.editorRef.value = { save, flush }
@@ -413,7 +413,7 @@ describe('useShellEditorHost', () => {
 
     expect(setSessionDirtyState).toHaveBeenCalledWith('session-a', true)
     expect(save).toHaveBeenCalledTimes(1)
-    expect(saveActiveSession).not.toHaveBeenCalled()
+    expect(saveSession).not.toHaveBeenCalled()
     expect(flush).toHaveBeenCalledTimes(3)
     expect(updateDraftContent).toHaveBeenLastCalledWith('session-a', '{"changed":true}')
     host.dispose()
@@ -450,7 +450,7 @@ describe('useShellEditorHost', () => {
   })
 
   it('uses the session save path for Monaco editors', async () => {
-    const { host, saveActiveSession } = createHost(createSession({
+    const { host, saveSession } = createHost(createSession({
       fileTypeId: 'text',
       editorId: 'monaco',
       name: 'notes.txt',
@@ -459,7 +459,7 @@ describe('useShellEditorHost', () => {
 
     await host.save()
 
-    expect(saveActiveSession).toHaveBeenCalledTimes(1)
+    expect(saveSession).toHaveBeenCalledTimes(1)
     expect(notificationMocks.notifySuccess).toHaveBeenCalledWith(
       'app.notifications.saved:notes.txt',
       'action.save',

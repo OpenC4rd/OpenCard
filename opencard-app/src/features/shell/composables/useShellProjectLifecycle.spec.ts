@@ -33,7 +33,7 @@ function createHarness(options?: {
   const closeWorkspaceSessions = vi.fn(() => {
     events.push('close-sessions')
   })
-  const openFile = vi.fn(async (path: string) => {
+  const open = vi.fn(async (path: string) => {
     events.push(`open-entry:${path}`)
   })
   const rememberRecentProject = vi.fn((path: string) => {
@@ -51,7 +51,7 @@ function createHarness(options?: {
     },
     sessions: {
       closeWorkspaceSessions,
-      openFile,
+      open,
     },
     closeCurrentProject,
     settings: {
@@ -73,7 +73,7 @@ function createHarness(options?: {
     readDirectoryEntries,
     closeCurrentProject,
     closeWorkspaceSessions,
-    openFile,
+    open,
     rememberRecentProject,
     forgetRecentProject,
     loadTemplates,
@@ -226,7 +226,7 @@ describe('useShellProjectLifecycle', () => {
 
   it('clears busy and reports an immediate notice when opening a created entry fails', async () => {
     const harness = createHarness({ page: { type: 'create-project', returnPage: 'welcome' } })
-    harness.openFile.mockRejectedValueOnce(new Error('entry failed'))
+    harness.open.mockRejectedValueOnce(new Error('entry failed'))
 
     await expect(harness.lifecycle.activateCreatedProject({
       path: 'D:/new-project',

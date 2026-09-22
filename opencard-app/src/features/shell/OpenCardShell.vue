@@ -828,8 +828,7 @@ const titleBarBrandLabel = computed(() => {
 const {
   sessions,
   activeSession,
-  openFile: openEditorSession,
-  openPreviewFile,
+  open: openEditorSession,
   activateSession,
   createDraftSession,
   updateDraftContent,
@@ -842,7 +841,6 @@ const {
   closeWorkspaceSessions,
   closeSessionsByPath,
   saveSession,
-  saveActiveSession,
   saveDirtySessions,
   remapSessionPaths,
 } = useEditorSessionStore()
@@ -1088,7 +1086,7 @@ const {
     setSessionPresentation,
     updateSessionUiState,
     updateSessionDiffUiState,
-    saveActiveSession,
+    saveSession,
   },
 })
 
@@ -1112,7 +1110,7 @@ const {
   },
   sessions: {
     closeWorkspaceSessions,
-    openFile: openEditorSession,
+    open: openEditorSession,
   },
   // 打开另一个项目前先按“关闭项目”流程收尾，未保存的改动会先询问。
   closeCurrentProject: () => requestProjectClose('current'),
@@ -1315,7 +1313,7 @@ const {
   activeSession,
   isDirectoryExpanded,
   activateSession,
-  openPreviewFile,
+  openPreviewFile: (path: string) => openEditorSession(path, { preview: true }),
   ensureProjectManagementStructure,
   translate: t,
   registeredFontSources: computed(() => fontRegistryReady.value

@@ -62,7 +62,7 @@ type SessionActions = {
   setSessionPresentation: (sessionId: string, presentation: EditorPresentation) => void
   updateSessionUiState: (sessionId: string, patch: EditorSessionUiState) => void
   updateSessionDiffUiState?: (sessionId: string, value: EditorDiffUiState) => void
-  saveActiveSession: () => Promise<SessionSaveResult>
+  saveSession: (sessionId: string) => Promise<SessionSaveResult>
 }
 
 type UseShellEditorHostOptions = {
@@ -104,7 +104,7 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
     if (session?.mode === 'diff') return
     editorHistoryManager.recordContent(sessionId, value, history)
     if (session?.id === sessionId && AUTO_SAVE_REGISTRY_EDITOR_IDS.has(session.editorId)) {
-      void options.sessionActions.saveActiveSession()
+      void options.sessionActions.saveSession(sessionId)
     }
   }
 
@@ -351,7 +351,7 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
     if (!session) return
     try {
       await editorHistoryManager.flush(session.id)
-      notifySaveResult(await options.sessionActions.saveActiveSession(), session.name)
+      notifySaveResult(await options.sessionActions.saveSession(session.id), session.name)
     } catch (error) {
       notifyAppError('OC-E4002', error)
     }
@@ -367,7 +367,7 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
         await editorRef.value.save()
         return
       }
-      notifySaveResult(await options.sessionActions.saveActiveSession(), session.name)
+      notifySaveResult(await options.sessionActions.saveSession(session.id), session.name)
     } catch (error) {
       notifyAppError('OC-E4002', error)
     }

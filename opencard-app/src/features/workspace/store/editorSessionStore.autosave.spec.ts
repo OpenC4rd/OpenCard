@@ -27,7 +27,7 @@ describe('editorSessionStore project profile manual save', () => {
 
   it('keeps profile edits dirty until explicitly saved', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('.opencard/project.json')
+    const session = await store.open('.opencard/project.json')
     store.updateDraftContent(session.id, '{"name":"Demo"}')
     expect(mocks.saveProjectConfiguration).not.toHaveBeenCalled()
     expect(store.sessions.value.find(candidate => candidate.id === session.id)?.isDirty).toBe(true)
@@ -40,7 +40,7 @@ describe('editorSessionStore project profile manual save', () => {
     let finishSave: ((content: string) => void) | undefined
     mocks.saveProjectConfiguration.mockImplementationOnce(() => new Promise<string>(resolve => { finishSave = resolve }))
     const store = useEditorSessionStore()
-    const session = await store.openFile('.opencard/project.json')
+    const session = await store.open('.opencard/project.json')
     store.updateDraftContent(session.id, '{"name":"First"}')
     const saving = store.saveSession(session.id)
     store.updateDraftContent(session.id, '{"name":"Second"}')
@@ -55,7 +55,7 @@ describe('editorSessionStore project profile manual save', () => {
 
   it('keeps dictionary edits isolated until explicit save', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('.opencard/locale.json')
+    const session = await store.open('.opencard/locale.json')
     store.updateDraftContent(session.id, '{"base":{"title":"Hello"}}')
     expect(mocks.saveProjectDictionary).not.toHaveBeenCalled()
 

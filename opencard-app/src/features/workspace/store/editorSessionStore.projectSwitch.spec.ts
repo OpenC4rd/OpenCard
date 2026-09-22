@@ -39,8 +39,8 @@ describe('editorSessionStore project switching', () => {
 
   it('closes workspace sessions and keeps external ones on project close', async () => {
     const store = useEditorSessionStore()
-    const workspaceSession = await store.openFile('main.ocdocument')
-    const externalSession = await store.openFile('D:/outside/card.ocdocument')
+    const workspaceSession = await store.open('main.ocdocument')
+    const externalSession = await store.open('D:/outside/card.ocdocument')
 
     store.closeWorkspaceSessions()
 
@@ -52,8 +52,8 @@ describe('editorSessionStore project switching', () => {
 
   it('closes sessions at and below a deleted workspace path', async () => {
     const store = useEditorSessionStore()
-    const retained = await store.openFile('other.ocdocument')
-    const removed = await store.openFile('cards/main.ocdocument')
+    const retained = await store.open('other.ocdocument')
+    const removed = await store.open('cards/main.ocdocument')
 
     store.closeSessionsByPath('cards')
 
@@ -65,7 +65,7 @@ describe('editorSessionStore project switching', () => {
 
   it('opens absolute paths outside the project as external sessions', async () => {
     const store = useEditorSessionStore()
-    const session = await store.openFile('D:/outside/card.ocdocument')
+    const session = await store.open('D:/outside/card.ocdocument')
 
     expect(session).toMatchObject({
       resourceKind: 'external',
@@ -79,8 +79,8 @@ describe('editorSessionStore project switching', () => {
 
   it('opens font and unsupported sessions without reading binary content as text', async () => {
     const store = useEditorSessionStore()
-    const fontSession = await store.openFile('assets/Brand.woff2')
-    const unsupportedSession = await store.openFile('assets/archive.bin')
+    const fontSession = await store.open('assets/Brand.woff2')
+    const unsupportedSession = await store.open('assets/archive.bin')
 
     expect(fontSession).toMatchObject({ editorId: 'font-preview', draftContent: '' })
     expect(unsupportedSession).toMatchObject({ editorId: 'unsupported-file', draftContent: '' })

@@ -35,7 +35,7 @@ describe('editorSessionStore explicit save path', () => {
   it('opens managed project files with their dedicated editors', async () => {
     const store = useEditorSessionStore()
 
-    const session = await store.openPreviewFile('D:/project/.opencard/fonts/fonts.json')
+    const session = await store.open('D:/project/.opencard/fonts/fonts.json', { preview: true })
 
     expect(session).toMatchObject({
       fileTypeId: 'opencard-font-registry',
