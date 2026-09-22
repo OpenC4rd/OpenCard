@@ -109,7 +109,8 @@ describe('editorSessionStore presentation', () => {
     const renamed = store.sessions.value.find(candidate => candidate.id === session.id)
     expect(renamed?.name).toBe('main.ocdocument')
     expect(renamed?.path).toBe('D:/project/archive/main.ocdocument')
-    expect(renamed?.presentation).toBeUndefined()
+    // 身份变了，旧声明作废；记成"没有呈现"而不是"尚未声明"，没挂载时列表显示新身份名而不是空着。
+    expect(renamed?.presentation).toBeNull()
   })
 
   it('keeps the declaration when an existing file is saved in place', async () => {
@@ -137,6 +138,16 @@ describe('editorSessionStore presentation', () => {
     const saved = store.sessions.value.find(candidate => candidate.id === draft.id)
     expect(saved?.name).toBe('卡片-final.ocdocument')
     // 会话换了身份，旧呈现随之作废；编辑器（若还开着）会按新身份重新声明。
-    expect(saved?.presentation).toBeUndefined()
+    expect(saved?.presentation).toBeNull()
+  })
+
+  it('records a declaration of "no presentation" so the identity name is shown', async () => {
+    const store = useEditorSessionStore()
+    const session = await store.open('D:/project/cards/main.ocdocument')
+
+    // 编辑器挂载后声明自己没有呈现，与"还没声明"是两种状态。
+    store.setSessionPresentation(session.id, null)
+
+    expect(store.sessions.value.find(candidate => candidate.id === session.id)?.presentation).toBeNull()
   })
 })

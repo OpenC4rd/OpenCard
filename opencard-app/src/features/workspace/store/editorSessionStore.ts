@@ -60,9 +60,11 @@ export type EditorSession = {
   name: string
   /**
    * 这个会话要求自己在外部看起来是什么样，由渲染它的编辑器写回（`setSessionPresentation`）。
-   * `name` 始终是文件或草稿的身份；壳层的任何表面都读这里，不再去问编辑器。
+   * 三态：`undefined` = 还没有编辑器声明过（刚打开、编辑器正在挂载，壳层此处留空）；
+   * `null` = 编辑器声明了"我没有呈现"（纯文本编辑器这类，壳层显示身份名）；
+   * 对象 = 声明的内容。`name` 始终是文件或草稿的身份。
    */
-  presentation?: EditorPresentation
+  presentation?: EditorPresentation | null
   editorId: string
   savedContent: string
   draftContent: string
@@ -246,19 +248,23 @@ export function useEditorSessionStore() {
     )
   }
 
-  /** 编辑器声明它要求自己对外长什么样；这是呈现的唯一写入口，壳层的每个表面都读这一份。 */
-  function setSessionPresentation(sessionId: string, presentation: EditorPresentation): void {
+  /**
+   * 编辑器声明它要求自己对外长什么样；`null` 表示这个编辑器没有呈现可声明。
+   * 声明与现状相同就不写，于是"读会话的呈现再写回同样值"不会形成循环。
+   */
+  function setSessionPresentation(sessionId: string, presentation: EditorPresentation | null): void {
     sessions.value = sessions.value.map((session) => {
       if (session.id !== sessionId) return session
       const current = session.presentation
-      if (current
+      if (current === presentation) return session
+      if (current && presentation
         && current.title === presentation.title
         && current.description === presentation.description
         && current.icon === presentation.icon
         && current.iconTone === presentation.iconTone) {
         return session
       }
-      return { ...session, presentation: { ...presentation } }
+      return { ...session, presentation }
     })
   }
 
@@ -586,8 +592,9 @@ export function useEditorSessionStore() {
             path: nextPath,
             resourceKind: nextResourceKind,
             name: nextName,
-            // 文件名真的变了（另存为、草稿落盘）说明会话换了身份，编辑器声明的呈现随之作废，等它重新声明。
-            presentation: nextName === candidate.name ? candidate.presentation : undefined,
+            // 文件名真的变了（另存为、草稿落盘）说明会话换了身份，编辑器先前的声明随之作废；
+            // 记为"没有呈现"而不是"尚未声明"，这样没挂载时列表显示的是新身份名而不是空着。
+            presentation: nextName === candidate.name ? candidate.presentation : null,
             fileTypeId: nextFileTypeId,
             editorId: resolveFileTypeById(nextFileTypeId).editorId,
             savedContent,
@@ -628,7 +635,8 @@ export function useEditorSessionStore() {
         ...session,
         path: nextPath,
         name: getPathBasename(nextPath),
-        presentation: undefined,
+        // 同上：身份变了，旧声明作废，记成"没有呈现"以便列表先显示新身份名。
+        presentation: null,
         fileTypeId: nextFileType.id,
         editorId: nextFileType.editorId,
       }

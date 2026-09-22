@@ -109,13 +109,17 @@ describe('useShellEditorHost', () => {
     host.dispose()
   })
 
-  it('publishes nothing for an editor that declares no presentation', async () => {
+  it('declares nothing before an editor is mounted, then null when it has no presentation', async () => {
     const { host, setSessionPresentation } = createHost()
+
+    // 编辑器还没挂载：什么都不声明，壳层据此留空，而不是先显示身份名再被替换。
+    await nextTick()
+    expect(setSessionPresentation).not.toHaveBeenCalled()
 
     host.editorRef.value = {}
     await nextTick()
 
-    expect(setSessionPresentation).not.toHaveBeenCalled()
+    expect(setSessionPresentation).toHaveBeenCalledWith('session-a', null)
     host.dispose()
   })
 

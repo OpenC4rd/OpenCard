@@ -59,7 +59,7 @@ export type ShellEditorRef = {
 type SessionActions = {
   updateDraftContent: (sessionId: string, content: string) => void
   setSessionDirtyState: (sessionId: string, isDirty: boolean) => void
-  setSessionPresentation: (sessionId: string, presentation: EditorPresentation) => void
+  setSessionPresentation: (sessionId: string, presentation: EditorPresentation | null) => void
   updateSessionUiState: (sessionId: string, patch: EditorSessionUiState) => void
   updateSessionDiffUiState?: (sessionId: string, value: EditorDiffUiState) => void
   saveSession: (sessionId: string) => Promise<SessionSaveResult>
@@ -413,18 +413,32 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
   )
 
   /**
+   * 当前编辑器实例是为哪个会话挂载的。用它而不是 `activeSession`：切换会话时旧编辑器还会短暂存在，
+   * 若此刻读它就会把旧呈现写给新会话。
+   */
+  const mountedSessionId = ref<string | null>(null)
+  watch(editorRef, (instance) => {
+    mountedSessionId.value = instance ? options.activeSession.value?.id ?? null : null
+  }, { immediate: true, flush: 'post' })
+
+  /**
    * 活动编辑器声明它要求自己在外部看起来是什么样，host 把它写回 session —— 这是呈现的唯一写入口，
    * 于是列表与头部读的是同一份，后台会话也留着最后一次声明。值没变时 store 自己会跳过写入。
    *
-   * 会话身份（路径与名字）也是这份声明的输入：另存为或重命名之后 store 会丢掉旧呈现，而编辑器的
-   * 呈现未必跟着文件变（卡牌文档的标题来自文档内容），所以身份一变就重新声明一次。提交时机放在
-   * DOM 更新之后，避免会话切换时旧编辑器还在，把旧呈现写给新会话。
+   * 已挂载却不带 `presentation` 的编辑器（纯文本这类）声明 `null`，即"我没有呈现"；在那之前什么都不声明，
+   * 壳层据此留空 —— 先显示身份名再被替换，等于让用户看一次改名。会话身份也是这份声明的输入：
+   * 另存为或重命名之后要按新身份重新声明一次。
    */
   const editorDeclaration = computed(() => {
+    const sessionId = mountedSessionId.value
+    const instance = editorRef.value
     const session = options.activeSession.value
-    const presentation = editorRef.value?.presentation
-    if (!session || !presentation) return null
-    return { sessionId: session.id, identity: `${session.path ?? ''}\0${session.name}`, presentation }
+    if (!sessionId || !instance || !session || session.id !== sessionId) return null
+    return {
+      sessionId,
+      identity: `${session.path ?? ''}\0${session.name}`,
+      presentation: instance.presentation ?? null,
+    }
   })
 
   const stopPresentationWatch = watch(

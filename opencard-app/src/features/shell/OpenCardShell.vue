@@ -378,6 +378,7 @@ import type {
   SessionIssueNavigationRequest,
 } from '../editor-runtime/model/editorIssue'
 import { CARD_DOCUMENT_SUFFIX, resolveFileType } from '../workspace/model/fileTypes'
+import { resolveSessionLabel } from '../workspace/model/sessionLabel'
 import { resolveInstalledResourcePackageRootPath } from '../workspace/model/resourcePackage'
 import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../workspace/model/projectStructure'
 import { useProjectExport } from './composables/useProjectExport'
@@ -1230,18 +1231,16 @@ function cancelUnsavedCloseRequest(): void {
 }
 
 /**
- * 会话在壳层里的显示名，列表与页面顶端共用这一份：编辑器声明的标题优先，否则用会话自己的身份名；
- * 外部与草稿带作用域前缀，未保存的会话在名字后加标记。
+ * 会话在壳层里的显示名，列表与页面顶端共用这一份；三态规则本身在 `workspace/model/sessionLabel`。
+ * 还没有编辑器声明过的会话显示为空，而不是先显示身份名再被替换。
  */
+const sessionScopeTexts = {
+  external: (name: string) => t('sidebar.editorTitles.external', { name }),
+  draft: (name: string) => t('sidebar.editorTitles.draft', { name }),
+}
+
 function formatSessionTitle(session: EditorSession): string {
-  const name = `${session.presentation?.title ?? session.name}${session.isDirty ? ' *' : ''}`
-  if (session.resourceKind === 'external') {
-    return t('sidebar.editorTitles.external', { name })
-  }
-  if (session.resourceKind === 'draft') {
-    return t('sidebar.editorTitles.draft', { name })
-  }
-  return name
+  return resolveSessionLabel(session, sessionScopeTexts)
 }
 
 const {
