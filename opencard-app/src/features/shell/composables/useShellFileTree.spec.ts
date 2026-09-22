@@ -10,17 +10,24 @@ import {
 
 describe('useShellFileTree opened editors', () => {
   it('projects a close action onto every opened editor item', () => {
-    const openedEditorItems = ref([{
-      key: 'session-1',
-      label: 'card.ocdocument',
-      resourceKind: 'workspace' as const,
-      icon: 'file.opencard' as const,
+    const sessions = ref<EditorSession[]>([{
+      id: 'session-1',
+      resourceKind: 'workspace',
+      path: 'D:/project/card.ocdocument',
+      fileTypeId: 'opencard',
+      name: 'card.ocdocument',
+      editorId: 'card-designer',
+      savedContent: '',
+      draftContent: '',
+      isDirty: false,
+      isPreview: false,
     }])
     const { openedEditorTreeData } = useShellFileTree({
       projectPath: ref(''),
       indexedEntries: ref([]),
       packageManifests: ref(new Map()),
-      openedEditorItems,
+      sessions,
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -29,6 +36,7 @@ describe('useShellFileTree opened editors', () => {
       ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
+    expect(openedEditorTreeData.value.items.get('session-1')?.label).toBe('card.ocdocument')
     expect(normalizeNodeTail(openedEditorTreeData.value.items.get('session-1')?.tail)).toEqual([{
       key: OPENED_EDITOR_CLOSE_ACTION_KEY,
       title: 'sidebar.closeEditor',
@@ -41,7 +49,8 @@ describe('useShellFileTree opened editors', () => {
       projectPath: ref('D:/project'),
       indexedEntries: ref([{ name: 'cards/main.ocdocument', isDirectory: false }]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -71,7 +80,8 @@ describe('useShellFileTree opened editors', () => {
         { name: 'notes.txt', isDirectory: false },
       ]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -95,7 +105,8 @@ describe('useShellFileTree opened editors', () => {
       ]),
       hideDotFiles: ref(false),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -125,7 +136,8 @@ describe('useShellFileTree opened editors', () => {
         { name: '.opencard/icons/unused.png', isDirectory: false },
       ]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => `translated:${key}`,
       isDirectoryExpanded: vi.fn(() => false),
@@ -168,20 +180,19 @@ describe('useShellFileTree opened editors', () => {
 
     await result.handleProjectManagementSelect([`${projectPath}/.opencard/fonts/fonts.json`])
     expect(ensureProjectManagementStructure).toHaveBeenCalledOnce()
-    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/fonts/fonts.json`, {
-      title: 'translated:fileTypes.opencardFontRegistry',
-    })
+    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/fonts/fonts.json`)
 
   })
 
-  it('opens every managed project file under its file tree name', async () => {
+  it('opens the file a management entry names', async () => {
     const projectPath = 'D:/project'
     const openPreviewFile = vi.fn(async () => undefined)
     const result = useShellFileTree({
       projectPath: ref(projectPath),
       indexedEntries: ref([]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => `translated:${key}`,
       isDirectoryExpanded: vi.fn(() => false),
@@ -199,9 +210,7 @@ describe('useShellFileTree opened editors', () => {
     ]) {
       openPreviewFile.mockClear()
       await result.handleProjectManagementSelect([`${projectPath}/${fileName}`])
-      expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/${fileName}`, {
-        title: expect.stringMatching(/^translated:fileTypes\.opencard/),
-      })
+      expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/${fileName}`)
     }
   })
 
@@ -214,7 +223,8 @@ describe('useShellFileTree opened editors', () => {
         { name: '.opencard/icons/unused.png', isDirectory: false },
       ]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -228,7 +238,7 @@ describe('useShellFileTree opened editors', () => {
 
   it('keeps selection references stable when active editor content changes', async () => {
     const path = 'D:/project/card.ocdocument'
-    const activeSession = ref<EditorSession | null>({
+    const session: EditorSession = {
       id: 'session-1',
       resourceKind: 'workspace',
       path,
@@ -239,17 +249,14 @@ describe('useShellFileTree opened editors', () => {
       draftContent: '{}',
       isDirty: false,
       isPreview: false,
-    })
+    }
+    const activeSession = ref<EditorSession | null>(session)
     const result = useShellFileTree({
       projectPath: ref('D:/project'),
       indexedEntries: ref([{ name: 'card.ocdocument', isDirectory: false }]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([{
-        key: 'session-1',
-        label: 'card.ocdocument',
-        resourceKind: 'workspace',
-        icon: 'file.opencard',
-      }]),
+      sessions: ref<EditorSession[]>([session]),
+      formatSessionTitle: current => current.name,
       activeSession,
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -278,7 +285,8 @@ describe('useShellFileTree opened editors', () => {
       projectPath: ref('D:/project'),
       indexedEntries: ref([{ name: 'assets/fonts/Brand.otf', isDirectory: false }]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       translate: key => key,
       isDirectoryExpanded: vi.fn(() => false),
@@ -302,7 +310,8 @@ describe('useShellFileTree opened editors', () => {
         { name: 'assets/fonts/Other.otf', isDirectory: false },
       ]),
       packageManifests: ref(new Map()),
-      openedEditorItems: ref([]),
+      sessions: ref([]),
+      formatSessionTitle: session => session.name,
       activeSession: ref(null),
       registeredFontSources: ref(['assets/fonts/Brand.otf']),
       translate: key => key,

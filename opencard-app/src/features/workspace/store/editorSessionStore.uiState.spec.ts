@@ -88,28 +88,6 @@ describe('editorSessionStore card designer layout', () => {
     store.closeSession(session.id)
   })
 
-  it('keeps the opened-editor projection stable when only editor UI state changes', () => {
-    const store = useEditorSessionStore()
-    const session = store.createDraftSession({ fileTypeId: 'opencard' })
-    const before = store.openedEditorItems.value
-
-    store.updateSessionUiState(session.id, {
-      cardDesigner: {
-        mode: 'design',
-        view: {
-          activeFace: 'front',
-          clipToFace: true,
-          selectedInstanceId: null,
-        },
-      },
-    })
-
-    expect(store.openedEditorItems.value).toBe(before)
-    expect(store.openedEditorItems.value[0]).toBe(before[0])
-
-    store.closeSession(session.id)
-  })
-
   it('persists the diff divider independently for each session', () => {
     const store = useEditorSessionStore()
     const first = store.createDraftSession({ fileTypeId: 'opencard' })

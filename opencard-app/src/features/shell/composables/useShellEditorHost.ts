@@ -59,6 +59,7 @@ export type ShellEditorRef = {
 type SessionActions = {
   updateDraftContent: (sessionId: string, content: string) => void
   setSessionDirtyState: (sessionId: string, isDirty: boolean) => void
+  setSessionPresentation: (sessionId: string, presentation: EditorPresentation) => void
   updateSessionUiState: (sessionId: string, patch: EditorSessionUiState) => void
   updateSessionDiffUiState?: (sessionId: string, value: EditorDiffUiState) => void
   saveActiveSession: () => Promise<SessionSaveResult>
@@ -411,10 +412,36 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
     () => persistPendingViewportTransform(),
   )
 
+  /**
+   * 活动编辑器声明它要求自己在外部看起来是什么样，host 把它写回 session —— 这是呈现的唯一写入口，
+   * 于是列表与头部读的是同一份，后台会话也留着最后一次声明。值没变时 store 自己会跳过写入。
+   *
+   * 会话身份（路径与名字）也是这份声明的输入：另存为或重命名之后 store 会丢掉旧呈现，而编辑器的
+   * 呈现未必跟着文件变（卡牌文档的标题来自文档内容），所以身份一变就重新声明一次。提交时机放在
+   * DOM 更新之后，避免会话切换时旧编辑器还在，把旧呈现写给新会话。
+   */
+  const editorDeclaration = computed(() => {
+    const session = options.activeSession.value
+    const presentation = editorRef.value?.presentation
+    if (!session || !presentation) return null
+    return { sessionId: session.id, identity: `${session.path ?? ''}\0${session.name}`, presentation }
+  })
+
+  const stopPresentationWatch = watch(
+    editorDeclaration,
+    (declaration) => {
+      if (declaration) {
+        options.sessionActions.setSessionPresentation(declaration.sessionId, declaration.presentation)
+      }
+    },
+    { immediate: true, flush: 'post' },
+  )
+
   function dispose(): void {
     if (disposed) return
     disposed = true
     stopSessionWatch()
+    stopPresentationWatch()
     persistPendingViewportTransform()
   }
 

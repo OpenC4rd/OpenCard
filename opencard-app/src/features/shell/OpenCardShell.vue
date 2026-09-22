@@ -373,7 +373,6 @@ import {
   type SettingsIntent,
 } from '../settings/model/appSettings'
 import CardFaceRenderer from '../card-rendering/components/CardFaceRenderer.vue'
-import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import type {
   EditorIssueSnapshot,
   SessionIssueNavigationRequest,
@@ -829,13 +828,13 @@ const titleBarBrandLabel = computed(() => {
 const {
   sessions,
   activeSession,
-  openedEditorItems,
   openFile: openEditorSession,
   openPreviewFile,
   activateSession,
   createDraftSession,
   updateDraftContent,
   setSessionDirtyState,
+  setSessionPresentation,
   updateSessionUiState,
   updateSessionDiffUiState,
   setSessionMode,
@@ -1086,6 +1085,7 @@ const {
   sessionActions: {
     updateDraftContent,
     setSessionDirtyState,
+    setSessionPresentation,
     updateSessionUiState,
     updateSessionDiffUiState,
     saveActiveSession,
@@ -1231,12 +1231,12 @@ function cancelUnsavedCloseRequest(): void {
   cancelUnsavedClose()
 }
 
-/** The list label already carries the unsaved marker, so an explicit title replaces only the name part. */
-function formatSessionTitle(session: { name: string; title?: string; resourceKind: 'workspace' | 'external' | 'draft' }): string {
-  const isDirty = session.name.endsWith(' *')
-  const name = session.title
-    ? `${session.title}${isDirty ? ' *' : ''}`
-    : session.name
+/**
+ * 会话在壳层里的显示名，列表与页面顶端共用这一份：编辑器声明的标题优先，否则用会话自己的身份名；
+ * 外部与草稿带作用域前缀，未保存的会话在名字后加标记。
+ */
+function formatSessionTitle(session: EditorSession): string {
+  const name = `${session.presentation?.title ?? session.name}${session.isDirty ? ' *' : ''}`
   if (session.resourceKind === 'external') {
     return t('sidebar.editorTitles.external', { name })
   }
@@ -1245,11 +1245,6 @@ function formatSessionTitle(session: { name: string; title?: string; resourceKin
   }
   return name
 }
-
-const localizedOpenedEditorItems = computed(() => openedEditorItems.value.map((item) => ({
-  ...item,
-  label: formatSessionTitle({ name: item.label, title: item.title, resourceKind: item.resourceKind }),
-})))
 
 const {
   issueTreeData,
@@ -1315,7 +1310,8 @@ const {
   indexedEntries,
   packageManifests: projectPackageManifests,
   hideDotFiles: computed(() => settingsStore.settings.value.workspace.hideDotFiles),
-  openedEditorItems: localizedOpenedEditorItems,
+  sessions,
+  formatSessionTitle,
   activeSession,
   isDirectoryExpanded,
   activateSession,
@@ -2056,28 +2052,26 @@ const titleBarMenus = computed<ShellTitleBarMenuGroup[]>(() => [
   },
 ])
 
-/** The active editor owns its own identity; the shell only places it. */
-const editorPresentation = computed<EditorPresentation | undefined>(() => (
-  currentEditorRef.value?.presentation
-))
-
+/**
+ * 页面顶端的标题、副标题与图标都读会话自己持有的呈现，和列表用的是同一份 —— 编辑器只负责声明，
+ * 由 host 写回会话（见 useShellEditorHost）。头部动作仍是编辑器直接声明的，因为它随选区与忙碌态变化。
+ */
 const workspaceTitle = computed(() => {
   if (isCreateProjectMode.value) return t('projectTemplates.title')
   if (isExportTemplateMode.value) return t('templateExport.title')
   if (isSettingsMode.value) return activeSettingsCategory.value.title
   if (isAboutMode.value) return t('app.about.title')
   if (isWelcomeMode.value) return 'OpenCard'
-  if (editorPresentation.value) return editorPresentation.value.title
   return activeSession.value
     ? formatSessionTitle(activeSession.value)
     : projectName.value || t('app.menu.workbench')
 })
 
-const workspaceIcon = computed(() => editorPresentation.value?.icon ?? undefined)
+const workspaceIcon = computed(() => activeSession.value?.presentation?.icon ?? undefined)
 
-const workspaceIconTone = computed(() => editorPresentation.value?.iconTone ?? undefined)
+const workspaceIconTone = computed(() => activeSession.value?.presentation?.iconTone ?? undefined)
 
-const workspaceSubtitle = computed(() => editorPresentation.value?.description ?? undefined)
+const workspaceSubtitle = computed(() => activeSession.value?.presentation?.description ?? undefined)
 
 /** The active editor owns its own header actions and exposes them through the editor ref. */
 const editorHeaderActions = computed<readonly ShellWorkspaceAction[]>(() => (

@@ -7,10 +7,9 @@
 import { computed, nextTick, readonly, ref } from 'vue'
 import { i18n } from '../../../i18n'
 import { getPathBasename, isSameOrDescendantPath, normalizePath } from '../../../shared/model/filePath'
-import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
+import type { EditorPresentation } from '../../../shared/ui/editorPresentation.types'
 import {
   CARD_DOCUMENT_SUFFIX,
-  resolveEntryIcon,
   resolveFileType,
   resolveFileTypeById,
 } from '../model/fileTypes'
@@ -43,13 +42,9 @@ function resolveOpenedSessionName(path: string, fileTypeId: string): string {
 export type SessionResourceKind = 'workspace' | 'external' | 'draft'
 export type SessionSaveResult = 'saved' | 'cancelled' | 'skipped'
 export type EditorSessionMode = 'edit' | 'diff'
-/** Optional display presentation a caller may attach when opening a session. */
+/** Opening a session: the only choice left to the caller is whether it opens as a preview. */
 export type OpenSessionOptions = {
   preview?: boolean
-  title?: string
-  description?: string
-  icon?: IconToken
-  iconTone?: IconTone
 }
 export interface EditorSessionDiffState {
   beforeRevisionId: string | null
@@ -63,13 +58,11 @@ export type EditorSession = {
   path: string | null
   fileTypeId: string
   name: string
-  /** Optional display label for the editor list. `name` stays the file or draft identity. */
-  title?: string
-  /** Optional one-line description shown next to the title in the workspace header. */
-  description?: string
-  /** Optional display icon overriding the file type icon. */
-  icon?: IconToken
-  iconTone?: IconTone
+  /**
+   * 这个会话要求自己在外部看起来是什么样，由渲染它的编辑器写回（`setSessionPresentation`）。
+   * `name` 始终是文件或草稿的身份；壳层的任何表面都读这里，不再去问编辑器。
+   */
+  presentation?: EditorPresentation
   editorId: string
   savedContent: string
   draftContent: string
@@ -78,16 +71,6 @@ export type EditorSession = {
   mode?: EditorSessionMode
   diff?: EditorSessionDiffState
   uiState?: EditorSessionUiState
-}
-
-export type OpenedEditorItem = {
-  key: string
-  label: string
-  /** Explicit display title, absent when the session name decides the label. */
-  title?: string
-  resourceKind: SessionResourceKind
-  icon: IconToken
-  iconTone?: IconTone
 }
 
 export type EditorSessionUiState = {
@@ -106,10 +89,6 @@ export type EditorSessionUiState = {
 type CreateDraftSessionOptions = {
   fileTypeId?: string
   name?: string
-  title?: string
-  description?: string
-  icon?: IconToken
-  iconTone?: IconTone
   content?: string
 }
 
@@ -181,14 +160,12 @@ export function createDefaultOpenCardContent(displayName: string) {
   }, null, 2)
 }
 
-/** An explicit title tracks the session name, so a rename drops it and the name decides the label again. */
-/** An explicit title tracks the session name, so a rename clears it and the name decides the label again. */
-function resolvePublishedName(session: EditorSession, content: string): Pick<EditorSession, 'name' | 'title'> {
+/** A draft card document names itself, so its content decides the session name; every other session keeps its file name. */
+function resolvePublishedName(session: EditorSession, content: string): string {
   if (session.resourceKind !== 'draft' || session.fileTypeId !== 'opencard') {
-    return { name: session.name, title: session.title }
+    return session.name
   }
-  const name = resolveOpenCardDraftName(content, session.name)
-  return { name, title: name === session.name ? session.title : undefined }
+  return resolveOpenCardDraftName(content, session.name)
 }
 
 function buildDraftName(fileTypeId: string, existingNames: string[]) {  const fileType = resolveFileTypeById(fileTypeId)
@@ -232,13 +209,12 @@ export function useEditorSessionStore() {
     saveProjectIconRegistry,
     saveProjectDictionary,
   } = useProjectStore()
-  let openedEditorItemCache: OpenedEditorItem[] = []
 
   function publishHistoryContent(sessionId: string, content: string, isDirty: boolean): void {
     sessions.value = sessions.value.map(session => session.id === sessionId
       ? {
           ...session,
-          ...resolvePublishedName(session, content),
+          name: resolvePublishedName(session, content),
           draftContent: content,
           isDirty,
           isPreview: isDirty ? false : session.isPreview,
@@ -259,40 +235,6 @@ export function useEditorSessionStore() {
     sessions.value.find((session) => session.id === activeSessionId.value) ?? null
   )
 
-  const openedEditorItems = computed<OpenedEditorItem[]>(() => {
-    const previousByKey = new Map(openedEditorItemCache.map((item) => [item.key, item]))
-    const nextItems = sessions.value.map((session) => {
-      const fileType = resolveSessionFileType(session)
-      const derivedIcon = session.resourceKind === 'workspace' && session.path
-        ? resolveEntryIcon(session.path, false, false, projectPath.value)
-        : { icon: fileType.icon, tone: fileType.iconTone }
-      const nextItem: OpenedEditorItem = {
-        key: session.id,
-        label: session.isDirty ? `${session.name} *` : session.name,
-        ...(session.title ? { title: session.title } : {}),
-        resourceKind: session.resourceKind,
-        icon: session.icon ?? derivedIcon.icon,
-        iconTone: session.icon ? session.iconTone : derivedIcon.tone,
-      }
-      const previous = previousByKey.get(session.id)
-      return previous
-        && previous.label === nextItem.label
-        && previous.title === nextItem.title
-        && previous.resourceKind === nextItem.resourceKind
-        && previous.icon === nextItem.icon
-        && previous.iconTone === nextItem.iconTone
-        ? previous
-        : nextItem
-    })
-
-    if (nextItems.length === openedEditorItemCache.length
-      && nextItems.every((item, index) => item === openedEditorItemCache[index])) {
-      return openedEditorItemCache
-    }
-    openedEditorItemCache = nextItems
-    return nextItems
-  })
-
   function setSessionPreviewState(sessionId: string, isPreview: boolean) {
     sessions.value = sessions.value.map((session) =>
       session.id === sessionId
@@ -304,35 +246,30 @@ export function useEditorSessionStore() {
     )
   }
 
-  /** Patches the display presentation; an omitted title means "use the session name again". */
-  function setSessionPresentation(
-    sessionId: string,
-    patch: { title?: string, description?: string, icon?: IconToken, iconTone?: IconTone },
-  ): void {
-    sessions.value = sessions.value.map(session => session.id === sessionId
-      ? {
-          ...session,
-          ...('title' in patch ? { title: patch.title } : {}),
-          ...('description' in patch ? { description: patch.description } : {}),
-          ...('icon' in patch ? { icon: patch.icon, iconTone: patch.iconTone } : {}),
-        }
-      : session)
+  /** 编辑器声明它要求自己对外长什么样；这是呈现的唯一写入口，壳层的每个表面都读这一份。 */
+  function setSessionPresentation(sessionId: string, presentation: EditorPresentation): void {
+    sessions.value = sessions.value.map((session) => {
+      if (session.id !== sessionId) return session
+      const current = session.presentation
+      if (current
+        && current.title === presentation.title
+        && current.description === presentation.description
+        && current.icon === presentation.icon
+        && current.iconTone === presentation.iconTone) {
+        return session
+      }
+      return { ...session, presentation: { ...presentation } }
+    })
   }
 
   async function openSession(path: string, options?: OpenSessionOptions) {
     const normalizedPath = normalizePath(path)
     const preview = options?.preview ?? false
-    const title = options?.title?.trim()
     const existingSession = sessions.value.find((session) => session.path === normalizedPath)
     if (existingSession) {
       if (!preview && existingSession.isPreview) {
         setSessionPreviewState(existingSession.id, false)
       }
-      setSessionPresentation(existingSession.id, {
-        title,
-        description: options?.description,
-        ...(options?.icon ? { icon: options.icon, iconTone: options.iconTone } : {}),
-      })
 
       activeSessionId.value = existingSession.id
       return existingSession
@@ -359,9 +296,6 @@ export function useEditorSessionStore() {
       path: normalizedPath,
       fileTypeId: fileType.id,
       name: resolveOpenedSessionName(normalizedPath, fileType.id),
-      ...(title ? { title } : {}),
-      ...(options?.description ? { description: options.description } : {}),
-      ...(options?.icon ? { icon: options.icon, iconTone: options.iconTone } : {}),
       editorId: fileType.editorId,
       savedContent: content,
       draftContent: content,
@@ -411,9 +345,6 @@ export function useEditorSessionStore() {
       path: null,
       fileTypeId: fileType.id,
       name,
-      ...(options.title?.trim() ? { title: options.title.trim() } : {}),
-      ...(options.description ? { description: options.description } : {}),
-      ...(options.icon ? { icon: options.icon, iconTone: options.iconTone } : {}),
       editorId: fileType.editorId,
       savedContent: content,
       draftContent: content,
@@ -455,7 +386,7 @@ export function useEditorSessionStore() {
       const isDirty = content !== session.savedContent
       return {
         ...session,
-        ...resolvePublishedName(session, content),
+        name: resolvePublishedName(session, content),
         draftContent: content,
         isDirty,
         isPreview: isDirty ? false : session.isPreview,
@@ -667,8 +598,8 @@ export function useEditorSessionStore() {
             path: nextPath,
             resourceKind: nextResourceKind,
             name: nextName,
-            // 只有文件名真的变了（另存为、草稿落盘）才丢弃显式标题；原地保存保留编辑器标题。
-            title: nextName === candidate.name ? candidate.title : undefined,
+            // 文件名真的变了（另存为、草稿落盘）说明会话换了身份，编辑器声明的呈现随之作废，等它重新声明。
+            presentation: nextName === candidate.name ? candidate.presentation : undefined,
             fileTypeId: nextFileTypeId,
             editorId: resolveFileTypeById(nextFileTypeId).editorId,
             savedContent,
@@ -752,7 +683,7 @@ export function useEditorSessionStore() {
         ...session,
         path: nextPath,
         name: getPathBasename(nextPath),
-        title: undefined,
+        presentation: undefined,
         fileTypeId: nextFileType.id,
         editorId: nextFileType.editorId,
       }
@@ -763,7 +694,6 @@ export function useEditorSessionStore() {
     sessions: readonly(sessions),
     activeSessionId: readonly(activeSessionId),
     activeSession,
-    openedEditorItems,
     openFile,
     openPreviewFile,
     createDraftSession,
@@ -771,6 +701,7 @@ export function useEditorSessionStore() {
     activatePath,
     updateDraftContent,
     setSessionDirtyState,
+    setSessionPresentation,
     updateSessionUiState,
     updateSessionDiffUiState,
     setSessionMode,

@@ -75,7 +75,7 @@ describe('editorSessionStore explicit save path', () => {
     mocks.pickSavePath.mockResolvedValueOnce(null)
 
     expect(session.name).toBe('Current Card.ocdocument')
-    expect(store.openedEditorItems.value.find(item => item.key === session.id)?.label)
+    expect(store.sessions.value.find(candidate => candidate.id === session.id)?.name)
       .toBe('Current Card.ocdocument')
 
     await expect(store.saveSession(session.id)).resolves.toBe('cancelled')
@@ -98,10 +98,9 @@ describe('editorSessionStore explicit save path', () => {
       JSON.stringify({ type: 'card-document', name: 'After' }),
     )
 
-    expect(store.sessions.value.find(candidate => candidate.id === session.id)?.name)
-      .toBe('After.ocdocument')
-    expect(store.openedEditorItems.value.find(item => item.key === session.id)?.label)
-      .toBe('After.ocdocument *')
+    const updated = store.sessions.value.find(candidate => candidate.id === session.id)
+    expect(updated?.name).toBe('After.ocdocument')
+    expect(updated?.isDirty).toBe(true)
 
     store.closeSession(session.id)
   })

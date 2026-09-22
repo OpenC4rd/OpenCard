@@ -1,7 +1,7 @@
 /** Workspace entry lookup and OcNode collection projection. */
 import { computed, ref, watch, type Ref } from 'vue'
-import type { OpenedEditorItem, EditorSession } from '../../workspace/store/editorSessionStore'
-import { resolveEntryIcon, resolveFileType } from '../../workspace/model/fileTypes'
+import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import { resolveEntryIcon, resolveFileTypeById, type EntryIconPresentation } from '../../workspace/model/fileTypes'
 import type {
   OcNode,
   OcNodeAction,
@@ -13,7 +13,6 @@ import {
   resolveInstalledResourcePackageManifestPath,
 } from '../../workspace/model/resourcePackage'
 import type { RequiredPackage } from '../../workspace/model/projectPackageManifest'
-import { PROJECT_FILE_TYPE_TITLE_KEYS } from '../../workspace/model/projectFileTitles'
 import { notifyAppError } from '../../notifications/titlebarNotices'
 import {
   PROJECT_DICTIONARY_FILE_NAME,
@@ -76,12 +75,14 @@ type UseShellFileTreeOptions = {
   projectPath: Readonly<Ref<string>>
   indexedEntries: Readonly<Ref<readonly IndexedEntry[]>>
   packageManifests: Readonly<Ref<ReadonlyMap<string, RequiredPackage>>>
-  openedEditorItems: Readonly<Ref<OpenedEditorItem[]>>
+  sessions: Readonly<Ref<readonly EditorSession[]>>
+  /** 会话在列表里的显示名，由壳层决定文案（作用域前缀、未保存标记）。 */
+  formatSessionTitle: (session: EditorSession) => string
   activeSession: Readonly<Ref<EditorSession | null>>
   hideDotFiles?: Readonly<Ref<boolean>>
   isDirectoryExpanded: (path: string) => boolean
   activateSession: (sessionId: string) => void
-  openPreviewFile: (path: string, options?: { title?: string }) => Promise<unknown>
+  openPreviewFile: (path: string) => Promise<unknown>
   ensureProjectManagementStructure: () => Promise<void>
   translate: (key: string, params?: Record<string, unknown>) => string
   registeredFontSources?: Readonly<Ref<readonly string[] | null>>
@@ -324,20 +325,47 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
       .map((entry) => entry.key),
   )
 
+  /**
+   * 图标分两半：形状听编辑器声明的（它声明的是"我是什么"），色调按项目条目算（是否登记在项目里
+   * 这类信息只有项目知道）；编辑器也声明了色调时才以它为准。没声明的会话整份按条目或文件类型算。
+   */
+  function resolveSessionVisual(session: EditorSession): EntryIconPresentation {
+    const fileType = resolveFileTypeById(session.fileTypeId)
+    const entry = session.resourceKind === 'workspace' && session.path
+      ? resolveEntryIcon(
+          session.path,
+          false,
+          false,
+          options.projectPath.value,
+          registeredFontSourceSet.value,
+        )
+      : { icon: fileType.icon, tone: fileType.iconTone }
+    if (!session.presentation) return entry
+    return {
+      icon: session.presentation.icon,
+      tone: session.presentation.iconTone ?? entry.tone,
+    }
+  }
+
   const openedEditorTreeData = computed<OcNodeCollection>(() => {
     const closeAction: OcNodeAction = {
       key: OPENED_EDITOR_CLOSE_ACTION_KEY,
       title: options.translate('sidebar.closeEditor'),
       icon: 'action.close',
     }
-    return {
-      rootKeys: options.openedEditorItems.value.map((item) => item.key),
-      items: new Map(options.openedEditorItems.value.map((item) => [item.key, {
-        label: item.label,
-        visual: { type: 'icon', icon: item.icon, iconTone: item.iconTone },
+    const items = new Map<string, OcNode>()
+    for (const session of options.sessions.value) {
+      const visual = resolveSessionVisual(session)
+      items.set(session.id, {
+        label: options.formatSessionTitle(session),
+        visual: { type: 'icon', icon: visual.icon, iconTone: visual.tone },
         tail: [closeAction],
         contextActions: [closeAction],
-      }])),
+      })
+    }
+    return {
+      rootKeys: options.sessions.value.map((session) => session.id),
+      items,
       children: new Map(),
     }
   })
@@ -364,17 +392,10 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
       const isManagementRoot = projectManagementTreeData.value.rootKeys.includes(selectedKey)
       if (isManagementRoot) await options.ensureProjectManagementStructure()
       const targetPath = projectManagementProjection.value.targetByNodeKey.get(selectedKey)
-      if (targetPath) await options.openPreviewFile(targetPath, ...resolveOpenOptions(targetPath))
+      if (targetPath) await options.openPreviewFile(targetPath)
     } catch (error) {
       notifyAppError('OC-E4001', { path: selectedKey, error })
     }
-  }
-
-  /** Managed and installed package files open under the name they carry in the file tree, not their file name. */
-  function resolveOpenOptions(targetPath: string): [{ title: string }?] {
-    const titleKey = PROJECT_FILE_TYPE_TITLE_KEYS[resolveFileType(targetPath, options.projectPath.value).id]
-    const title = titleKey ? options.translate(titleKey) : ''
-    return title ? [{ title }] : []
   }
 
   function syncSelectionFromActiveSession(session: EditorSession | null): void {
@@ -385,7 +406,7 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
       return
     }
 
-    const opened = options.openedEditorItems.value.some((item) => item.key === session.id)
+    const opened = options.sessions.value.some((candidate) => candidate.id === session.id)
     setSelectedKeys(openedEditorSelectedKeys, opened ? [session.id] : [])
 
     if (session.resourceKind !== 'workspace' || !session.path) {
@@ -413,7 +434,7 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
     const selectedEntry = findProjectEntryByKey(nextSelectedKeys[0])
     if (!selectedEntry || selectedEntry.isDirectory) return
     try {
-      await options.openPreviewFile(selectedEntry.key, ...resolveOpenOptions(selectedEntry.key))
+      await options.openPreviewFile(selectedEntry.key)
     } catch (error) {
       notifyAppError('OC-E4001', { path: selectedEntry.key, error })
     }

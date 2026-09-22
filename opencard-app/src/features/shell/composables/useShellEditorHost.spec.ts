@@ -41,6 +41,7 @@ function createHost(session = createSession()) {
   const activeSession = ref<EditorSession | null>(session)
   const updateDraftContent = vi.fn()
   const setSessionDirtyState = vi.fn()
+  const setSessionPresentation = vi.fn()
   const updateSessionUiState = vi.fn()
   const saveActiveSession = vi.fn(async () => 'saved' as const)
   editorHistoryManager.initialize(
@@ -63,6 +64,7 @@ function createHost(session = createSession()) {
     sessionActions: {
       updateDraftContent,
       setSessionDirtyState,
+      setSessionPresentation,
       updateSessionUiState,
       saveActiveSession,
     },
@@ -72,6 +74,7 @@ function createHost(session = createSession()) {
     activeSession,
     updateDraftContent,
     setSessionDirtyState,
+    setSessionPresentation,
     updateSessionUiState,
     saveActiveSession,
   }
@@ -84,6 +87,38 @@ afterEach(() => {
 })
 
 describe('useShellEditorHost', () => {
+  it('publishes the active editor presentation into its session', async () => {
+    const { host, activeSession, setSessionPresentation } = createHost()
+    const presentation = {
+      title: 'Main',
+      description: 'Edit the card document',
+      icon: 'file.opencard' as const,
+    }
+
+    host.editorRef.value = { presentation }
+    await nextTick()
+
+    expect(setSessionPresentation).toHaveBeenCalledWith('session-a', presentation)
+
+    // 另存为/重命名会丢掉旧呈现，而编辑器的呈现未必跟着文件变，所以身份一变要重新声明。
+    setSessionPresentation.mockClear()
+    activeSession.value = { ...activeSession.value!, name: 'renamed.ocdocument' }
+    await nextTick()
+
+    expect(setSessionPresentation).toHaveBeenCalledWith('session-a', presentation)
+    host.dispose()
+  })
+
+  it('publishes nothing for an editor that declares no presentation', async () => {
+    const { host, setSessionPresentation } = createHost()
+
+    host.editorRef.value = {}
+    await nextTick()
+
+    expect(setSessionPresentation).not.toHaveBeenCalled()
+    host.dispose()
+  })
+
   it('projects registered editor props and resource roots', () => {
     const workspace = createHost(createSession({
       resourceKind: 'workspace',

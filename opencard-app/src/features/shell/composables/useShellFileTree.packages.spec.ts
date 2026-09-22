@@ -32,7 +32,8 @@ describe('useShellFileTree package navigation', () => {
         { name: '.opencard/packages/theme/.opencard/manifest.json', isDirectory: false },
       ]),
       packageManifests,
-      openedEditorItems: ref([]),
+      sessions: ref<EditorSession[]>([]),
+      formatSessionTitle: session => session.name,
       activeSession,
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
@@ -42,14 +43,10 @@ describe('useShellFileTree package navigation', () => {
     })
 
     await tree.handleProjectManagementSelect([`${projectPath}/.opencard/packages/packages.json`])
-    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/packages/packages.json`, {
-      title: 'fileTypes.opencardResourcePackage',
-    })
+    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/packages/packages.json`)
 
     await tree.handleProjectManagementSelect([`${projectPath}/.opencard/packages/theme`])
-    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/packages/theme/.opencard/manifest.json`, {
-      title: 'fileTypes.opencardResourcePackage',
-    })
+    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/packages/theme/.opencard/manifest.json`)
     expect(tree.projectManagementTreeData.value.children.get(`${projectPath}/.opencard/packages/packages.json`))
       .toEqual([`${projectPath}/.opencard/packages/theme`])
     expect(normalizeNodeTail(tree.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/packages/theme`)?.tail))
