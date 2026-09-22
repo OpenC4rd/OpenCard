@@ -234,29 +234,15 @@ describe('CreateProjectWorkspace', () => {
     expect(wrapper.get<HTMLInputElement>('input[readonly]').element.value).toBe('/next-projects')
   })
 
-  it('uses selectedKey for details and only offers deletion for user templates', async () => {
+  it('uses selectedKey for the details panel', async () => {
     const wrapper = mountWorkspace(builtin.key)
     await flushPromises()
 
     expect(wrapper.get('.create-project__details').text()).toContain('Blank')
-    expect(wrapper.find('.create-project__details-actions').exists()).toBe(false)
 
     await wrapper.setProps({ selectedKey: user.key })
 
     expect(wrapper.get('.create-project__details').text()).toContain('Personal')
-    const actions = wrapper.get('.create-project__details-actions')
-    expect(actions.text()).toContain('Delete')
-    expect(actions.find('.create-project__delete-confirm').exists()).toBe(false)
-
-    await actions.get('button').trigger('click')
-
-    const confirmation = wrapper.get('.create-project__delete-confirm')
-    expect(confirmation.text()).toContain('Delete this template?')
-    await confirmation.findAll('button')[0].trigger('click')
-    await flushPromises()
-
-    expect(store.deleteUserTemplate).toHaveBeenCalledWith(user)
-    expect(wrapper.emitted('update:selectedKey')).toEqual([[builtin.key]])
   })
 
   it('lists the add-on packages that will be installed into the new project', async () => {

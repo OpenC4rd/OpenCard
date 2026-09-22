@@ -178,15 +178,15 @@ describe('useSettingsWorkspace', () => {
       'versionControl.createInitialCommit',
     ])
     // 名称为空就是这位作者 ID，邮箱再按名称归一化推导。
-    expect(editor(rowOf(activeCategory.value, 'versionControl.committerName')).definition.placeholder)
-      .toBe('publisher-a1b2c3')
-    expect(editor(rowOf(activeCategory.value, 'versionControl.committerEmail')).definition.placeholder)
-      .toBe('publisher-a1b2c3@noreply.example')
+    expect(editor(rowOf(activeCategory.value, 'versionControl.committerName')).definition)
+      .toMatchObject({ placeholder: 'publisher-a1b2c3' })
+    expect(editor(rowOf(activeCategory.value, 'versionControl.committerEmail')).definition)
+      .toMatchObject({ placeholder: 'publisher-a1b2c3@noreply.example' })
     expect(editor(rowOf(activeCategory.value, 'versionControl.createInitialCommit')).value).toBe(true)
 
     settingsRef.value.versionControl.committerName = '张三'
-    expect(editor(rowOf(activeCategory.value, 'versionControl.committerEmail')).definition.placeholder)
-      .toBe('zhang-san@noreply.example')
+    expect(editor(rowOf(activeCategory.value, 'versionControl.committerEmail')).definition)
+      .toMatchObject({ placeholder: 'zhang-san@noreply.example' })
   })
 
   it('resolves the anchor of any setting key without switching to its category first', () => {

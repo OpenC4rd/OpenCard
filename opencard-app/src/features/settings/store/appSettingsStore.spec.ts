@@ -85,7 +85,8 @@ describe('appSettingsStore', () => {
       committerEmail: '',
       createInitialCommit: false,
     })
-    expect((await persistence.load())?.versionControl).toMatchObject({
+    const persisted = await persistence.load() as { versionControl?: unknown } | null
+    expect(persisted?.versionControl).toMatchObject({
       committerName: '张三',
       createInitialCommit: false,
     })

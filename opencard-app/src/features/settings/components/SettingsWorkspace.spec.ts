@@ -1,9 +1,8 @@
 import { mount } from '@vue/test-utils'
-import { nextTick, ref } from 'vue'
+import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import SettingsWorkspace from './SettingsWorkspace.vue'
-import { useSettingsWorkspace, type SettingsCategoryViewModel } from '../composables/useSettingsWorkspace'
-import { createDefaultAppSettings, type SettingsCategoryKey } from '../model/appSettings'
+import type { SettingsCategoryViewModel } from '../composables/useSettingsWorkspace'
 
 describe('SettingsWorkspace', () => {
   it('renders one card per settings group and forwards row events', async () => {

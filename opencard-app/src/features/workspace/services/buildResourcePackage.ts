@@ -49,7 +49,7 @@ export type ResourcePackageProjectBuildOptions = {
   packageSelection?: {
     keys: readonly string[]
   }
-  outputPath?: string
+  outputPath: string
 }
 
 /**

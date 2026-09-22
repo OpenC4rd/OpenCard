@@ -246,6 +246,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
         expandedDirectories: [],
         packageBuilder: {
           name: 'Theme',
+          author: 'publisher-test',
           version: '2.1.0',
           fontFamilyKeys: ['cjk'],
           fontCompositionKeys: [],

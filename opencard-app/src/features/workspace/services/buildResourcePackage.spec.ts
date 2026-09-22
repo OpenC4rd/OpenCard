@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_PROFILE_FILE_NAME } from '../model/projectStructure'
 import type { FileSystemService } from './fileSystemService'
 import { buildResourcePackageFromProject, type ResourcePackageBuildRequest } from './buildResourcePackage'
 
-const invoke = vi.hoisted(() => vi.fn(async (command: string, args: { request: ResourcePackageBuildRequest }) => ({
+const invoke = vi.hoisted(() => vi.fn(async (_command: string, args: { request: ResourcePackageBuildRequest }) => ({
   outputPath: args.request.outputPath,
   contentHash: 'hash',
 })))
@@ -27,11 +28,11 @@ class MemoryFileSystem implements Pick<FileSystemService,
     if (value === undefined) throw new Error(`Missing text file: ${path}`)
     return value
   }
-  async readDirectoryEntries(path: string): Promise<{ name: string, isDirectory: boolean, isSymlink: boolean }[]> {
+  async readDirectoryEntries(path: string): Promise<DirEntry[]> {
     const prefix = `${path}/`
     return [...this.values.keys()]
       .filter(value => value.startsWith(prefix))
-      .map(value => ({ name: value.slice(prefix.length), isDirectory: false, isSymlink: false }))
+      .map(value => ({ name: value.slice(prefix.length), isDirectory: false, isFile: true, isSymlink: false }))
   }
 }
 
@@ -123,15 +124,18 @@ describe('buildResourcePackageFromProject', () => {
     const empty = createFileSystem()
     await expect(buildResourcePackageFromProject({
       fs: empty, projectRootPath: '/project', key: 'theme', name: 'Theme', version: '1.0.0',
+      outputPath: '/out/theme.ocpack',
     })).rejects.toThrow('Select at least one resource')
 
     await expect(buildResourcePackageFromProject({
       fs: createFileSystem(), projectRootPath: '/project', key: 'theme', name: 'Theme', version: '1.0.0',
+      outputPath: '/out/theme.ocpack',
       fontSelection: { familyKeys: ['missing'], compositionKeys: [] },
     })).rejects.toThrow('Selected project font is unavailable: missing')
 
     await expect(buildResourcePackageFromProject({
       fs: createFileSystem(), projectRootPath: '/project', key: 'theme', name: 'Theme', version: '1.0.0',
+      outputPath: '/out/theme.ocpack',
       packageSelection: { keys: ['absent'] },
     })).rejects.toThrow('Selected resource package is missing: absent')
   })
