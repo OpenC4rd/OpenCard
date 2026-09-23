@@ -36,7 +36,10 @@ export type RichTextElementNode = {
 }
 export type RichTextIconNode = {
   type: 'icon'
-  /** Package the icon belongs to. `null` means the current project. */
+  /**
+   * Reference qualifier: `null` for the current scope, `''` for the host project, otherwise the
+   * package's full coordinate（`作者/包名@版本`）.
+   */
   packageKey: string | null
   seriesKey: string
   iconKey: string

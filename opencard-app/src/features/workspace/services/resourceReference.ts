@@ -1,10 +1,16 @@
 import { normalizeKeySlug } from '../../../shared/model/keySlug'
 import {
+  formatPackageCoordinate,
+  formatPackageQualifier,
+  parsePackageQualifier,
+  type PackageQualifier,
+} from '../model/packageCoordinate'
+import {
   findProjectIcon,
   type ProjectIconCatalogEntry,
 } from './projectIconCatalog'
 import type { ProjectFontRegistryEntry } from '../model/projectFontRegistry'
-import { resolveProjectEnvironmentFontFamily, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
+import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackageCoordinate, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
 import { toCssFontFamily, type FontCatalogEntry } from '../model/projectFonts'
 
 export type ResourceReferenceScope = 'current' | 'host' | 'package'
@@ -12,7 +18,8 @@ export type ResourceReferenceKind = 'font' | 'icon'
 
 export type ResourceReference = {
   scope: ResourceReferenceScope
-  packageKey?: string
+  /** `scope: 'package'` 时是引用里写的限定符：`作者/包名`（用最新版）或 `作者/包名@版本`。 */
+  qualifier?: PackageQualifier
   kind: ResourceReferenceKind
   key: string
 }
@@ -39,6 +46,11 @@ export type ResolvedResource<T> = {
   environment: ProjectResourceEnvironment | null
   value: T | null
   diagnostics: readonly ResourceReferenceDiagnostic[]
+  /**
+   * 这个包正在解开，所以现在还画不出东西 —— 但它不是缺包。真正的缺包会带诊断出来，
+   * `pending` 只是"再等一下"。
+   */
+  pending?: true
 }
 
 export type ResourceReferenceResolutionOptions = {
@@ -55,11 +67,16 @@ function diagnostic(
   return { code, reference: source, message }
 }
 
-function splitReference(source: string): { qualifier: string | null, body: string } | null {
-  const at = source.indexOf('@')
-  if (at < 0) return { qualifier: null, body: source }
-  if (source.indexOf('@', at + 1) >= 0) return null
-  return { qualifier: source.slice(0, at), body: source.slice(at + 1) }
+/**
+ * 引用写成 `限定符#正文`，取**第一个** `#`：`#` 之前是限定符，之后是正文。
+ * 没有 `#` 就没有限定符（当前作用域）；限定符为空字符串表示宿主项目；
+ * 非空限定符是 `作者/包名` 或 `作者/包名@版本` —— 坐标里的 `@` 与分段符 `#` 各司其职，
+ * 正文里不会出现 `#`。
+ */
+function splitReference(source: string): { qualifier: string | null, body: string } {
+  const hash = source.indexOf('#')
+  if (hash < 0) return { qualifier: null, body: source }
+  return { qualifier: source.slice(0, hash), body: source.slice(hash + 1) }
 }
 
 function normalizeKind(value: string): ResourceReferenceKind | null {
@@ -88,11 +105,6 @@ export function parseResourceReference(source: string): ParsedResourceReference 
   }
 
   const split = splitReference(value)
-  if (!split) return {
-    reference: null,
-    diagnostics: [diagnostic('syntax-error', original, 'Resource reference contains more than one package separator')],
-  }
-
   const separator = split.body.indexOf(':')
   if (separator <= 0) return {
     reference: null,
@@ -119,37 +131,38 @@ export function parseResourceReference(source: string): ParsedResourceReference 
     reference: { scope: 'host', kind, key },
     diagnostics: [],
   }
-  const packageKey = normalizeKeySlug(split.qualifier)
-  if (!packageKey) return {
+  const qualifier = parsePackageQualifier(split.qualifier)
+  if (!qualifier) return {
     reference: null,
-    diagnostics: [diagnostic('syntax-error', original, 'Package Key is invalid')],
+    diagnostics: [diagnostic('syntax-error', original, 'Resource reference must name a 作者/包名 or 作者/包名@版本 qualifier')],
   }
   return {
-    reference: { scope: 'package', packageKey, kind, key },
+    reference: { scope: 'package', qualifier, kind, key },
     diagnostics: [],
   }
 }
 
 function formatResourceReference(reference: ResourceReference): string {
-  const qualifier = reference.scope === 'host'
-    ? '@'
-    : reference.scope === 'package'
-      ? `${reference.packageKey ?? ''}@`
-      : ''
+  const qualifier = reference.scope === 'current'
+    ? ''
+    : reference.scope === 'host'
+      ? '#'
+      : `${reference.qualifier ? formatPackageQualifier(reference.qualifier) : ''}#`
   return `${qualifier}${reference.kind}:${reference.key}`
 }
 
 function lookupPackage(
   environment: ProjectResourceEnvironment,
-  packageKey: string,
+  qualifier: PackageQualifier,
 ): ProjectResourcePackage | null {
-  return environment.packages?.get(packageKey.toLocaleLowerCase()) ?? null
+  const coordinate = resolveProjectResourcePackageCoordinate(environment, qualifier)
+  return coordinate ? environment.packages?.get(coordinate) ?? null : null
 }
 
 function resolveEnvironment(
   reference: ResourceReference,
   options: ResourceReferenceResolutionOptions,
-): { environment: ProjectResourceEnvironment | null, package?: ProjectResourcePackage, diagnostics: ResourceReferenceDiagnostic[] } {
+): { environment: ProjectResourceEnvironment | null, package?: ProjectResourcePackage, diagnostics: ResourceReferenceDiagnostic[], pending?: true } {
   if (reference.scope === 'current') return { environment: options.environment, diagnostics: [] }
   if (reference.scope === 'host') {
     if (!options.hostEnvironment) return {
@@ -160,17 +173,14 @@ function resolveEnvironment(
   }
 
   const source = formatResourceReference(reference)
-  const pkg = lookupPackage(options.environment, reference.packageKey ?? '')
+  const pkg = reference.qualifier ? lookupPackage(options.environment, reference.qualifier) : null
   if (!pkg) return {
     environment: null,
     diagnostics: [diagnostic('package-unavailable', source, 'Referenced package is not visible from the current environment')],
   }
-  if (pkg.unavailable) return {
-    environment: null,
-    package: pkg,
-    diagnostics: [diagnostic('package-unavailable', source, 'Referenced package is unavailable')],
-  }
-  const packageEnvironment = options.packageEnvironments?.get(pkg.manifest.key.toLocaleLowerCase())
+  // 包在目录里就说明它是好的；只是还没解开，所以现在画不出东西，也不该报缺包。
+  if (pkg.rootPath === null) return { environment: null, package: pkg, diagnostics: [], pending: true }
+  const packageEnvironment = options.packageEnvironments?.get(formatPackageCoordinate(pkg.coordinate))
   return packageEnvironment
     ? { environment: packageEnvironment, package: pkg, diagnostics: [] }
     : {
@@ -209,6 +219,7 @@ function resolveResourceReference<T extends string | ProjectFontRegistryEntry | 
       environment: null,
       value: null,
       diagnostics: selected.diagnostics,
+      ...(selected.pending ? { pending: true as const } : {}),
     }
   }
   const environment = selected.environment
@@ -259,7 +270,7 @@ export function parseResourceReferenceList(
     const candidate = value.trim()
     if (!candidate) return { source: candidate, reference: null, diagnostics: [] }
     const lower = candidate.toLocaleLowerCase()
-    if (!lower.startsWith(`${kind}:`) && !lower.includes(`@${kind}:`)) {
+    if (!lower.startsWith(`${kind}:`) && !lower.includes(`#${kind}:`)) {
       return { source: candidate, reference: null, diagnostics: [] }
     }
     const parsed = parseResourceReference(candidate)
@@ -275,15 +286,19 @@ export function buildResourceFontCatalog(
     entries.push({ value: `font:${key}`, label: entry.name, source: 'project', detail: `font:${key}`,
       cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, environment, toCssFontFamily) })
   }
-  for (const [packageKey, packageEnvironment] of environment.packageEnvironments ?? []) {
-    const pkg = environment.packages?.get(packageKey)
-    if (!pkg || pkg.unavailable) continue
+  // 环境按坐标索引，引用值就写完整坐标：`作者/包名@版本#font:key`。
+  // 挑中的东西写死版本 —— 用户挑的就是这个长相。坐标里的 `@` 与引用分段符 `#` 不同，
+  // 所以坐标可以完整写出来。
+  for (const [coordinate, packageEnvironment] of environment.packageEnvironments ?? []) {
+    const pkg = environment.packages?.get(coordinate)
+    if (!pkg) continue
+    const qualifier = formatPackageCoordinate(pkg.coordinate)
     for (const [key, entry] of Object.entries(packageEnvironment.fonts)) {
       entries.push({
-        value: `${packageKey}@font:${key}`,
+        value: `${qualifier}#font:${key}`,
         label: entry.name,
         source: 'project',
-        detail: `${packageKey}@font:${key}`,
+        detail: `${qualifier}#font:${key}`,
         cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, packageEnvironment, toCssFontFamily),
       })
     }

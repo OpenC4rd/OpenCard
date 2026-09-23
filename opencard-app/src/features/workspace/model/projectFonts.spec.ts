@@ -16,7 +16,7 @@ describe('project font catalog', () => {
   })
 
   it('keeps ordinary CSS fallbacks and reports scoped references without an environment', () => {
-    const result = resolveProjectFontExpression('font:brand-latin; Arial; theme@font:body')
+    const result = resolveProjectFontExpression('font:brand-latin; Arial; alice/theme@1.0.0#font:body')
     expect(result.cssFontFamily).toContain('OpenCardProjectFont-brand-latin')
     expect(result.cssFontFamily).toContain('Arial')
     expect(result.issues).toContainEqual({ kind: 'missing', key: 'body', path: [] })

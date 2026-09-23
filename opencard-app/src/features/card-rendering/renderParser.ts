@@ -606,8 +606,8 @@ function isValidRenderFilePath(
 
 /**
  * A path field may declare that it also accepts resource references. A reference names a resource by
- * key (`icon:collection/icon`, `pack@icon:collection/icon`) and resolves to a path afterwards, so the
- * contract, not the path validator, decides whether a field accepts it.
+ * key (`icon:collection/icon`, `作者/包名@版本#icon:collection/icon`) and resolves to a path afterwards,
+ * so the contract, not the path validator, decides whether a field accepts it.
  */
 function isAcceptedResourceReference(
   value: string,

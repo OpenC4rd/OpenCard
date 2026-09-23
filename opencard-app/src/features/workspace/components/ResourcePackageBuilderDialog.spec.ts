@@ -25,8 +25,9 @@ const projectStore = vi.hoisted(() => ({
   projectIconSeries: { value: [
     { key: 'status', name: 'Status', source: 'icons/status.png', icons: [] },
   ] },
-  projectResourcePackages: { value: new Map() },
   projectProfile: { value: { author: 'publisher-test' } },
+  // 内化别人的资源时要按坐标找到包解开在哪；这份替身里一个包都没装。
+  projectResourceEnvironment: { value: { packages: new Map() } },
 }))
 
 const settings = vi.hoisted(() => ({
@@ -181,7 +182,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
-      key: 'local-publisher-test-project-09d226',
+      name: 'Project',
       imageSelection: { paths: ['images/card.png'] },
     }))
   })
@@ -246,12 +247,12 @@ describe('ResourcePackageBuilderDialog selection', () => {
         expandedDirectories: [],
         packageBuilder: {
           name: 'Theme',
+          title: 'Theme Pack',
           author: 'publisher-test',
           version: '2.1.0',
           fontFamilyKeys: ['cjk'],
           fontCompositionKeys: [],
           iconSeriesKeys: [],
-          packageKeys: [],
           imagePaths: ['images/nested/banner.svg'],
         },
       },
@@ -266,12 +267,16 @@ describe('ResourcePackageBuilderDialog selection', () => {
     expect(actionsOf(data, 'icon-series:status')).toEqual(['select'])
     expect(actionsOf(data, 'image:images/nested/banner.svg')).toEqual(['deselect'])
     expect(actionsOf(data, 'image:images/card.png')).toEqual(['select'])
+    // The remembered package name and version come back; the version would otherwise default to 1.0.0.
+    const fields = wrapper.findAll('.resource-package-builder__fields input')
+    expect((fields[0]!.element as HTMLInputElement).value).toBe('Theme')
+    expect((fields[1]!.element as HTMLInputElement).value).toBe('Theme Pack')
+    expect((fields[3]!.element as HTMLInputElement).value).toBe('2.1.0')
 
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Theme',
-      version: '2.1.0',
       imageSelection: { paths: ['images/nested/banner.svg'] },
       fontSelection: { familyKeys: ['cjk'], compositionKeys: [] },
       iconSelection: { seriesKeys: [] },
@@ -298,10 +303,10 @@ describe('ResourcePackageBuilderDialog selection', () => {
       name: 'Project',
       author: 'publisher-test',
       version: '1.0.0',
+      title: 'Project',
       fontFamilyKeys: ['cjk'],
       fontCompositionKeys: [],
       iconSeriesKeys: [],
-      packageKeys: [],
       imagePaths: ['images/nested/banner.svg'],
     })
 

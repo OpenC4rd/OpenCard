@@ -9,10 +9,7 @@ import type {
   OcNodeRenameSelection,
 } from '../../../shared/ui/node/node.types'
 import type { IconToken } from '../../../shared/ui/icon/iconTokens'
-import {
-  resolveInstalledResourcePackageManifestPath,
-} from '../../workspace/model/resourcePackage'
-import type { RequiredPackage } from '../../workspace/model/projectPackageManifest'
+import { RESOURCE_PACKAGE_SUFFIX } from '../../workspace/model/resourcePackage'
 import { notifyAppError } from '../../notifications/titlebarNotices'
 import {
   PROJECT_DICTIONARY_FILE_NAME,
@@ -23,7 +20,6 @@ import {
   PROJECT_INTERNAL_DIRECTORY_NAME,
   PROJECT_PROFILE_FILE_NAME,
   PROJECT_PACKAGE_DIRECTORY,
-  PROJECT_PACKAGE_MANIFEST_FILE_NAME,
 } from '../../workspace/model/projectStructure'
 
 export const OPENED_EDITOR_CLOSE_ACTION_KEY = 'close-editor'
@@ -34,7 +30,7 @@ export const PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY = 'project-entry-copy-a
 export const PROJECT_ENTRY_MORE_ACTION_KEY = 'project-entry-more'
 export const PROJECT_ENTRY_DELETE_ACTION_KEY = 'project-entry-delete'
 export const PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY = 'project-entry-confirm-delete'
-export const PROJECT_PACKAGE_VERIFY_ACTION_KEY = 'project-package-verify'
+export const PROJECT_PACKAGE_ADD_ACTION_KEY = 'project-package-add'
 export const PROJECT_PACKAGE_DELETE_ACTION_KEY = 'project-package-delete'
 
 type ProjectManagementEntry = {
@@ -50,9 +46,8 @@ const PROJECT_MANAGEMENT_ENTRIES: readonly ProjectManagementEntry[] = [
   { path: PROJECT_FONT_REGISTRY_FILE_NAME, labelKey: 'fileTypes.opencardFontRegistry', assetDirectory: PROJECT_FONT_DIRECTORY },
   { path: PROJECT_ICON_REGISTRY_FILE_NAME, labelKey: 'fileTypes.opencardIconRegistry', assetDirectory: PROJECT_ICON_DIRECTORY },
   {
-    path: PROJECT_PACKAGE_MANIFEST_FILE_NAME,
+    path: `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`,
     labelKey: 'fileTypes.opencardResourcePackage',
-    assetDirectory: PROJECT_PACKAGE_DIRECTORY,
     packageDirectory: true,
   },
 ] as const
@@ -74,7 +69,6 @@ type ProjectEntryView = {
 type UseShellFileTreeOptions = {
   projectPath: Readonly<Ref<string>>
   indexedEntries: Readonly<Ref<readonly IndexedEntry[]>>
-  packageManifests: Readonly<Ref<ReadonlyMap<string, RequiredPackage>>>
   sessions: Readonly<Ref<readonly EditorSession[]>>
   /** 会话在列表里的显示名，由壳层决定文案（作用域前缀、未保存标记）。 */
   formatSessionTitle: (session: EditorSession) => string
@@ -242,55 +236,58 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
       treeData: emptyTreeData,
       targetByNodeKey: new Map<string, string>(),
       nodeKeyByTargetPath: new Map<string, string>(),
-      packageKeyByNodeKey: new Map<string, string>(),
     }
     const items = new Map<string, OcNode>()
     const children = new Map<string, readonly string[]>()
     const targetByNodeKey = new Map<string, string>()
     const nodeKeyByTargetPath = new Map<string, string>()
-    const packageKeyByNodeKey = new Map<string, string>()
     const rootKeys = PROJECT_MANAGEMENT_ENTRIES.map((entry) => {
       const key = normalizeShellPath(`${options.projectPath.value}/${entry.path}`)
-      const presentation = entry.assetDirectory === PROJECT_PACKAGE_DIRECTORY
+      const presentation = entry.packageDirectory
         ? { icon: 'file.package' as IconToken, tone: 'config' as const }
         : resolveEntryIcon(key, false, false, options.projectPath.value)
       items.set(key, {
         label: options.translate(entry.labelKey),
-        tail: entry.path,
+        tail: entry.packageDirectory
+          ? [entry.path, {
+            key: PROJECT_PACKAGE_ADD_ACTION_KEY,
+            title: options.translate('packageManager.add'),
+            icon: 'action.add',
+          }]
+          : entry.path,
         visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
       })
-      targetByNodeKey.set(key, key)
-      nodeKeyByTargetPath.set(key, key)
-      if (entry.packageDirectory && entry.assetDirectory === PROJECT_PACKAGE_DIRECTORY) {
-        const directory = `${PROJECT_INTERNAL_DIRECTORY_NAME}/${entry.assetDirectory}`
-        const packageNodeKeys = [...options.packageManifests.value.keys()].sort().map((packageKey) => {
-          const nodeKey = normalizeShellPath(`${options.projectPath.value}/${directory}/${packageKey}`)
-          const targetPath = resolveInstalledResourcePackageManifestPath(options.projectPath.value, packageKey)
+      // 包目录本身不是一个文件：选中它只是选中，不该去"打开"它。
+      if (!entry.packageDirectory) {
+        targetByNodeKey.set(key, key)
+        nodeKeyByTargetPath.set(key, key)
+      }
+      if (entry.packageDirectory) {
+        // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`：节点就是那个文件本身，
+        // 所以节点 key 与目标路径是同一个值，删除直接按路径走。
+        const packageNodeKeys = options.indexedEntries.value
+          .map(candidate => normalizeShellPath(candidate.name))
+          .filter(relative => relative.startsWith(`${entry.path}/`))
+          .filter(relative => !relative.slice(entry.path.length + 1).includes('/'))
+          .filter(relative => relative.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX))
+          .map(relative => normalizeShellPath(`${options.projectPath.value}/${relative}`))
+          .sort((left, right) => left.localeCompare(right))
+        for (const nodeKey of packageNodeKeys) {
+          const parts = nodeKey.split('/')
           items.set(nodeKey, {
-            label: packageKey,
+            label: parts[parts.length - 1] ?? nodeKey,
             visual: { type: 'icon', icon: 'file.package', iconTone: 'config' },
-            tail: [
-              {
-                key: PROJECT_PACKAGE_VERIFY_ACTION_KEY,
-                title: options.translate('packageManager.verify'),
-                icon: 'action.check',
-              },
-              {
-                key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
-                title: options.translate('resourcePackage.delete'),
-                icon: 'action.delete',
-                iconTone: 'danger',
-              },
-            ],
+            tail: [{
+              key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
+              title: options.translate('resourcePackage.delete'),
+              icon: 'action.delete',
+              iconTone: 'danger',
+            }],
           })
-          targetByNodeKey.set(nodeKey, targetPath)
-          nodeKeyByTargetPath.set(targetPath, nodeKey)
-          packageKeyByNodeKey.set(nodeKey, packageKey)
-          return nodeKey
-        })
-        if (packageNodeKeys.length > 0) {
-          children.set(key, packageNodeKeys)
+          targetByNodeKey.set(nodeKey, nodeKey)
+          nodeKeyByTargetPath.set(nodeKey, nodeKey)
         }
+        if (packageNodeKeys.length > 0) children.set(key, packageNodeKeys)
       }
       return key
     })
@@ -298,7 +295,6 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
       treeData: { rootKeys, items, children },
       targetByNodeKey,
       nodeKeyByTargetPath,
-      packageKeyByNodeKey,
     }
   })
 
@@ -372,10 +368,6 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
 
   function findProjectEntryByKey(key: string): ProjectEntryView | null {
     return projectProjection.value.byKey.get(normalizeShellPath(key)) ?? null
-  }
-
-  function findProjectPackageKeyByNodeKey(nodeKey: string): string | null {
-    return projectManagementProjection.value.packageKeyByNodeKey.get(normalizeShellPath(nodeKey)) ?? null
   }
 
   function setProjectEntryExpanded(key: string, expanded: boolean): boolean {
@@ -462,7 +454,6 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
     handleFileTreeSelect,
     handleProjectManagementSelect,
     findProjectEntryByKey,
-    findProjectPackageKeyByNodeKey,
     setProjectManagementEntryExpanded,
     setProjectEntryExpanded,
   }

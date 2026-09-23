@@ -18,7 +18,7 @@ const projectSource: ProjectIconSource = {
   catalog: buildProjectIconCatalog(projectSeries, source => `asset://${source}`),
 }
 const packageSource: ProjectIconSource = {
-  packageKey: 'theme',
+  packageKey: 'alice/theme@1.0.0',
   label: 'Theme Pack',
   catalog: buildProjectIconCatalog(packageSeries, source => `asset://theme/${source}`),
 }
@@ -52,11 +52,11 @@ describe('project icon completion', () => {
     const result = await createProjectIconCompletionProvider(sources, { mode: 'reference' })(
       { value: 'icon:', cursor: 5 },
     )
-    const pkg = result?.items.find(item => item.insertText === 'theme@icon:')
+    const pkg = result?.items.find(item => item.insertText === 'alice/theme@1.0.0#icon:')
     expect(pkg).toMatchObject({ label: 'Theme Pack', replaceStart: 0, replaceEnd: 5 })
-    // Applying it must yield the package reference, not `icon:theme@icon:`.
+    // Applying it must yield the package reference, not `icon:alice/theme@1.0.0#icon:`.
     const applied = `icon:`.slice(0, pkg!.replaceStart) + pkg!.insertText + `icon:`.slice(pkg!.replaceEnd!)
-    expect(applied).toBe('theme@icon:')
+    expect(applied).toBe('alice/theme@1.0.0#icon:')
   })
 
   it('walks up from an icon to its collection and from a package collection to the sources', async () => {
@@ -66,11 +66,11 @@ describe('project icon completion', () => {
     const iconResult = await provider({ value: iconValue, cursor: iconValue.length })
     expect(iconResult?.parent).toMatchObject({ label: '..', insertText: 'icon:' })
 
-    const packageIconValue = 'theme@icon:mark/'
+    const packageIconValue = 'alice/theme@1.0.0#icon:mark/'
     const packageIconResult = await provider({ value: packageIconValue, cursor: packageIconValue.length })
-    expect(packageIconResult?.parent).toMatchObject({ insertText: 'theme@icon:' })
+    expect(packageIconResult?.parent).toMatchObject({ insertText: 'alice/theme@1.0.0#icon:' })
 
-    const packageCollectionValue = 'theme@icon:'
+    const packageCollectionValue = 'alice/theme@1.0.0#icon:'
     const packageCollectionResult = await provider({
       value: packageCollectionValue,
       cursor: packageCollectionValue.length,
@@ -107,11 +107,11 @@ describe('project icon completion', () => {
 
   it('writes the canonical token for a package icon', async () => {
     const provider = createProjectIconCompletionProvider(sources)
-    const value = '[[theme@icon:mark/'
+    const value = '[[alice/theme@1.0.0#icon:mark/'
     const result = await provider({ value, cursor: value.length })
     expect(result?.items[0]).toMatchObject({
       label: 'Sword',
-      insertText: '[[theme@icon:mark/sword]]',
+      insertText: '[[alice/theme@1.0.0#icon:mark/sword]]',
     })
     expect(result?.items[0]).not.toHaveProperty('detail')
   })

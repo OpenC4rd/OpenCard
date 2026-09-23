@@ -89,7 +89,7 @@ describe('RichTextStringPropertyField', () => {
    */
   it('passes the package icon sources to both the preview and the editor', async () => {
     const packageIconSources = [{
-      packageKey: 'starter-pack',
+      packageKey: 'starter-pack/kit@1.0.0',
       label: 'Starter Pack',
       catalog: EMPTY_PROJECT_ICON_CATALOG,
     }]

@@ -597,7 +597,6 @@ describe('ProjectTemplateService project creation', () => {
       '/projects/Empty/.opencard/icons/icons.json',
       '/projects/Empty/.opencard/locale.json',
       '/projects/Empty/.opencard/packages',
-      '/projects/Empty/.opencard/packages/packages.json',
       '/projects/Empty/.opencard/project.json',
     ])
   })

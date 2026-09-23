@@ -101,7 +101,7 @@ OpenCard 当前更适合作为编辑和维护工作台。完成一轮设计后�
 OpenCard 当前主要通过源码运行。需要 Node.js、npm，以及 Tauri 2 的本地开发环境。
 
 ```bash
-git clone https://github.com/POPCORNBOOM/OpenCard.git
+git clone https://github.com/OpenC4rd/OpenCard.git
 cd OpenCard/opencard-app
 npm install
 npm run tauri dev
@@ -135,7 +135,7 @@ OpenCard/
 - 工程约定：[`docs/工程规则.md`](docs/工程规则.md)
 - UI 组件规范：[`docs/UI_RULES.md`](docs/UI_RULES.md)
 - 架构与数据流：[`docs/架构.md`](docs/架构.md)
-- 问题反馈：[GitHub Issues](https://github.com/POPCORNBOOM/OpenCard/issues)
+- 问题反馈：[GitHub Issues](https://github.com/OpenC4rd/OpenCard/issues)
 
 ## 许可证与项目状态
 

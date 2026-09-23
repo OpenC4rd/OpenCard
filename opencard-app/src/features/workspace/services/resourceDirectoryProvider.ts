@@ -1,37 +1,42 @@
 import type { FilePathDirectoryProvider } from '../../../shared/model/filePath'
 import type { FileSystemService } from './fileSystemService'
+import { parsePackageQualifier } from '../model/packageCoordinate'
 import { resolveResourcePath } from '../model/scopedResourcePath'
-import type { ProjectResourceEnvironment } from './projectResourceEnvironment'
+import { packageScopeRoots, type ProjectResourceEnvironment } from './projectResourceEnvironment'
 
-/** `pkg@` with nothing after it: the one place inside a package where an icon reference can start. */
+/**
+ * `作者/包名@版本#` with nothing after the separator: the one place inside a package where a
+ * resource path or an icon reference can start. The qualifier is the whole text before that
+ * separator.
+ */
 function isPackageRoot(directory: string): boolean {
-  return /^[^/]+@$/.test(directory)
+  const separator = directory.lastIndexOf('#')
+  return separator === directory.length - 1
+    && parsePackageQualifier(directory.slice(0, separator)) !== null
 }
 
+/**
+ * 文件选择器在一个作用域里浏览。作用域的根由环境给出 —— 项目就是项目根，包就是它解开后的目录。
+ * 所以在包里浏览时，路径前缀是包内的相对路径；在项目里浏览时，`作者/包名#` 还能继续走进某个包。
+ */
 export function createResourceDirectoryProvider(
   rootPath: string,
-  sourceFilePath: string,
   environment: ProjectResourceEnvironment,
   fs: Pick<FileSystemService, 'readDirectoryEntries'>,
   options: { hideDotFiles?: boolean, iconEntryLabel?: string } = {},
 ): FilePathDirectoryProvider {
-  const source = /^[a-z]:[\\/]/i.test(sourceFilePath) || sourceFilePath.startsWith('/')
-    ? sourceFilePath : `${rootPath.replace(/[\\/]+$/, '')}/${sourceFilePath}`
-  const scope = resolveResourcePath(rootPath, source, '__oc_browse__')
-  function findScope(candidate: ProjectResourceEnvironment): ProjectResourceEnvironment | undefined {
-    if (!scope.ok || !candidate.rootPath) return undefined
-    const located = resolveResourcePath(rootPath, `${candidate.rootPath}/__oc_browse__`, '__oc_browse__')
-    if (located.ok && located.value === scope.value) return candidate
-    for (const child of candidate.packageEnvironments?.values() ?? []) {
-      const found = findScope(child)
-      if (found) return found
-    }
-    return undefined
-  }
-  const current = findScope(environment)
+  const scopeRootPath = environment.rootPath ?? rootPath
+  const current = environment
+  const packageRoots = packageScopeRoots(current.packages)
+  const resolve = (reference: string) => resolveResourcePath({
+    scopeRootPath,
+    projectRootPath: rootPath,
+    reference,
+    packageRoots,
+  })
   return async directory => {
     const prefix = directory.replace(/\/+$/, '')
-    const resolved = resolveResourcePath(rootPath, source, `${prefix ? `${prefix}/` : ''}__oc_browse__`)
+    const resolved = resolve(`${prefix ? `${prefix}/` : ''}__oc_browse__`)
     if (!resolved.ok) return []
     const entries = (await fs.readDirectoryEntries(resolved.value.slice(0, -'/__oc_browse__'.length), 1))
       .filter(entry => !options.hideDotFiles || !entry.name.split(/[\\/]/).some(segment => segment.startsWith('.')))
@@ -43,14 +48,15 @@ export function createResourceDirectoryProvider(
       isDirectory: true,
       icon: 'file.project-icon' as const,
     }
-    // A package root offers it as well, so `pkg@` can continue into `pkg@icon:` and reach the icons
-    // the package ships. Deeper paths inside a package have no icon scope, so they get no entry.
+    // A package root offers it as well, so `作者/包名@版本#` can continue into
+    // `作者/包名@版本#icon:` and reach the icons the package ships. Deeper paths inside a package
+    // have no icon scope, so they get no entry.
     if (prefix) return isPackageRoot(prefix) ? [...entries, iconEntry] : entries
     return [
       ...entries,
       iconEntry,
-      ...[...(current?.packages ?? [])].filter(([, pkg]) => !pkg.unavailable).map(([key, pkg]) => ({
-        name: `${key}@`, label: pkg.manifest.name, isDirectory: true, icon: 'file.package' as const,
+      ...[...(current.packages ?? [])].map(([key, pkg]) => ({
+        name: `${key}#`, label: pkg.manifest.title, isDirectory: true, icon: 'file.package' as const,
       })),
     ]
   }

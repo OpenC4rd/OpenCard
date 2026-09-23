@@ -6,8 +6,11 @@ export { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from './resourceP
  * - 只返回文件语义结果 不处理编辑器渲染流程
  */
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
-import { PROJECT_ICON_DIRECTORY, PROJECT_INTERNAL_DIRECTORY_NAME, PROJECT_PACKAGE_DIRECTORY } from './projectStructure'
-import { INSTALLED_RESOURCE_PACKAGE_MANIFEST_GLOB } from './resourcePackage'
+import {
+  PROJECT_ICON_DIRECTORY,
+  PROJECT_INTERNAL_DIRECTORY_NAME,
+  PROJECT_PACKAGE_DIRECTORY,
+} from './projectStructure'
 
 export const CARD_DOCUMENT_EXTENSION = 'ocdocument'
 export const CARD_DOCUMENT_SUFFIX = `.${CARD_DOCUMENT_EXTENSION}`
@@ -116,33 +119,13 @@ const fileTypes: FileTypeDefinition[] = [
     projectTreePriority: 3,
   },
   {
-    id: 'opencard-project-package-manifest',
-    labelKey: 'fileTypes.opencardResourcePackage',
-    patterns: ['.opencard/packages/packages.json'],
-    icon: 'file.package',
-    iconTone: iconTone.config,
-    language: 'json',
-    editorId: 'package-manager',
-    previewable: true,
-    projectTreePriority: 5,
-  },
-  {
-    id: 'opencard-installed-package-manifest',
-    labelKey: 'fileTypes.opencardResourcePackage',
-    patterns: [INSTALLED_RESOURCE_PACKAGE_MANIFEST_GLOB],
-    icon: 'file.package',
-    iconTone: iconTone.config,
-    language: 'json',
-    editorId: 'package-manifest',
-    previewable: true,
-  },
-  {
     id: 'opencard-resource-package',
     labelKey: 'fileTypes.opencardResourcePackage',
     extensions: ['ocpack'],
     icon: 'file.package',
     iconTone: iconTone.opencard,
-    editorId: 'unsupported-file',
+    editorId: 'package-manifest',
+    previewable: true,
   },
   {
     id: 'opencard',
@@ -372,7 +355,7 @@ export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryI
 
 /**
  * 项目里成"套"的资源各自占固定目录下的一层，并共用清单文件的配色：
- * 包在 `.opencard/packages/<Key>`，图标集合在 `.opencard/icons/<Key>`。
+ * 包在 `.opencard/packages/<作者>/<包名>/<版本>` 的作者层，图标集合在 `.opencard/icons/<Key>`。
  */
 const MANAGED_DIRECTORY_PRESENTATIONS: readonly (readonly [string, EntryIconPresentation])[] = [
   [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`, { icon: 'file.package', tone: iconTone.config }],

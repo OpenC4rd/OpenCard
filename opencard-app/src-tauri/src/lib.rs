@@ -25,15 +25,15 @@ const FILE_CHANGE_BATCH_MS: u64 = 120;
 const FILE_CHANGE_BATCH_MAX: usize = 256;
 
 /*
- * 递归监听项目根会把版本库内部与被管理的包存储也报上来，而这些变化界面不关心：
- * 版本控制自己读仓库，包安装流程自己收尾重载。放它们过去只会让前端白跑扫描。
+ * 递归监听项目根会把版本库内部也报上来，而界面不关心：版本控制自己读仓库。
+ * 放它们过去只会让前端白跑扫描。
+ *
+ * `.opencard/packages/` 不再被过滤：项目里的包就是那几个 `.ocpack` 文件，
+ * 用户拖进去一个、或者 `git pull` 拉回来一个，界面都必须看见。
  */
 fn is_ignored_change(path: &str) -> bool {
     let normalized = path.replace('\\', "/").to_lowercase();
-    normalized.ends_with("/.git")
-        || normalized.contains("/.git/")
-        || normalized.ends_with("/.opencard/packages")
-        || normalized.contains("/.opencard/packages/")
+    normalized.ends_with("/.git") || normalized.contains("/.git/")
 }
 
 // 存储 watcher 的全局状态
@@ -450,10 +450,9 @@ pub fn run() {
             git_service::git_rebase_continue,
             git_service::git_abort_operation,
             external_open::take_external_open_requests,
-            resource_package::recover_resource_package_transactions,
-            resource_package::inspect_resource_package,
-            resource_package::inspect_installed_resource_package,
-            resource_package::install_resource_package,
+            resource_package::read_resource_package,
+            resource_package::unpack_resource_package,
+            resource_package::recover_resource_package_cache,
             resource_package_builder::build_resource_package,
         ])
         .build(tauri::generate_context!())

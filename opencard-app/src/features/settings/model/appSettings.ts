@@ -64,12 +64,13 @@ export type ProjectWorkspaceSidebarState = {
 /** Last package-builder input for one project; absent means "no build was made yet". */
 export type ProjectPackageBuilderState = {
   name: string
+  /** 给人看的名字；缺省是包名。 */
+  title: string
   author: string
   version: string
   fontFamilyKeys: string[]
   fontCompositionKeys: string[]
   iconSeriesKeys: string[]
-  packageKeys: string[]
   imagePaths: string[]
 }
 
@@ -677,12 +678,12 @@ function normalizePackageBuilderState(value: unknown): ProjectPackageBuilderStat
   if (!isRecord(value)) return null
   return {
     name: normalizeText(value.name),
+    title: normalizeText(value.title),
     author: normalizeText(value.author),
     version: normalizeText(value.version),
     fontFamilyKeys: normalizeTextList(value.fontFamilyKeys),
     fontCompositionKeys: normalizeTextList(value.fontCompositionKeys),
     iconSeriesKeys: normalizeTextList(value.iconSeriesKeys),
-    packageKeys: normalizeTextList(value.packageKeys),
     imagePaths: normalizeTextList(value.imagePaths),
   }
 }

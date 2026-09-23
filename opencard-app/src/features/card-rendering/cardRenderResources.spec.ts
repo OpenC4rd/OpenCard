@@ -15,12 +15,33 @@ import {
 } from './cardRenderResources'
 import { setProjectFonts } from '../workspace/model/projectFonts'
 import { normalizeResourcePackageManifest } from '../workspace/model/resourcePackage'
+import type { PackageCoordinate } from '../workspace/model/packageCoordinate'
+import type { ProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
 
 const { convertFileSrc } = vi.hoisted(() => ({
   convertFileSrc: vi.fn((path: string) => `asset://${path}`),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc }))
+
+/** A package the environment can use: everything a reference needs, and nothing about a file. */
+function packageEntry(coordinate: PackageCoordinate, rootPath: string): ProjectResourcePackage {
+  return {
+    coordinate,
+    manifest: normalizeResourcePackageManifest({
+      type: 'opencard-resource-package',
+      author: coordinate.author,
+      name: coordinate.name,
+      version: coordinate.version,
+      title: coordinate.name,
+      public: { fonts: [], iconSeries: [] },
+    }).manifest,
+    archivePath: `/project/.opencard/packages/${coordinate.name}.ocpack`,
+    fingerprint: `fp-${coordinate.name}`,
+    rootPath,
+    cover: null,
+  }
+}
 
 function unavailable(
   code: ResourceIssueCode,
@@ -56,7 +77,7 @@ describe('cardRenderResources', () => {
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project',
       fontDocument: {}, fonts: { brand: { kind: 'family', name: 'Brand', family: font } },
-      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
+      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
     const root = createCardResourceResolver(createCardRenderResourceContext({ hostEnvironment: environment }))
     const derived = root.withScopes(new Map([[
@@ -78,7 +99,7 @@ describe('cardRenderResources', () => {
     }
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project', fontDocument: {}, fonts: {},
-      iconDocument: {}, iconCatalog: { series: [], entries: [icon], errors: [] }, issues: [],
+      iconDocument: {}, iconCatalog: { series: [], entries: [icon], errors: [] },
     }
     const root = createCardResourceResolver(createCardRenderResourceContext({ hostEnvironment: environment }))
     const derived = root.withScopes(new Map([
@@ -114,31 +135,30 @@ describe('cardRenderResources', () => {
       source: 'icons/warning.svg', src: 'asset://icons/warning.svg',
       tint: 'theme' as const, imageWidth: 16, imageHeight: 16,
     }
+    const coordinate = { author: 'alice', name: 'theme', version: '1.0.0' }
     const packageEnvironment: ProjectResourceEnvironment = {
-      kind: 'package', namespace: 'package-theme', rootPath: '/project/.opencard/packages/theme',
-      fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: { series: [], entries: [icon], errors: [] }, issues: [],
+      kind: 'package', namespace: 'package-alice-theme-1.0.0',
+      rootPath: '/project/.opencard/packages/alice/theme/1.0.0',
+      fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: { series: [], entries: [icon], errors: [] },
     }
     const hostEnvironment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project', rootPath: '/project', fontDocument: {}, fonts: {},
-      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
-      packages: new Map([['theme', {
-        manifest: normalizeResourcePackageManifest({}, 'theme').manifest,
-        rootPath: packageEnvironment.rootPath!, cover: null, issues: [],
-      }]]),
+      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+      packages: new Map([['alice/theme@1.0.0', packageEntry(coordinate, packageEnvironment.rootPath!)]]),
     }
     const resolver = createCardResourceResolver(createCardRenderResourceContext({
       hostEnvironment,
-      packageEnvironments: new Map([['theme', packageEnvironment]]),
+      packageEnvironments: new Map([['alice/theme@1.0.0', packageEnvironment]]),
     }))
 
-    expect(resolver.resolve({ value: 'theme@icon:status/warning', expect: 'asset', blockId: 'image', fieldKey: 'source' }))
+    expect(resolver.resolve({ value: 'alice/theme@1.0.0#icon:status/warning', expect: 'asset', blockId: 'image', fieldKey: 'source' }))
       .toEqual({ kind: 'icon', entry: icon })
   })
 
   it('reports a package reference that the current environment cannot see', () => {
     const context = createCardRenderResourceContext({ resourceRootPath: 'D:/Cards' })
 
-    expect(resolveCardResource({ value: 'theme@icon:status/warning', expect: 'asset', blockId: 'image', fieldKey: 'source' }, context))
+    expect(resolveCardResource({ value: 'goblin/missing@1.0.0#icon:status/warning', expect: 'asset', blockId: 'image', fieldKey: 'source' }, context))
       .toEqual(unavailable('package-unavailable', 'Referenced package is not visible from the current environment'))
   })
 
@@ -151,7 +171,7 @@ describe('cardRenderResources', () => {
       fonts: {},
       iconDocument: {},
       iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      issues: [],
+
     }
     const context = createCardRenderResourceContext({
       resourceScopes: new Map([[
@@ -184,24 +204,35 @@ describe('cardRenderResources', () => {
       .toEqual(unavailable('unsafe-path', 'Resource scheme is not permitted: https://other.example.com/portrait.png'))
   })
 
-  it('resolves project, current-package, and child-package shorthand from the document scope', () => {
+  it('resolves a package path through the host environment and a project path through the # anchor', () => {
+    const packageEnvironment: ProjectResourceEnvironment = {
+      kind: 'package', namespace: 'package-alice-theme-1.0.0',
+      rootPath: '/cache/packages/aa11',
+      fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+    }
+    const hostEnvironment: ProjectResourceEnvironment = {
+      kind: 'project', namespace: 'project', rootPath: 'D:/Cards',
+      fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+      packages: new Map([['alice/theme@1.0.0', packageEntry({ author: 'alice', name: 'theme', version: '1.0.0' }, '/cache/packages/aa11')]]),
+    }
     const projectContext = createCardRenderResourceContext({
       resourceRootPath: 'D:/Cards',
       sourceFilePath: 'D:/Cards/decks/card.ocdocument',
+      hostEnvironment,
     })
-    expect(resolveCardResource({ value: 'theme@images/frame.png', expect: 'asset' }, projectContext))
-      .toEqual({ kind: 'url', src: 'asset://D:/Cards/.opencard/packages/theme/images/frame.png' })
+    expect(resolveCardResource({ value: 'alice/theme@1.0.0#images/frame.png', expect: 'asset' }, projectContext))
+      .toEqual({ kind: 'url', src: 'asset:///cache/packages/aa11/images/frame.png' })
 
+    // 包里的文件属于包的作用域；要拿项目里的东西就用 `#` 锚点走出去。
     const packageContext = createCardRenderResourceContext({
       resourceRootPath: 'D:/Cards',
-      sourceFilePath: 'D:/Cards/.opencard/packages/theme/cards/card.ocdocument',
+      sourceFilePath: 'D:/Cards/.opencard/packages/alice/theme/1.0.0/cards/card.ocdocument',
+      hostEnvironment: packageEnvironment,
     })
     expect(resolveCardResource({ value: 'images/frame.png', expect: 'asset' }, packageContext))
-      .toEqual({ kind: 'url', src: 'asset://D:/Cards/.opencard/packages/theme/images/frame.png' })
-    expect(resolveCardResource({ value: '@images/logo.png', expect: 'asset' }, packageContext))
+      .toEqual({ kind: 'url', src: 'asset:///cache/packages/aa11/images/frame.png' })
+    expect(resolveCardResource({ value: '#images/logo.png', expect: 'asset' }, packageContext))
       .toEqual({ kind: 'url', src: 'asset://D:/Cards/images/logo.png' })
-    expect(resolveCardResource({ value: 'palette@images/swatch.png', expect: 'asset' }, packageContext))
-      .toEqual({ kind: 'url', src: 'asset://D:/Cards/.opencard/packages/theme/.opencard/packages/palette/images/swatch.png' })
   })
 
   it('resolves an allowed remote asset through the project cache when provided', () => {
@@ -229,34 +260,31 @@ describe('cardRenderResources', () => {
     expect(convertFileSrc).not.toHaveBeenCalled()
   })
 
-  it('reports unsafe and reserved paths, and a source file outside the project', () => {
+  it('reports unsafe and reserved paths, and a package the project does not have', () => {
     const context = createCardRenderResourceContext({
       resourceRootPath: 'D:/Cards',
       sourceFilePath: 'D:/Cards/decks/card.ocdocument',
     })
-    const outsideContext = createCardRenderResourceContext({
-      resourceRootPath: 'D:/Cards',
-      sourceFilePath: 'D:/Elsewhere/card.ocdocument',
-    })
 
     expect(resolveCardResource({ value: 'assets/../escape.png', expect: 'asset' }, context))
       .toEqual(unavailable('unsafe-path', 'Resource path contains an unsafe or non-portable segment'))
+    // 归档住在 `.opencard/packages` 里，而不是解开后的资源；引用必须写坐标。
     expect(resolveCardResource({ value: '.opencard/packages/inner.png', expect: 'asset' }, context))
-      .toEqual(unavailable('reserved-path', 'Package storage must be addressed through a package Key'))
-    expect(resolveCardResource({ value: 'assets/a.png', expect: 'asset' }, outsideContext))
-      .toEqual(unavailable('source-outside-project', 'Source file is outside a valid project resource scope'))
+      .toEqual(unavailable('reserved-path', 'Package storage must be addressed through a package coordinate'))
+    expect(resolveCardResource({ value: 'alice/theme@1.0.0#images/frame.png', expect: 'asset' }, context))
+      .toEqual(unavailable('package-unavailable', 'Package is not installed: alice/theme@1.0.0'))
   })
 
   it('resolves package-qualified font references with a package namespace', () => {
     const packageEnvironment: ProjectResourceEnvironment = {
       kind: 'package',
-      namespace: 'package-theme',
-      rootPath: '/project/.opencard/packages/theme',
+      namespace: 'package-alice-theme-1.0.0',
+      rootPath: '/project/.opencard/packages/alice/theme/1.0.0',
       fontDocument: {},
       fonts: { body: { kind: 'family', name: 'Body', family: { key: 'body', name: 'Body', files: {} } } },
       iconDocument: {},
       iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      issues: [],
+
     }
     const projectEnvironment: ProjectResourceEnvironment = {
       kind: 'project',
@@ -266,21 +294,18 @@ describe('cardRenderResources', () => {
       fonts: { body: { kind: 'family', name: 'Body', family: { key: 'body', name: 'Body', files: {} } } },
       iconDocument: {},
       iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      packages: new Map([['theme', {
-        manifest: {
-          type: 'opencard-resource-package', key: 'theme', name: 'Theme', version: '1.0.0', contentHash: '',
-          public: { fonts: [], iconSeries: [] },
-        },
-        rootPath: '/project/.opencard/packages/theme', cover: null, issues: [],
-      }]]),
-      issues: [],
+      packages: new Map([['alice/theme@1.0.0', packageEntry(
+        { author: 'alice', name: 'theme', version: '1.0.0' },
+        '/project/.opencard/packages/alice/theme/1.0.0',
+      )]]),
+
     }
     const context = createCardRenderResourceContext({
       hostEnvironment: projectEnvironment,
-      packageEnvironments: new Map([['theme', packageEnvironment]]),
+      packageEnvironments: new Map([['alice/theme@1.0.0', packageEnvironment]]),
     })
-    expect(resolveFontCssFamily('theme@font:body; Arial', context)).toContain('OpenCardResource-package-theme-body')
-    expect(resolveFontCssFamily('theme@font:body; Arial', context)).toContain('Arial')
+    expect(resolveFontCssFamily('alice/theme@1.0.0#font:body; Arial', context)).toContain('OpenCardResource-package-alice-theme-1.0.0-body')
+    expect(resolveFontCssFamily('alice/theme@1.0.0#font:body; Arial', context)).toContain('Arial')
   })
 
   it('keeps the font list join and reports an empty font field as empty', () => {
@@ -289,7 +314,7 @@ describe('cardRenderResources', () => {
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project',
       fontDocument: {}, fonts: { brand: { kind: 'family', name: 'Brand', family: font } },
-      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
+      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
     const context = createCardRenderResourceContext({ hostEnvironment: environment })
 

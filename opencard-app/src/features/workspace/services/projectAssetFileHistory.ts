@@ -1,9 +1,7 @@
 import { normalizePath } from '../../../shared/model/filePath'
-import { resolveAppStoragePath } from '../../../shared/storage/appStoragePaths'
+import { APP_CACHE_STAGED_DIRECTORY_NAME, resolveAppCachePath } from '../../../shared/storage/appStoragePaths'
 import type { HistoryResourceLifecycle } from '../../editor-runtime/history/contentHistory'
 import { fileSystemService, type FileSystemService } from './fileSystemService'
-
-export const PROJECT_ASSET_HISTORY_DIRECTORY = 'history/assets'
 
 type StagedFile = {
   originalPath: string
@@ -11,9 +9,12 @@ type StagedFile = {
 }
 
 /**
- * Moves project asset files out of the project into app storage, so removing a registry entry can be
- * undone. The bytes are copied before the originals are dropped and the staged copies are released
- * once the history entry falls out of the undo stack; a failure at any point restores what it moved.
+ * Moves project asset files out of the project into the app's staged cache, so removing a registry
+ * entry can be undone. The bytes are copied before the originals are dropped and the staged copies
+ * are released once the history entry falls out of the undo stack; a failure at any point restores
+ * what it moved.
+ *
+ * 暂存属于"随进程生死"的东西：撤销栈本身不跨进程，所以启动维护会把整个 `cache/staged` 清空。
  */
 export async function stageProjectAssetFiles(
   originalPaths: readonly string[],
@@ -24,7 +25,7 @@ export async function stageProjectAssetFiles(
   const uniquePaths = [...new Set(originalPaths.map(normalizePath))]
   if (uniquePaths.length === 0) throw new Error(`No project ${label} files were provided for staging.`)
 
-  const operationDirectory = await resolveAppStoragePath(...PROJECT_ASSET_HISTORY_DIRECTORY.split('/'), operationId)
+  const operationDirectory = await resolveAppCachePath(APP_CACHE_STAGED_DIRECTORY_NAME, operationId)
   const files = uniquePaths.map((originalPath, index): StagedFile => ({
     originalPath,
     stagedPath: `${normalizePath(operationDirectory)}/${index}-${basename(originalPath, label)}`,

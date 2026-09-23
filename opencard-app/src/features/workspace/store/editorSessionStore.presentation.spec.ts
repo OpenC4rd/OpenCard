@@ -49,15 +49,15 @@ describe('editorSessionStore presentation', () => {
 
   it('opens a file under its own identity and carries no presentation', async () => {
     const store = useEditorSessionStore()
-    const session = await store.open('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/alice-icons-1.0.0.ocpack')
 
-    expect(session.name).toBe('packages.json')
+    expect(session.name).toBe('alice-icons-1.0.0.ocpack')
     expect(session.presentation).toBeUndefined()
   })
 
   it('holds the presentation its editor declares, and every reader sees that one', async () => {
     const store = useEditorSessionStore()
-    const session = await store.open('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/alice-icons-1.0.0.ocpack')
 
     store.setSessionPresentation(session.id, PACKAGE_PRESENTATION)
 
@@ -68,7 +68,7 @@ describe('editorSessionStore presentation', () => {
 
   it('leaves the session object alone when the same presentation is declared again', async () => {
     const store = useEditorSessionStore()
-    const session = await store.open('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/alice-icons-1.0.0.ocpack')
     store.setSessionPresentation(session.id, PACKAGE_PRESENTATION)
     const before = store.sessions.value.find(candidate => candidate.id === session.id)
 
@@ -79,7 +79,7 @@ describe('editorSessionStore presentation', () => {
 
   it('ignores a declaration for a session that is not open', async () => {
     const store = useEditorSessionStore()
-    const session = await store.open('D:/project/.opencard/packages/packages.json')
+    const session = await store.open('D:/project/.opencard/packages/alice-icons-1.0.0.ocpack')
 
     store.setSessionPresentation('missing-session', PACKAGE_PRESENTATION)
 

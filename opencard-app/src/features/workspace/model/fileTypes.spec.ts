@@ -50,10 +50,15 @@ describe('workspace entry icon tokens', () => {
     })
   })
 
-  it('uses the config tone for package metadata', () => {
-    expect(resolveEntryIcon('D:/Cards/.opencard/packages/packages.json', false, false, 'D:/Cards')).toEqual({
+  it('uses the opencard tone for a package archive, wherever it sits', () => {
+    expect(resolveEntryIcon('D:/Cards/.opencard/packages/alice-icons-1.0.0.ocpack', false, false, 'D:/Cards')).toEqual({
       icon: 'file.package',
-      tone: 'config',
+      tone: 'opencard',
+    })
+    // 文件叫什么名字、放在哪都不改变它是什么。
+    expect(resolveEntryIcon('D:/Cards/downloads/whatever.ocpack', false, false, 'D:/Cards')).toEqual({
+      icon: 'file.package',
+      tone: 'opencard',
     })
   })
 

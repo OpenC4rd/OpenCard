@@ -122,65 +122,82 @@ async function completionItems(
 
 describe('useCdePropertyEditorProjection', () => {
   it('refreshes package font completion and previews from the environment snapshot', async () => {
+    const coordinate = 'alice/theme@1.0.0'
+    const invisibleCoordinate = 'goblin/invisible@1.0.0'
     const child: ProjectResourceEnvironment = {
-      kind: 'package', namespace: 'package-theme', rootPath: '/project/.opencard/packages/theme',
+      kind: 'package', namespace: 'package-alice-theme-1.0.0',
+      rootPath: '/project/.opencard/packages/alice/theme/1.0.0',
       fonts: { body: { kind: 'family', name: 'Body', family: { key: 'body', name: 'Body', files: {} } } },
-      fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
+      fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
     const environment = ref<ProjectResourceEnvironment>({ ...child, kind: 'project', namespace: 'project', fonts: {} })
     const { state } = createHarness(environment)
     const fields = () => state.propertyEditorInputs.value[0]!.fields
-    expect(await completionItems(fields().fontFamily?.completion?.provider, 'theme@', 6)).toEqual([])
+    expect(await completionItems(fields().fontFamily?.completion?.provider, 'alice/theme@1.0.0#', 18)).toEqual([])
     environment.value = {
       ...environment.value,
-      packages: new Map([['theme', { manifest: normalizeResourcePackageManifest({}, 'theme').manifest, rootPath: child.rootPath!, cover: null, issues: [] }]]),
-      packageEnvironments: new Map([['theme', child], ['invisible', child]]),
+      packages: new Map([[coordinate, {
+        coordinate: { author: 'alice', name: 'theme', version: '1.0.0' },
+        manifest: normalizeResourcePackageManifest({
+          type: 'opencard-resource-package',
+          author: 'alice', name: 'theme', version: '1.0.0', title: 'Theme',
+          public: { fonts: [], iconSeries: [] },
+        }).manifest,
+        archivePath: '/project/.opencard/packages/theme.ocpack',
+        fingerprint: 'fp-theme',
+        rootPath: child.rootPath!, cover: null,
+      }]]),
+      packageEnvironments: new Map([[coordinate, child], [invisibleCoordinate, child]]),
     }
-    expect(await completionItems(fields().fontFamily?.completion?.provider, 'theme@', 6)).toEqual([
-      expect.objectContaining({ insertText: 'theme@font:', keepOpen: true }),
+    expect(await completionItems(fields().fontFamily?.completion?.provider, 'alice/theme@1.0.0#', 18)).toEqual([
+      expect.objectContaining({ insertText: 'alice/theme@1.0.0#font:', keepOpen: true }),
     ])
-    const completion = await completionResult(fields().fontFamily?.completion?.provider, 'theme@font:', 11)
+    const completion = await completionResult(
+      fields().fontFamily?.completion?.provider,
+      'alice/theme@1.0.0#font:',
+      24,
+    )
     expect(completion?.items).toEqual([expect.objectContaining({
-      insertText: 'theme@font:body', value: 'theme@font:body',
-      labelStyle: { fontFamily: '"OpenCardResource-package-theme-body"' },
+      insertText: 'alice/theme@1.0.0#font:body', value: 'alice/theme@1.0.0#font:body',
+      labelStyle: { fontFamily: '"OpenCardResource-package-alice-theme-1.0.0-body"' },
     })])
     expect(completion?.parent).toEqual(expect.objectContaining({ label: '..', insertText: '', keepOpen: true }))
     expect(fields().content?.fontOptions).toContainEqual(expect.objectContaining({
-      value: 'theme@font:body', cssFamily: '"OpenCardResource-package-theme-body"',
+      value: 'alice/theme@1.0.0#font:body', cssFamily: '"OpenCardResource-package-alice-theme-1.0.0-body"',
     }))
-    expect(fields().content?.fontOptions?.some(font => font.value.startsWith('invisible@'))).toBe(false)
+    expect(fields().content?.fontOptions?.some(font => font.value.startsWith(invisibleCoordinate))).toBe(false)
     expect(await completionItems(fields().fontFamily?.completion?.provider, 'Ar', 2)).toEqual([])
     const definition = fields().fontFamily!
     if (definition.fieldType !== 'string') throw new Error('Expected a string font field')
     const wrapper = mount(ReferenceStringPropertyField, {
       attachTo: document.body,
-      props: { definition, value: 'Arial; theme@; Georgia' },
+      props: { definition, value: 'Arial; alice/theme@1.0.0#; Georgia' },
     })
     try {
       const input = wrapper.get('input')
-      input.element.setSelectionRange(13, 13)
+      input.element.setSelectionRange(25, 25)
       await input.trigger('focus')
       await flushPromises()
-      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('theme')
+      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('Theme')
       await input.trigger('keydown', { key: 'Tab' })
       await flushPromises()
-      expect(input.element.value).toBe('Arial; theme@font:; Georgia')
+      expect(input.element.value).toBe('Arial; alice/theme@1.0.0#font:; Georgia')
       expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('Body')
       await input.trigger('keydown', { key: 'ArrowDown' })
       await input.trigger('keydown', { key: 'Enter' })
       await flushPromises()
       expect(input.element.value).toBe('Arial; ; Georgia')
-      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('theme')
+      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('Theme')
       await input.trigger('keydown', { key: 'Tab' })
       await flushPromises()
       await input.trigger('keydown', { key: 'Enter' })
       await flushPromises()
-      expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['Arial; theme@font:body; Georgia'])
+      expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['Arial; alice/theme@1.0.0#font:body; Georgia'])
     } finally {
       wrapper.unmount()
     }
     environment.value = { ...environment.value, packageEnvironments: new Map() }
-    expect(await completionItems(fields().fontFamily?.completion?.provider, 'theme@', 6)).toEqual([])
+    expect(await completionItems(fields().fontFamily?.completion?.provider, 'alice/theme@1.0.0#', 18)).toEqual([])
   })
   it('builds instance, parent, project, and dictionary binding scopes', async () => {
     const { state } = createHarness()

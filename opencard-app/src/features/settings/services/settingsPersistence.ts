@@ -1,10 +1,9 @@
 /** Persistence adapters for the single versioned application settings document. */
 import { isTauri } from '@tauri-apps/api/core'
 import { LazyStore } from '@tauri-apps/plugin-store'
-import { resolveAppStoragePath } from '../../../shared/storage/appStoragePaths'
+import { APP_SETTINGS_FILE_NAME, resolveAppStoragePath } from '../../../shared/storage/appStoragePaths'
 import { createDefaultAppSettings, type AppSettings } from '../model/appSettings'
 
-const SETTINGS_FILE_NAME = 'settings.json'
 const SETTINGS_DOCUMENT_KEY = 'app-settings'
 const SETTINGS_AUTO_SAVE_DELAY_MS = 250
 
@@ -36,7 +35,7 @@ class TauriSettingsPersistence implements SettingsPersistence {
   private storePromise: Promise<LazyStore> | null = null
 
   private getStore(): Promise<LazyStore> {
-    this.storePromise ??= resolveAppStoragePath(SETTINGS_FILE_NAME).then((path) => (
+    this.storePromise ??= resolveAppStoragePath(APP_SETTINGS_FILE_NAME).then((path) => (
       new LazyStore(path, {
         defaults: {
           [SETTINGS_DOCUMENT_KEY]: createDefaultAppSettings(),

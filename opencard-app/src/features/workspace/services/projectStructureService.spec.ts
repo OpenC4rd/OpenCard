@@ -48,7 +48,6 @@ describe('projectStructureService', () => {
       'D:/Cards/.opencard-init-test/fonts/fonts.json',
       'D:/Cards/.opencard-init-test/icons/icons.json',
       'D:/Cards/.opencard-init-test/locale.json',
-      'D:/Cards/.opencard-init-test/packages/packages.json',
       'D:/Cards/.opencard-init-test/project.json',
     ])
     expect(writes.get('D:/Cards/.opencard-init-test/project.json')).toBe('{}\n')

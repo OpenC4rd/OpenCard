@@ -1,37 +1,33 @@
 import { nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { normalizeNodeTail } from '../../../shared/ui/node/node.types'
+import { isNodeTailAction, normalizeNodeTail, type OcNode } from '../../../shared/ui/node/node.types'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { resolveFileType } from '../../workspace/model/fileTypes'
-import { RESOURCE_PACKAGE_TYPE, type ResourcePackageManifest } from '../../workspace/model/resourcePackage'
 import {
+  PROJECT_PACKAGE_ADD_ACTION_KEY,
   PROJECT_PACKAGE_DELETE_ACTION_KEY,
-  PROJECT_PACKAGE_VERIFY_ACTION_KEY,
   useShellFileTree,
 } from './useShellFileTree'
 
+/** 只取尾部里那些是命令的部分（目录行还有一段显示用的路径文字）。 */
+function actionsOf(tail: OcNode['tail']): string[] {
+  return normalizeNodeTail(tail).flatMap(part => (isNodeTailAction(part) ? [part.key] : []))
+}
+
 describe('useShellFileTree package navigation', () => {
-  it('previews the package manager and child manifests through their semantic targets', async () => {
+  it('lists the project packages from the folder and opens each archive by its own path', async () => {
     const projectPath = 'D:/project'
     const openPreviewFile = vi.fn(async () => undefined)
     const activeSession = ref<EditorSession | null>(null)
-    const manifest: ResourcePackageManifest = {
-      type: RESOURCE_PACKAGE_TYPE,
-      key: 'theme',
-      name: 'Theme',
-      version: '1.0.0',
-      contentHash: '0'.repeat(64),
-      public: { fonts: [], iconSeries: [] },
-    }
-    const packageManifests = ref<ReadonlyMap<string, ResourcePackageManifest>>(new Map([['theme', manifest]]))
+    const packagesRoot = `${projectPath}/.opencard/packages`
+    const archivePath = `${packagesRoot}/alice-icons-1.0.0.ocpack`
     const tree = useShellFileTree({
       projectPath: ref(projectPath),
       indexedEntries: ref([
-        { name: '.opencard/packages/theme', isDirectory: true },
-        { name: '.opencard/packages/theme/.opencard', isDirectory: true },
-        { name: '.opencard/packages/theme/.opencard/manifest.json', isDirectory: false },
+        { name: '.opencard/packages', isDirectory: true },
+        { name: '.opencard/packages/alice-icons-1.0.0.ocpack', isDirectory: false },
+        { name: '.opencard/packages/notes.txt', isDirectory: false },
       ]),
-      packageManifests,
       sessions: ref<EditorSession[]>([]),
       formatSessionTitle: session => session.name,
       activeSession,
@@ -42,45 +38,39 @@ describe('useShellFileTree package navigation', () => {
       translate: key => key,
     })
 
-    await tree.handleProjectManagementSelect([`${projectPath}/.opencard/packages/packages.json`])
-    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/packages/packages.json`)
+    // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`；别的文件不进这棵树。
+    expect(tree.projectManagementTreeData.value.children.get(packagesRoot)).toEqual([archivePath])
+    expect(normalizeNodeTail(tree.projectManagementTreeData.value.items.get(archivePath)?.tail))
+      .toEqual([{
+        key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
+        title: 'resourcePackage.delete',
+        icon: 'action.delete',
+        iconTone: 'danger',
+      }])
+    // 包目录那一行提供一个"添加包"的入口，而选中它只是选中：目录不是一个可以打开的文件。
+    expect(actionsOf(tree.projectManagementTreeData.value.items.get(packagesRoot)?.tail))
+      .toEqual([PROJECT_PACKAGE_ADD_ACTION_KEY])
+    await tree.handleProjectManagementSelect([packagesRoot])
+    expect(openPreviewFile).not.toHaveBeenCalled()
 
-    await tree.handleProjectManagementSelect([`${projectPath}/.opencard/packages/theme`])
-    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/packages/theme/.opencard/manifest.json`)
-    expect(tree.projectManagementTreeData.value.children.get(`${projectPath}/.opencard/packages/packages.json`))
-      .toEqual([`${projectPath}/.opencard/packages/theme`])
-    expect(normalizeNodeTail(tree.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/packages/theme`)?.tail))
-      .toEqual([
-        { key: PROJECT_PACKAGE_VERIFY_ACTION_KEY, title: 'packageManager.verify', icon: 'action.check' },
-        {
-          key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
-          title: 'resourcePackage.delete',
-          icon: 'action.delete',
-          iconTone: 'danger',
-        },
-      ])
-    expect(tree.findProjectPackageKeyByNodeKey(`${projectPath}/.opencard/packages/theme`)).toBe('theme')
+    await tree.handleProjectManagementSelect([archivePath])
+    expect(openPreviewFile).toHaveBeenCalledWith(archivePath)
 
-    packageManifests.value = new Map()
     activeSession.value = {
       id: 'package-manifest',
       resourceKind: 'workspace',
-      path: `${projectPath}/.opencard/packages/theme/.opencard/manifest.json`,
-      fileTypeId: 'json',
-      name: 'manifest.json',
-      editorId: 'monaco',
+      path: archivePath,
+      fileTypeId: 'opencard-resource-package',
+      name: 'alice-icons-1.0.0.ocpack',
+      editorId: 'package-manifest',
       savedContent: '',
       draftContent: '',
       isDirty: false,
       isPreview: true,
     }
     await nextTick()
-    expect(tree.selectedManagementKeys.value).toEqual([])
-
-    packageManifests.value = new Map([['theme', manifest]])
-    await nextTick()
-    expect(tree.selectedManagementKeys.value).toEqual([`${projectPath}/.opencard/packages/theme`])
-    expect(resolveFileType(`${projectPath}/.opencard/packages/theme/.opencard/manifest.json`, projectPath))
-      .toMatchObject({ id: 'opencard-installed-package-manifest', editorId: 'package-manifest' })
+    expect(tree.selectedManagementKeys.value).toEqual([archivePath])
+    expect(resolveFileType(archivePath, projectPath))
+      .toMatchObject({ id: 'opencard-resource-package', editorId: 'package-manifest' })
   })
 })

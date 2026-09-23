@@ -9,6 +9,7 @@ import type { PreparedRichTextCatalog } from './prepareRichText'
 import {
   createProjectResourceNamespace,
   createScopedProjectFontFamily,
+  packageScopeRoots,
   projectResourceScopeIdentity,
   type ProjectResourceEnvironment,
   type ProjectResourceScopeMap,
@@ -23,8 +24,9 @@ import {
 import type { ProjectFontRegistryEntry } from '../workspace/model/projectFontRegistry'
 import { toCssFontFamily } from '../workspace/model/projectFonts'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import { parsePackageQualifier, resolvePackageQualifier } from '../workspace/model/packageCoordinate'
 import { isRemoteResourceAllowed } from '../editor-runtime/services/editorResource'
-import { resolveResourcePath, type ScopedResourcePathIssueCode } from '../workspace/model/scopedResourcePath'
+import { resolveResourcePath, type PackageScopeRoots, type ScopedResourcePathIssueCode } from '../workspace/model/scopedResourcePath'
 
 export type CardRenderResourceContext = {
   readonly resourceRootPath: string | null
@@ -37,6 +39,8 @@ export type CardRenderResourceContext = {
   readonly resolveIconDimensions?: ProjectIconDimensionReader
   readonly resourceScopes: ProjectResourceScopeMap
   readonly packageEnvironments: ReadonlyMap<string, ProjectResourceEnvironment>
+  /** 坐标 → 解开目录，一次渲染只算一次。 */
+  readonly packageRoots: PackageScopeRoots
   readonly richText?: PreparedRichTextCatalog
   readonly resolveFontFamily?: (references: string) => string
   readonly bindingProject?: Readonly<ProjectInformation> | null
@@ -61,7 +65,7 @@ export type ResourceIssueCode =
 export type ResourceExpectation = 'asset' | 'font'
 
 export type ResourceRequest = {
-  /** The field's raw text: `xx.png` / `pkg@xx.png` / `icon:a/b` / `pkg@icon:a/b` / `font:x; Arial`. */
+  /** The field's raw text: `xx.png` / `作者/包名@版本#xx.png` / `icon:a/b` / `作者/包名@版本#icon:a/b` / `font:x; Arial`. */
   readonly value: string
   readonly expect: ResourceExpectation
   /** Scope lookup: the binding of this block and field. */
@@ -137,6 +141,8 @@ function resolveImageResource(
   const parsed = parseResourceReference(value)
   if (parsed.reference?.kind === 'icon') {
     const resolved = resolveIconReference(value, context, request.blockId, fieldKey)
+    // 包正在解开：现在没有图可画，但它不是缺包 —— 出口与"这个字段是空的"完全一样。
+    if (resolved.pending) return { kind: 'empty' }
     return resolved.value
       ? { kind: 'icon', entry: resolved.value }
       : unavailable(resolved.diagnostics, 'Referenced icon is unavailable')
@@ -149,7 +155,7 @@ function resolveImageResource(
     }
   }
   // A font-or-icon reference that could not even be parsed still names no image.
-  if (/^(?:[a-z0-9._-]+@|@)?(?:font|icon):/i.test(value)) {
+  if (/^(?:[^#\s]*#)?(?:font|icon):/i.test(value)) {
     return unavailable(parsed.diagnostics, `Image source "${value}" is not a readable resource reference`)
   }
 
@@ -186,8 +192,8 @@ function resolveFontResource(
   return { kind: 'font', cssFamily }
 }
 
-/** An asset field resolves to a URL or to a coded failure — nothing else. */
-type AssetResource = Extract<ResolvedResource, { kind: 'url' | 'unavailable' }>
+/** An asset field resolves to a URL, to nothing, or to a coded failure — nothing else. */
+type AssetResource = Extract<ResolvedResource, { kind: 'empty' | 'url' | 'unavailable' }>
 
 function resolveAssetResource(
   value: string,
@@ -203,14 +209,31 @@ function resolveAssetResource(
     return { kind: 'url', src: context.resolveRemoteResource?.(value) ?? value }
   }
   const projectRootPath = context.resourceRootPath ?? context.hostEnvironment.rootPath ?? environment.rootPath
-  if (!projectRootPath) {
+  const scopeRootPath = environment.rootPath ?? context.hostEnvironment.rootPath
+  if (!projectRootPath || !scopeRootPath) {
     return { kind: 'unavailable', code: 'scope-unavailable', message: `No project root is available to resolve "${value}"` }
   }
-  const sourceFilePath = resolveAssetScopeSourceFile(context, environment, projectRootPath)
-  const resolved = resolveResourcePath(projectRootPath, sourceFilePath, value)
-  return resolved.ok
-    ? { kind: 'url', src: convertFileSrc(resolved.value) }
-    : { kind: 'unavailable', code: pathIssueCode(resolved.code), message: resolved.message }
+  const resolved = resolveResourcePath({
+    scopeRootPath,
+    projectRootPath,
+    reference: value,
+    packageRoots: context.packageRoots,
+  })
+  if (resolved.ok) return { kind: 'url', src: convertFileSrc(resolved.value) }
+  // 包正在解开时，它的文件还没有落到磁盘上；这是"再等一下"，不是缺包。
+  if (resolved.code === 'package-unavailable' && isMaterializingReference(context, value)) return { kind: 'empty' }
+  return { kind: 'unavailable', code: pathIssueCode(resolved.code), message: resolved.message }
+}
+
+/** 这条引用的限定符指向的包，是不是正在解开。 */
+function isMaterializingReference(context: CardRenderResourceContext, value: string): boolean {
+  const hash = value.indexOf('#')
+  if (hash <= 0) return false
+  const qualifier = parsePackageQualifier(value.slice(0, hash))
+  const packages = context.hostEnvironment.packages
+  if (!qualifier || !packages) return false
+  const coordinate = resolvePackageQualifier(packages.keys(), qualifier)
+  return coordinate ? packages.get(coordinate)?.rootPath === null : false
 }
 
 /** `resolveResourcePath` carries its own taxonomy; only its syntax name differs here. */
@@ -218,11 +241,9 @@ function pathIssueCode(code: ScopedResourcePathIssueCode): ResourceIssueCode {
   switch (code) {
     case 'unsafe-path':
     case 'reserved-path':
-    case 'source-outside-project': return code
+    case 'package-unavailable': return code
     case 'invalid-reference': return 'syntax-error'
-    // `resolveResourcePath` never reports these two; they belong to relativizing a path.
-    case 'target-outside-project':
-    case 'unrepresentable-scope': return 'resource-unavailable'
+    case 'target-outside-scope': return 'resource-unavailable'
   }
 }
 
@@ -263,7 +284,6 @@ function fallbackEnvironment(
     iconDocument: {},
     iconCatalog: projectIconCatalog,
     packages: new Map(),
-    issues: [],
   }
 }
 
@@ -277,6 +297,7 @@ export function createCardRenderResourceContext(options: {
   resolveIconDimensions?: ProjectIconDimensionReader
   resourceScopes?: ProjectResourceScopeMap
   packageEnvironments?: ReadonlyMap<string, ProjectResourceEnvironment>
+  packageRoots?: PackageScopeRoots
   richText?: PreparedRichTextCatalog
   resolveFontFamily?: (references: string) => string
   bindingProject?: Readonly<ProjectInformation> | null
@@ -300,6 +321,7 @@ export function createCardRenderResourceContext(options: {
     resolveIconDimensions: options.resolveIconDimensions,
     resourceScopes: options.resourceScopes ?? new Map(),
     packageEnvironments: options.packageEnvironments ?? new Map(),
+    packageRoots: options.packageRoots ?? packageScopeRoots(options.hostEnvironment?.packages),
     richText: options.richText ?? new Map(),
     resolveFontFamily: options.resolveFontFamily,
     bindingProject: options.bindingProject,
@@ -319,24 +341,4 @@ export function resolveCardResourceEnvironment(
   return blockId && fieldKey
     ? context.resourceScopes.get(projectResourceScopeIdentity(blockId, fieldKey)) ?? context.hostEnvironment
     : context.hostEnvironment
-}
-
-function resolveAssetScopeSourceFile(
-  context: CardRenderResourceContext,
-  environment: ProjectResourceEnvironment,
-  projectRootPath: string,
-): string {
-  if (environment === context.hostEnvironment || environment.rootPath === context.hostEnvironment.rootPath) {
-    return context.sourceFilePath ?? `${projectRootPath.replace(/[\\/]+$/, '')}/.opencard/project.json`
-  }
-
-  const environmentRoot = environment.rootPath?.replace(/\\/g, '/').replace(/\/+$/, '')
-  const hostRoot = context.hostEnvironment.rootPath?.replace(/\\/g, '/').replace(/\/+$/, '')
-  const renderRoot = projectRootPath.replace(/\\/g, '/').replace(/\/+$/, '')
-  if (environmentRoot && hostRoot && environmentRoot.toLocaleLowerCase().startsWith(`${hostRoot.toLocaleLowerCase()}/`)) {
-    return `${renderRoot}/${environmentRoot.slice(hostRoot.length + 1)}/.opencard/manifest.json`
-  }
-  return environmentRoot
-    ? `${environmentRoot}/.opencard/manifest.json`
-    : context.sourceFilePath ?? `${renderRoot}/.opencard/project.json`
 }

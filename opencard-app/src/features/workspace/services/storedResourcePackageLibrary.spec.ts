@@ -3,10 +3,10 @@ import type { FileSystemService } from './fileSystemService'
 import type { StoredResourcePackagePathService } from './storedResourcePackageLibrary'
 import { StoredResourcePackageLibraryService } from './storedResourcePackageLibrary'
 
-const installer = vi.hoisted(() => ({ previewResourcePackage: vi.fn() }))
+const archives = vi.hoisted(() => ({ readResourcePackageArchive: vi.fn() }))
 
-vi.mock('./resourcePackageInstaller', () => ({
-  previewResourcePackage: installer.previewResourcePackage,
+vi.mock('./resourcePackageArchive', () => ({
+  readResourcePackageArchive: archives.readResourcePackageArchive,
 }))
 
 type DirectoryEntry = { name: string; isFile: boolean; isDirectory: boolean; isSymlink: boolean }
@@ -51,9 +51,20 @@ const paths: StoredResourcePackagePathService = {
   join: async (...segments: string[]) => segments.join('/'),
 }
 
-const manifest = (key: string, name: string, version: string) => ({
-  manifest: { type: 'opencard-resource-package', key, name, version, contentHash: 'a'.repeat(64), public: { fonts: [], iconSeries: [] } },
-})
+/** 读一个归档得到的全部信息：身份与指纹。 */
+function archive(coordinate: string, title: string, fingerprint = 'fp') {
+  const [author, nameVersion] = coordinate.split('/')
+  const [name, version] = nameVersion!.split('@')
+  return {
+    coordinate,
+    manifest: {
+      type: 'opencard-resource-package',
+      author: author!, name: name!, version: version!, title,
+      public: { fonts: [], iconSeries: [] },
+    },
+    fingerprint,
+  }
+}
 
 function createLibrary(fs: MemoryFileSystem): StoredResourcePackageLibraryService {
   return new StoredResourcePackageLibraryService(fs as unknown as FileSystemService, paths)
@@ -64,82 +75,80 @@ describe('StoredResourcePackageLibraryService', () => {
     const fs = new MemoryFileSystem()
     fs.directories.add('/app/packages')
     fs.files.set('/app/packages/notes.txt', new Uint8Array([1]))
-    installer.previewResourcePackage.mockReset()
+    archives.readResourcePackageArchive.mockReset()
 
     const library = await createLibrary(fs).loadLibrary()
 
     expect(library).toEqual({ packs: [], warnings: [] })
-    expect(installer.previewResourcePackage).not.toHaveBeenCalled()
+    expect(archives.readResourcePackageArchive).not.toHaveBeenCalled()
   })
 
-  it('lists add-on packages sorted by name and reports unreadable ones as warnings', async () => {
+  it('lists add-on packages sorted by title and reports unreadable ones as warnings', async () => {
     const fs = new MemoryFileSystem()
     fs.directories.add('/app/packages')
     fs.files.set('/app/packages/zeta.ocpack', new Uint8Array([1]))
     fs.files.set('/app/packages/alpha.ocpack', new Uint8Array([3]))
     fs.files.set('/app/packages/broken.ocpack', new Uint8Array([2]))
-    installer.previewResourcePackage.mockReset()
-    installer.previewResourcePackage.mockImplementation(async ({ sourcePath }: { sourcePath: string }) => {
+    archives.readResourcePackageArchive.mockReset()
+    archives.readResourcePackageArchive.mockImplementation(async (sourcePath: string) => {
       if (sourcePath.endsWith('broken.ocpack')) throw new Error('Package manifest is invalid')
-      if (sourcePath.endsWith('alpha.ocpack')) return manifest('alpha', 'Alpha Pack', '1.0.0')
-      return manifest('zeta', 'Zeta Pack', '2.0.0')
+      if (sourcePath.endsWith('alpha.ocpack')) return archive('alice/alpha@1.0.0', 'Alpha Pack', 'fp-alpha')
+      return archive('zeta/zeta@2.0.0', 'Zeta Pack', 'fp-zeta')
     })
 
     const library = await createLibrary(fs).loadLibrary()
 
     expect(library.packs).toEqual([
-      { path: '/app/packages/alpha.ocpack', key: 'alpha', name: 'Alpha Pack', version: '1.0.0' },
-      { path: '/app/packages/zeta.ocpack', key: 'zeta', name: 'Zeta Pack', version: '2.0.0' },
+      { path: '/app/packages/alpha.ocpack', coordinate: 'alice/alpha@1.0.0', title: 'Alpha Pack', fingerprint: 'fp-alpha' },
+      { path: '/app/packages/zeta.ocpack', coordinate: 'zeta/zeta@2.0.0', title: 'Zeta Pack', fingerprint: 'fp-zeta' },
     ])
     expect(library.warnings).toEqual([
       { path: '/app/packages/broken.ocpack', reason: 'Package manifest is invalid' },
     ])
   })
 
-  it('validates a package before storing it and names the file after its Key', async () => {
+  it('reads a package before storing it and names the file after its coordinate', async () => {
     const fs = new MemoryFileSystem()
     fs.files.set('/incoming/Theme.ocpack', new Uint8Array([7, 7]))
-    installer.previewResourcePackage.mockReset()
-    installer.previewResourcePackage.mockResolvedValue(manifest('theme', 'Theme', '1.0.0'))
+    archives.readResourcePackageArchive.mockReset()
+    archives.readResourcePackageArchive.mockResolvedValue(archive('alice/theme@1.0.0', 'Theme', 'fp-theme'))
 
     const imported = await createLibrary(fs).importPackage('/incoming/Theme.ocpack')
 
-    expect(installer.previewResourcePackage).toHaveBeenCalledWith({
-      projectRootPath: '/app/packages',
-      sourcePath: '/incoming/Theme.ocpack',
-    })
+    expect(archives.readResourcePackageArchive).toHaveBeenCalledWith('/incoming/Theme.ocpack')
+    // 文件名不参与身份，只用来去重；版本进名字，同一个包的多个版本才能并存。
     expect(imported).toEqual({
-      path: '/app/packages/theme.ocpack',
-      key: 'theme',
-      name: 'Theme',
-      version: '1.0.0',
+      path: '/app/packages/alice-theme-1.0.0.ocpack',
+      coordinate: 'alice/theme@1.0.0',
+      title: 'Theme',
+      fingerprint: 'fp-theme',
     })
-    expect(fs.files.get('/app/packages/theme.ocpack')).toEqual(new Uint8Array([7, 7]))
+    expect(fs.files.get('/app/packages/alice-theme-1.0.0.ocpack')).toEqual(new Uint8Array([7, 7]))
   })
 
-  it('keeps an already stored package under the same Key and suffixes the new file', async () => {
+  it('keeps an already stored package under the same name and suffixes the new file', async () => {
     const fs = new MemoryFileSystem()
     fs.directories.add('/app/packages')
-    fs.files.set('/app/packages/theme.ocpack', new Uint8Array([1]))
+    fs.files.set('/app/packages/alice-theme-1.0.0.ocpack', new Uint8Array([1]))
     fs.files.set('/incoming/Theme.ocpack', new Uint8Array([2]))
-    installer.previewResourcePackage.mockReset()
-    installer.previewResourcePackage.mockResolvedValue(manifest('theme', 'Theme', '2.0.0'))
+    archives.readResourcePackageArchive.mockReset()
+    archives.readResourcePackageArchive.mockResolvedValue(archive('alice/theme@1.0.0', 'Theme', 'fp-theme'))
 
     const imported = await createLibrary(fs).importPackage('/incoming/Theme.ocpack')
 
-    expect(imported.path).toBe('/app/packages/theme-2.ocpack')
-    expect(fs.files.get('/app/packages/theme.ocpack')).toEqual(new Uint8Array([1]))
-    expect(fs.files.get('/app/packages/theme-2.ocpack')).toEqual(new Uint8Array([2]))
+    expect(imported.path).toBe('/app/packages/alice-theme-1.0.0-2.ocpack')
+    expect(fs.files.get('/app/packages/alice-theme-1.0.0.ocpack')).toEqual(new Uint8Array([1]))
+    expect(fs.files.get('/app/packages/alice-theme-1.0.0-2.ocpack')).toEqual(new Uint8Array([2]))
   })
 
-  it('refuses to store a package the installer rejects', async () => {
+  it('refuses to store an archive it cannot read', async () => {
     const fs = new MemoryFileSystem()
     fs.files.set('/incoming/Broken.ocpack', new Uint8Array([3]))
-    installer.previewResourcePackage.mockReset()
-    installer.previewResourcePackage.mockRejectedValue(new Error('Missing packaged font file: fonts/x.ttf'))
+    archives.readResourcePackageArchive.mockReset()
+    archives.readResourcePackageArchive.mockRejectedValue(new Error('Package fingerprint is missing'))
 
     await expect(createLibrary(fs).importPackage('/incoming/Broken.ocpack'))
-      .rejects.toThrow('Missing packaged font file: fonts/x.ttf')
+      .rejects.toThrow('Package fingerprint is missing')
     expect(fs.files.has('/app/packages/Broken.ocpack')).toBe(false)
   })
 

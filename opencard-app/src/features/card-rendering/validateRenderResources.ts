@@ -1,5 +1,5 @@
 import type { CardFaceKey } from '../../entities/card/model'
-import { normalizeKeySlug } from '../../shared/model/keySlug'
+import { parsePackageQualifier } from '../workspace/model/packageCoordinate'
 import type { ProjectRemoteResourcePolicy } from '../workspace/model/projectMetadata'
 import { isRemoteResourceAllowed } from '../editor-runtime/services/editorResource'
 import {
@@ -8,6 +8,9 @@ import {
   resolveResourceReferenceText,
   type ResourceReferenceDiagnostic,
 } from '../workspace/services/resourceReference'
+import {
+  resolveProjectResourcePackageCoordinate,
+} from '../workspace/services/projectResourceEnvironment'
 import { resolveCardResourceEnvironment, type CardRenderResourceContext } from './cardRenderResources'
 import { createCardPipelineIssue, type CardPipelineIssue } from './cardPipelineIssue'
 import { joinBlockPath } from './renderBlockPath'
@@ -161,22 +164,26 @@ function validatePackageAssetReference(
   },
 ): void {
   const value = source.trim()
-  const at = value.indexOf('@')
-  if (at <= 0 || at !== value.lastIndexOf('@')) return
+  // 包限定符是**第一个** `#` 之前那段：资源引用与图标引用的 `kind:key` 里不含 `#`，
+  // 所以 `作者/包名@版本#` 能无歧义地切出来。
+  const hash = value.indexOf('#')
+  if (hash <= 0) return
   // A resource reference is validated as a reference; only literal package asset paths reach the checks below.
   if (parseResourceReference(value).reference) return
-  const packageKey = normalizeKeySlug(value.slice(0, at))
-  if (!packageKey) return
+  const qualifier = parsePackageQualifier(value.slice(0, hash))
+  if (!qualifier) return
   const environment = resolveCardResourceEnvironment(resources, blockId, fieldKey)
-  const pkg = environment.packages?.get(packageKey.toLocaleLowerCase())
-  const packageEnvironment = resources.packageEnvironments.get(packageKey.toLocaleLowerCase())
-    ?? environment.packageEnvironments?.get(packageKey.toLocaleLowerCase())
-  if (pkg && !pkg.unavailable && packageEnvironment) return
+  const resolvedCoordinate = resolveProjectResourcePackageCoordinate(environment, qualifier)
+  const pkg = resolvedCoordinate ? environment.packages?.get(resolvedCoordinate) : undefined
+  // 正在解开的包不是缺包：文件还没落到磁盘上，解好之后画面自己补齐。
+  if (pkg && pkg.rootPath === null) return
+  const packageEnvironment = resolvedCoordinate
+    ? resources.packageEnvironments.get(resolvedCoordinate) ?? environment.packageEnvironments?.get(resolvedCoordinate)
+    : undefined
+  if (pkg && packageEnvironment) return
   const reason = !pkg
     ? 'Referenced package is not visible from the current environment'
-    : pkg.unavailable
-      ? 'Referenced package is unavailable'
-      : 'Referenced package environment is not loaded'
+    : 'Referenced package environment is not loaded'
   pushPackageResourceIssue('card-designer.resource.package-missing', value, {
     code: 'package-unavailable',
     reference: value,
@@ -217,7 +224,7 @@ function pushPackageResourceIssue(
       fieldName: context.fieldKey,
       reference,
       ...(type === 'card-designer.resource.package-missing'
-        ? { packageKey: reference.slice(0, reference.indexOf('@')) }
+        ? { packageKey: reference.slice(0, reference.indexOf('#')) }
         : {}),
     },
     token: reference,

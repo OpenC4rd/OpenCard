@@ -221,7 +221,7 @@ function applySuggestionByKey(key: string): void {
   const nextCursor = replaceStart + item.insertText.length
   if (item.key.startsWith('clear-file:')
     || item.insertText.endsWith('/')
-    || item.insertText.endsWith('@')
+    || item.insertText.endsWith('#')
     || item.insertText.endsWith(':')) {
     sessionState.value = 'browsing-directory'
   } else if (item.key.startsWith('path:')) {
@@ -290,7 +290,7 @@ function resolveBrowseContext(
 
   const withoutTrailingSlash = normalizedValue.replace(/\/+$/, '')
   if (!withoutTrailingSlash) return { directory: '', fragment: '' }
-  if (normalizedValue.endsWith('@')) {
+  if (normalizedValue.endsWith('#')) {
     return { directory: normalizedValue, fragment: '' }
   }
   if (normalizedValue.endsWith('/')) {
@@ -365,20 +365,20 @@ function createPathCompletionResult(
 
 function toPathCompletionItem(entry: FilePathDirectoryEntry, directory: string) {
   const normalizedEntry = entry.name.replace(/\\/g, '/').replace(/\/+$/, '')
-  const directoryPrefix = directory.endsWith('@') ? directory : `${directory}/`
+  const directoryPrefix = directory.endsWith('#') ? directory : `${directory}/`
   const path = directory
     && normalizedEntry !== directory
     && !normalizedEntry.startsWith(directoryPrefix)
-    ? `${directory}${directory.endsWith('@') ? '' : '/'}${normalizedEntry}`
+    ? `${directory}${directory.endsWith('#') ? '' : '/'}${normalizedEntry}`
     : normalizedEntry
-  const label = entry.label ?? (path.endsWith('@') ? path.slice(0, -1) : getPathBasename(path))
+  const label = entry.label ?? (path.endsWith('#') ? path.slice(0, -1) : getPathBasename(path))
   if (!label) return null
   const isDirectory = Boolean(entry.isDirectory)
   return {
     key: `path:${path}`,
     label,
     icon: entry.icon ?? (isDirectory ? 'folder.generic' as const : 'file.generic' as const),
-    insertText: isDirectory && !path.endsWith('@') && !path.endsWith(':') ? `${path}/` : path,
+    insertText: isDirectory && !path.endsWith('#') && !path.endsWith(':') ? `${path}/` : path,
     keepOpen: true,
     isDirectory,
   }
@@ -386,7 +386,7 @@ function toPathCompletionItem(entry: FilePathDirectoryEntry, directory: string) 
 
 function createParentCompletionItem(directory: string): PropertyCompletionItem | null {
   if (!directory || /^[a-z]:\/?$/i.test(directory)) return null
-  const parent = directory.endsWith('@') ? '' : getPathDirectory(directory)
+  const parent = directory.endsWith('#') ? '' : getPathDirectory(directory)
   return {
     key: `parent:${directory}`,
     label: '..',
@@ -399,7 +399,7 @@ function createParentCompletionItem(directory: string): PropertyCompletionItem |
 function getPathDirectory(path: string): string {
   const slashIndex = path.lastIndexOf('/')
   if (slashIndex < 0) {
-    const packageSeparator = path.indexOf('@')
+    const packageSeparator = path.indexOf('#')
     return packageSeparator >= 0 ? path.slice(0, packageSeparator + 1) : ''
   }
   if (slashIndex === 2 && /^[a-z]:\//i.test(path)) return path.slice(0, 3)
@@ -407,7 +407,7 @@ function getPathDirectory(path: string): string {
 }
 
 function getPathBasename(path: string): string {
-  const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('@'))
+  const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('#'))
   return path.slice(separatorIndex + 1)
 }
 

@@ -13,28 +13,25 @@ import {
   serializeProjectIconRegistry,
   type ProjectIconRegistryDocument,
 } from '../model/projectIconRegistry'
-import { PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_PROFILE_FILE_NAME,
-  PROJECT_PACKAGE_DIRECTORY, PROJECT_INTERNAL_DIRECTORY_NAME } from '../model/projectStructure'
+import { PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_PROFILE_FILE_NAME } from '../model/projectStructure'
 import { isProjectCoverPath, resolveCoverAbsolutePath } from '../model/projectCover'
 import { parseProjectMetadataText } from '../model/projectMetadata'
 import type { FileSystemService } from './fileSystemService'
 import { invoke } from '@tauri-apps/api/core'
-import { normalizeKeySlug } from '../../../shared/model/keySlug'
 import { resolveFileType } from '../model/fileTypes'
-import { resolveResourcePath } from '../model/scopedResourcePath'
-import {
-  normalizeResourcePackageManifest,
-  RESOURCE_PACKAGE_MANIFEST_FILE_NAME,
-  type ResourcePackageIncludedPackage,
-} from '../model/resourcePackage'
+import { resolveResourcePath, type PackageScopeRoots } from '../model/scopedResourcePath'
 import type { ProjectIcon } from '../model/projectIcons'
 
 export type ResourcePackageProjectBuildOptions = {
-  fs: Pick<FileSystemService, 'readFile' | 'fileExists' | 'readDirectoryEntries'>
+  fs: Pick<FileSystemService, 'readFile' | 'fileExists'>
   projectRootPath: string
-  key: string
+  /** 身份由打包界面填:包自己说清楚自己是谁,文件名不算数。 */
+  author: string
   name: string
   version: string
+  title: string
+  /** 项目的包解开在哪 —— 内化时要从那里取文件。 */
+  packageRoots?: PackageScopeRoots
   imageSelection?: {
     paths: readonly string[]
   }
@@ -44,10 +41,6 @@ export type ResourcePackageProjectBuildOptions = {
   }
   iconSelection?: {
     seriesKeys: readonly string[]
-  }
-  /** 直接勾选要整包带走的子包；被引用的子包无论如何都会带上。 */
-  packageSelection?: {
-    keys: readonly string[]
   }
   outputPath: string
 }
@@ -85,21 +78,21 @@ type ResourcePackageIconProjection = {
 
 export type ResourcePackageProjectBuildResult = {
   outputPath: string
-  contentHash: string
+  fingerprint: string
   imagePaths: readonly string[]
 }
 
 export type ResourcePackageBuildRequest = {
   outputPath: string
-  key: string
+  author: string
   name: string
   version: string
+  title: string
   cover?: string
   files: readonly ResourcePackagePlannedFile[]
   texts: readonly { archivePath: string, text: string }[]
   publicFonts: readonly ResourcePackagePublicFont[]
   publicIconSeries: readonly ResourcePackagePublicIconSeries[]
-  packages: readonly ResourcePackageIncludedPackage[]
 }
 
 /**
@@ -166,72 +159,36 @@ function selectedIdentities(keys: readonly string[]): Set<string> {
   return new Set(keys.map(key => key.toLocaleLowerCase()))
 }
 
-const RESOURCE_PACKAGE_STORAGE_PREFIX = `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}/`
-
-/** 资源落在包存储里时返回它所属的子包 Key，否则 null。 */
-function resourcePackageKey(filePath: string): string | null {
-  if (!filePath.toLocaleLowerCase().startsWith(RESOURCE_PACKAGE_STORAGE_PREFIX.toLocaleLowerCase())) return null
-  return filePath.slice(RESOURCE_PACKAGE_STORAGE_PREFIX.length).split('/')[0] || null
+/**
+ * 一条引用在包内的落点：限定符（如果有）之后的路径。
+ *
+ * 项目文件 `.opencard/fonts/x.woff2` 落成 `.opencard/fonts/x.woff2`；
+ * 来自别人的包 `alice/support@1.2.0#fonts/shared.ttf` 落成 `fonts/shared.ttf`。
+ * 两者落到包内之后都只是当前作用域里的相对路径 —— 这就是"内化"：
+ * 复制的是资源文件本身，包里不留任何对别的包的引用。
+ */
+function archivedReferencePath(source: string): string {
+  const hash = source.indexOf('#')
+  return (hash < 0 ? source : source.slice(hash + 1)).trim()
 }
 
-/**
- * 资源在包内的位置：就是它在项目里的位置，原样复制，不改名、不挪层。
- * 注册表里的引用照抄这个位置，只有落在包存储里的资源要换成包 Key 的写法：
- * `.opencard/packages` 不允许出现在引用里，而 `support@icons/ok.svg` 解析到的正是同一位置。
- */
-function packageResourceReference(filePath: string): string {
-  const key = resourcePackageKey(filePath)
-  if (!key) return filePath
-  return `${key}@${filePath.slice(RESOURCE_PACKAGE_STORAGE_PREFIX.length + key.length + 1)}`
-}
-
-/**
- * 被引用或勾选的子包必须整包进包：只捞被引用的那几个文件会把子包拆残，
- * 子包自己的清单与注册表就不在了，`子包@font:…` 这类引用会解析不到。
- * 返回带进包的文件，以及写进清单的子包摘要。
- */
-async function bundleResourceSubPackages(
+/** 解析一条资源引用（可能指向项目，也可能指向某个已解开的包）。 */
+function resolveBundledResource(
   options: ResourcePackageProjectBuildOptions,
   root: string,
-  packageKeys: ReadonlySet<string>,
-  planned: readonly ResourcePackagePlannedFile[],
-): Promise<{ files: ResourcePackagePlannedFile[]; packages: ResourcePackageIncludedPackage[] }> {
-  const included = new Set(planned.map(file => file.archivePath.toLocaleLowerCase()))
-  const extra: ResourcePackagePlannedFile[] = []
-  const packages: ResourcePackageIncludedPackage[] = []
-  for (const key of packageKeys) {
-    const packageRoot = `${root}/${RESOURCE_PACKAGE_STORAGE_PREFIX}${key}`
-    if (!await options.fs.fileExists(packageRoot)) throw new Error(`Selected resource package is missing: ${key}`)
-    let summary: ResourcePackageIncludedPackage = { key, name: key, version: '' }
-    for (const entry of await options.fs.readDirectoryEntries(packageRoot, Number.POSITIVE_INFINITY)) {
-      if (entry.isDirectory || entry.isSymlink) continue
-      const path = `${RESOURCE_PACKAGE_STORAGE_PREFIX}${key}/${entry.name}`
-      if (path.toLocaleLowerCase().endsWith(`/${RESOURCE_PACKAGE_MANIFEST_FILE_NAME}`.toLocaleLowerCase())) {
-        summary = includedPackageSummary(key, await options.fs.readFile(`${root}/${path}`))
-      }
-      const identity = path.toLocaleLowerCase()
-      if (included.has(identity)) continue
-      included.add(identity)
-      extra.push(plannedFile(`${root}/${path}`, path))
-    }
-    packages.push(summary)
-  }
-  return { files: extra, packages }
-}
-
-function includedPackageSummary(key: string, manifestJson: string): ResourcePackageIncludedPackage {
-  try {
-    const manifest = normalizeResourcePackageManifest(JSON.parse(manifestJson), key).manifest
-    return { key, name: manifest.name, version: manifest.version }
-  } catch {
-    return { key, name: key, version: '' }
-  }
+  reference: string,
+) {
+  return resolveResourcePath({
+    scopeRootPath: root,
+    projectRootPath: root,
+    reference,
+    packageRoots: options.packageRoots,
+  })
 }
 
 async function buildFontProjection(
   options: ResourcePackageProjectBuildOptions,
   root: string,
-  packageKeys: Set<string>,
 ): Promise<ResourcePackageFontProjection> {
   const publicFamilyKeys = selectedIdentities(options.fontSelection?.familyKeys ?? [])
   const selectedCompositionKeys = selectedIdentities(options.fontSelection?.compositionKeys ?? [])
@@ -277,15 +234,13 @@ async function buildFontProjection(
       for (const style of ['upright', 'italic'] as const) {
         const source = styles[style]
         if (!source) continue
-        const resolved = resolveResourcePath(root, registryPath, source)
+        const entryPath = archivedReferencePath(source)
+        const resolved = resolveBundledResource(options, root, source)
         if (!resolved.ok) throw new Error(`Project font file path is invalid: ${source}`)
         if (!await options.fs.fileExists(resolved.value)) throw new Error(`Project font file is missing: ${source}`)
-        const filePath = projectRelativePath(root, resolved.value)
-        const packageKey = resourcePackageKey(filePath)
-        if (packageKey) packageKeys.add(packageKey)
-        projectedStyles[style] = packageResourceReference(filePath)
-        const identity = filePath.toLocaleLowerCase()
-        if (!files.has(identity)) files.set(identity, plannedFile(resolved.value, filePath))
+        projectedStyles[style] = entryPath
+        const identity = entryPath.toLocaleLowerCase()
+        if (!files.has(identity)) files.set(identity, plannedFile(resolved.value, entryPath))
       }
       projectedFiles[weight as keyof ProjectFont['files']] = projectedStyles
     }
@@ -308,7 +263,6 @@ async function buildFontProjection(
 async function buildIconProjection(
   options: ResourcePackageProjectBuildOptions,
   root: string,
-  packageKeys: Set<string>,
 ): Promise<ResourcePackageIconProjection> {
   const selectedSeriesKeys = selectedIdentities(options.iconSelection?.seriesKeys ?? [])
   if (selectedSeriesKeys.size === 0) return { document: null, files: [], publicIconSeries: [] }
@@ -329,17 +283,15 @@ async function buildIconProjection(
   for (const entry of selectedSeries) {
     const icons: ProjectIcon[] = []
     for (const icon of entry.icons) {
-      const resolved = resolveResourcePath(root, registryPath, icon.source)
+      const entryPath = archivedReferencePath(icon.source)
+      const resolved = resolveBundledResource(options, root, icon.source)
       if (!resolved.ok) throw new Error(`Project icon path is invalid: ${icon.source}`)
       if (!await options.fs.fileExists(resolved.value)) {
         throw new Error(`Project icon file is missing: ${icon.source}`)
       }
-      const filePath = projectRelativePath(root, resolved.value)
-      const packageKey = resourcePackageKey(filePath)
-      if (packageKey) packageKeys.add(packageKey)
-      icons.push({ ...icon, source: packageResourceReference(filePath) })
-      const identity = filePath.toLocaleLowerCase()
-      if (!files.has(identity)) files.set(identity, plannedFile(resolved.value, filePath))
+      icons.push({ ...icon, source: entryPath })
+      const identity = entryPath.toLocaleLowerCase()
+      if (!files.has(identity)) files.set(identity, plannedFile(resolved.value, entryPath))
     }
     projectedSeries.push({ ...entry, icons })
   }
@@ -358,20 +310,15 @@ async function buildIconProjection(
 export async function buildResourcePackageFromProject(
   options: ResourcePackageProjectBuildOptions,
 ): Promise<ResourcePackageProjectBuildResult> {
-  const key = normalizeKeySlug(options.key)
-  if (!key) throw new Error('Invalid package Key')
   const root = options.projectRootPath.replace(/\\/g, '/').replace(/[\\/]+$/, '')
   if (!root) throw new Error('Project root path is required')
   const images = selectedImages(root, options.imageSelection?.paths ?? [])
-  const packageKeys = new Set(options.packageSelection?.keys ?? [])
-  const fontProjection = await buildFontProjection(options, root, packageKeys)
-  const iconProjection = await buildIconProjection(options, root, packageKeys)
-  if (images.length === 0 && packageKeys.size === 0 && !fontProjection.document && !iconProjection.document) {
+  const fontProjection = await buildFontProjection(options, root)
+  const iconProjection = await buildIconProjection(options, root)
+  if (images.length === 0 && !fontProjection.document && !iconProjection.document) {
     throw new Error('Select at least one resource')
   }
   const files: ResourcePackagePlannedFile[] = [...fontProjection.files, ...iconProjection.files]
-  const bundled = await bundleResourceSubPackages(options, root, packageKeys, files)
-  files.push(...bundled.files)
   for (const image of images) {
     if (!await options.fs.fileExists(image.absolutePath)) {
       throw new Error(`Selected project image is missing: ${image.relativePath}`)
@@ -393,16 +340,19 @@ export async function buildResourcePackageFromProject(
   if (await options.fs.fileExists(localePath)) {
     texts.push({ archivePath: '.opencard/locale.json', text: await options.fs.readFile(localePath) })
   }
+  // 包里没有依赖清单：用到的别人的资源已经内化成包内的普通文件。
   const request: ResourcePackageBuildRequest = {
     outputPath: options.outputPath,
-    key, name: options.name, version: options.version,
+    author: options.author,
+    name: options.name,
+    version: options.version,
+    title: options.title,
     ...(cover ? { cover } : {}),
     files,
     texts,
     publicFonts: fontProjection.publicFonts,
     publicIconSeries: iconProjection.publicIconSeries,
-    packages: bundled.packages,
   }
-  const result = await invoke<{ outputPath: string, contentHash: string }>('build_resource_package', { request })
+  const result = await invoke<{ outputPath: string, fingerprint: string }>('build_resource_package', { request })
   return { ...result, imagePaths: images.map(image => image.absolutePath) }
 }

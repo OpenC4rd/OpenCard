@@ -3,7 +3,7 @@
 //! 打包放在 Rust 侧是为了避开前端逐文件 IPC 与主线程压缩：前端只给"源路径 → 包内路径"的清单，
 //! 这里负责读取、压缩（已压缩资源直接 store）与写入，并按文件回报进度。
 //! 内容哈希沿用 `resource_package.rs` 里校验时用的同一套拼接规则（标签 + 路径长度 + 路径 + 内容长度 + 内容，
-//! 按包内路径排序、不含清单本身），两边因此天然一致。
+//! 按包内路径排序、指纹纸条除外），算出来的值写进包里的 `.opencard/fingerprint.txt`。
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -14,10 +14,10 @@ use tauri::{AppHandle, Emitter};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-use crate::resource_package::{normalize_archive_path, MAX_PATH_BYTES};
+use crate::resource_package::{hash_entry_preamble, normalize_archive_path, CONTENT_HASH_TAG, MAX_PATH_BYTES};
 
 const MANIFEST_PATH: &str = ".opencard/manifest.json";
-const CONTENT_HASH_TAG: &[u8] = b"opencard-resource-package-content\0v1\n";
+const FINGERPRINT_PATH: &str = ".opencard/fingerprint.txt";
 const PROGRESS_EVENT: &str = "resource-package-build-progress";
 
 #[derive(Debug, Deserialize)]
@@ -54,19 +54,16 @@ pub struct ResourcePackageBuildPublicIconSeries {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourcePackageBuildIncludedPackage {
-    pub key: String,
-    pub name: String,
-    pub version: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ResourcePackageBuildRequest {
     pub output_path: String,
-    pub key: String,
+    /// 身份：作者与包名都是小写 slug，版本是精确 semver。它由打包界面填，
+    /// 因为在包外面没有任何东西能替它说清楚自己是谁 —— 文件名不算数。
+    pub author: String,
     pub name: String,
     pub version: String,
+    /// 给人看的名字。留空就回落成包名。
+    #[serde(default)]
+    pub title: String,
     #[serde(default)]
     pub cover: Option<String>,
     #[serde(default)]
@@ -77,15 +74,13 @@ pub struct ResourcePackageBuildRequest {
     pub public_fonts: Vec<ResourcePackageBuildPublicFont>,
     #[serde(default)]
     pub public_icon_series: Vec<ResourcePackageBuildPublicIconSeries>,
-    #[serde(default)]
-    pub packages: Vec<ResourcePackageBuildIncludedPackage>,
 }
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourcePackageBuildResult {
     pub output_path: String,
-    pub content_hash: String,
+    pub fingerprint: String,
     pub entry_count: usize,
 }
 
@@ -119,6 +114,32 @@ fn archive_entry_path(value: &str) -> Result<String, String> {
     normalize_archive_path(value.as_bytes())
 }
 
+/// 清单就是包对外的全部自述：我是谁，以及我公开哪些字体与图标。
+/// 它参与内容哈希，所以这里不能写任何由内容推导出来的值 —— 指纹因此不在这里，
+/// 而是单独那张纸条。
+fn build_manifest(request: &ResourcePackageBuildRequest) -> serde_json::Value {
+    let mut manifest = serde_json::Map::new();
+    manifest.insert("type".into(), serde_json::json!("opencard-resource-package"));
+    manifest.insert("author".into(), serde_json::json!(request.author));
+    manifest.insert("name".into(), serde_json::json!(request.name));
+    manifest.insert("version".into(), serde_json::json!(request.version));
+    manifest.insert("title".into(), serde_json::json!(request.title));
+    if let Some(cover) = &request.cover {
+        manifest.insert("cover".into(), serde_json::json!(cover));
+    }
+    manifest.insert("public".into(), serde_json::json!({
+        "fonts": request.public_fonts
+            .iter()
+            .map(|font| serde_json::json!({ "key": font.key, "title": font.title }))
+            .collect::<Vec<_>>(),
+        "iconSeries": request.public_icon_series
+            .iter()
+            .map(|series| serde_json::json!({ "key": series.key, "title": series.title, "count": series.count }))
+            .collect::<Vec<_>>(),
+    }));
+    serde_json::Value::Object(manifest)
+}
+
 /// 源文件不在这里做存在性检查：读取失败本身就是"文件不在了"的答案，少一次往返。
 #[tauri::command]
 pub async fn build_resource_package(
@@ -131,9 +152,16 @@ pub async fn build_resource_package(
         std::fs::create_dir_all(parent).map_err(|error| format!("Cannot create package folder: {error}"))?;
     }
 
-    // 所有条目合成一张表并按包内路径全局排序：校验侧是按归档条目顺序算哈希的，
+    // 所有条目合成一张表并按包内路径全局排序：读的那侧也是按包内路径排序后算哈希的，
     // 分组写（文本先、文件后）会让两边算出不同的哈希。
-    let mut entries: Vec<PlannedEntry> = Vec::with_capacity(request.files.len() + request.texts.len());
+    // 清单可以先构造出来，作为这张表里的一员参与排序与哈希；指纹纸条不在这张表里 ——
+    // 它的内容取决于表里所有条目，所以只能等它们都写完再算。
+    let manifest_text = build_manifest(&request).to_string();
+    let mut entries: Vec<PlannedEntry> = Vec::with_capacity(request.files.len() + request.texts.len() + 1);
+    entries.push(PlannedEntry::Text {
+        archive_path: MANIFEST_PATH.to_string(),
+        bytes: manifest_text.into_bytes(),
+    });
     for text in &request.texts {
         entries.push(PlannedEntry::Text {
             archive_path: archive_entry_path(&text.archive_path)?,
@@ -153,6 +181,12 @@ pub async fn build_resource_package(
         });
     }
     entries.sort_by(|left, right| left.archive_path().cmp(right.archive_path()));
+    // 重复路径会让归档自相矛盾。清单现在也是这张表里的一员，所以这里必须挡住。
+    for pair in entries.windows(2) {
+        if pair[0].archive_path().eq_ignore_ascii_case(pair[1].archive_path()) {
+            return Err(format!("Duplicate package path: {}", pair[0].archive_path()));
+        }
+    }
 
     let part_path = format!("{output_path}.part");
     let mut digest = Sha256::new();
@@ -177,13 +211,11 @@ pub async fn build_resource_package(
                 CompressionMethod::Stored
             });
             writer.start_file(path, options).map_err(zip_error)?;
-            let path_bytes = path.as_bytes();
-            if path_bytes.len() > MAX_PATH_BYTES {
+            if path.as_bytes().len() > MAX_PATH_BYTES {
                 return Err(format!("Package path is too long: {path}"));
             }
-            digest.update((path_bytes.len() as u64).to_be_bytes());
-            digest.update(path_bytes);
-            digest.update(size.to_be_bytes());
+            // 与校验侧同一份写法，两边不会各算各的。
+            hash_entry_preamble(digest, path, size);
             let mut written = 0_u64;
             loop {
                 let count = read.read(&mut buffer).map_err(|error| format!("Cannot read source file: {error}"))?;
@@ -219,55 +251,22 @@ pub async fn build_resource_package(
             let _ = app.emit(PROGRESS_EVENT, BuildProgress { done, total });
         }
 
-        writer.finish().map_err(zip_error)?;
-    }
-
-    let content_hash = format!("{:x}", digest.finalize());
-    let mut manifest = serde_json::Map::new();
-    manifest.insert("type".into(), serde_json::json!("opencard-resource-package"));
-    manifest.insert("key".into(), serde_json::json!(request.key));
-    manifest.insert("name".into(), serde_json::json!(request.name));
-    manifest.insert("version".into(), serde_json::json!(request.version));
-    manifest.insert("contentHash".into(), serde_json::json!(content_hash));
-    if let Some(cover) = &request.cover {
-        manifest.insert("cover".into(), serde_json::json!(cover));
-    }
-    manifest.insert("public".into(), serde_json::json!({
-        "fonts": request.public_fonts
-            .iter()
-            .map(|font| serde_json::json!({ "key": font.key, "title": font.title }))
-            .collect::<Vec<_>>(),
-        "iconSeries": request.public_icon_series
-            .iter()
-            .map(|series| serde_json::json!({ "key": series.key, "title": series.title, "count": series.count }))
-            .collect::<Vec<_>>(),
-    }));
-    if !request.packages.is_empty() {
-        manifest.insert("packages".into(), serde_json::json!(request.packages
-            .iter()
-            .map(|package| serde_json::json!({ "key": package.key, "name": package.name, "version": package.version }))
-            .collect::<Vec<_>>()));
-    }
-    let manifest = serde_json::Value::Object(manifest);
-
-    {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&part_path)
-            .map_err(|error| format!("Cannot reopen package: {error}"))?;
-        let mut writer = ZipWriter::new_append(file).map_err(zip_error)?;
+        // 指纹纸条最后写。归档里的先后顺序不影响哈希：读的那侧按包内路径重排，
+        // 并按路径把纸条自己排除在外。
+        let fingerprint = format!("{:x}", digest.finalize());
+        let note = format!("sha256:{fingerprint}\n");
         writer
-            .start_file(MANIFEST_PATH, SimpleFileOptions::default().compression_method(CompressionMethod::Deflated))
+            .start_file(FINGERPRINT_PATH, SimpleFileOptions::default().compression_method(CompressionMethod::Stored))
             .map_err(zip_error)?;
-        writer.write_all(manifest.to_string().as_bytes()).map_err(zip_error)?;
-        writer.finish().map_err(zip_error)?;
-    }
+        writer.write_all(note.as_bytes()).map_err(zip_error)?;
 
-    std::fs::rename(&part_path, output).map_err(|error| format!("Cannot finish package: {error}"))?;
-    Ok(ResourcePackageBuildResult {
-        output_path,
-        content_hash,
-        entry_count: request.files.len() + request.texts.len() + 1,
-    })
+        writer.finish().map_err(zip_error)?;
+
+        std::fs::rename(&part_path, output).map_err(|error| format!("Cannot finish package: {error}"))?;
+        Ok(ResourcePackageBuildResult {
+            output_path,
+            fingerprint,
+            entry_count: entries.len() + 1,
+        })
+    }
 }

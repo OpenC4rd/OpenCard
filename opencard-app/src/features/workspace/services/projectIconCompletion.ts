@@ -1,5 +1,11 @@
 import type { PropertyCompletionItem, PropertyCompletionProvider } from '../../../shared/ui/property-editor/propertyEditor.types'
 import {
+  formatPackageCoordinate,
+  formatPackageIdentity,
+  parsePackageCoordinate,
+  parsePackageQualifier,
+} from '../model/packageCoordinate'
+import {
   createProjectIconStyle,
   type ProjectIconCatalog,
   type ProjectIconDimensionReader,
@@ -8,7 +14,7 @@ import { readProjectIconSize } from './projectIconDimensionResolver'
 
 /**
  * One place project icons can come from: the current project, or a package that ships icons.
- * `packageKey` is `null` for the current project.
+ * `packageKey` is the package's full coordinate（`作者/包名@版本`）and `null` for the current project.
  */
 export type ProjectIconSource = {
   packageKey: string | null
@@ -17,9 +23,9 @@ export type ProjectIconSource = {
 }
 
 export type ProjectIconCompletionMode =
-  /** Rich text: emits the `[[[package@]icon:collection/icon]]` token. */
+  /** Rich text: emits the `[[[作者/包名@版本#]icon:collection/icon]]` token. */
   | 'rich-text'
-  /** A path field: emits the bare `[package@]icon:collection/icon` reference. */
+  /** A path field: emits the bare `[作者/包名@版本#]icon:collection/icon` reference. */
   | 'reference'
 
 export type ProjectIconCompletionOptions = {
@@ -34,7 +40,7 @@ type PreparedIcon = PropertyCompletionItem & { searchKeys: string[] }
 
 /**
  * Where the cursor sits and which span each kind of choice replaces:
- * - a collection replaces the text after `[package@]icon:`
+ * - a collection replaces the text after `[作者/包名@版本#]icon:`
  * - a package qualifier replaces the reference, dropping the collection it had
  * - a finished reference replaces the whole token, brackets included
  */
@@ -48,8 +54,21 @@ type TokenState = {
   seriesKey?: string
 }
 
-const QUALIFIED_REFERENCE_PATTERN = /^(?:([a-z0-9._-]+)@)?icon:(.*)$/i
-const PACKAGE_QUALIFIER_PATTERN = /([a-z0-9._-]+)@$/
+/**
+ * `[作者/包名@版本#]icon:<正文>`：限定符是 `icon:` 之前那段，且必须紧挨着一个 `#`，
+ * 由坐标模块判定它是不是完整坐标；旧写法（单段 Key、两个 `@`）不再是一种限定符。
+ * 解析失败（还没写到 `icon:`、或限定符非法）时返回 `null`，让调用方退回 `[[` 之后的补全。
+ */
+function parseIconReference(content: string): { qualifier: string | null, body: string } | null {
+  const bodyStart = content.indexOf('icon:')
+  if (bodyStart < 0) return null
+  const body = content.slice(bodyStart + 'icon:'.length)
+  if (bodyStart === 0) return { qualifier: null, body }
+  const head = content.slice(0, bodyStart)
+  if (!head.endsWith('#')) return null
+  const parsed = parsePackageCoordinate(head.slice(0, -1))
+  return parsed ? { qualifier: formatPackageCoordinate(parsed), body } : null
+}
 
 function within(range: Range, item: PropertyCompletionItem): PropertyCompletionItem {
   return { ...item, replaceStart: range.start, replaceEnd: range.end }
@@ -70,12 +89,12 @@ function locateRichTextToken(value: string, cursor: number): TokenState | null {
     start,
     end: value.slice(cursor, cursor + 2) === ']]' ? cursor + 2 : cursor,
   }
-  const matched = QUALIFIED_REFERENCE_PATTERN.exec(content)
+  const matched = parseIconReference(content)
   if (!matched) {
     return { stage: 'prefix', packageKey: null, query: content, body: inner, reference: inner, token }
   }
-  const rest = matched[2]!
-  const packageKey = matched[1] ?? null
+  const rest = matched.body
+  const packageKey = matched.qualifier
   const body = { start: cursor - rest.length, end: cursor }
   const slash = rest.indexOf('/')
   if (slash < 0) {
@@ -96,9 +115,12 @@ function locateReferenceToken(value: string, cursor: number): TokenState | null 
   const head = value.slice(0, cursor)
   const iconAt = head.lastIndexOf('icon:')
   if (iconAt < 0) return null
-  const qualifier = PACKAGE_QUALIFIER_PATTERN.exec(head.slice(0, iconAt))
-  const packageKey = qualifier?.[1] ?? null
-  const start = qualifier ? iconAt - qualifier[1]!.length - 1 : iconAt
+  const matched = parseIconReference(head)
+  // `icon:` 之前要么什么都没有，要么是一段合法限定符；别的文本不是这条引用。
+  if (iconAt > 0 && !matched) return null
+  const packageKey = matched?.qualifier ?? null
+  // 整个字段就是这条引用：带限定符时从第 0 个字符开始替换。
+  const start = packageKey === null ? iconAt : 0
   const whole = { start, end: value.length }
   const bodyStart = iconAt + 'icon:'.length
   const rest = value.slice(bodyStart)
@@ -119,7 +141,7 @@ function locateReferenceToken(value: string, cursor: number): TokenState | null 
 }
 
 function qualify(packageKey: string | null, reference: string): string {
-  return `${packageKey ? `${packageKey}@` : ''}${reference}`
+  return `${packageKey ? `${packageKey}#` : ''}${reference}`
 }
 
 export function createProjectIconCompletionProvider(
@@ -130,12 +152,19 @@ export function createProjectIconCompletionProvider(
   const readDimensions = options.readDimensions ?? readProjectIconSize
 
   const catalogByPackage = new Map<string, ProjectIconCatalog>(
-    sources.map(source => [source.packageKey ?? '', source.catalog]),
+    sources.map(source => [packageIdentity(source.packageKey), source.catalog]),
   )
   const preparedIconsByCollection = new Map<string, PreparedIcon[]>()
 
+  /** 目录按包身份登记：坐标带了版本也归到同一个包的图标索引上。 */
+  function packageIdentity(packageKey: string | null): string {
+    if (packageKey === null) return ''
+    const qualifier = parsePackageQualifier(packageKey)
+    return qualifier ? formatPackageIdentity(qualifier) : ''
+  }
+
   function catalogFor(packageKey: string | null): ProjectIconCatalog | null {
-    return catalogByPackage.get(packageKey ?? '') ?? null
+    return catalogByPackage.get(packageIdentity(packageKey)) ?? null
   }
 
   function findCollection(packageKey: string | null, seriesKey: string) {

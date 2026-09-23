@@ -1,8 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { LazyStore } from '@tauri-apps/plugin-store'
-import { resolveAppStoragePath } from '../../../shared/storage/appStoragePaths'
+import { APP_UPDATE_STATE_FILE_NAME, resolveAppStoragePath } from '../../../shared/storage/appStoragePaths'
 
-const UPDATE_STATE_FILE_NAME = 'update-state.json'
 const UPDATE_STATE_KEY = 'update-state'
 
 export interface ReleaseNotesSnapshot {
@@ -41,7 +40,7 @@ class TauriUpdateStatePersistence implements UpdateStatePersistence {
   private storePromise: Promise<LazyStore> | null = null
 
   private getStore(): Promise<LazyStore> {
-    this.storePromise ??= resolveAppStoragePath(UPDATE_STATE_FILE_NAME).then(path => new LazyStore(path))
+    this.storePromise ??= resolveAppStoragePath(APP_UPDATE_STATE_FILE_NAME).then(path => new LazyStore(path))
     return this.storePromise
   }
 

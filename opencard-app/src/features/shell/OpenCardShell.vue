@@ -289,7 +289,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { confirm as showConfirm } from '@tauri-apps/plugin-dialog'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning, addTitleBarNotice, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { useProjectStore } from '../workspace/store/projectStore'
@@ -379,7 +378,6 @@ import type {
 } from '../editor-runtime/model/editorIssue'
 import { CARD_DOCUMENT_SUFFIX, resolveFileType } from '../workspace/model/fileTypes'
 import { resolveSessionLabel } from '../workspace/model/sessionLabel'
-import { resolveInstalledResourcePackageRootPath } from '../workspace/model/resourcePackage'
 import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../workspace/model/projectStructure'
 import { useProjectExport } from './composables/useProjectExport'
 import ProjectExportDialog from '../exporting/components/ProjectExportDialog.vue'
@@ -409,8 +407,8 @@ import {
   PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY,
   PROJECT_ENTRY_RENAME_ACTION_KEY,
   PROJECT_ENTRY_REVEAL_ACTION_KEY,
+  PROJECT_PACKAGE_ADD_ACTION_KEY,
   PROJECT_PACKAGE_DELETE_ACTION_KEY,
-  PROJECT_PACKAGE_VERIFY_ACTION_KEY,
   useShellFileTree,
 } from './composables/useShellFileTree'
 import ShellSidebar from './components/ShellSidebar.vue'
@@ -505,7 +503,6 @@ const {
   projectProfile,
   projectInformation,
   projectFontFamilies,
-  projectPackageManifests,
   fontRegistryReady,
   renderEnvironment: projectRenderEnvironment,
   indexedEntries,
@@ -804,7 +801,6 @@ const {
 } = useShellProgressTasks()
 const UPDATE_PROGRESS_TASK_KEY = 'app-update'
 const EXPORT_TEMPLATE_PROGRESS_TASK_KEY = 'export-template'
-const RESOURCE_PACKAGE_INSTALL_TASK_KEY = 'create-project-resource-packages'
 watch(isExportTemplateBusy, busy => {
   if (busy) {
     setShellProgressTask({
@@ -1126,58 +1122,27 @@ const {
   translate: t,
 })
 
-/**
- * 创建本身就是复制模板加改名，因此附加包装在项目打开之后才安装：
- * 装包失败只影响那一个包，项目本身照常可用。
- */
 async function handleProjectCreated(project: CreatedProject): Promise<void> {
   const activated = await activateCreatedProject(project)
   if (activated) await installAttachedResourcePackages()
 }
 
+/**
+ * 建项目时挑中的包：把归档**复制**进新项目就是"装"。身份来自包自己的清单，所以机器上那份
+ * 删掉、换台机器重新导入，项目都还是同一个项目。
+ *
+ * 创建本身就是复制模板加改名，因此附加包装在项目打开之后才安装：一个包失败只影响那一个包，
+ * 项目本身照常可用。
+ */
 async function installAttachedResourcePackages(): Promise<void> {
-  const packs = attachedResourcePackages.value
-  if (packs.length === 0) return
-  // 一个 Key 在项目里只能存在一份，因此先装进去的那个生效，其余的同 Key 包都跳过。
-  const installedKeys = new Set(
-    [...projectStore.projectResourcePackages.value.keys()].map((key) => key.toLocaleLowerCase()),
-  )
-  const pending = packs.filter((pack) => {
-    const key = pack.key.toLocaleLowerCase()
-    if (installedKeys.has(key)) {
-      notifyWarning(t('projectTemplates.status.resourcePackageAlreadyInstalled', { name: pack.name }))
-      return false
+  for (const pack of attachedResourcePackages.value) {
+    try {
+      await projectStore.installResourcePackageFile(pack.path)
+    } catch (error) {
+      notifyAppError('OC-E3016', { path: pack.path, error }, locale.value)
     }
-    installedKeys.add(key)
-    return true
-  })
-  if (pending.length === 0) return
-
-  let completed = 0
-  const publish = () => setShellProgressTask({
-    key: RESOURCE_PACKAGE_INSTALL_TASK_KEY,
-    title: t('projectTemplates.status.installingResourcePackages'),
-    progress: completed / pending.length,
-    cancellable: false,
-  })
-  publish()
-  try {
-    for (const pack of pending) {
-      try {
-        const installed = await projectStore.installResourcePackageFile(pack.path)
-        notifySuccess(t('resourcePackage.installed', { name: installed.manifest.name }))
-      } catch (cause) {
-        reportUncodedFailure(
-          t('projectTemplates.errors.resourcePackageInstallFailed', { name: pack.name }),
-          cause,
-        )
-      }
-      completed += 1
-      publish()
-    }
-  } finally {
-    removeShellProgressTask(RESOURCE_PACKAGE_INSTALL_TASK_KEY)
   }
+  attachedResourcePackagePaths.value = []
 }
 
 const {
@@ -1300,12 +1265,10 @@ const {
   handleProjectManagementSelect,
   setProjectManagementEntryExpanded,
   findProjectEntryByKey,
-  findProjectPackageKeyByNodeKey,
   setProjectEntryExpanded,
 } = useShellFileTree({
   projectPath,
   indexedEntries,
-  packageManifests: projectPackageManifests,
   hideDotFiles: computed(() => settingsStore.settings.value.workspace.hideDotFiles),
   sessions,
   formatSessionTitle,
@@ -1549,7 +1512,6 @@ const exportTemplateTreeData = computed<OcNodeCollection>(() => {
       'locale.json',
       'fonts/fonts.json',
       'icons/icons.json',
-      'packages/packages.json',
     ].includes(relativePath)
     const isRuntimeCache = relativePath === '.opencard-cache' || relativePath.startsWith('.opencard-cache/')
     const isExcluded = isExportPathExcluded(relativePath)
@@ -2306,7 +2268,7 @@ async function importStoredResourcePackage(): Promise<void> {
     )
     if (!sourcePath) return
     const imported = await resourcePackageStore.importPackage(sourcePath)
-    notifySuccess(t('projectTemplates.status.resourcePackageImported', { name: imported.name }))
+    notifySuccess(t('projectTemplates.status.resourcePackageImported', { name: imported.title }))
   } catch (cause) {
     reportResourcePackageImportFailure(cause)
   } finally {
@@ -2321,7 +2283,7 @@ async function importDroppedResourcePackage(path: string): Promise<void> {
     return null
   })
   if (!imported) return
-  notifySuccess(t('projectTemplates.status.resourcePackageImported', { name: imported.name }))
+  notifySuccess(t('projectTemplates.status.resourcePackageImported', { name: imported.title }))
   if (!isCreateProjectMode.value) enterCreateProject()
   if (!attachedResourcePackagePaths.value.includes(imported.path)) {
     attachedResourcePackagePaths.value = [...attachedResourcePackagePaths.value, imported.path]
@@ -2331,7 +2293,7 @@ async function importDroppedResourcePackage(path: string): Promise<void> {
 async function removeStoredResourcePackage(pack: StoredResourcePackage): Promise<void> {
   const accepted = await requestConfirmation({
     title: t('projectTemplates.sections.resourcePackages'),
-    message: t('projectTemplates.confirmRemoveResourcePackage', { name: pack.name }),
+    message: t('projectTemplates.confirmRemoveResourcePackage', { name: pack.title }),
     confirmLabel: t('projectTemplates.actions.removeResourcePackage'),
   })
   if (!accepted) return
@@ -2641,32 +2603,37 @@ function handleProjectManagementExpansionChange(event: OcNodeExpansionEvent): vo
   setProjectManagementEntryExpanded(event.key, event.expanded)
 }
 
+/** 把一个 `.ocpack` 复制进当前项目。这就是"装"；复制之前先读一遍它是谁，读不出来就不进项目。 */
+async function addResourcePackageToProject(sourcePath: string): Promise<void> {
+  try {
+    await projectStore.installResourcePackageFile(sourcePath)
+    notifySuccess(t('packageManager.added', { name: sourcePath.split('/').pop() ?? sourcePath }))
+  } catch (error) {
+    notifyAppError('OC-E3016', { path: sourcePath, error }, locale.value)
+  }
+}
+
+async function pickAndAddResourcePackage(): Promise<void> {
+  const sourcePath = await resourcePackageStore.pickSourceFile(t('packageManager.add'))
+  if (sourcePath) await addResourcePackageToProject(sourcePath)
+}
+
 async function handleProjectManagementAction(event: OcNodeActionEvent) {
-  const packageKey = findProjectPackageKeyByNodeKey(event.key)
-  if (!packageKey) return
-  if (event.actionKey === PROJECT_PACKAGE_VERIFY_ACTION_KEY) {
-    const result = await projectStore.checkResourcePackage(packageKey)
-    if (!result) return
-    const status = t(`packageManager.status.${result.status}`)
-    if (result.status === 'ok') {
-      notifySuccess(`${packageKey}: ${status}`)
-    } else {
-      notifyWarning(`${packageKey}: ${status}`)
-    }
+  if (event.actionKey === PROJECT_PACKAGE_ADD_ACTION_KEY) {
+    await pickAndAddResourcePackage()
     return
   }
   if (event.actionKey !== PROJECT_PACKAGE_DELETE_ACTION_KEY) return
-  const required = projectPackageManifests.value.get(packageKey)
-  if (!required) return
-  const installed = projectStore.projectResourcePackages.value.get(packageKey)
-  const packageRootPath = resolveInstalledResourcePackageRootPath(projectPath.value, packageKey)
+  // 管理区里包节点的 key 就是那个 `.ocpack` 文件本身。
+  const archivePath = event.key
+  const installed = projectStore.findProjectResourcePackage(archivePath)
   try {
-    if (!await removeResourcePackage(packageKey)) return
-    closeSessionsByPath(packageRootPath)
+    await removeResourcePackage(archivePath)
+    closeSessionsByPath(archivePath)
     selectedManagementKeys.value = []
-    notifySuccess(t('resourcePackage.deleted', { name: installed?.manifest.name ?? packageKey }))
+    notifySuccess(t('resourcePackage.deleted', { name: installed?.manifest.title ?? archivePath.split('/').pop() ?? archivePath }))
   } catch (error) {
-    notifyAppError('OC-E3016', { path: packageRootPath, error }, locale.value)
+    notifyAppError('OC-E3016', { path: archivePath, error }, locale.value)
   }
 }
 
@@ -2810,12 +2777,8 @@ async function handleExternalOpenPaths(paths: readonly string[]): Promise<void> 
           await importDroppedResourcePackage(normalizedPath)
           continue
         }
-        const installed = await projectStore.installResourcePackageFile(normalizedPath, {
-          confirmReplacement: async (next, previous) => await showConfirm(t('resourcePackage.confirmUpgrade', {
-            name: next.name, version: next.version, previousVersion: previous.version,
-          }), { title: t('resourcePackage.title'), kind: 'warning' }),
-        })
-        notifySuccess(t('resourcePackage.installed', { name: path.split('/').pop() ?? installed.manifest.name }))
+        // 项目开着就直接装进去：装一个包就是把归档复制进 .opencard/packages。
+        await addResourcePackageToProject(normalizedPath)
         continue
       }
       if (kind === 'project-resource') {
@@ -3126,10 +3089,9 @@ function createResourcePackageTreeData(
     for (const pack of packs) {
       const isAttached = attachedResourcePackagePaths.value.includes(pack.path)
       items.set(pack.path, {
-        label: pack.name,
+        label: pack.title,
         visual: { type: 'icon', icon: 'file.package' },
         tail: [
-          pack.version,
           isAttached
             ? {
                 key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY,

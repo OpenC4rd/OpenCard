@@ -14,9 +14,9 @@
       <OcPanel gap="3" padding="4" border="muted" radius="md">
         <h2>{{ t('packageManifest.information') }}</h2>
         <dl class="package-manifest-editor__details">
-          <div><dt>{{ t('packageManifest.key') }}</dt><dd><code>{{ manifest.key }}</code></dd></div>
-          <div><dt>{{ t('packageManifest.version') }}</dt><dd>{{ manifest.version }}</dd></div>
-          <div><dt>{{ t('packageManifest.contentHash') }}</dt><dd><code>{{ manifest.contentHash }}</code></dd></div>
+          <div><dt>{{ t('packageManifest.coordinate') }}</dt><dd><code>{{ coordinate }}</code></dd></div>
+          <div><dt>{{ t('packageManifest.name') }}</dt><dd>{{ manifest.title }}</dd></div>
+          <div><dt>{{ t('packageManifest.fingerprint') }}</dt><dd><code>{{ fingerprint }}</code></dd></div>
         </dl>
       </OcPanel>
 
@@ -50,11 +50,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
-import { resolveInstalledResourcePackageKey } from '../../features/workspace/model/resourcePackage'
+import { getPathBasename } from '../../shared/model/filePath'
+import { readResourcePackageArchive, type ResourcePackageArchive } from '../../features/workspace/services/resourcePackageArchive'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
 import OcEmpty from '../base/OcEmpty.vue'
 import OcPanel from '../base/OcPanel.vue'
@@ -66,13 +67,26 @@ const emit = defineEmits<EditorEmits>()
 const { t } = useI18n()
 const projectStore = useProjectStore()
 
-const packageKey = computed(() => resolveInstalledResourcePackageKey(props.filePath) ?? '')
-const manifest = computed(() => projectStore.projectResourcePackages.value.get(packageKey.value)?.manifest ?? null)
-const cover = computed(() => projectStore.projectResourcePackages.value.get(packageKey.value)?.cover ?? null)
+/**
+ * 预览回答的是"这个文件是什么"，所以读的就是这个文件 —— 不查项目的包表。
+ * 项目里是不是装了它、它是重复件还是还没解开，都不该改变它是什么。
+ */
+const archive = ref<ResourcePackageArchive | null>(null)
+watch(() => props.filePath, async path => {
+  archive.value = await readResourcePackageArchive(path).catch(() => null)
+}, { immediate: true })
+
+const manifest = computed(() => archive.value?.manifest ?? null)
+const coordinate = computed(() => archive.value?.coordinate ?? '')
+const fingerprint = computed(() => archive.value?.fingerprint ?? '')
+// 封面是唯一需要解开目录的东西：包表里认得这个文件就顺手显示，不认得就不显示。
+const cover = computed(() => projectStore.findProjectResourcePackage(props.filePath)?.cover ?? null)
 
 const presentation = computed<EditorPresentation>(() => ({
-  title: manifest.value?.name ?? packageKey.value ?? t('packageManifest.title'),
-  description: t('packageManifest.description'),
+  // 主标题是这个文件本身叫什么，小字是它自述的坐标。文件叫什么名字不算数 —— 那是"它是谁"，
+  // 不是"你打开的是哪一个文件"。
+  title: getPathBasename(props.filePath),
+  description: coordinate.value || t('packageManifest.description'),
   icon: 'file.package',
 }))
 

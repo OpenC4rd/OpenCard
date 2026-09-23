@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { relativizeResourcePath, resolveResourcePath, type ScopedResourcePathResult } from './scopedResourcePath'
+import {
+  relativizeResourcePath,
+  resolveResourcePath,
+  type PackageScopeRoots,
+  type ScopedResourcePathResult,
+} from './scopedResourcePath'
 
 function expectPath(result: ScopedResourcePathResult, value: string): void {
   expect(result).toEqual({ ok: true, value })
@@ -9,60 +14,70 @@ function expectIssue(result: ScopedResourcePathResult, code: string): void {
   expect(result).toMatchObject({ ok: false, code })
 }
 
+const project = 'D:/project'
+const themeRoot = 'C:/Users/Me/.opencard/cache/packages/aa11'
+const newerThemeRoot = 'C:/Users/Me/.opencard/cache/packages/bb22'
+const iconsRoot = 'C:/Users/Me/.opencard/cache/packages/cc33'
+const packageRoots: PackageScopeRoots = new Map([
+  ['alice/theme@1.0.0', themeRoot],
+  ['alice/theme@1.2.0', newerThemeRoot],
+  ['bob/icons@2.0.0', iconsRoot],
+])
+
 describe('resolveResourcePath', () => {
-  const root = 'D:/project'
-
-  it('resolves local, project, package, and nested-package references without a scope cache', () => {
-    expectPath(resolveResourcePath(root, `${root}/cards/main.ocdocument`, 'images/bg.png'), `${root}/images/bg.png`)
-    expectPath(resolveResourcePath(root, `${root}/cards/main.ocdocument`, '/images/bg.png'), `${root}/images/bg.png`)
-    expectPath(resolveResourcePath(root, `${root}/cards/main.ocdocument`, 'theme@images/bg.png'), `${root}/.opencard/packages/theme/images/bg.png`)
-
-    const themeDocument = `${root}/.opencard/packages/theme/cards/main.ocdocument`
-    expectPath(resolveResourcePath(root, themeDocument, 'images/bg.png'), `${root}/.opencard/packages/theme/images/bg.png`)
-    expectPath(resolveResourcePath(root, themeDocument, '@assets/logo.png'), `${root}/assets/logo.png`)
-    expectPath(resolveResourcePath(root, themeDocument, 'icons@sprites/main.png'), `${root}/.opencard/packages/theme/.opencard/packages/icons/sprites/main.png`)
-
-    const nestedDocument = `${root}/.opencard/packages/theme/.opencard/packages/icons/cards/main.ocdocument`
-    expectPath(resolveResourcePath(root, nestedDocument, 'sprites/main.png'), `${root}/.opencard/packages/theme/.opencard/packages/icons/sprites/main.png`)
+  it('resolves scope, host, pinned-version, and newest-version references', () => {
+    const host = { scopeRootPath: project, projectRootPath: project, packageRoots }
+    expectPath(resolveResourcePath({ ...host, reference: 'images/bg.png' }), `${project}/images/bg.png`)
+    expectPath(resolveResourcePath({ ...host, reference: '/images/bg.png' }), `${project}/images/bg.png`)
+    expectPath(resolveResourcePath({ ...host, reference: 'alice/theme@1.0.0#icons/ok.svg' }), `${themeRoot}/icons/ok.svg`)
+    // 不写版本就取最高的那一版 —— 所以"装错版本"这件事不存在。
+    expectPath(resolveResourcePath({ ...host, reference: 'alice/theme#icons/ok.svg' }), `${newerThemeRoot}/icons/ok.svg`)
   })
 
-  it('rejects unsafe syntax, package-storage bypasses, and invalid source scopes', () => {
-    expectIssue(resolveResourcePath(root, `${root}/card.ocdocument`, '../secret.png'), 'unsafe-path')
-    expectIssue(resolveResourcePath(root, `${root}/card.ocdocument`, 'images\\bg.png'), 'unsafe-path')
-    expectIssue(resolveResourcePath(root, `${root}/card.ocdocument`, '.opencard/packages/theme/bg.png'), 'reserved-path')
-    expectIssue(resolveResourcePath(root, `${root}/card.ocdocument`, 'theme@icons@main.png'), 'invalid-reference')
-    expectIssue(resolveResourcePath(root, `${root}/card.ocdocument`, 'bad key@main.png'), 'invalid-reference')
-    expectIssue(resolveResourcePath(root, `${root}/card.ocdocument`, 'packages.json@main.png'), 'invalid-reference')
-    expectIssue(resolveResourcePath(root, 'D:/other/card.ocdocument', 'image.png'), 'source-outside-project')
-    expectIssue(resolveResourcePath(root, `${root}/.opencard/packages/packages.json`, 'image.png'), 'source-outside-project')
+  it('resolves a package against its own root, and the host through the project anchor', () => {
+    const scoped = { scopeRootPath: themeRoot, projectRootPath: project, packageRoots }
+    expectPath(resolveResourcePath({ ...scoped, reference: 'images/bg.png' }), `${themeRoot}/images/bg.png`)
+    expectPath(resolveResourcePath({ ...scoped, reference: '#assets/logo.png' }), `${project}/assets/logo.png`)
   })
 
-  it('supports POSIX projects and keeps POSIX containment case-sensitive', () => {
-    expectPath(resolveResourcePath('/project', '/project/.opencard/packages/theme/card.ocdocument', 'image.png'), '/project/.opencard/packages/theme/image.png')
-    expectIssue(resolveResourcePath('/project', '/PROJECT/card.ocdocument', 'image.png'), 'source-outside-project')
+  it('rejects unsafe syntax, package-storage bypasses, and unknown coordinates', () => {
+    const host = { scopeRootPath: project, projectRootPath: project, packageRoots }
+    expectIssue(resolveResourcePath({ ...host, reference: '../secret.png' }), 'unsafe-path')
+    expectIssue(resolveResourcePath({ ...host, reference: 'images\\bg.png' }), 'unsafe-path')
+    expectIssue(resolveResourcePath({ ...host, reference: 'alice/theme@1.0.0#images/bg#extra.png' }), 'unsafe-path')
+    expectIssue(resolveResourcePath({ ...host, reference: '.opencard/packages/alice/theme/1.0.0/bg.png' }), 'reserved-path')
+    expectIssue(resolveResourcePath({ ...host, reference: 'theme#main.png' }), 'invalid-reference')
+    expectIssue(resolveResourcePath({ ...host, reference: 'bad key#main.png' }), 'invalid-reference')
+    expectIssue(resolveResourcePath({ ...host, reference: 'carol/pack@1.0.0#a.png' }), 'package-unavailable')
+    expectIssue(resolveResourcePath({ ...host, reference: 'alice/theme@9.9.9#a.png' }), 'package-unavailable')
+  })
+
+  it('keeps POSIX containment case-sensitive', () => {
+    expectPath(resolveResourcePath({
+      scopeRootPath: '/project', projectRootPath: '/project', reference: 'image.png',
+    }), '/project/image.png')
   })
 })
 
 describe('relativizeResourcePath', () => {
-  const root = 'D:/project'
-  const projectDocument = `${root}/cards/main.ocdocument`
-  const themeDocument = `${root}/.opencard/packages/theme/cards/main.ocdocument`
-  const iconDocument = `${root}/.opencard/packages/theme/.opencard/packages/icons/cards/main.ocdocument`
-
-  it('creates the shortest canonical reference for representable scope relationships', () => {
-    expectPath(relativizeResourcePath(root, projectDocument, `${root}/assets/logo.png`), 'assets/logo.png')
-    expectPath(relativizeResourcePath(root, themeDocument, `${root}/.opencard/packages/theme/images/bg.png`), 'images/bg.png')
-    expectPath(relativizeResourcePath(root, themeDocument, `${root}/assets/logo.png`), '@assets/logo.png')
-    expectPath(relativizeResourcePath(root, projectDocument, `${root}/.opencard/packages/theme/images/bg.png`), 'theme@images/bg.png')
-    expectPath(relativizeResourcePath(root, themeDocument, `${root}/.opencard/packages/theme/.opencard/packages/icons/sprites/main.png`), 'icons@sprites/main.png')
-    expectPath(relativizeResourcePath(root, iconDocument, `${root}/.opencard/packages/theme/.opencard/packages/icons/sprites/main.png`), 'sprites/main.png')
+  it('writes the shortest canonical reference for each scope relationship', () => {
+    expectPath(relativizeResourcePath({
+      scopeRootPath: project, projectRootPath: project, targetPath: `${project}/assets/logo.png`,
+    }), 'assets/logo.png')
+    expectPath(relativizeResourcePath({
+      scopeRootPath: themeRoot, projectRootPath: project, targetPath: `${themeRoot}/images/bg.png`,
+    }), 'images/bg.png')
+    expectPath(relativizeResourcePath({
+      scopeRootPath: themeRoot, projectRootPath: project, targetPath: `${project}/assets/logo.png`,
+    }), '#assets/logo.png')
+    expectPath(relativizeResourcePath({
+      scopeRootPath: project, projectRootPath: project, packageRoots, targetPath: `${themeRoot}/images/bg.png`,
+    }), 'alice/theme@1.0.0#images/bg.png')
   })
 
-  it('rejects parent, sibling, deep-descendant, external, and reserved targets', () => {
-    expectIssue(relativizeResourcePath(root, iconDocument, `${root}/.opencard/packages/theme/image.png`), 'unrepresentable-scope')
-    expectIssue(relativizeResourcePath(root, themeDocument, `${root}/.opencard/packages/other/image.png`), 'unrepresentable-scope')
-    expectIssue(relativizeResourcePath(root, projectDocument, `${root}/.opencard/packages/theme/.opencard/packages/icons/image.png`), 'unrepresentable-scope')
-    expectIssue(relativizeResourcePath(root, projectDocument, 'D:/other/image.png'), 'target-outside-project')
-    expectIssue(relativizeResourcePath(root, projectDocument, `${root}/.opencard/packages/packages.json`), 'target-outside-project')
+  it('rejects targets that belong to no scope the reference can name', () => {
+    expectIssue(relativizeResourcePath({
+      scopeRootPath: project, projectRootPath: project, targetPath: 'D:/other/image.png',
+    }), 'target-outside-scope')
   })
 })

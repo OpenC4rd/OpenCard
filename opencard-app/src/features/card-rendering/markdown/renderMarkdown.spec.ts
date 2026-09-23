@@ -40,4 +40,18 @@ describe('renderMarkdown project icons', () => {
     expect(references).toEqual(['icon:status/wide'])
     expect(html).toContain('project-inline-icon oc-project-icon')
   })
+
+  it('reads the coordinate#icon spelling and leaves the retired package@icon spelling alone', () => {
+    const references: string[] = []
+    const resolveIconReference = (source: string) => {
+      references.push(source)
+      return catalog.entries[0]!
+    }
+
+    expect(renderMarkdown('[[alice/theme@1.0.0#icon:status/wide]]', { resolveIconReference }))
+      .toContain('project-inline-icon oc-project-icon')
+    expect(references).toEqual(['alice/theme@1.0.0#icon:status/wide'])
+    expect(renderMarkdown('[[alice/theme@icon:status/wide]]', { resolveIconReference }))
+      .not.toContain('project-inline-icon')
+  })
 })

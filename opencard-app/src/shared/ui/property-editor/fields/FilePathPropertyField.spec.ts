@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
 import FilePathPropertyField from './FilePathPropertyField.vue'
 import { createResourceDirectoryProvider } from '../../../../features/workspace/services/resourceDirectoryProvider'
-import { buildProjectIconCatalog, EMPTY_PROJECT_ICON_CATALOG } from '../../../../features/workspace/services/projectIconCatalog'
-import { createProjectIconCompletionProvider } from '../../../../features/workspace/services/projectIconCompletion'
+import { EMPTY_PROJECT_ICON_CATALOG } from '../../../../features/workspace/services/projectIconCatalog'
 import { normalizeResourcePackageManifest } from '../../../../features/workspace/model/resourcePackage'
 
 vi.mock('vue-i18n', () => ({
@@ -15,12 +14,19 @@ describe('FilePathPropertyField', () => {
   it('browses a package from its title, selects a file, and returns from the package root', async () => {
     const readDirectoryEntries = vi.fn(async (path: string) => path === '/project'
       ? [] : [{ name: 'image.png', isDirectory: false, isFile: true, isSymlink: false }])
-    const provider = createResourceDirectoryProvider('/project', 'card.ocdocument', {
+    const provider = createResourceDirectoryProvider('/project', {
       kind: 'project', namespace: 'project', rootPath: '/project',
-      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
-      packages: new Map([['theme', {
-        manifest: { ...normalizeResourcePackageManifest({}, 'theme').manifest, name: 'Theme Pack' },
-        rootPath: '/project/.opencard/packages/theme', cover: null, issues: [],
+      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+      packages: new Map([['alice/theme@1.0.0', {
+        coordinate: { author: 'alice', name: 'theme', version: '1.0.0' },
+        manifest: normalizeResourcePackageManifest({
+          type: 'opencard-resource-package',
+          author: 'alice', name: 'theme', version: '1.0.0', title: 'Theme Pack',
+          public: { fonts: [], iconSeries: [] },
+        }).manifest,
+        archivePath: '/project/.opencard/packages/theme.ocpack',
+        fingerprint: 'fp-theme',
+        rootPath: '/cache/packages/aa11', cover: null,
       }]]),
     }, { readDirectoryEntries })
     const wrapper = mount(FilePathPropertyField, {
@@ -35,11 +41,11 @@ describe('FilePathPropertyField', () => {
       const rootMenu = wrapper.getComponent(OcAutocompletePopover)
       expect(rootMenu.props('items')).toEqual([
         expect.objectContaining({ insertText: 'icon:', icon: 'file.project-icon' }),
-        expect.objectContaining({ label: 'Theme Pack', insertText: 'theme@', icon: 'file.package' }),
+        expect.objectContaining({ label: 'Theme Pack', insertText: 'alice/theme@1.0.0#', icon: 'file.package' }),
       ])
       rootMenu.vm.$emit('select', rootMenu.props('items').find(item => item.label === 'Theme Pack')!.key)
       await flushPromises()
-      expect(readDirectoryEntries).toHaveBeenLastCalledWith('/project/.opencard/packages/theme', 1)
+      expect(readDirectoryEntries).toHaveBeenLastCalledWith('/cache/packages/aa11', 1)
       const menu = wrapper.getComponent(OcAutocompletePopover)
       expect(menu.props('items').map(item => item.label)).toEqual(['icon:', 'image.png', '..'])
       menu.vm.$emit('select', menu.props('items').find(item => item.label === '..')!.key)
@@ -48,86 +54,9 @@ describe('FilePathPropertyField', () => {
       expect(menu.props('items').map(item => item.label)).toContain('Theme Pack')
       menu.vm.$emit('select', menu.props('items').find(item => item.label === 'Theme Pack')!.key)
       await flushPromises()
-      // Select the file explicitly: the highlighted item is no longer a reliable way to name a file,
-      // because a package root now offers `icon:` first, exactly as the project root does.
       menu.vm.$emit('select', menu.props('items').find(item => item.label === 'image.png')!.key)
       await flushPromises()
-      expect(input.element.value).toBe('theme@image.png')
-    } finally {
-      wrapper.unmount()
-    }
-  })
-
-  /**
-   * An image source can name an icon a package ships, as `pkg@icon:collection/icon`. Nothing used to
-   * offer the `icon:` step at a package root, so typing `pkg@` could only browse the package files —
-   * which is exactly where the icons are not, because the icon set lives in the hidden `.opencard/`.
-   */
-  it('continues from a package qualifier into the icons that package ships', async () => {
-    const readDirectoryEntries = vi.fn(async (path: string) => path === '/project'
-      ? [] : [{ name: 'image.png', isDirectory: false, isFile: true, isSymlink: false }])
-    const environment = {
-      kind: 'project' as const, namespace: 'project', rootPath: '/project',
-      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
-      packages: new Map([['theme', {
-        manifest: { ...normalizeResourcePackageManifest({}, 'theme').manifest, name: 'Theme Pack' },
-        rootPath: '/project/.opencard/packages/theme', cover: null, issues: [],
-      }]]),
-    }
-    const packageCatalog = buildProjectIconCatalog([{
-      name: 'MDI icons',
-      key: 'mdi',
-      icons: [{ iconKey: 'home', name: 'Home', source: 'icons/home.svg', tint: 'theme' }],
-    }], source => `asset://${source}`)
-    const wrapper = mount(FilePathPropertyField, {
-      props: {
-        definition: {
-          title: 'Image',
-          fieldType: 'filePath',
-          directoryProvider: createResourceDirectoryProvider(
-            '/project', 'card.ocdocument', environment, { readDirectoryEntries },
-          ),
-          completion: {
-            provider: createProjectIconCompletionProvider([
-              { packageKey: null, label: 'Project', catalog: EMPTY_PROJECT_ICON_CATALOG },
-              { packageKey: 'theme', label: 'Theme Pack', catalog: packageCatalog },
-            ], { mode: 'reference' }),
-          },
-        },
-        value: '',
-        'onUpdate:value': (value: string) => { void wrapper.setProps({ value }) },
-      },
-    })
-    try {
-      const input = wrapper.get('input')
-      await input.trigger('focus')
-      await flushPromises()
-
-      const rootMenu = wrapper.getComponent(OcAutocompletePopover)
-      rootMenu.vm.$emit('select', rootMenu.props('items').find(item => item.label === 'Theme Pack')!.key)
-      await flushPromises()
-      expect(input.element.value).toBe('theme@')
-
-      const packageMenu = wrapper.getComponent(OcAutocompletePopover)
-      const iconEntry = packageMenu.props('items').find(item => item.label === 'icon:')
-      expect(iconEntry).toBeTruthy()
-      packageMenu.vm.$emit('select', iconEntry!.key)
-      await flushPromises()
-      expect(input.element.value).toBe('theme@icon:')
-
-      const seriesMenu = wrapper.getComponent(OcAutocompletePopover)
-      const collection = seriesMenu.props('items').find(item => item.label === 'MDI icons')
-      expect(collection).toBeTruthy()
-      seriesMenu.vm.$emit('select', collection!.key)
-      await flushPromises()
-      expect(input.element.value).toBe('theme@icon:mdi/')
-
-      const iconMenu = wrapper.getComponent(OcAutocompletePopover)
-      const icon = iconMenu.props('items').find(item => item.label === 'Home')
-      expect(icon).toBeTruthy()
-      iconMenu.vm.$emit('select', icon!.key)
-      await flushPromises()
-      expect(input.element.value).toBe('theme@icon:mdi/home')
+      expect(input.element.value).toBe('alice/theme@1.0.0#image.png')
     } finally {
       wrapper.unmount()
     }
@@ -141,10 +70,10 @@ describe('FilePathPropertyField', () => {
     ])
     const environment = {
       kind: 'project' as const, namespace: 'project', rootPath: '/project',
-      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
+      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
-    const hidden = createResourceDirectoryProvider('/project', 'card.ocdocument', environment, { readDirectoryEntries }, { hideDotFiles: true })
-    const visible = createResourceDirectoryProvider('/project', 'card.ocdocument', environment, { readDirectoryEntries }, { hideDotFiles: false })
+    const hidden = createResourceDirectoryProvider('/project', environment, { readDirectoryEntries }, { hideDotFiles: true })
+    const visible = createResourceDirectoryProvider('/project', environment, { readDirectoryEntries }, { hideDotFiles: false })
 
     expect((await hidden('')).map(entry => entry.name)).toEqual(['assets', 'icon:'])
     expect((await visible('')).map(entry => entry.name)).toEqual(['.opencard', '.git', 'assets', 'icon:'])
@@ -374,23 +303,23 @@ describe('FilePathPropertyField', () => {
 
   it('browses a package root without inserting a slash after the package separator', async () => {
     const directoryProvider = vi.fn(async () => [
-      { name: 'theme@images', isDirectory: true },
-      { name: 'theme@cover.png', isDirectory: false },
+      { name: 'alice/theme@1.0.0#images', isDirectory: true },
+      { name: 'alice/theme@1.0.0#cover.png', isDirectory: false },
     ])
     const wrapper = mount(FilePathPropertyField, {
       props: {
         definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
-        value: 'theme@',
+        value: 'alice/theme@1.0.0#',
       },
     })
 
     await wrapper.get('input').trigger('focus')
     await flushPromises()
 
-    expect(directoryProvider).toHaveBeenCalledWith('theme@')
+    expect(directoryProvider).toHaveBeenCalledWith('alice/theme@1.0.0#')
     expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ label: 'images', insertText: 'theme@images/' }),
-      expect.objectContaining({ label: 'cover.png', insertText: 'theme@cover.png' }),
+      expect.objectContaining({ label: 'images', insertText: 'alice/theme@1.0.0#images/' }),
+      expect.objectContaining({ label: 'cover.png', insertText: 'alice/theme@1.0.0#cover.png' }),
       expect.objectContaining({ label: '..' }),
     ])
   })

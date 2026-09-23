@@ -20,7 +20,7 @@ export type RenderFieldContract = {
   extensions?: readonly string[]
   allowRemote?: boolean
   /**
-   * Resource reference kinds this path field also accepts, for example `pack@icon:collection/icon`.
+   * Resource reference kinds this path field also accepts, for example `作者/包名@版本#icon:collection/icon`.
    * A reference names an image by key instead of by path; it resolves to a path, so everything
    * downstream of resolution is identical to a literal path.
    */

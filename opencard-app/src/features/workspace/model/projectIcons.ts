@@ -1,6 +1,6 @@
 import { createAvailableKey } from '../../../shared/model/keySlug'
 import { isRecord } from '../../../shared/model/record'
-import { resolveResourcePath } from './scopedResourcePath'
+import { resolveReferenceSyntax } from './scopedResourcePath'
 export const projectIconKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
 /** Every standalone icon file format a set may hold: vector sources and raster sources alike. */
 export const projectIconSourcePattern = /\.(?:svg|png|jpe?g|webp)$/i
@@ -73,10 +73,10 @@ export function normalizeProjectIconDirectory(value: string): string | null {
   return directory
 }
 
-/** Accepts every supported icon file, resolving the reference against the project root. */
+/** Accepts every supported icon file, checking the reference's shape rather than what it points at. */
 export function normalizeProjectIconSource(value: string): string | null {
   const source = value.trim()
-  const resolved = resolveResourcePath('C:/project', 'C:/project/.opencard/icons/icons.json', source)
+  const resolved = resolveReferenceSyntax(source)
   return resolved.ok && projectIconSourcePattern.test(source) ? source : null
 }
 

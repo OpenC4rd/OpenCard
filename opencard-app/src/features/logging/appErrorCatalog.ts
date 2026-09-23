@@ -132,13 +132,13 @@ export const APP_ERROR_CATALOG = {
   },
   'OC-E3016': {
     area: '项目与资源',
-    meaning: { 'zh-CN': '无法更新项目包', 'en-US': 'Could not update the project package' },
-    solution: '确认包目录未被其他程序占用且项目可写，然后重新打开项目再试。',
+    meaning: { 'zh-CN': '无法读取项目里的资源包', 'en-US': 'Could not read the project resource packages' },
+    solution: '检查 .opencard/packages 下的 .ocpack 文件是否完整、项目目录是否可读，然后重新打开项目。',
   },
   'OC-E3017': {
     area: '项目与资源',
-    meaning: { 'zh-CN': '无法从远程来源安装包', 'en-US': 'Could not install the package from its remote source' },
-    solution: '在输出面板查看该包的来源与失败详情，确认来源地址和标签正确、网络可用、包归档完整后重新同步。',
+    meaning: { 'zh-CN': '无法解开资源包', 'en-US': 'Could not unpack the resource package' },
+    solution: '确认归档完整、磁盘剩余空间足够且缓存目录可写；删掉 ~/.opencard/cache/packages 可以让程序重新解一次。',
   },
   'OC-E4001': {
     area: '编辑器与文档',

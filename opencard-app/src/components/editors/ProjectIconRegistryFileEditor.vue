@@ -338,7 +338,11 @@ async function confirmSeriesRemoval(): Promise<void> {
   try {
     if (cleanupOrphanedFiles.value && orphanedRemovalSources.value.length) {
       const paths = orphanedRemovalSources.value.map(source => {
-        const resolved = resolveResourcePath(projectDirectory.value, props.filePath, source)
+        const resolved = resolveResourcePath({
+          scopeRootPath: projectDirectory.value,
+          projectRootPath: projectDirectory.value,
+          reference: source,
+        })
         if (!resolved.ok) throw new Error(resolved.message)
         return resolved.value
       })

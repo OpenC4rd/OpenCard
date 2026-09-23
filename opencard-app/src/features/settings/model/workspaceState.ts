@@ -32,12 +32,12 @@ export function cloneProjectWorkspaceState(state: ProjectWorkspaceStateRead | un
     ...(packageBuilder ? {
       packageBuilder: {
         name: packageBuilder.name,
+        title: packageBuilder.title,
         author: packageBuilder.author,
         version: packageBuilder.version,
         fontFamilyKeys: [...packageBuilder.fontFamilyKeys],
         fontCompositionKeys: [...packageBuilder.fontCompositionKeys],
         iconSeriesKeys: [...packageBuilder.iconSeriesKeys],
-        packageKeys: [...packageBuilder.packageKeys],
         imagePaths: [...packageBuilder.imagePaths],
       },
     } : {}),

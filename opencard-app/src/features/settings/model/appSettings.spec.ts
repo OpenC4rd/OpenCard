@@ -193,10 +193,10 @@ describe('appSettings', () => {
         name: 'Theme',
         author: '',
         version: '2.1.0',
+        title: '',
         fontFamilyKeys: ['latin'],
         fontCompositionKeys: ['body'],
         iconSeriesKeys: [],
-        packageKeys: [],
         imagePaths: ['images/card.png'],
       },
     })

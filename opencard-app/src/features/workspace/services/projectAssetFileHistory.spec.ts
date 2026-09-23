@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import type { FileSystemService } from './fileSystemService'
 import { stageProjectAssetFiles } from './projectAssetFileHistory'
 
-vi.mock('../../../shared/storage/appStoragePaths', () => ({
+vi.mock('../../../shared/storage/appStoragePaths', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../shared/storage/appStoragePaths')>(),
   resolveAppStoragePath: vi.fn(async (...segments: string[]) => `C:/Users/Test/.opencard/${segments.join('/')}`),
+  resolveAppCachePath: vi.fn(async (...segments: string[]) => `C:/Users/Test/.opencard/cache/${segments.join('/')}`),
 }))
 
 function createFileSystem(initialFiles: readonly string[]) {
@@ -32,7 +34,7 @@ function createFileSystem(initialFiles: readonly string[]) {
 describe('project asset file history', () => {
   it('stages across storage volumes and follows undo, redo, and release', async () => {
     const original = 'D:/Cards/.opencard/assets/Brand.png'
-    const staged = 'C:/Users/Test/.opencard/history/assets/remove-1/0-Brand.png'
+    const staged = 'C:/Users/Test/.opencard/cache/staged/remove-1/0-Brand.png'
     const { fs, files, directories, copyFile } = createFileSystem([original])
 
     const resource = await stageProjectAssetFiles([original], 'remove-1', fs)
@@ -50,7 +52,7 @@ describe('project asset file history', () => {
 
     await resource.release()
     expect(files.has(staged)).toBe(false)
-    expect(directories.has('C:/Users/Test/.opencard/history/assets/remove-1')).toBe(false)
+    expect(directories.has('C:/Users/Test/.opencard/cache/staged/remove-1')).toBe(false)
   })
 
   it('deduplicates source paths within one history operation', async () => {
@@ -68,6 +70,6 @@ describe('project asset file history', () => {
     await expect(stageProjectAssetFiles([present, missing], 'remove-3', fs)).rejects.toThrow()
     // The first file is back where it started, and nothing is left staged.
     expect(files.has(present)).toBe(true)
-    expect(files.has('C:/Users/Test/.opencard/history/assets/remove-3/0-A.png')).toBe(false)
+    expect(files.has('C:/Users/Test/.opencard/cache/staged/remove-3/0-A.png')).toBe(false)
   })
 })

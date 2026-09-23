@@ -12,10 +12,11 @@ import { fileSystemService, takeDirectoryWalkMetrics } from '../services/fileSys
 import { createProjectOpenTimer } from '../services/projectOpenTiming'
 import { initializeProjectStructure } from '../services/projectStructureService'
 import {
+  isProjectIndexSkippedPath,
   isProjectInternalRelativePath,
   PROJECT_INTERNAL_DIRECTORIES,
   PROJECT_INTERNAL_DIRECTORY_NAME,
-  PROJECT_PACKAGE_MANIFEST_FILE_NAME,
+  PROJECT_PACKAGE_DIRECTORY,
   resolveProjectInternalRelativePath,
 } from '../model/projectStructure'
 import {
@@ -53,6 +54,10 @@ import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../se
 import { taskScheduler } from '../../../utils/taskScheduler'
 import type { OcNodeDropPosition } from '../../../shared/ui/node/node.types'
 import { getPathBasename, normalizePath } from '../../../shared/model/filePath'
+import {
+  APP_CACHE_PACKAGES_DIRECTORY_NAME,
+  resolveAppCachePath,
+} from '../../../shared/storage/appStoragePaths'
 import { reportAppError } from '../../logging/appErrorCatalog'
 import {
   clearProjectFonts,
@@ -90,26 +95,16 @@ import {
   DEFAULT_PROJECT_FONT_DIRECTORY,
 } from '../model/projectFonts'
 import {
-  previewResourcePackage,
-  decideResourcePackageInstallation,
-  checkInstalledResourcePackage,
-  installResourcePackage,
-  type ResourcePackageCheckResult,
-  type ResourcePackageInstallResult,
-} from '../services/resourcePackageInstaller'
-import { downloadRemotePackage, parseRemotePackageSource } from '../services/remotePackageSource'
-import {
-  PROJECT_PACKAGE_MANIFEST_TYPE,
-  serializeProjectPackageManifest,
-  type RequiredPackage,
-} from '../model/projectPackageManifest'
-import { toKeySlug } from '../../../shared/model/keySlug'
-import { resolveAppDownloadPath } from '../../../shared/storage/appStoragePaths'
+  readResourcePackageArchive,
+  unpackResourcePackage,
+  type ResourcePackageArchive,
+} from '../services/resourcePackageArchive'
 import {
   createProjectResourceNamespace,
   loadProjectResourceEnvironment,
+  packageScopeRoots,
   type ProjectResourceEnvironment,
-  type ProjectResourceEnvironmentIssue,
+  type ProjectResourcePackage,
   type ProjectResourcePackageCatalog,
 } from '../services/projectResourceEnvironment'
 import {
@@ -141,7 +136,6 @@ export type ImportedProjectFontFiles = {
   sources: readonly string[]
   copied: boolean
 }
-export type ImportedResourcePackage = ResourcePackageInstallResult
 export type ProjectAssetImportConflict = {
   existingSource: string
   availableCopySource: string
@@ -202,9 +196,7 @@ const projectDictionary = ref<ProjectDictionary | null>(null)
 const resolvedDictionary = ref<ResolvedProjectDictionary | null>(null)
 const dictionaryError = ref<string | null>(null)
 const projectResourcePackages = shallowRef<ProjectResourcePackageCatalog>(new Map())
-const projectPackageManifests = shallowRef<ReadonlyMap<string, RequiredPackage>>(new Map())
 const projectResourceEnvironments = shallowRef<ReadonlyMap<string, ProjectResourceEnvironment>>(new Map())
-const projectResourceEnvironmentIssues = shallowRef<readonly ProjectResourceEnvironmentIssue[]>([])
 let resourceEnvironmentReloadVersion = 0
 const settingsStore = useAppSettingsStore()
 const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => ({
@@ -220,9 +212,7 @@ const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => ({
   iconDocument: { iconSeries: projectIconSeries.value },
   iconCatalog: projectIconCatalog.value,
   packages: projectResourcePackages.value,
-  packageIndex: { type: PROJECT_PACKAGE_MANIFEST_TYPE, packages: Object.fromEntries(projectPackageManifests.value) },
   packageEnvironments: projectResourceEnvironments.value,
-  issues: projectResourceEnvironmentIssues.value,
 }))
 /**
  * One icon's paint asks for its size here. The catalog entry is the shared record every render path
@@ -289,12 +279,28 @@ function resolveProjectInternalPath(path = ''): string {
   return resolveProjectPath(resolveProjectInternalRelativePath(path))
 }
 
+/**
+ * 这个文件属于哪个作用域。项目里的文件属于项目；缓存里的文件属于某个包 ——
+ * 包解开在软件存储里，与项目根毫无关系，所以只有拿已知的包根去比。
+ */
+function scopeRootForFile(rootPath: string, filePath: string): string | null {
+  const identity = pathIdentity(filePath)
+  if (identity === pathIdentity(rootPath) || identity.startsWith(`${pathIdentity(rootPath)}/`)) return rootPath
+  for (const candidate of packageScopeRoots(projectResourceEnvironment.value.packages).values()) {
+    const packageIdentity = pathIdentity(candidate)
+    if (identity === packageIdentity || identity.startsWith(`${packageIdentity}/`)) return candidate
+  }
+  return null
+}
+
 function resolveResourcePathFromFile(sourceFilePath: string, reference: string): string {
-  const resolved = resolveScopedResourcePath(
-    ensureProjectOpen(),
-    resolveProjectPath(sourceFilePath),
+  const rootPath = ensureProjectOpen()
+  const resolved = resolveScopedResourcePath({
+    scopeRootPath: scopeRootForFile(rootPath, resolveProjectPath(sourceFilePath)) ?? rootPath,
+    projectRootPath: rootPath,
     reference,
-  )
+    packageRoots: packageScopeRoots(projectResourceEnvironment.value.packages),
+  })
   if (!resolved.ok) throw new Error(resolved.message)
   return resolved.value
 }
@@ -304,11 +310,13 @@ function resolveResourceAssetSrcFromFile(sourceFilePath: string, reference: stri
 }
 
 function createResourceReferenceFromFile(sourceFilePath: string, targetPath: string): string {
-  const resolved = relativizeResourcePath(
-    ensureProjectOpen(),
-    resolveProjectPath(sourceFilePath),
-    resolveProjectPath(targetPath),
-  )
+  const rootPath = ensureProjectOpen()
+  const resolved = relativizeResourcePath({
+    scopeRootPath: scopeRootForFile(rootPath, resolveProjectPath(sourceFilePath)) ?? rootPath,
+    projectRootPath: rootPath,
+    targetPath: resolveProjectPath(targetPath),
+    packageRoots: packageScopeRoots(projectResourceEnvironment.value.packages),
+  })
   if (!resolved.ok) throw new Error(resolved.message)
   return resolved.value
 }
@@ -482,38 +490,29 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
   const expectedProjectPath = projectPath.value
   if (!expectedProjectPath) {
     projectResourcePackages.value = new Map()
-    projectPackageManifests.value = new Map()
     projectResourceEnvironments.value = new Map()
-    projectResourceEnvironmentIssues.value = []
     return false
   }
   try {
     const environment = await loadProjectResourceEnvironment({
       fs: fileSystemService,
       rootPath: expectedProjectPath,
+      packagesRoot: await resolveAppCachePath(APP_CACHE_PACKAGES_DIRECTORY_NAME),
       kind: 'project',
       identity: expectedProjectPath,
       generation: fileChangeRevision.value,
       iconCatalog: projectIconCatalog.value,
+      unusableFingerprints,
+      onPackagePending: schedulePackageUnpacking,
     })
     if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
-    const packageIndex = environment.packageIndex ?? {
-      type: PROJECT_PACKAGE_MANIFEST_TYPE,
-      packages: {},
-    }
-    const issues = [...environment.issues]
-    if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
     projectResourcePackages.value = environment.packages ?? new Map()
-    projectPackageManifests.value = new Map(Object.entries(packageIndex.packages))
     projectResourceEnvironments.value = environment.packageEnvironments ?? new Map()
-    projectResourceEnvironmentIssues.value = issues
     return true
   } catch (error) {
     if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
     projectResourcePackages.value = new Map()
-    projectPackageManifests.value = new Map()
     projectResourceEnvironments.value = new Map()
-    projectResourceEnvironmentIssues.value = [{ resource: 'packages', path: `${expectedProjectPath}/.opencard/packages`, message: error instanceof Error ? error.message : String(error) }]
     reportAppError('OC-E3016', { path: `${expectedProjectPath}/.opencard/packages`, error })
     return false
   }
@@ -656,26 +655,9 @@ function isMetadataPath(path: string): boolean {
 }
 
 /**
- * Directories the file index never walks:
- * - the managed asset directories (`.opencard/fonts`, `.opencard/icons`, `.opencard/packages`) hold one
- *   file per asset, and no index consumer reads them: the tree hides dot paths by default, the package
- *   builder excludes `.opencard/`, and assets are rendered through their registries;
- * - `.git` belongs to version control, which reads the repository itself. A repository with a large
- *   history makes one recursive listing there cost seconds — measured at 4.9s for a single `.git` read —
- *   and that cost lands on every project open and every workbench re-layout.
- *
- * Recursion stops at these directories rather than at every dot path, so the index stays independent
- * of the "hide dot files" display setting. Each directory keeps its own registered depth, so a set
- * folder or an installed package stays listed while its contents are not enumerated.
+ * 那些被跳过的目录的登记不进索引：它们只作为条目被父目录列出。
+ * 规则本身在 `model/projectStructure` 里，和 `.opencard` 的定义待在一起。
  */
-function isIndexSkippedDirectory(relativePath: string): boolean {
-  const identity = relativePath.replace(/\\/g, '/').replace(/\/+$/, '').toLocaleLowerCase()
-  if (identity === '.git' || identity.startsWith('.git/')) return true
-  return PROJECT_INTERNAL_DIRECTORIES.some((directory) => {
-    const managed = directory.toLocaleLowerCase()
-    return identity === managed || identity.startsWith(`${managed}/`)
-  })
-}
 
 async function refreshIndexedEntries(options?: { persist?: boolean }) {
   if (!projectPath.value) return
@@ -683,13 +665,12 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
   try {
     const nextEntries = new Map<string, DirEntry>()
     const unavailableDirectories = new Set<string>()
-    // 托管目录（.opencard/fonts、.opencard/icons、.opencard/packages）的内容永远不进索引：
-    // 它们只作为条目被父目录列出。若这里还按登记去列一次，装了大包之后每次打开项目都要重新
-    // 读那个装了上千个文件的目录（实测单次 5 秒），所以登记里的托管目录直接丢掉。
-    const managedRegistrations = [...registeredDirectories.value.keys()].filter(isIndexSkippedDirectory)
+    // 托管目录（.opencard/fonts、.opencard/icons）的内容永远不进索引：它们只作为条目被父目录列出。
+    // 若这里还按登记去列一次，导入过大量字体的项目每次打开都要重新读那个目录。
+    const managedRegistrations = [...registeredDirectories.value.keys()].filter(isProjectIndexSkippedPath)
     if (managedRegistrations.length > 0) {
       registeredDirectories.value = new Map([...registeredDirectories.value]
-        .filter(([relativePath]) => !isIndexSkippedDirectory(relativePath)))
+        .filter(([relativePath]) => !isProjectIndexSkippedPath(relativePath)))
     }
     const registrations = Array.from(registeredDirectories.value.entries())
       .sort(([leftPath], [rightPath]) => leftPath.length - rightPath.length)
@@ -699,7 +680,7 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
       let entries: DirEntry[]
       try {
         entries = await fileSystemService.readDirectoryEntries(directoryPath, depth, relativePath, {
-          skipDirectory: isIndexSkippedDirectory,
+          skipDirectory: isProjectIndexSkippedPath,
         })
       } catch (error) {
         if (!relativePath || await fileSystemService.fileExists(directoryPath)) throw error
@@ -730,8 +711,8 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
 
 async function readDirectoryEntries(path: string = '', depth: number = PROJECT_TREE_LOOKAHEAD_DEPTH) {
   const relativePath = toRelativeProjectPath(path)
-  // 托管目录的内容不进索引，也不登记，否则会在大包上退化成每次打开项目都重列一遍。
-  if (isIndexSkippedDirectory(relativePath)) return
+  // 托管目录的内容不进索引，也不登记，否则会在大目录上退化成每次打开项目都重列一遍。
+  if (isProjectIndexSkippedPath(relativePath)) return
   const normalizedDepth = Number.isFinite(depth) ? Math.max(1, Math.floor(depth)) : Number.POSITIVE_INFINITY
   const currentDepth = registeredDirectories.value.get(relativePath) ?? 0
 
@@ -745,7 +726,7 @@ async function readDirectoryEntries(path: string = '', depth: number = PROJECT_T
 function setDirectoryExpanded(path: string, expanded: boolean) {
   const relativePath = toRelativeProjectPath(path)
   // 托管目录的内容不进索引，展开与否都不登记。
-  if (!relativePath || isIndexSkippedDirectory(relativePath)) {
+  if (!relativePath || isProjectIndexSkippedPath(relativePath)) {
     return
   }
 
@@ -783,16 +764,9 @@ async function startWatching() {
 
   try {
     unlistenFn = await listen<FileChangedPayload>('file-changed', (event: Event<FileChangedPayload>) => {
-      // 装包/更新包会一次写入成百上千个文件，这些落盘由安装流程自己收尾（它会重载资源环境并刷新索引）。
-      // 逐个事件去跑字体/图标扫描只会把这些文件数变成主线程的卡顿，所以这里直接不看包内部的变化；
-      // 包索引本身仍要跟，它决定有哪些包可用。
-      const changedPaths = event.payload.paths
-        .map((path) => normalizePath(path))
-        .filter((path) => {
-          const relative = toRelativeProjectPath(path).toLocaleLowerCase()
-          if (relative === PROJECT_PACKAGE_MANIFEST_FILE_NAME.toLocaleLowerCase()) return true
-          return !relative.startsWith(`${PROJECT_INTERNAL_DIRECTORY_NAME}/packages/`)
-        })
+      // 项目里的 `.ocpack` 现在就是"这个项目装了哪些包"本身，所以它们的变化必须看见：
+      // 用户从资源管理器拖进来一个、或者 `git pull` 拉回来一个，都要重扫。
+      const changedPaths = event.payload.paths.map((path) => normalizePath(path))
       if (changedPaths.length === 0) return
       fileChangeRevision.value += 1
       if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_PROFILE_FILE_NAME)))) {
@@ -877,6 +851,8 @@ async function setProjectPath(path: string) {
   indexedEntries.value = []
   registeredDirectories.value = new Map()
   expandedDirectories.value = new Set()
+  // 换项目就把"解不开的包"忘掉：那个记录只在同一个项目里说得通。
+  unusableFingerprints.clear()
     clearProjectProfile()
     clearProjectFontRegistry()
     clearProjectIconRegistry()
@@ -1125,168 +1101,66 @@ async function getProjectFontImportConflict(
   )
 }
 
-type ResourcePackageInstallOptions = {
-  confirmReplacement?: (next: ResourcePackageInstallResult['manifest'], previous: ResourcePackageInstallResult['manifest']) => boolean | Promise<boolean>
-  /** 安装到指定 Key 而不是归档内的 Key，用于远程包或解决 Key 冲突。 */
-  targetKey?: string
+/** 解不开的包：别再排一次队，也别指望它。为什么解不开已经报在发生处了。 */
+const unusableFingerprints = new Set<string>()
+
+/**
+ * 发现一个还没解开的包就把它排上队，**不等它**。解开是幂等的、按指纹去重的，
+ * 所以两个项目同时用到同一个包也只会解一次。解完之后重建一次环境，引用它的图标与字体自己出现。
+ */
+function schedulePackageUnpacking(
+  archive: ResourcePackageArchive,
+  archivePath: string,
+  packagesRoot: string,
+): void {
+  void unpackResourcePackage(archive, archivePath, packagesRoot).then(
+    () => reloadProjectResourceEnvironment(),
+    (error: unknown) => {
+      // 错误对象就在手边，报一次就够；不再往别的地方挂第二份文案。
+      unusableFingerprints.add(archive.fingerprint)
+      reportAppError('OC-E3017', { path: archivePath, error })
+      void reloadProjectResourceEnvironment()
+    },
+  )
 }
 
-async function installResourcePackageFile(
-  sourcePath: string,
-  options: ResourcePackageInstallOptions = {},
-): Promise<ImportedResourcePackage> {
-  const projectRootPath = ensureProjectOpen()
-  const preview = await previewResourcePackage({
-    projectRootPath,
-    sourcePath: normalizePath(sourcePath),
-    ...(options.targetKey ? { targetKey: options.targetKey } : {}),
-  })
-  const decision = decideResourcePackageInstallation(preview.manifest, preview.existingManifest)
-  if (decision === 'unchanged' && preview.existingManifest && preview.existingFingerprint) {
-    await persistProjectPackageIndex(preview.existingManifest)
-    return { manifest: preview.existingManifest, targetPath: preview.targetPath, replaced: false, unchanged: true, fingerprint: preview.existingFingerprint }
-  }
-  if (decision === 'replace' && preview.existingManifest) {
-    if (!options.confirmReplacement) throw new Error('Package replacement requires confirmation')
-    const accepted = await options.confirmReplacement(preview.manifest, preview.existingManifest)
-    if (!accepted) throw new Error('Package installation was cancelled')
-  }
-  // 先装再写索引：反过来会留下"索引里声明了、磁盘上却没有"的幽灵条目。
-  const installed = await installResourcePackage({ preview })
-  await persistProjectPackageIndex(installed.manifest)
+/**
+ * 把一个 `.ocpack` 复制进项目 —— 这就是"装"。装进去就算数：机器上那份删了也不影响，
+ * 项目自己带着归档提交进 git。
+ *
+ * 复制之前先读一遍：读不出身份的归档不进项目，否则它只会在那里当一个谁也叫不出名字的文件。
+ *
+ * **文件名由坐标唯一决定**，所以同一个包再装一次就是覆盖同一个文件，同一个坐标换了一份内容
+ * 就是就地替换 —— 项目里有且只有这一份。分隔符用 `@`：它不可能出现在作者、包名或版本里，
+ * 所以两个不同的坐标不会撞成同一个文件名。
+ */
+async function installResourcePackageFile(sourcePath: string, projectRootPath?: string): Promise<void> {
+  const rootPath = projectRootPath ? normalizePath(projectRootPath) : ensureProjectOpen()
+  const archive = await readResourcePackageArchive(sourcePath)
+  const packagesRoot = `${rootPath}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`
+  await fileSystemService.createDirectory(packagesRoot)
+  const target = `${packagesRoot}/${archive.coordinate.replace(/\//g, '@')}.ocpack`
+  // 别把一个文件复制到它自己身上：那会先截断再读，把包毁成 0 字节。
+  if (pathIdentity(normalizePath(sourcePath)) === pathIdentity(target)) return
+  await fileSystemService.copyFile(sourcePath, target)
+  // 装进一个还没打开的项目（新建项目时的预装）不需要刷新当前项目。
+  if (!projectPath.value || pathIdentity(rootPath) !== pathIdentity(projectPath.value)) return
   await reloadProjectResourceEnvironment()
   await refreshIndexedEntries()
-  return installed
 }
 
-async function persistProjectPackageIndex(manifest: ResourcePackageInstallResult['manifest']): Promise<void> {
-  const next = new Map(projectPackageManifests.value)
-  next.set(manifest.key, { version: manifest.version })
-  await writeProjectPackageIndex(next)
-  projectPackageManifests.value = next
-}
-
-type RequiredPackageInput = {
-  readonly key: string
-  readonly version: string
-  readonly source?: string | null
-}
-
-async function addRequiredPackages(entries: readonly RequiredPackageInput[]): Promise<void> {
-  if (!entries.length) return
-  const next = new Map(projectPackageManifests.value)
-  for (const entry of entries) {
-    const key = entry.key.trim()
-    const version = entry.version.trim()
-    if (!key || !version) throw new Error('Package Key and version are required')
-    next.set(key, { version, ...(entry.source?.trim() ? { source: entry.source.trim() } : {}) })
-  }
-  await writeProjectPackageIndex(next)
-  projectPackageManifests.value = next
-}
-
-async function installMissingRemotePackages(
-  entries: readonly { key: string; version: string; source?: string | null }[],
-  onProgress?: (completed: number, total: number) => void,
-): Promise<{ succeeded: string[]; failed: string[] }> {
-  ensureProjectOpen()
-  const succeeded: string[] = []
-  const failed: string[] = []
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index]!
-    let downloadedPath: string | null = null
-    try {
-      const source = parseRemotePackageSource(entry.source ?? '', entry.version)
-      const downloadsDirectory = await resolveAppDownloadPath()
-      const target = await resolveAppDownloadPath(`${toKeySlug(entry.key)}-${toKeySlug(entry.version, 'version')}.zip`)
-      await fileSystemService.createDirectory(downloadsDirectory)
-      await downloadRemotePackage(source, target)
-      downloadedPath = target
-      const installed = await installResourcePackageFile(target, { targetKey: entry.key })
-      const next = new Map(projectPackageManifests.value)
-      next.set(entry.key, { version: installed.manifest.version, source: entry.source })
-      await writeProjectPackageIndex(next)
-      projectPackageManifests.value = next
-      succeeded.push(entry.key)
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause)
-      reportAppError('OC-E3017', `${entry.key} (${entry.source ? `${entry.source}@${entry.version}` : entry.version}): ${message}`)
-      failed.push(entry.key)
-    } finally {
-      // 下载件只用于本次安装，无论成功失败都不留在磁盘上。
-      if (downloadedPath) {
-        try {
-          await fileSystemService.deleteFile(downloadedPath)
-        } catch {
-          // 临时文件删除失败不影响安装结果。
-        }
-      }
-      onProgress?.(index + 1, entries.length)
-    }
-  }
-  return { succeeded, failed }
-}
-
-async function removeRequiredPackage(packageKey: string): Promise<boolean> {
-  const key = packageKey.trim().toLocaleLowerCase()
-  const entry = [...projectPackageManifests.value].find(([candidate]) => candidate.toLocaleLowerCase() === key)
-  if (!entry) return false
-  const next = new Map(projectPackageManifests.value)
-  next.delete(entry[0])
-  await writeProjectPackageIndex(next)
-  projectPackageManifests.value = next
-  return true
-}
-
-async function writeProjectPackageIndex(manifests: ReadonlyMap<string, RequiredPackage>): Promise<void> {
-  const projectRootPath = ensureProjectOpen()
-  await fileSystemService.writeFile(`${projectRootPath}/${PROJECT_PACKAGE_MANIFEST_FILE_NAME}`, serializeProjectPackageManifest({
-    type: PROJECT_PACKAGE_MANIFEST_TYPE,
-    packages: Object.fromEntries(manifests),
-  }))
-}
-
-async function removeResourcePackage(packageKey: string): Promise<boolean> {
-  const projectRootPath = ensureProjectOpen()
-  const key = packageKey.trim().toLocaleLowerCase()
-  const packagesRoot = `${projectRootPath}/.opencard/packages`
-  // 按磁盘上真实存在的目录来删：只按索引里的 Key 去算路径时，一旦 Key 对不上就会
-  // "索引清空、目录还在"，而扫描目录的加载逻辑会把它当已安装包读回来。
-  const entries = await fileSystemService.readDirectoryEntries(packagesRoot, 1).catch(() => [])
-  const directories = entries
-    .filter(entry => entry.isDirectory && !entry.isSymlink)
-    .map(entry => entry.name)
-  const matches = directories.filter(name => name.toLocaleLowerCase() === key)
-  for (const name of matches) {
-    await fileSystemService.deleteFile(`${packagesRoot}/${name}`)
-    if (await fileSystemService.fileExists(`${packagesRoot}/${name}`)) {
-      throw new Error(`Could not remove the installed package: ${name}`)
-    }
-  }
-  if (matches.length === 0 && !projectPackageManifests.value.has(key)) return false
-
-  const next = new Map(projectPackageManifests.value)
-  for (const candidate of next.keys()) {
-    if (candidate.toLocaleLowerCase() === key) next.delete(candidate)
-  }
-  await writeProjectPackageIndex(next)
-  projectPackageManifests.value = next
+/** 卸载 = 删掉那个文件。共享的解开缓存不受影响 —— 它是派生的，删了会自动重建。 */
+async function removeResourcePackage(archivePath: string): Promise<void> {
+  await fileSystemService.deleteFile(archivePath)
   await reloadProjectResourceEnvironment()
   await refreshIndexedEntries()
-  return true
 }
 
-async function checkResourcePackage(packageKey: string): Promise<ResourcePackageCheckResult | null> {
-  const projectRootPath = ensureProjectOpen()
-  const key = packageKey.trim().toLocaleLowerCase()
-  const manifestEntry = [...projectPackageManifests.value].find(([candidate]) => candidate.toLocaleLowerCase() === key)
-  if (!manifestEntry) return null
-  const [storedKey, required] = manifestEntry
-  return await checkInstalledResourcePackage({
-    projectRootPath,
-    packageKey: storedKey,
-    requiredVersion: required.version,
-  })
+/** 按归档路径找项目里的那个包。文件名不参与身份，所以路径是它在项目里的唯一标识。 */
+function findProjectResourcePackage(archivePath: string): ProjectResourcePackage | null {
+  const identity = pathIdentity(normalizePath(archivePath))
+  return [...projectResourcePackages.value.values()]
+    .find(candidate => pathIdentity(candidate.archivePath) === identity) ?? null
 }
 
 async function createEntryWithAvailableName(
@@ -1657,7 +1531,6 @@ export function useProjectStore() {
     renderEnvironment,
     projectIconLoadErrors: readonly(projectIconLoadErrors),
     projectDictionary: readonly(projectDictionary),
-    projectPackageManifests: readonly(projectPackageManifests),
     projectResourcePackages: readonly(projectResourcePackages),
     projectResourceEnvironment,
     resolvedDictionary: readonly(resolvedDictionary),
@@ -1701,11 +1574,8 @@ export function useProjectStore() {
     importProjectFontFiles,
     getProjectFontImportConflict,
     installResourcePackageFile,
-    addRequiredPackages,
-    installMissingRemotePackages,
-    removeRequiredPackage,
     removeResourcePackage,
-    checkResourcePackage,
+    findProjectResourcePackage,
     createEntryWithAvailableName,
     trashFile,
     revealEntryInFileManager,

@@ -5,15 +5,15 @@ describe('project font registry', () => {
   it('normalizes six font slots and composition font keys', () => {
     expect(parseProjectFontRegistry({
       families: [{ key: 'brand', name: ' Brand ', files: {
-        normal: { upright: 'typography@Brand-Regular.woff2' },
-        bold: { italic: '@shared/Brand-BoldItalic.ttf' },
+        normal: { upright: 'alice/brand@1.0.0#Brand-Regular.woff2' },
+        bold: { italic: '#shared/Brand-BoldItalic.ttf' },
       } }],
       compositions: [{ key: 'body', name: ' Body ', members: [
         { fontKey: 'brand', ranges: [{ start: 65, end: 90 }, { start: 91, end: 122 }] },
         { fontKey: 'fallback' },
       ] }],
     })).toEqual({ families: [{ key: 'brand', name: 'Brand', files: {
-      normal: { upright: 'typography@Brand-Regular.woff2' }, bold: { italic: '@shared/Brand-BoldItalic.ttf' },
+      normal: { upright: 'alice/brand@1.0.0#Brand-Regular.woff2' }, bold: { italic: '#shared/Brand-BoldItalic.ttf' },
     } }], compositions: [{ key: 'body', name: 'Body', members: [
       { fontKey: 'brand', ranges: [{ start: 65, end: 122 }] }, { fontKey: 'fallback' },
     ] }] })

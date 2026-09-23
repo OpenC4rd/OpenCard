@@ -15,7 +15,7 @@ describe('project icon registry', () => {
         grid: { snapToGrid: true, rows: 2, columns: 3 },
         icons: [{
           iconKey: 'warning', name: 'Warning',
-          source: 'theme@icons/warning.svg', tint: 'original', pixelated: true,
+          source: 'alice/theme@1.0.0#icons/warning.svg', tint: 'original', pixelated: true,
           x: 0, y: 0, width: 16, height: 16, atlasRotation: 90,
         }],
       }],
@@ -25,7 +25,7 @@ describe('project icon registry', () => {
         key: 'status',
         icons: [{
           iconKey: 'warning', name: 'Warning',
-          source: 'theme@icons/warning.svg', tint: 'original', pixelated: true,
+          source: 'alice/theme@1.0.0#icons/warning.svg', tint: 'original', pixelated: true,
         }],
       }],
     })

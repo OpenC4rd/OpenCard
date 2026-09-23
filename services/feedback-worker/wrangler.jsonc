@@ -19,6 +19,8 @@
     }
   },
   "vars": {
+    // 反馈仓库刻意留在旧所有者名下：它是私有基础设施，用户侧看不到它在哪，
+    // 而搬过去要在新账号上重装（甚至重建）GitHub App 并更新安装 ID —— 不值当。
     "GITHUB_OWNER": "POPCORNBOOM",
     "GITHUB_REPO": "OpenCard-reports",
     "ALLOWED_ORIGINS": "http://tauri.localhost,https://tauri.localhost,tauri://localhost,http://localhost:1420"

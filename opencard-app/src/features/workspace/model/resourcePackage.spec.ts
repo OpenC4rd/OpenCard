@@ -1,23 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import {
   normalizeResourcePackageManifest,
-  resolveInstalledResourcePackageKey,
-  resolveInstalledResourcePackageManifestPath,
+  resourcePackageCoordinate,
 } from './resourcePackage'
 
 function manifest(publicFonts: unknown, publicIconSeries: unknown = []) {
   return {
-    type: 'opencard-resource-package', key: 'theme', name: 'Theme', version: '1.0.0',
-    contentHash: '0'.repeat(64), public: { fonts: publicFonts, iconSeries: publicIconSeries },
+    type: 'opencard-resource-package',
+    author: 'alice',
+    name: 'theme',
+    version: '1.0.0',
+    title: 'Theme',
+    public: { fonts: publicFonts, iconSeries: publicIconSeries },
   }
 }
 
-describe('installed package manifest paths', () => {
-  it('constructs and reverses the single-Key package manifest location', () => {
-    const path = resolveInstalledResourcePackageManifestPath('D:\\Cards\\Demo', 'theme')
-    expect(path).toBe('D:/Cards/Demo/.opencard/packages/theme/.opencard/manifest.json')
-    expect(resolveInstalledResourcePackageKey(path)).toBe('theme')
-    expect(resolveInstalledResourcePackageKey('D:/Cards/Demo/.opencard/packages/group/theme/.opencard/manifest.json')).toBeNull()
+describe('package manifest identity', () => {
+  it('reads the coordinate out of the package own declaration', () => {
+    const normalized = normalizeResourcePackageManifest(manifest([]))
+    expect(normalized.issues).toEqual([])
+    expect(resourcePackageCoordinate(normalized.manifest)).toBe('alice/theme@1.0.0')
+  })
+
+  it('normalizes case rather than rejecting it, exactly like a reference does', () => {
+    const normalized = normalizeResourcePackageManifest({ ...manifest([]), author: ' Alice ', title: '' })
+    expect(resourcePackageCoordinate(normalized.manifest)).toBe('alice/theme@1.0.0')
+    // 显示名缺省就是包名。
+    expect(normalized.manifest.title).toBe('theme')
+  })
+
+  it('refuses to invent an identity when one is missing or malformed', () => {
+    for (const broken of [
+      { ...manifest([]), author: undefined },
+      { ...manifest([]), name: 'Not A Slug' },
+      { ...manifest([]), version: '1.0' },
+      { ...manifest([]), version: undefined },
+    ]) {
+      const normalized = normalizeResourcePackageManifest(broken)
+      expect(normalized.issues.map(issue => issue.path)).toContain('author')
+      expect(resourcePackageCoordinate(normalized.manifest)).toBeNull()
+    }
   })
 })
 

@@ -14,7 +14,6 @@ import {
   resolveFileTypeById,
 } from '../model/fileTypes'
 import { fileSystemService } from '../services/fileSystemService'
-import { resolveInstalledResourcePackageKey } from '../model/resourcePackage'
 import { useProjectStore } from './projectStore'
 import type {
   CardDesignerLayoutState,
@@ -32,10 +31,7 @@ import {
 const PROJECT_CONFIGURATION_AUTOSAVE_KEY_PREFIX = 'project-configuration-autosave:'
 const CONTENTLESS_EDITOR_IDS = new Set(['image-preview', 'font-preview', 'package-manifest', 'unsupported-file'])
 
-function resolveOpenedSessionName(path: string, fileTypeId: string): string {
-  if (fileTypeId === 'opencard-installed-package-manifest') {
-    return resolveInstalledResourcePackageKey(path) ?? getPathBasename(path)
-  }
+function resolveOpenedSessionName(path: string): string {
   return getPathBasename(path)
 }
 
@@ -301,7 +297,7 @@ export function useEditorSessionStore() {
       resourceKind,
       path: normalizedPath,
       fileTypeId: fileType.id,
-      name: resolveOpenedSessionName(normalizedPath, fileType.id),
+      name: resolveOpenedSessionName(normalizedPath),
       editorId: fileType.editorId,
       savedContent: content,
       draftContent: content,

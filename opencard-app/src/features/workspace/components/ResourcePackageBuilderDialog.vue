@@ -36,13 +36,14 @@
                 @input="name = ($event.target as HTMLInputElement).value" />
             </label>
             <label>
+              <OcText as="span" size="sm">{{ t('resourcePackage.displayName') }}</OcText>
+              <OcFieldInput variant="underline" full-width :value="displayName" :disabled="busy"
+                @input="displayName = ($event.target as HTMLInputElement).value" />
+            </label>
+            <label>
               <OcText as="span" size="sm">{{ t('resourcePackage.author') }}</OcText>
               <OcFieldInput variant="underline" full-width mono :value="author" :disabled="busy"
                 @input="author = ($event.target as HTMLInputElement).value" />
-            </label>
-            <label>
-              <OcText as="span" size="sm">{{ t('resourcePackage.key') }}</OcText>
-              <OcFieldInput variant="underline" full-width mono readonly :value="packageKey" :disabled="busy" />
             </label>
             <label>
               <OcText as="span" size="sm">{{ t('resourcePackage.version') }}</OcText>
@@ -61,6 +62,9 @@
               <span class="resource-package-builder__contents-value">{{ row.value }}</span>
             </OcText>
           </div>
+          <OcText v-if="!packageCoordinate" class="resource-package-builder__contents" size="xs" tone="muted">
+            {{ t('resourcePackage.identityHint') }}
+          </OcText>
           <OcText v-if="errorText" class="resource-package-builder__error" tone="danger" role="alert">{{ errorText }}</OcText>
         </aside>
       </div>
@@ -86,7 +90,8 @@ import OcText from '../../../components/base/OcText.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcTree from '../../../components/standard/OcTree.vue'
 import { resolveFileType } from '../model/fileTypes'
-import { createPackageKey, toKeySlug } from '../../../shared/model/keySlug'
+import { formatPackageCoordinate, parsePackageCoordinate } from '../model/packageCoordinate'
+import { toKeySlug } from '../../../shared/model/keySlug'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import type { ProjectPackageBuilderState } from '../../settings/model/appSettings'
 import { findProjectWorkspaceState, updateProjectWorkspaceState, type ProjectWorkspaceStateRead } from '../../settings/model/workspaceState'
@@ -102,6 +107,7 @@ import { fileSystemService } from '../services/fileSystemService'
 import { readProjectCover } from '../services/projectCoverService'
 import type { ProjectCover } from '../model/projectCover'
 import { useProjectStore } from '../store/projectStore'
+import { packageScopeRoots } from '../services/projectResourceEnvironment'
 import { notifyError, notifySuccess } from '../../notifications/titlebarNotices'
 import { useShellProgressTasks } from '../../shell/composables/useShellProgressTasks'
 import { listen } from '@tauri-apps/api/event'
@@ -115,12 +121,12 @@ const { t } = useI18n()
 const projectStore = useProjectStore()
 const appSettingsStore = useAppSettingsStore()
 const name = ref('')
+const displayName = ref('')
 const author = ref('')
 const version = ref('1.0.0')
 const selectedFamilyKeys = ref<Set<string>>(new Set())
 const selectedCompositionKeys = ref<Set<string>>(new Set())
 const selectedIconSeriesKeys = ref<Set<string>>(new Set())
-const selectedPackageKeys = ref<Set<string>>(new Set())
 const selectedImageIds = ref<Set<string>>(new Set())
 const busy = ref(false)
 const errorText = ref('')
@@ -137,14 +143,14 @@ const buildTaskBusy = computed(() => tasks.value.some(task => task.key === PACKA
 /** Everything the background build needs, captured before the dialog closes. */
 type PackageBuildRequest = {
   outputPath: string
-  packageKey: string
+  author: string
   name: string
+  title: string
   version: string
   imagePaths: readonly string[]
   familyKeys: readonly string[]
   compositionKeys: readonly string[]
   iconSeriesKeys: readonly string[]
-  packageKeys: readonly string[]
 }
 
 type PackageCandidate = {
@@ -201,23 +207,20 @@ const imageCandidates = computed<readonly PackageCandidate[]>(() => [
 ])
 const expandedKeys = computed(() => [...expandedKeySet.value])
 const expandedKeySet = ref<Set<string>>(new Set())
-const packageKey = computed(() => {
-  const packageName = name.value.trim()
-  const packageAuthor = toKeySlug(author.value.trim(), '')
-  if (!packageName || !packageAuthor) return ''
-  return createPackageKey({ source: 'local', author: packageAuthor, name: packageName })
+const packageCoordinate = computed(() => {
+  const parsed = parsePackageCoordinate(`${author.value.trim()}/${name.value.trim()}@${version.value.trim()}`)
+  return parsed ? formatPackageCoordinate(parsed) : ''
 })
 const selectedCount = computed(() => selectedFamilyKeys.value.size
   + selectedCompositionKeys.value.size + selectedIconSeriesKeys.value.size
-  + selectedPackageKeys.value.size + selectedImageIds.value.size)
-const canBuild = computed(() => Boolean(packageKey.value && version.value.trim() && selectedCount.value > 0))
+  + selectedImageIds.value.size)
+const canBuild = computed(() => Boolean(packageCoordinate.value && selectedCount.value > 0))
 
 /** 包摘要只列数量：具体带了哪些在左边那棵树里看得见。 */
 const contentSummary = computed<readonly { label: string, value: string }[]>(() => [
   { label: t('resourcePackage.projectFonts'), count: selectedFamilyKeys.value.size },
   { label: t('resourcePackage.fontCompositions'), count: selectedCompositionKeys.value.size },
   { label: t('resourcePackage.icons'), count: selectedIconSeriesKeys.value.size },
-  { label: t('resourcePackage.packages'), count: selectedPackageKeys.value.size },
   { label: t('resourcePackage.images'), count: selectedImageIds.value.size },
 ].filter(row => row.count > 0).map(row => ({ label: row.label, value: String(row.count) })))
 
@@ -288,32 +291,6 @@ const treeData = computed<OcNodeCollection>(() => {
       return key
     }))
   }
-  // 子包这一类始终显示：没有安装包时给一条禁用的提示，而不是让这一类凭空消失。
-  const packages = [...projectStore.projectResourcePackages.value.values()]
-  const packageCategoryKey = 'category:packages'
-  rootKeys.push(packageCategoryKey)
-  items.set(packageCategoryKey, {
-    label: t('resourcePackage.packages'), visual: { type: 'icon', icon: 'file.package', iconTone: 'config' },
-  })
-  if (packages.length === 0) {
-    children.set(packageCategoryKey, ['packages-empty'])
-    items.set('packages-empty', {
-      label: t('resourcePackage.noPackages'),
-      visual: { type: 'icon', icon: 'file.package', iconTone: 'muted' },
-      disabled: true,
-    })
-  } else {
-    children.set(packageCategoryKey, packages.map(pkg => {
-      const key = `package:${pkg.manifest.key}`
-      const selected = selectedPackageKeys.value.has(pkg.manifest.key)
-      items.set(key, {
-        label: pkg.manifest.name, tail: [pkg.manifest.key, pkg.manifest.version, ...toggleSelection(selected)],
-        visual: { type: 'icon', icon: 'file.package', iconTone: selected ? 'active' : 'muted' },
-        contextActions: toggleSelection(selected),
-      })
-      return key
-    }))
-  }
   if (imageCandidates.value.length > 0) {
     const categoryKey = 'category:images'
     rootKeys.push(categoryKey)
@@ -349,6 +326,7 @@ watch(() => props.open, open => {
   if (!open) return
   const cached = packageBuilderCache()
   name.value = cached?.name || props.projectName
+  displayName.value = cached?.title || name.value
   // 作者默认取项目作者，不再和设置里的作者 ID 联动。
   author.value = cached?.author || projectStore.projectProfile.value?.author || ''
   version.value = cached?.version || '1.0.0'
@@ -368,12 +346,8 @@ watch(() => props.open, open => {
     imageCandidates.value.map(candidate => candidate.id),
     cached?.imagePaths.map(imageSelectionId),
   )
-  selectedPackageKeys.value = restoreSelection(
-    [...projectStore.projectResourcePackages.value.keys()],
-    cached?.packageKeys,
-  )
   expandedKeySet.value = new Set([
-    'category:fonts', 'font-group:families', 'font-group:compositions', 'category:icons', 'category:packages', 'category:images',
+    'category:fonts', 'font-group:families', 'font-group:compositions', 'category:icons', 'category:images',
   ])
   errorText.value = ''
   void refreshProjectCover()
@@ -429,14 +403,6 @@ function handleTreeAction(event: OcNodeActionEvent): void {
     selectedIconSeriesKeys.value = nextSeries
     return
   }
-  if (event.key.startsWith('package:')) {
-    const packageKey = event.key.slice('package:'.length)
-    const nextPackages = new Set(selectedPackageKeys.value)
-    if (selected) nextPackages.add(packageKey)
-    else nextPackages.delete(packageKey)
-    selectedPackageKeys.value = nextPackages
-    return
-  }
   const nextImages = new Set(selectedImageIds.value)
   if (selected) nextImages.add(event.key)
   else nextImages.delete(event.key)
@@ -464,14 +430,14 @@ async function build(): Promise<void> {
     if (!outputPath) return
     request = {
       outputPath,
-      packageKey: packageKey.value,
+      author: author.value.trim(),
       name: name.value.trim(),
+      title: displayName.value.trim() || name.value.trim(),
       version: version.value.trim(),
       imagePaths,
       familyKeys: [...selectedFamilyKeys.value],
       compositionKeys: [...selectedCompositionKeys.value],
       iconSeriesKeys: [...selectedIconSeriesKeys.value],
-      packageKeys: [...selectedPackageKeys.value],
     }
   } catch (cause) {
     errorText.value = cause instanceof Error ? cause.message : String(cause)
@@ -508,15 +474,18 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
   })
   try {
     const result = await buildResourcePackageFromProject({
-      fs: fileSystemService, projectRootPath: props.projectRootPath, key: request.packageKey,
-      name: request.name, version: request.version,
+      fs: fileSystemService, projectRootPath: props.projectRootPath,
+      author: request.author,
+      name: request.name,
+      version: request.version,
+      title: request.title,
+      packageRoots: packageScopeRoots(projectStore.projectResourceEnvironment.value.packages),
       imageSelection: { paths: request.imagePaths },
       fontSelection: {
         familyKeys: request.familyKeys,
         compositionKeys: request.compositionKeys,
       },
       iconSelection: { seriesKeys: request.iconSeriesKeys },
-      packageSelection: { keys: request.packageKeys },
       outputPath: request.outputPath,
     })
     const builtPath = result.outputPath ?? request.outputPath
@@ -532,12 +501,12 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
 function rememberBuildInputs(imagePaths: readonly string[]): void {
   const cache: ProjectPackageBuilderState = {
     name: name.value.trim(),
+    title: displayName.value.trim(),
     author: author.value.trim(),
     version: version.value.trim(),
     fontFamilyKeys: [...selectedFamilyKeys.value],
     fontCompositionKeys: [...selectedCompositionKeys.value],
     iconSeriesKeys: [...selectedIconSeriesKeys.value],
-    packageKeys: [...selectedPackageKeys.value],
     imagePaths: [...imagePaths],
   }
   appSettingsStore.updateProjectCreation({

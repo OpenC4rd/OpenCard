@@ -105,13 +105,10 @@ mod tests {
         let paths = collect_supported_paths(
             [
                 "cards/main.ocdocument",
-                ".ocproject",
-                ".ocfonts",
-                ".ocicons",
-                ".oclocale",
                 "blocks/square.ocblock",
                 "template.octemplate",
                 "icons.ociconpack",
+                "packages/theme.ocpack",
                 "notes.txt",
             ],
             Path::new("D:/Project"),
@@ -121,13 +118,10 @@ mod tests {
             paths,
             [
                 "D:/Project/cards/main.ocdocument",
-                "D:/Project/.ocproject",
-                "D:/Project/.ocfonts",
-                "D:/Project/.ocicons",
-                "D:/Project/.oclocale",
                 "D:/Project/blocks/square.ocblock",
                 "D:/Project/template.octemplate",
                 "D:/Project/icons.ociconpack",
+                "D:/Project/packages/theme.ocpack",
             ]
         );
     }

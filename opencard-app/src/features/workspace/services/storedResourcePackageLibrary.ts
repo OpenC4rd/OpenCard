@@ -1,14 +1,14 @@
 import { join } from '@tauri-apps/api/path'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
-import { resolveAppStorageRoot } from '../../../shared/storage/appStoragePaths'
-import { fileSystemService, type FileSystemService } from './fileSystemService'
-import { previewResourcePackage } from './resourcePackageInstaller'
-import { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from '../model/resourcePackage'
 import {
-  STORED_RESOURCE_PACKAGE_DIRECTORY_NAME,
-  type StoredResourcePackage,
-  type StoredResourcePackageSnapshot,
-} from '../model/storedResourcePackage'
+  APP_PACKAGE_DIRECTORY_NAME,
+  resolveAppStorageRoot,
+} from '../../../shared/storage/appStoragePaths'
+import { toKeySlug } from '../../../shared/model/keySlug'
+import { fileSystemService, type FileSystemService } from './fileSystemService'
+import { readResourcePackageArchive, type ResourcePackageArchive } from './resourcePackageArchive'
+import { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from '../model/resourcePackage'
+import type { StoredResourcePackage, StoredResourcePackageSnapshot } from '../model/storedResourcePackage'
 
 export interface StoredResourcePackagePathService {
   appStorageDir(): Promise<string>
@@ -29,9 +29,8 @@ function isPackageFile(entry: DirEntry): boolean {
 }
 
 /**
- * 软件存储里的附加包列表：导入时校验归档，创建项目时再按需装入项目。
- * 存储本身不是一个项目，校验只借用应用存储目录作为“已经装过哪些包”的检查根，
- * 而该根下永远不会有安装好的包目录，因此每次校验都是纯粹的归档检查。
+ * 软件存储里的附加包列表：导入时读一遍归档，确认它是个能说出自己是谁的包。
+ * 存储里的归档不属于任何项目，所以读它不需要任何项目根 —— 身份来自包自己的清单。
  */
 export class StoredResourcePackageLibraryService {
   constructor(
@@ -48,12 +47,12 @@ export class StoredResourcePackageLibraryService {
       if (!isPackageFile(entry)) continue
       const path = await this.paths.join(root, entry.name)
       try {
-        packs.push(await this.inspect(path, root))
+        packs.push(this.describe(path, await readResourcePackageArchive(path)))
       } catch (cause) {
         warnings.push({ path, reason: describeError(cause) })
       }
     }
-    return { packs: packs.sort((left, right) => left.name.localeCompare(right.name)), warnings }
+    return { packs: packs.sort((left, right) => left.title.localeCompare(right.title)), warnings }
   }
 
   async pickSourceFile(title: string): Promise<string | null> {
@@ -64,28 +63,27 @@ export class StoredResourcePackageLibraryService {
     })
   }
 
-  /** 校验之后才写入存储，因此存进来的包一定可以装入项目。 */
+  /** 读得出来才写入存储，因此存进来的包一定可以复制进项目。 */
   async importPackage(sourcePath: string): Promise<StoredResourcePackage> {
     const root = await this.resolveRoot()
     await this.fs.createDirectory(root)
-    const inspected = await this.inspect(sourcePath, root)
-    const targetPath = await this.resolveAvailablePath(root, inspected.key)
+    const archive = await readResourcePackageArchive(sourcePath)
+    const targetPath = await this.resolveAvailablePath(root, toKeySlug(archive.coordinate.replace('/', '-'), 'package'))
     // 归档可能很大，直接复制文件，不把整包读进前端内存。
     await this.fs.copyFile(sourcePath, targetPath)
-    return { ...inspected, path: targetPath }
+    return this.describe(targetPath, archive)
   }
 
   async removePackage(path: string): Promise<void> {
     await this.fs.deleteFile(path)
   }
 
-  private async inspect(path: string, storeRoot: string): Promise<StoredResourcePackage> {
-    const preview = await previewResourcePackage({ projectRootPath: storeRoot, sourcePath: path })
+  private describe(path: string, archive: ResourcePackageArchive): StoredResourcePackage {
     return {
       path,
-      key: preview.manifest.key,
-      name: preview.manifest.name,
-      version: preview.manifest.version,
+      coordinate: archive.coordinate,
+      title: archive.manifest.title,
+      fingerprint: archive.fingerprint,
     }
   }
 
@@ -102,7 +100,7 @@ export class StoredResourcePackageLibraryService {
   private async resolveRoot(): Promise<string> {
     return await this.paths.join(
       await this.paths.appStorageDir(),
-      STORED_RESOURCE_PACKAGE_DIRECTORY_NAME,
+      APP_PACKAGE_DIRECTORY_NAME,
     )
   }
 }

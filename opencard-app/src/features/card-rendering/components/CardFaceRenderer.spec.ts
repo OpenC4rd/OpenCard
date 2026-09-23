@@ -22,7 +22,7 @@ describe('CardFaceRenderer resources', () => {
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project',
       fontDocument: {}, fonts: { brand: { kind: 'family', name: 'Brand', family: font } },
-      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, issues: [],
+      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
     const native = parseRenderReadyBlockForTest(createBlock('text-block', {
       id: 'native-text', content: '<p>Native</p>', fontFamily: 'font:brand',
@@ -71,7 +71,7 @@ describe('CardFaceRenderer resources', () => {
       fonts: {},
       iconDocument: {},
       iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      issues: [],
+
     }
     const resourceContext = createCardRenderResourceContext({
       resourceScopes: new Map([[

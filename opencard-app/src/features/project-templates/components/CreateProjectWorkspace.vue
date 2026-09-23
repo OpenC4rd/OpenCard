@@ -35,8 +35,8 @@
               <dt>{{ t('projectTemplates.fields.resourcePackages') }}</dt>
               <dd>
                 <ul v-if="attachedResourcePackages.length" class="create-project__resource-package-list">
-                  <li v-for="pack in attachedResourcePackages" :key="pack.key">
-                    {{ pack.name }}
+                  <li v-for="pack in attachedResourcePackages" :key="pack.path">
+                    {{ pack.title }}
                   </li>
                 </ul>
                 <span v-else>{{ t('projectTemplates.status.noResourcePackagesSelected') }}</span>

@@ -1,4 +1,5 @@
 /** Pure helpers for projecting Card Designer fields into PropertyEditor definitions. */
+import { formatPackageCoordinate, formatPackageIdentity, parsePackageQualifier } from '../workspace/model/packageCoordinate'
 import {
   exposesCardFieldReference,
   getCardFieldDefinition,
@@ -26,6 +27,7 @@ import {
   type ProjectIconSource,
 } from '../workspace/services/projectIconCompletion'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
+import { resolveProjectResourcePackageCoordinate } from '../workspace/services/projectResourceEnvironment'
 import { buildResourceFontCatalog } from '../workspace/services/resourceReference'
 import {
   resolveReferenceCompletion,
@@ -134,10 +136,10 @@ export function enrichCardPropertyFieldDefinition(options: {
     },
     ...Array.from(options.resourceEnvironment?.packageEnvironments ?? []).flatMap(([packageKey, environment]) => {
       const pkg = options.resourceEnvironment?.packages?.get(packageKey)
-      return pkg && !pkg.unavailable && environment.iconCatalog.entries.length
+      return pkg && environment.iconCatalog.entries.length
         ? [{
-          packageKey: pkg.manifest.key,
-          label: pkg.manifest.name,
+          packageKey: formatPackageCoordinate(pkg.coordinate),
+          label: pkg.manifest.title,
           catalog: environment.iconCatalog,
         }]
         : []
@@ -219,8 +221,11 @@ function createFontCompletionProvider(
   for (const font of fontCatalog) {
     if (font.source === 'system') continue
     const prefix = font.value.slice(0, font.value.indexOf('font:') + 5)
-    const packageKey = prefix.includes('@') ? prefix.slice(0, prefix.indexOf('@')) : null
-    scopes.set(prefix, packageKey ? environment?.packages?.get(packageKey)?.manifest.name || packageKey : projectLabel)
+    // 引用里写的是**完整坐标**，而资源环境也按坐标索引：解析出来直接查表，否则拿不到显示名。
+    const qualifier = prefix.includes('#') ? parsePackageQualifier(prefix.slice(0, prefix.indexOf('#'))) : null
+    const coordinate = qualifier && environment ? resolveProjectResourcePackageCoordinate(environment, qualifier) : null
+    const pkg = coordinate ? environment?.packages?.get(coordinate) : null
+    scopes.set(prefix, qualifier ? pkg?.manifest.title || formatPackageIdentity(qualifier) : projectLabel)
   }
   return async ({ value, cursor }) => {
     const position = Math.min(cursor, value.length)

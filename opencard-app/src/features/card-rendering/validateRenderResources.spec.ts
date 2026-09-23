@@ -65,7 +65,7 @@ describe('validateRenderResources', () => {
 
   it('warns for named system fonts while allowing portable and scoped font families', () => {
     const ready = parseRenderDocument(
-      documentWithFont('Arial; "Microsoft YaHei"; sans-serif; system-ui; font:body; theme@font:title; Arial'),
+      documentWithFont('Arial; "Microsoft YaHei"; sans-serif; system-ui; font:body; alice/theme@1.0.0#font:title; Arial'),
       { instanceId: 'instance' },
     ).document
 
@@ -104,25 +104,25 @@ describe('validateRenderResources', () => {
 
   it('reports a missing package separately from a missing package resource file', () => {
     const missingPackage = validateRenderResources(
-      readyImage('missing@images/portrait.png'),
+      readyImage('goblin/missing@1.0.0#icon:status/warning'),
       undefined,
       null,
       createCardRenderResourceContext({}),
     )
     expect(missingPackage).toContainEqual(expect.objectContaining({
       type: 'card-designer.resource.package-missing',
-      parameters: expect.objectContaining({ packageKey: 'missing' }),
+      parameters: expect.objectContaining({ packageKey: 'goblin/missing@1.0.0' }),
     }))
 
     const packageEnvironment: ProjectResourceEnvironment = {
       kind: 'package',
-      namespace: 'package-theme',
-      rootPath: '/project/.opencard/packages/theme',
+      namespace: 'package-alice-theme-1.0.0',
+      rootPath: '/project/.opencard/packages/alice/theme/1.0.0',
       fontDocument: {},
       fonts: {},
       iconDocument: {},
       iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      issues: [],
+
     }
     const hostEnvironment: ProjectResourceEnvironment = {
       kind: 'project',
@@ -132,17 +132,23 @@ describe('validateRenderResources', () => {
       fonts: {},
       iconDocument: {},
       iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      packages: new Map([['theme', {
-        manifest: normalizeResourcePackageManifest({}, 'theme').manifest,
+      packages: new Map([['alice/theme@1.0.0', {
+        coordinate: { author: 'alice', name: 'theme', version: '1.0.0' },
+        manifest: normalizeResourcePackageManifest({
+          type: 'opencard-resource-package',
+          author: 'alice', name: 'theme', version: '1.0.0', title: 'Theme',
+          public: { fonts: [], iconSeries: [] },
+        }).manifest,
+        archivePath: '/project/.opencard/packages/theme.ocpack',
+        fingerprint: 'fp-theme',
         rootPath: packageEnvironment.rootPath!,
         cover: null,
-        issues: [],
       }]]),
-      packageEnvironments: new Map([['theme', packageEnvironment]]),
-      issues: [],
+      packageEnvironments: new Map([['alice/theme@1.0.0', packageEnvironment]]),
+
     }
     const missingFile = validateRenderResources(
-      parseRenderDocument(documentWithFont('theme@font:body'), { instanceId: null }).document,
+      parseRenderDocument(documentWithFont('alice/theme@1.0.0#font:body'), { instanceId: null }).document,
       undefined,
       null,
       createCardRenderResourceContext({
@@ -152,7 +158,7 @@ describe('validateRenderResources', () => {
     )
     expect(missingFile).toContainEqual(expect.objectContaining({
       type: 'card-designer.resource.file-missing',
-      parameters: expect.objectContaining({ reference: 'theme@font:body' }),
+      parameters: expect.objectContaining({ reference: 'alice/theme@1.0.0#font:body' }),
     }))
   })
 })

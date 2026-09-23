@@ -1110,11 +1110,9 @@ const propertyProjectContext = computed(() => ({
 }))
 const propertyDirectoryProvider = computed<FilePathDirectoryProvider | undefined>(() => {
   const rootPath = props.resourceRootPath
-  const sourceFilePath = props.filePath?.startsWith('draft://') ? null : props.filePath
-  return rootPath && sourceFilePath
+  return rootPath
     ? createResourceDirectoryProvider(
         rootPath,
-        sourceFilePath,
         projectStore.projectResourceEnvironment.value,
         fileSystemService,
         {

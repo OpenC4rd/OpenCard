@@ -253,8 +253,8 @@ describe('CreateProjectWorkspace', () => {
 
     await wrapper.setProps({
       attachedResourcePackages: [
-        { path: '/app/packages/theme.ocpack', key: 'theme', name: 'Theme Pack', version: '1.0.0' },
-        { path: '/app/packages/extra.ocpack', key: 'extra', name: 'Extra Pack', version: '2.1.0' },
+        { path: '/app/packages/alice-theme-1.0.0.ocpack', coordinate: 'alice/theme@1.0.0', title: 'Theme Pack', fingerprint: 'fp-theme' },
+        { path: '/app/packages/bob-extra-2.1.0.ocpack', coordinate: 'bob/extra@2.1.0', title: 'Extra Pack', fingerprint: 'fp-extra' },
       ],
     })
     await flushPromises()

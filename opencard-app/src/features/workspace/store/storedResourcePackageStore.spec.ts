@@ -7,7 +7,12 @@ type LibraryService = Pick<
   'loadLibrary' | 'pickSourceFile' | 'importPackage' | 'removePackage'
 >
 
-const theme = { path: '/app/packages/theme.ocpack', key: 'theme', name: 'Theme', version: '1.0.0' }
+const theme = {
+  path: '/app/packages/alice-theme-1.0.0.ocpack',
+  coordinate: 'alice/theme@1.0.0',
+  title: 'Theme',
+  fingerprint: 'fp-theme',
+}
 
 function createService(): LibraryService & { loadLibrary: ReturnType<typeof vi.fn> } {
   return {

@@ -2,7 +2,7 @@ import { basename, join, resolveResource } from '@tauri-apps/api/path'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { parseCardDocument } from '../../../entities/card/storage'
-import { resolveAppStorageRoot } from '../../../shared/storage/appStoragePaths'
+import { APP_TEMPLATE_DIRECTORY_NAME, resolveAppStorageRoot } from '../../../shared/storage/appStoragePaths'
 import { fileSystemService, type FileSystemService } from '../../workspace/services/fileSystemService'
 import { CARD_DOCUMENT_SUFFIX } from '../../workspace/model/fileTypes'
 import { parseProjectMetadataText, serializeProjectMetadata } from '../../workspace/model/projectMetadata'
@@ -40,7 +40,6 @@ import {
 import { isProjectCoverPath } from '../../workspace/model/projectCover'
 
 const BUILTIN_TEMPLATE_INDEX_PATH = 'templates/index.json'
-const USER_TEMPLATE_DIRECTORY_NAME = 'templates'
 const TEMPLATE_MANIFEST_FILE_NAME = 'template.json'
 const TEMPLATE_CONTENT_DIRECTORY_NAME = 'content'
 const STRUCTURED_PROJECT_FILES = [
@@ -686,7 +685,7 @@ export class ProjectTemplateService {
   }
 
   private async resolveUserTemplateRoot(): Promise<string> {
-    return await this.paths.join(await this.paths.appStorageDir(), USER_TEMPLATE_DIRECTORY_NAME)
+    return await this.paths.join(await this.paths.appStorageDir(), APP_TEMPLATE_DIRECTORY_NAME)
   }
 
   private async copyDirectory(sourcePath: string, targetPath: string): Promise<void> {

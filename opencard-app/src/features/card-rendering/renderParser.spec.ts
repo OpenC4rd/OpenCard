@@ -101,10 +101,10 @@ describe('renderParser', () => {
   it('accepts every image source form: path, package path, remote url, and icon reference', () => {
     const accepted = [
       'assets/portrait.png',
-      'theme@assets/portrait.png',
+      'alice/theme@1.0.0#assets/portrait.png',
       'https://images.example.com/portrait.png',
       'icon:status/warning',
-      'theme@icon:status/warning',
+      'alice/theme@1.0.0#icon:status/warning',
     ]
 
     for (const source of accepted) {
@@ -117,6 +117,23 @@ describe('renderParser', () => {
 
       expect(result.document.faces.front.children[0]!.block).toMatchObject({ type: 'image-block', source })
       expect(result.issues).not.toContainEqual(expect.objectContaining({
+        type: 'card-designer.render-parse.invalid-file-path',
+        location: expect.objectContaining({ blockId: 'image', fieldKey: 'source' }),
+      }))
+    }
+  })
+
+  it('rejects the retired key@kind:path and package@version@kind:path spellings', () => {
+    for (const source of ['theme@icon:status/warning', 'alice/theme@1.0.0@icon:status/warning']) {
+      const document = createDocument()
+      document.faces.front.children[0]!.block = createImageBlock({
+        id: 'image', name: 'Image', source,
+      })
+
+      const result = parseRenderDocument(document)
+
+      expect(result.document.faces.front.children[0]!.block).toMatchObject({ type: 'image-block', source: '' })
+      expect(result.issues).toContainEqual(expect.objectContaining({
         type: 'card-designer.render-parse.invalid-file-path',
         location: expect.objectContaining({ blockId: 'image', fieldKey: 'source' }),
       }))
