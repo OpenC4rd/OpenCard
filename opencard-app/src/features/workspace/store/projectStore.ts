@@ -1130,16 +1130,18 @@ function schedulePackageUnpacking(
  *
  * 复制之前先读一遍：读不出身份的归档不进项目，否则它只会在那里当一个谁也叫不出名字的文件。
  *
- * **文件名由坐标唯一决定**，所以同一个包再装一次就是覆盖同一个文件，同一个坐标换了一份内容
- * 就是就地替换 —— 项目里有且只有这一份。分隔符用 `@`：它不可能出现在作者、包名或版本里，
- * 所以两个不同的坐标不会撞成同一个文件名。
+ * **文件名原样保留**：归档叫什么名字，进项目还叫什么名字。所以同一个文件再装一次就是覆盖
+ * 同一份，项目里有且只有一份；也所以两个名字相同而内容不同的包会互相覆盖 —— 名字由人管，
+ * 身份由包自己管。
  */
 async function installResourcePackageFile(sourcePath: string, projectRootPath?: string): Promise<void> {
   const rootPath = projectRootPath ? normalizePath(projectRootPath) : ensureProjectOpen()
-  const archive = await readResourcePackageArchive(sourcePath)
+  // 读一遍确认它是个包（结果不用）：读不出来的归档不进项目，否则它只会在那里当一个
+  // 谁也叫不出名字的文件。
+  await readResourcePackageArchive(sourcePath)
   const packagesRoot = `${rootPath}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`
   await fileSystemService.createDirectory(packagesRoot)
-  const target = `${packagesRoot}/${archive.coordinate.replace(/\//g, '@')}.ocpack`
+  const target = `${packagesRoot}/${getPathBasename(normalizePath(sourcePath))}`
   // 别把一个文件复制到它自己身上：那会先截断再读，把包毁成 0 字节。
   if (pathIdentity(normalizePath(sourcePath)) === pathIdentity(target)) return
   await fileSystemService.copyFile(sourcePath, target)

@@ -80,6 +80,8 @@ type UseShellFileTreeOptions = {
   ensureProjectManagementStructure: () => Promise<void>
   translate: (key: string, params?: Record<string, unknown>) => string
   registeredFontSources?: Readonly<Ref<readonly string[] | null>>
+  /** 归档路径 → 它自述的坐标。包列表的小字用它；读不出身份的包不在表里。 */
+  packageCoordinates?: Readonly<Ref<ReadonlyMap<string, string>>>
 }
 
 function normalizeShellPath(path: string): string {
@@ -274,15 +276,20 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
           .sort((left, right) => left.localeCompare(right))
         for (const nodeKey of packageNodeKeys) {
           const parts = nodeKey.split('/')
+          // 小字是包自述的坐标：文件叫什么名字不算数，所以列表里这两件事各说各的。
+          const coordinate = options.packageCoordinates?.value.get(nodeKey)
           items.set(nodeKey, {
             label: parts[parts.length - 1] ?? nodeKey,
             visual: { type: 'icon', icon: 'file.package', iconTone: 'config' },
-            tail: [{
-              key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
-              title: options.translate('resourcePackage.delete'),
-              icon: 'action.delete',
-              iconTone: 'danger',
-            }],
+            tail: [
+              ...(coordinate ? [coordinate] : []),
+              {
+                key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
+                title: options.translate('resourcePackage.delete'),
+                icon: 'action.delete',
+                iconTone: 'danger',
+              },
+            ],
           })
           targetByNodeKey.set(nodeKey, nodeKey)
           nodeKeyByTargetPath.set(nodeKey, nodeKey)

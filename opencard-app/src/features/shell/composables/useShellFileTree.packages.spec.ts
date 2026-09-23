@@ -36,17 +36,24 @@ describe('useShellFileTree package navigation', () => {
       openPreviewFile,
       ensureProjectManagementStructure: vi.fn(async () => undefined),
       translate: key => key,
+      packageCoordinates: ref(new Map([[archivePath, 'alice/icons@1.0.0']])),
     })
 
     // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`；别的文件不进这棵树。
     expect(tree.projectManagementTreeData.value.children.get(packagesRoot)).toEqual([archivePath])
+    // 标题是文件真正的名字，小字是包自述的坐标 —— 文件叫什么名字不算数。
+    expect(tree.projectManagementTreeData.value.items.get(archivePath)?.label)
+      .toBe('alice-icons-1.0.0.ocpack')
     expect(normalizeNodeTail(tree.projectManagementTreeData.value.items.get(archivePath)?.tail))
-      .toEqual([{
-        key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
-        title: 'resourcePackage.delete',
-        icon: 'action.delete',
-        iconTone: 'danger',
-      }])
+      .toEqual([
+        'alice/icons@1.0.0',
+        {
+          key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
+          title: 'resourcePackage.delete',
+          icon: 'action.delete',
+          iconTone: 'danger',
+        },
+      ])
     // 包目录那一行提供一个"添加包"的入口，而选中它只是选中：目录不是一个可以打开的文件。
     expect(actionsOf(tree.projectManagementTreeData.value.items.get(packagesRoot)?.tail))
       .toEqual([PROJECT_PACKAGE_ADD_ACTION_KEY])

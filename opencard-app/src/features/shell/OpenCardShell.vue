@@ -379,6 +379,7 @@ import type {
 import { CARD_DOCUMENT_SUFFIX, resolveFileType } from '../workspace/model/fileTypes'
 import { resolveSessionLabel } from '../workspace/model/sessionLabel'
 import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../workspace/model/projectStructure'
+import { formatPackageCoordinate } from '../workspace/model/packageCoordinate'
 import { useProjectExport } from './composables/useProjectExport'
 import ProjectExportDialog from '../exporting/components/ProjectExportDialog.vue'
 import ResourcePackageBuilderDialog from '../workspace/components/ResourcePackageBuilderDialog.vue'
@@ -1270,6 +1271,10 @@ const {
   projectPath,
   indexedEntries,
   hideDotFiles: computed(() => settingsStore.settings.value.workspace.hideDotFiles),
+  packageCoordinates: computed(() => new Map(
+    [...projectStore.projectResourcePackages.value.values()]
+      .map(pkg => [pkg.archivePath.replace(/\\/g, '/'), formatPackageCoordinate(pkg.coordinate)] as const),
+  )),
   sessions,
   formatSessionTitle,
   activeSession,
