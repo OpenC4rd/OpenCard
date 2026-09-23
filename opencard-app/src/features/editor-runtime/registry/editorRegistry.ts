@@ -121,6 +121,7 @@ import ProjectConfigEditor from '../../../components/editors/ProjectConfigEditor
 import ProjectFontRegistryFileEditor from '../../../components/editors/ProjectFontRegistryFileEditor.vue'
 import ProjectIconRegistryFileEditor from '../../../components/editors/ProjectIconRegistryFileEditor.vue'
 import PackageManifestEditor from '../../../components/editors/PackageManifestEditor.vue'
+import PackageManagerEditor from '../../../components/editors/PackageManagerEditor.vue'
 import DictionaryEditor from '../../../components/editors/DictionaryEditor.vue'
 import FontPreviewEditor from '../../../components/editors/FontPreviewEditor.vue'
 import UnsupportedFileEditor from '../../../components/editors/UnsupportedFileEditor.vue'
@@ -180,6 +181,13 @@ editorRegistry.register({
   id: 'package-manifest',
   name: 'Package Manifest',
   component: PackageManifestEditor,
+  hasPreview: false,
+})
+
+editorRegistry.register({
+  id: 'package-manager',
+  name: 'Package Manager',
+  component: PackageManagerEditor,
   hasPreview: false,
 })
 

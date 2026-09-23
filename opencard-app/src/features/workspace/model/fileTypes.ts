@@ -128,6 +128,19 @@ const fileTypes: FileTypeDefinition[] = [
     previewable: true,
   },
   {
+    /**
+     * 包文件夹自己也是一个"页面"：项目里装了哪些包，就是那个文件夹里有哪几个归档。
+     * 它不是磁盘上的文件，所以列表里只由点这一行打开（见侧栏的包目录行）。
+     */
+    id: 'opencard-package-directory',
+    labelKey: 'fileTypes.opencardResourcePackage',
+    patterns: [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`],
+    icon: 'file.package',
+    iconTone: iconTone.config,
+    editorId: 'package-manager',
+    previewable: true,
+  },
+  {
     id: 'opencard',
     labelKey: 'fileTypes.opencard',
     extensions: [CARD_DOCUMENT_EXTENSION],

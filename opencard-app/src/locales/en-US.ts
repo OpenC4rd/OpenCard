@@ -22,6 +22,11 @@ export default {
   },
   packageManager: {
     add: 'Add package…', added: 'Added {name}.',
+    title: 'Packages', description: 'Which packages this project has, and how each one is doing.',
+    installed: 'Installed packages', empty: 'No packages installed yet.',
+    unpacked: 'Unpacked', unpacking: 'Unpacking',
+    unreadable: 'Files that cannot be read', unreadableHint: 'These files cannot say who they are, so they cannot be used as packages.',
+    reveal: 'Show in file manager', copyCoordinate: 'Copy coordinate',
   },
   packageManifest: {
     description: 'View package information and the resources it provides.', unavailable: 'This package is no longer available.',

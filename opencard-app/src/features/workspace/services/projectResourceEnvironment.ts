@@ -35,6 +35,17 @@ export type ProjectResourcePackage = {
 
 export type ProjectResourcePackageCatalog = ReadonlyMap<string, ProjectResourcePackage>
 
+/**
+ * 一个读不出来的归档：它在项目里，但我们说不出它是谁。
+ *
+ * 发现阶段本来就要读每个归档才知道它是谁，所以这一条不是额外校验，只是不再把结果丢掉：
+ * 包管理器整页要能让人看到"这个文件我读不出来"，否则它在那里就是一个谁也解释不了的空缺。
+ */
+export type UnreadableProjectPackage = {
+  readonly archivePath: string
+  readonly reason: string
+}
+
 export type ProjectResourceEnvironment = {
   readonly kind: ProjectResourceScopeKind
   readonly namespace: string
@@ -45,6 +56,7 @@ export type ProjectResourceEnvironment = {
   readonly iconDocument: ProjectIconRegistryDocument
   readonly iconCatalog: ProjectIconCatalog
   readonly packages?: ProjectResourcePackageCatalog
+  readonly unreadablePackages?: readonly UnreadableProjectPackage[]
   readonly packageEnvironments?: ReadonlyMap<string, ProjectResourceEnvironment>
 }
 
@@ -133,10 +145,11 @@ async function discoverProjectResourcePackages(options: {
   packagesRoot: string
   unusableFingerprints?: ReadonlySet<string>
   onPackagePending?: (archive: ResourcePackageArchive, archivePath: string, packagesRoot: string) => void
-}): Promise<Map<string, ProjectResourcePackage>> {
+}): Promise<{ packages: Map<string, ProjectResourcePackage>, unreadable: UnreadableProjectPackage[] }> {
   const packages = new Map<string, ProjectResourcePackage>()
+  const unreadable: UnreadableProjectPackage[] = []
   const archiveRoot = `${options.root}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`
-  if (!await options.fs.fileExists(archiveRoot)) return packages
+  if (!await options.fs.fileExists(archiveRoot)) return { packages, unreadable }
 
   const entries = (await options.fs.readDirectory(archiveRoot)).filter(isPackageFile)
   entries.sort((left, right) => left.name.localeCompare(right.name))
@@ -148,7 +161,8 @@ async function discoverProjectResourcePackages(options: {
     let archive: ResourcePackageArchive
     try {
       archive = await readResourcePackageArchive(archivePath)
-    } catch {
+    } catch (cause) {
+      unreadable.push({ archivePath, reason: cause instanceof Error ? cause.message : String(cause) })
       continue
     }
     if (packages.has(archive.coordinate)) continue
@@ -168,7 +182,7 @@ async function discoverProjectResourcePackages(options: {
     // 还没解开的包只排队，不在这里等：加载环境不该被一次解压卡住。
     if (!unpacked) options.onPackagePending?.(archive, archivePath, options.packagesRoot)
   }
-  return packages
+  return { packages, unreadable }
 }
 
 /** 注册表读不出来就当作空的：它是描述性的，读不动不该把整个作用域判死。 */
@@ -246,7 +260,7 @@ export async function loadProjectResourceEnvironment(options: {
     ? await readScopeRegistries(options.fs, root)
     : { fonts: {}, icons: {} }
 
-  const packages = root && options.kind === 'project'
+  const discovered = root && options.kind === 'project'
     ? await discoverProjectResourcePackages({
       fs: options.fs,
       root,
@@ -254,7 +268,8 @@ export async function loadProjectResourceEnvironment(options: {
       unusableFingerprints: options.unusableFingerprints,
       onPackagePending: options.onPackagePending,
     })
-    : new Map<string, ProjectResourcePackage>()
+    : { packages: new Map<string, ProjectResourcePackage>(), unreadable: [] }
+  const packages = discovered.packages
 
   const packageEnvironments = new Map<string, ProjectResourceEnvironment>()
   for (const [coordinate, pkg] of packages) {
@@ -283,6 +298,7 @@ export async function loadProjectResourceEnvironment(options: {
     iconDocument: registries.icons,
     iconCatalog,
     packages,
+    unreadablePackages: discovered.unreadable,
     packageEnvironments,
   }
 }

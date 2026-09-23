@@ -49,11 +49,11 @@ describe('useShellFileTree package navigation', () => {
     // 尾部动作和文件树里那一行是同一套（重命名/回收站/显示/复制路径都在那个"更多"里）。
     expect(actionsOf(tree.projectManagementTreeData.value.items.get(archivePath)?.tail))
       .toEqual([PROJECT_ENTRY_MORE_ACTION_KEY])
-    // 包目录那一行提供一个"添加包"的入口，而选中它只是选中：目录不是一个可以打开的文件。
+    // 包目录那一行提供一个"添加包"的入口，点这一行打开包管理器整页。
     expect(actionsOf(tree.projectManagementTreeData.value.items.get(packagesRoot)?.tail))
       .toEqual([PROJECT_PACKAGE_ADD_ACTION_KEY])
     await tree.handleProjectManagementSelect([packagesRoot])
-    expect(openPreviewFile).not.toHaveBeenCalled()
+    expect(openPreviewFile).toHaveBeenCalledWith(packagesRoot)
 
     await tree.handleProjectManagementSelect([archivePath])
     expect(openPreviewFile).toHaveBeenCalledWith(archivePath)

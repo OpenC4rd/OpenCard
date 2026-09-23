@@ -22,6 +22,11 @@ export default {
   },
   packageManager: {
     add: '添加包…', added: '已加入 {name}。',
+    title: '包', description: '项目里装了哪些包，各自是什么状态。',
+    installed: '已装的包', empty: '还没有装任何包。',
+    unpacked: '已解压', unpacking: '正在解压',
+    unreadable: '读不出来的文件', unreadableHint: '这些文件说不清自己是谁，所以当不了包用。',
+    reveal: '在文件管理器里显示', copyCoordinate: '复制坐标',
   },
   packageManifest: {
     description: '查看包信息和对外提供的资源。', unavailable: '这个包已不可用。',

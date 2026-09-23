@@ -253,7 +253,8 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
           : entry.path,
         visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
       })
-      // 包目录本身不是一个文件：选中它只是选中，不该去"打开"它。
+      // 点包目录这一行打开包管理器整页：项目里装了哪些包，就是那个文件夹里有哪几个归档。
+      // 其余目录行不是一个文件，选中只是选中，不该去"打开"它。
       if (!entry.packageDirectory) {
         targetByNodeKey.set(key, key)
         nodeKeyByTargetPath.set(key, key)
@@ -289,6 +290,8 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
             return nodeKey
           })
         if (packageNodeKeys.length > 0) children.set(key, packageNodeKeys)
+        targetByNodeKey.set(key, key)
+        nodeKeyByTargetPath.set(key, key)
       }
       return key
     })

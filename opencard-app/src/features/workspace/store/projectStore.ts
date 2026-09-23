@@ -106,6 +106,7 @@ import {
   type ProjectResourceEnvironment,
   type ProjectResourcePackage,
   type ProjectResourcePackageCatalog,
+  type UnreadableProjectPackage,
 } from '../services/projectResourceEnvironment'
 import {
   relativizeResourcePath,
@@ -196,6 +197,8 @@ const projectDictionary = ref<ProjectDictionary | null>(null)
 const resolvedDictionary = ref<ResolvedProjectDictionary | null>(null)
 const dictionaryError = ref<string | null>(null)
 const projectResourcePackages = shallowRef<ProjectResourcePackageCatalog>(new Map())
+/** 说不出身份的归档：包管理器整页要能让人看到它们，而不是留一个解释不了的空缺。 */
+const unreadableProjectResourcePackages = shallowRef<readonly UnreadableProjectPackage[]>([])
 const projectResourceEnvironments = shallowRef<ReadonlyMap<string, ProjectResourceEnvironment>>(new Map())
 let resourceEnvironmentReloadVersion = 0
 const settingsStore = useAppSettingsStore()
@@ -490,6 +493,7 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
   const expectedProjectPath = projectPath.value
   if (!expectedProjectPath) {
     projectResourcePackages.value = new Map()
+    unreadableProjectResourcePackages.value = []
     projectResourceEnvironments.value = new Map()
     return false
   }
@@ -507,11 +511,13 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
     })
     if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
     projectResourcePackages.value = environment.packages ?? new Map()
+    unreadableProjectResourcePackages.value = environment.unreadablePackages ?? []
     projectResourceEnvironments.value = environment.packageEnvironments ?? new Map()
     return true
   } catch (error) {
     if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
     projectResourcePackages.value = new Map()
+    unreadableProjectResourcePackages.value = []
     projectResourceEnvironments.value = new Map()
     reportAppError('OC-E3016', { path: `${expectedProjectPath}/.opencard/packages`, error })
     return false
@@ -1524,6 +1530,7 @@ export function useProjectStore() {
     projectIconLoadErrors: readonly(projectIconLoadErrors),
     projectDictionary: readonly(projectDictionary),
     projectResourcePackages: readonly(projectResourcePackages),
+    unreadableProjectResourcePackages,
     projectResourceEnvironment,
     resolvedDictionary: readonly(resolvedDictionary),
     dictionaryError: readonly(dictionaryError),
