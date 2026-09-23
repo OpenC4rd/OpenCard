@@ -2686,7 +2686,13 @@ async function runProjectEntryAction(
   }
 
   if (actionKey === PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY) {
-    await requestPathTrash(path)
+    // 拒绝也要说话：这个动作会被"应用自己管的文件不能删"这类规则挡下来，
+    // 不报出来就只表现为"点了没用"。
+    try {
+      await requestPathTrash(path)
+    } catch (error) {
+      notifyAppError('OC-E3016', { path, error }, locale.value)
+    }
     return
   }
   if (actionKey === PROJECT_ENTRY_REVEAL_ACTION_KEY) {

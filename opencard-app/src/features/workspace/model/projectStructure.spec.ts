@@ -34,11 +34,15 @@ describe('projectStructure', () => {
     expect(resolveProjectInternalRelativePath()).toBe('.opencard')
   })
 
-  it('recognizes only the internal directory and its descendants', () => {
+  it('recognizes the internal directory and its descendants, except the packages the user owns', () => {
     expect(isProjectInternalRelativePath('.opencard')).toBe(true)
     expect(isProjectInternalRelativePath('.opencard/fonts/Body.ttf')).toBe(true)
     expect(isProjectInternalRelativePath('.opencard-cache')).toBe(false)
     expect(isProjectInternalRelativePath('cards/.opencard/file')).toBe(false)
+    // 包归档是用户自己的文件：能删、能改名、能拖，和其它文件一样。
+    expect(isProjectInternalRelativePath('.opencard/packages/alice.ocpack')).toBe(false)
+    expect(isProjectInternalRelativePath('.opencard/packages/nested/alice.ocpack')).toBe(false)
+    expect(isProjectInternalRelativePath('.opencard/packages')).toBe(true)
   })
 
   it('indexes the package folder but not the one-file-per-asset folders', () => {

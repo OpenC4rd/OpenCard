@@ -28,8 +28,16 @@ export function resolveProjectInternalRelativePath(path = ''): string {
   return normalized ? `${PROJECT_INTERNAL_DIRECTORY_NAME}/${normalized}` : PROJECT_INTERNAL_DIRECTORY_NAME
 }
 
+/**
+ * 这个路径是不是"应用自己管的东西"。管的东西不接受回收站、重命名、拖动、拖入 ——
+ * 应用要么按注册表重建它，要么会因此在索引里对不上。
+ *
+ * `.opencard/packages/` **不是**应用管的：里面放的是用户自己的包归档，和项目里任何别的文件
+ * 一样可以改名、可以删、可以拖来拖去。身份来自包里面的清单，文件名换了它还是同一个包。
+ */
 export function isProjectInternalRelativePath(path: string): boolean {
   const normalized = path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+  if (normalized.startsWith(`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}/`)) return false
   return normalized === PROJECT_INTERNAL_DIRECTORY_NAME
     || normalized.startsWith(`${PROJECT_INTERNAL_DIRECTORY_NAME}/`)
 }
