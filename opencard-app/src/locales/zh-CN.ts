@@ -22,7 +22,7 @@ export default {
     identityHint: '作者、包名与版本要能拼成 作者/包名{\'@\'}版本。',
   },
   packageManager: {
-    add: '添加包…', added: '已加入 {name}。', addFailed: '添加包失败：{message}',
+    add: '添加包…', added: '已加入 {name}。',
   },
   packageManifest: {
     description: '查看包信息和对外提供的资源。', unavailable: '这个包已不可用。',

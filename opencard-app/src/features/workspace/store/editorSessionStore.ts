@@ -31,10 +31,6 @@ import {
 const PROJECT_CONFIGURATION_AUTOSAVE_KEY_PREFIX = 'project-configuration-autosave:'
 const CONTENTLESS_EDITOR_IDS = new Set(['image-preview', 'font-preview', 'package-manifest', 'unsupported-file'])
 
-function resolveOpenedSessionName(path: string): string {
-  return getPathBasename(path)
-}
-
 export type SessionResourceKind = 'workspace' | 'external' | 'draft'
 export type SessionSaveResult = 'saved' | 'cancelled' | 'skipped'
 export type EditorSessionMode = 'edit' | 'diff'
@@ -297,7 +293,7 @@ export function useEditorSessionStore() {
       resourceKind,
       path: normalizedPath,
       fileTypeId: fileType.id,
-      name: resolveOpenedSessionName(normalizedPath),
+      name: getPathBasename(normalizedPath),
       editorId: fileType.editorId,
       savedContent: content,
       draftContent: content,

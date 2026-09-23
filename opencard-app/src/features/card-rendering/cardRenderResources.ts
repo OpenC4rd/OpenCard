@@ -34,7 +34,6 @@ export type CardRenderResourceContext = {
   readonly hostEnvironment: ProjectResourceEnvironment
   readonly remoteResourcePolicy?: ProjectRemoteResourcePolicy
   readonly resolveRemoteResource?: (url: string) => string | null
-  readonly projectIconCatalog: ProjectIconCatalog
   /** Reads an icon's size, which is what asks for it and re-renders the consumer that read it. */
   readonly resolveIconDimensions?: ProjectIconDimensionReader
   readonly resourceScopes: ProjectResourceScopeMap
@@ -55,7 +54,6 @@ export type ResourceIssueCode =
   | 'syntax-error'
   | 'unsafe-path'
   | 'reserved-path'
-  | 'source-outside-project'
   | 'scope-unavailable'
   | 'package-unavailable'
   | 'resource-unavailable'
@@ -81,7 +79,6 @@ export type ResolvedResource =
   | { kind: 'unavailable', code: ResourceIssueCode, message: string }
 
 export interface CardResourceResolver {
-  readonly hostEnvironment: ProjectResourceEnvironment
   resolve: (request: ResourceRequest) => ResolvedResource
   /** Reads an icon's size, which is what asks for it. */
   resolveIconDimensions: ProjectIconDimensionReader
@@ -112,7 +109,6 @@ export function createCardResourceResolver(
   }
 
   return {
-    get hostEnvironment() { return context().hostEnvironment },
     resolve: request => resolveCardResource(request, context()),
     resolveIconDimensions: entry => (context().resolveIconDimensions ?? noopIconDimensionReader)(entry),
     withScopes: scopes => createCardResourceResolver(contextSource, [...scopeSources, scopes]),
@@ -192,15 +188,12 @@ function resolveFontResource(
   return { kind: 'font', cssFamily }
 }
 
-/** An asset field resolves to a URL, to nothing, or to a coded failure — nothing else. */
-type AssetResource = Extract<ResolvedResource, { kind: 'empty' | 'url' | 'unavailable' }>
-
 function resolveAssetResource(
   value: string,
   context: CardRenderResourceContext,
   blockId?: string,
   fieldKey?: string,
-): AssetResource {
+): ResolvedResource {
   const environment = resolveCardResourceEnvironment(context, blockId, fieldKey)
   if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^[a-z]:[\\/]/i.test(value)) {
     if (!isRemoteResourceAllowed(value, context.remoteResourcePolicy)) {
@@ -317,7 +310,6 @@ export function createCardRenderResourceContext(options: {
       ?? fallbackEnvironment(options.resourceRootPath ?? null, projectIconCatalog),
     remoteResourcePolicy: options.remoteResourcePolicy,
     resolveRemoteResource: options.resolveRemoteResource,
-    projectIconCatalog,
     resolveIconDimensions: options.resolveIconDimensions,
     resourceScopes: options.resourceScopes ?? new Map(),
     packageEnvironments: options.packageEnvironments ?? new Map(),

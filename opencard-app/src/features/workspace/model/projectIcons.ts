@@ -1,6 +1,6 @@
 import { createAvailableKey } from '../../../shared/model/keySlug'
 import { isRecord } from '../../../shared/model/record'
-import { resolveReferenceSyntax } from './scopedResourcePath'
+import { referenceSyntaxIsValid } from './scopedResourcePath'
 export const projectIconKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
 /** Every standalone icon file format a set may hold: vector sources and raster sources alike. */
 export const projectIconSourcePattern = /\.(?:svg|png|jpe?g|webp)$/i
@@ -76,8 +76,7 @@ export function normalizeProjectIconDirectory(value: string): string | null {
 /** Accepts every supported icon file, checking the reference's shape rather than what it points at. */
 export function normalizeProjectIconSource(value: string): string | null {
   const source = value.trim()
-  const resolved = resolveReferenceSyntax(source)
-  return resolved.ok && projectIconSourcePattern.test(source) ? source : null
+  return referenceSyntaxIsValid(source) && projectIconSourcePattern.test(source) ? source : null
 }
 
 export function isRasterProjectIconSource(source: string): boolean {

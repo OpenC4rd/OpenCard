@@ -54,7 +54,6 @@ describe('appSettings', () => {
         structureTreeScrollToSelection: true,
         hideDotFiles: true,
         showWelcomeBackground: true,
-        packageManagerView: 'tree',
         showSelectionPositionOnMove: true,
         showSelectionSizeOnResize: true,
         alignmentSnappingEnabledByDefault: true,
@@ -111,18 +110,6 @@ describe('appSettings', () => {
       version: APP_SETTINGS_VERSION,
       workspace: { showWelcomeBackground: 'yes' },
     }).workspace.showWelcomeBackground).toBe(true)
-  })
-
-  it('normalizes the package manager list view', () => {
-    expect(normalizeAppSettings({ version: APP_SETTINGS_VERSION }).workspace.packageManagerView).toBe('tree')
-    expect(normalizeAppSettings({
-      version: APP_SETTINGS_VERSION,
-      workspace: { packageManagerView: 'album' },
-    }).workspace.packageManagerView).toBe('album')
-    expect(normalizeAppSettings({
-      version: APP_SETTINGS_VERSION,
-      workspace: { packageManagerView: 'mosaic' },
-    }).workspace.packageManagerView).toBe('tree')
   })
 
   it('keeps only editable valid theme colors for each theme', () => {

@@ -22,7 +22,7 @@ export default {
     identityHint: "Author, package name and version must form author/package{'@'}version.",
   },
   packageManager: {
-    add: 'Add package…', added: 'Added {name}.', addFailed: 'Could not add the package: {message}',
+    add: 'Add package…', added: 'Added {name}.',
   },
   packageManifest: {
     description: 'View package information and the resources it provides.', unavailable: 'This package is no longer available.',

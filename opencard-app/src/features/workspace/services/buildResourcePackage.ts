@@ -79,7 +79,6 @@ type ResourcePackageIconProjection = {
 export type ResourcePackageProjectBuildResult = {
   outputPath: string
   fingerprint: string
-  imagePaths: readonly string[]
 }
 
 export type ResourcePackageBuildRequest = {
@@ -353,6 +352,5 @@ export async function buildResourcePackageFromProject(
     publicFonts: fontProjection.publicFonts,
     publicIconSeries: iconProjection.publicIconSeries,
   }
-  const result = await invoke<{ outputPath: string, fingerprint: string }>('build_resource_package', { request })
-  return { ...result, imagePaths: images.map(image => image.absolutePath) }
+  return await invoke<ResourcePackageProjectBuildResult>('build_resource_package', { request })
 }

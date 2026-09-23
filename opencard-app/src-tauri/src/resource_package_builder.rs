@@ -81,7 +81,6 @@ pub struct ResourcePackageBuildRequest {
 pub struct ResourcePackageBuildResult {
     pub output_path: String,
     pub fingerprint: String,
-    pub entry_count: usize,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -118,26 +117,27 @@ fn archive_entry_path(value: &str) -> Result<String, String> {
 /// 它参与内容哈希，所以这里不能写任何由内容推导出来的值 —— 指纹因此不在这里，
 /// 而是单独那张纸条。
 fn build_manifest(request: &ResourcePackageBuildRequest) -> serde_json::Value {
-    let mut manifest = serde_json::Map::new();
-    manifest.insert("type".into(), serde_json::json!("opencard-resource-package"));
-    manifest.insert("author".into(), serde_json::json!(request.author));
-    manifest.insert("name".into(), serde_json::json!(request.name));
-    manifest.insert("version".into(), serde_json::json!(request.version));
-    manifest.insert("title".into(), serde_json::json!(request.title));
+    let mut manifest = serde_json::json!({
+        "type": "opencard-resource-package",
+        "author": request.author,
+        "name": request.name,
+        "version": request.version,
+        "title": request.title,
+        "public": {
+            "fonts": request.public_fonts
+                .iter()
+                .map(|font| serde_json::json!({ "key": font.key, "title": font.title }))
+                .collect::<Vec<_>>(),
+            "iconSeries": request.public_icon_series
+                .iter()
+                .map(|series| serde_json::json!({ "key": series.key, "title": series.title, "count": series.count }))
+                .collect::<Vec<_>>(),
+        },
+    });
     if let Some(cover) = &request.cover {
-        manifest.insert("cover".into(), serde_json::json!(cover));
+        manifest["cover"] = serde_json::json!(cover);
     }
-    manifest.insert("public".into(), serde_json::json!({
-        "fonts": request.public_fonts
-            .iter()
-            .map(|font| serde_json::json!({ "key": font.key, "title": font.title }))
-            .collect::<Vec<_>>(),
-        "iconSeries": request.public_icon_series
-            .iter()
-            .map(|series| serde_json::json!({ "key": series.key, "title": series.title, "count": series.count }))
-            .collect::<Vec<_>>(),
-    }));
-    serde_json::Value::Object(manifest)
+    manifest
 }
 
 /// 源文件不在这里做存在性检查：读取失败本身就是"文件不在了"的答案，少一次往返。
@@ -254,7 +254,7 @@ pub async fn build_resource_package(
         // 指纹纸条最后写。归档里的先后顺序不影响哈希：读的那侧按包内路径重排，
         // 并按路径把纸条自己排除在外。
         let fingerprint = format!("{:x}", digest.finalize());
-        let note = format!("sha256:{fingerprint}\n");
+        let note = format!("{fingerprint}\n");
         writer
             .start_file(FINGERPRINT_PATH, SimpleFileOptions::default().compression_method(CompressionMethod::Stored))
             .map_err(zip_error)?;
@@ -263,10 +263,6 @@ pub async fn build_resource_package(
         writer.finish().map_err(zip_error)?;
 
         std::fs::rename(&part_path, output).map_err(|error| format!("Cannot finish package: {error}"))?;
-        Ok(ResourcePackageBuildResult {
-            output_path,
-            fingerprint,
-            entry_count: entries.len() + 1,
-        })
+        Ok(ResourcePackageBuildResult { output_path, fingerprint })
     }
 }

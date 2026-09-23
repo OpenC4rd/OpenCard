@@ -88,11 +88,6 @@ export function parsePackageCoordinate(value: unknown): PackageCoordinate | null
   return qualifier && qualifier.version ? { author: qualifier.author, name: qualifier.name, version: qualifier.version } : null
 }
 
-export function parsePackageIdentity(value: unknown): PackageIdentity | null {
-  const qualifier = parsePackageQualifier(value)
-  return qualifier && !qualifier.version ? { author: qualifier.author, name: qualifier.name } : null
-}
-
 type ParsedVersion = {
   readonly core: readonly number[]
   readonly prerelease: readonly string[]

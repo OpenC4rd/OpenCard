@@ -130,8 +130,6 @@ export function createAppSettingsStore(
       candidate.workspace.hideDotFiles = value as boolean
     } else if (key === 'workspace.showWelcomeBackground') {
       candidate.workspace.showWelcomeBackground = value as boolean
-    } else if (key === 'workspace.packageManagerView') {
-      candidate.workspace.packageManagerView = value === 'album' ? 'album' : 'tree'
     } else if (key === 'workspace.showSelectionPositionOnMove') {
       candidate.workspace.showSelectionPositionOnMove = value as boolean
     } else if (key === 'workspace.showSelectionSizeOnResize') {

@@ -25,7 +25,6 @@ export const MAX_AUTO_SAVE_INTERVAL_SECONDS = 300
 export type AppLocale = 'system' | 'zh-CN' | 'en-US'
 export type AppThemePreference = OcThemeId | 'system'
 export type StructureTreeSelectionBehavior = 'none' | 'expand' | 'expand-exclusive'
-export type PackageManagerView = 'tree' | 'album'
 export type SettingsCategoryKey = 'general' | 'appearance' | 'workspace' | 'versionControl'
 /** 设置页分类的唯一清单：侧栏树、分类投影与跳转都从这里取，避免各处各抄一份。 */
 export const SETTINGS_CATEGORY_KEYS: readonly SettingsCategoryKey[] = [
@@ -173,7 +172,6 @@ export type AppSettingKey =
   | 'workspace.structureTreeScrollToSelection'
   | 'workspace.hideDotFiles'
   | 'workspace.showWelcomeBackground'
-  | 'workspace.packageManagerView'
   | 'workspace.showSelectionPositionOnMove'
   | 'workspace.showSelectionSizeOnResize'
   | 'workspace.alignmentSnappingEnabledByDefault'
@@ -228,8 +226,6 @@ export interface AppSettings {
     hideDotFiles: boolean
     /** 欢迎页的背景效果（桌游封面墙 + 引力背景）。 */
     showWelcomeBackground: boolean
-    /** 包管理器列表视图：树形或相册。 */
-    packageManagerView: PackageManagerView
     showSelectionPositionOnMove: boolean
     showSelectionSizeOnResize: boolean
     alignmentSnappingEnabledByDefault: boolean
@@ -321,7 +317,6 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     structureTreeScrollToSelection: true,
     hideDotFiles: true,
     showWelcomeBackground: true,
-    packageManagerView: 'tree',
     showSelectionPositionOnMove: true,
     showSelectionSizeOnResize: true,
     alignmentSnappingEnabledByDefault: true,
@@ -881,7 +876,6 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       showWelcomeBackground: typeof workspace.showWelcomeBackground === 'boolean'
         ? workspace.showWelcomeBackground
         : DEFAULT_APP_SETTINGS.workspace.showWelcomeBackground,
-      packageManagerView: workspace.packageManagerView === 'album' ? 'album' : 'tree',
       showSelectionPositionOnMove: typeof workspace.showSelectionPositionOnMove === 'boolean'
         ? workspace.showSelectionPositionOnMove
         : DEFAULT_APP_SETTINGS.workspace.showSelectionPositionOnMove,

@@ -19,29 +19,9 @@ export function findProjectWorkspaceState(
 
 /** Copies one cached state into a shape callers may patch before storing it back. */
 export function cloneProjectWorkspaceState(state: ProjectWorkspaceStateRead | undefined): ProjectWorkspaceState {
-  const packageBuilder = state?.packageBuilder
-  return {
-    expandedDirectories: [...(state?.expandedDirectories ?? [])],
-    ...(state?.sidebar ? {
-      sidebar: {
-        collapsedLists: [...state.sidebar.collapsedLists],
-        listWeights: { ...state.sidebar.listWeights },
-      },
-    } : {}),
-    ...(state?.projectProfile ? { projectProfile: { collapsedSections: [...state.projectProfile.collapsedSections] } } : {}),
-    ...(packageBuilder ? {
-      packageBuilder: {
-        name: packageBuilder.name,
-        title: packageBuilder.title,
-        author: packageBuilder.author,
-        version: packageBuilder.version,
-        fontFamilyKeys: [...packageBuilder.fontFamilyKeys],
-        fontCompositionKeys: [...packageBuilder.fontCompositionKeys],
-        iconSeriesKeys: [...packageBuilder.iconSeriesKeys],
-        imagePaths: [...packageBuilder.imagePaths],
-      },
-    } : {}),
-  }
+  // 这份状态是纯数据（加载时已经归一化，未知字段不会留到这里），所以一次深拷贝就够。
+  // 断言只是因为入参是深只读投影，拷贝出来的是一份全新的可变数据。
+  return structuredClone(state ?? { expandedDirectories: [] }) as ProjectWorkspaceState
 }
 
 /** Rebuilds the record for one project, preserving fields the caller does not touch. */

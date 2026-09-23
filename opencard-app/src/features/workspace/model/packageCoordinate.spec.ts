@@ -5,7 +5,6 @@ import {
   formatPackageIdentity,
   normalizePackageVersion,
   parsePackageCoordinate,
-  parsePackageIdentity,
   parsePackageQualifier,
   resolvePackageQualifier,
 } from './packageCoordinate'
@@ -13,7 +12,6 @@ import {
 describe('package coordinate identity', () => {
   it('parses a bare package identity and refuses to call it a coordinate', () => {
     expect(parsePackageQualifier('alice/potion')).toEqual({ author: 'alice', name: 'potion' })
-    expect(parsePackageIdentity('alice/potion')).toEqual({ author: 'alice', name: 'potion' })
     expect(parsePackageCoordinate('alice/potion')).toBeNull()
   })
 
@@ -21,7 +19,6 @@ describe('package coordinate identity', () => {
     expect(parsePackageQualifier('alice/potion@1.1.0')).toEqual({ author: 'alice', name: 'potion', version: '1.1.0' })
     expect(parsePackageCoordinate('alice/potion@v1.1.0')).toEqual({ author: 'alice', name: 'potion', version: '1.1.0' })
     expect(parsePackageCoordinate('alice/potion@1.1.0-beta.1')).toEqual({ author: 'alice', name: 'potion', version: '1.1.0-beta.1' })
-    expect(parsePackageIdentity('alice/potion@1.1.0')).toBeNull()
   })
 
   it('normalizes case instead of rejecting it', () => {

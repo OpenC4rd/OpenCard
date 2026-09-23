@@ -151,14 +151,6 @@ function formatResourceReference(reference: ResourceReference): string {
   return `${qualifier}${reference.kind}:${reference.key}`
 }
 
-function lookupPackage(
-  environment: ProjectResourceEnvironment,
-  qualifier: PackageQualifier,
-): ProjectResourcePackage | null {
-  const coordinate = resolveProjectResourcePackageCoordinate(environment, qualifier)
-  return coordinate ? environment.packages?.get(coordinate) ?? null : null
-}
-
 function resolveEnvironment(
   reference: ResourceReference,
   options: ResourceReferenceResolutionOptions,
@@ -173,7 +165,10 @@ function resolveEnvironment(
   }
 
   const source = formatResourceReference(reference)
-  const pkg = reference.qualifier ? lookupPackage(options.environment, reference.qualifier) : null
+  const coordinate = reference.qualifier
+    ? resolveProjectResourcePackageCoordinate(options.environment, reference.qualifier)
+    : null
+  const pkg = coordinate ? options.environment.packages?.get(coordinate) ?? null : null
   if (!pkg) return {
     environment: null,
     diagnostics: [diagnostic('package-unavailable', source, 'Referenced package is not visible from the current environment')],

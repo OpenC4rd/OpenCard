@@ -13,9 +13,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import {
   normalizeResourcePackageManifest,
+  RESOURCE_PACKAGE_SUFFIX,
   resourcePackageCoordinate,
   type ResourcePackageManifest,
 } from '../model/resourcePackage'
+import type { StoredResourcePackage, StoredResourcePackageWarning } from '../model/storedResourcePackage'
+import type { FileSystemService } from './fileSystemService'
 
 type NativeInspection = {
   manifestJson: string
@@ -77,4 +80,36 @@ export function unpackResourcePackage(
 /** 清掉中断留下的半个解压目录，并把缓存降回大小上限以内。 */
 export async function recoverResourcePackageCache(packagesRoot: string): Promise<void> {
   await invoke('recover_resource_package_cache', { packagesRoot })
+}
+
+/**
+ * 扫一个目录里的 `.ocpack`：读得出身份的列出来（按显示名排序），读不出的收成警告。
+ * 软件存储和随应用发布的内置包用的是同一份目录形状，所以扫描只有这一处。
+ *
+ * 读取那一步由调用方传进来：同模块内部直接调用是替换不掉的，显式传进来这条接缝才试得动。
+ */
+export async function scanResourcePackageDirectory(options: {
+  fs: Pick<FileSystemService, 'readDirectory'>
+  root: string
+  join: (...paths: string[]) => Promise<string>
+  read: (path: string) => Promise<ResourcePackageArchive>
+}): Promise<{ packs: StoredResourcePackage[], warnings: StoredResourcePackageWarning[] }> {
+  const packs: StoredResourcePackage[] = []
+  const warnings: StoredResourcePackageWarning[] = []
+  for (const entry of await options.fs.readDirectory(options.root)) {
+    if (!entry.isFile || !entry.name.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX)) continue
+    const path = await options.join(options.root, entry.name)
+    try {
+      const archive = await options.read(path)
+      packs.push({
+        path,
+        coordinate: archive.coordinate,
+        title: archive.manifest.title,
+        fingerprint: archive.fingerprint,
+      })
+    } catch (cause) {
+      warnings.push({ path, reason: cause instanceof Error ? cause.message : String(cause) })
+    }
+  }
+  return { packs: packs.sort((left, right) => left.title.localeCompare(right.title)), warnings }
 }

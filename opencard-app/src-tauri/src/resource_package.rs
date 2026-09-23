@@ -34,8 +34,8 @@ pub(crate) const MAX_PATH_BYTES: usize = 512;
 const MAX_PATH_DEPTH: usize = 32;
 const MAX_COMPRESSION_RATIO: u64 = 200;
 const MANIFEST_PATH: &str = ".opencard/manifest.json";
-/// 指纹纸条：一行 `sha256:<64 位十六进制>`。它自己必须被排除在内容哈希之外，
-/// 否则纸条的内容会改变它自己声称的那个值。
+/// 指纹纸条：一行裸的 64 位十六进制（包内所有文件内容算出来的 sha256）。
+/// 它自己必须被排除在内容哈希之外，否则纸条的内容会改变它自己声称的那个值。
 const FINGERPRINT_PATH: &str = ".opencard/fingerprint.txt";
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 const MAX_FINGERPRINT_BYTES: u64 = 4096;
@@ -44,9 +44,9 @@ const MAX_FINGERPRINT_BYTES: u64 = 4096;
 /// 指纹纸条从"不存在"变为"存在但被排除"，因此这里是 v3。
 pub(crate) const CONTENT_HASH_TAG: &[u8] = b"opencard-resource-package-content\0v3\n";
 
-/// 集合目录里的簿记：每个包最后一次被用到的时刻与占用字节数。
-/// 它放在集合目录里、而不是放进每个包目录 —— 包目录里多一个文件会让"包内文件清单"这句话不准确。
-const INDEX_FILE_NAME: &str = "index.json";
+/// "最后一次用到"的印记：缓存根下一个 `.used.<指纹>` 文件，清理时按它的修改时间排序
+/// 决定先删谁。放在根上、不放进包目录 —— 包目录里多一个文件会让"包内文件清单"这句话不准确。
+const USED_PREFIX: &str = ".used.";
 const MAX_CACHE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// 解压到一半的目录以 `.` 开头，而指纹永远是十六进制，所以两者不会相撞。
@@ -82,7 +82,6 @@ pub struct UnpackResourcePackageRequest {
 #[serde(rename_all = "camelCase")]
 pub struct NativeResourcePackageUnpack {
     pub root_path: String,
-    pub fingerprint: String,
 }
 
 #[derive(Debug, Clone)]
@@ -228,13 +227,9 @@ fn declared_fingerprint(projection: &mut ArchiveProjection) -> Result<String, St
     parse_fingerprint(&text).ok_or_else(|| "Package fingerprint is invalid".to_string())
 }
 
-/// 纸条的内容是 `sha256:<64 位十六进制>`。带算法前缀是为了将来换算法时不必改文件布局。
+/// 纸条的内容就是那一行 64 位十六进制。
 pub(crate) fn parse_fingerprint(text: &str) -> Option<String> {
-    let text = text.trim();
-    if !text.get(..7)?.eq_ignore_ascii_case("sha256:") {
-        return None;
-    }
-    let value = text.get(7..)?;
+    let value = text.trim();
     (value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
         .then(|| value.to_ascii_lowercase())
 }
@@ -301,50 +296,20 @@ fn now_millis() -> u64 {
         .as_millis() as u64
 }
 
-/// 集合目录里的簿记。`lastUsedAt` 是清理时排序的依据，`bytes` 让它不必再递归遍历目录树。
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
-struct PackageCacheEntry {
-    #[serde(default, rename = "lastUsedAt")]
-    last_used_at: u64,
-    #[serde(default)]
-    bytes: u64,
+fn stamp_path(packages_root: &Path, fingerprint: &str) -> PathBuf {
+    packages_root.join(format!("{USED_PREFIX}{fingerprint}"))
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-struct PackageCacheIndex {
-    #[serde(default)]
-    packages: HashMap<String, PackageCacheEntry>,
+/// 记下"这个包刚被用到"。写在文件内容里而不是靠长度：非空写入才一定会刷新修改时间。
+/// 写不进去不算失败 —— 最坏只是清理时先删它。
+fn mark_used(packages_root: &Path, fingerprint: &str) {
+    let _ = std::fs::write(stamp_path(packages_root, fingerprint), now_millis().to_string());
 }
 
-fn index_file_path(packages_root: &Path) -> PathBuf {
-    packages_root.join(INDEX_FILE_NAME)
-}
-
-/// 索引丢了不该拦住解开：它只决定清理时先删谁。
-fn read_index(packages_root: &Path) -> PackageCacheIndex {
-    std::fs::read_to_string(index_file_path(packages_root))
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
-}
-
-/// 索引写不进去也一样不拦：下一次用到会重新记，最坏情况只是清理顺序不准。
-fn write_index(packages_root: &Path, index: &PackageCacheIndex) {
-    if let Ok(text) = serde_json::to_string(index) {
-        let _ = std::fs::write(index_file_path(packages_root), text);
-    }
-}
-
-/// 记下"这个包刚被用到"。`bytes` 为 `None` 表示这次不知道它多大（命中了已解开的目录），
-/// 那就保留索引里的旧值。
-fn touch_usage(packages_root: &Path, fingerprint: &str, bytes: Option<u64>) {
-    let mut index = read_index(packages_root);
-    let entry = index.packages.entry(fingerprint.to_string()).or_default();
-    entry.last_used_at = now_millis();
-    if let Some(bytes) = bytes {
-        entry.bytes = bytes;
-    }
-    write_index(packages_root, &index);
+fn modified_at(path: &Path) -> SystemTime {
+    std::fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .unwrap_or(UNIX_EPOCH)
 }
 
 fn directory_bytes(path: &Path) -> u64 {
@@ -371,9 +336,8 @@ fn recover_unpacking(packages_root: &Path) -> Result<(), String> {
     for entry in entries {
         let path = entry.map_err(|error| error.to_string())?.path();
         let name = path.file_name().and_then(|value| value.to_str()).unwrap_or("");
-        if name.starts_with(STAGING_PREFIX) || name.ends_with(".tmp") {
+        if name.starts_with(STAGING_PREFIX) {
             let _ = retry_access_denied(|| std::fs::remove_dir_all(&path));
-            let _ = std::fs::remove_file(&path);
         }
     }
     Ok(())
@@ -382,8 +346,9 @@ fn recover_unpacking(packages_root: &Path) -> Result<(), String> {
 /// 超过上限就按"最后一次用到"从旧到新删，直到降回上限以内。刚解开的那一份永远留下 ——
 /// 它正是这次调用的目的。
 ///
-/// 字节数从索引里读，不再每次启动递归遍历整棵树；索引里没有记录的条目量一次并补记，
-/// 那次之后就不用再量。
+/// "最后用到"取自 `.used.<指纹>` 的修改时间，没有印记的按最旧算（刚解开就盖了印记，
+/// 所以没有印记只意味着印记被删了）。占用字节数现量一次：目录名是内容指纹，量出来的
+/// 值不会变，而省这一次遍历不值得再维护一份必须和磁盘保持一致的清单。
 fn prune_cache(packages_root: &Path, keep: &str, max_bytes: u64) -> Result<(), String> {
     let entries = match std::fs::read_dir(packages_root) {
         Ok(entries) => entries,
@@ -391,43 +356,40 @@ fn prune_cache(packages_root: &Path, keep: &str, max_bytes: u64) -> Result<(), S
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(format!("Cannot read the package cache: {error}")),
     };
-    let mut index = read_index(packages_root);
-    let mut packages: Vec<(String, PathBuf, u64, u64)> = Vec::new();
+    let mut packages: Vec<(String, PathBuf, u64)> = Vec::new();
+    let mut used_at = HashMap::new();
     for entry in entries {
         let path = entry.map_err(|error| error.to_string())?.path();
-        if !path.is_dir() { continue; }
         let name = path.file_name().and_then(|value| value.to_str()).unwrap_or("").to_string();
-        if name.starts_with('.') { continue; }
-        let recorded = index.packages.get(&name).cloned().unwrap_or_default();
-        let bytes = if recorded.bytes > 0 {
-            recorded.bytes
-        } else {
-            let measured = directory_bytes(&path);
-            index.packages.entry(name.clone()).or_default().bytes = measured;
-            measured
-        };
-        packages.push((name, path, bytes, recorded.last_used_at));
+        if path.is_dir() {
+            // 半个解压目录以 `.` 开头，不是包。
+            if name.starts_with('.') { continue; }
+            let bytes = directory_bytes(&path);
+            packages.push((name, path, bytes));
+        } else if let Some(fingerprint) = name.strip_prefix(USED_PREFIX) {
+            used_at.insert(fingerprint.to_string(), modified_at(&path));
+        }
     }
-    // 目录已经不在的条目留着只会让簿记和磁盘对不上，顺手清掉。
-    // 反过来，目录在、索引里没有的条目是"内容寻址的自己人"：目录名就是指纹，补记下来即可。
-    let present = packages.iter().map(|(name, _, _, _)| name.clone()).collect::<HashSet<_>>();
-    index.packages.retain(|name, _| present.contains(name));
-    let total = packages.iter().map(|(_, _, bytes, _)| *bytes).sum::<u64>();
+    // 目录已经不在的印记留着只会攒垃圾，顺手清掉。
+    for fingerprint in used_at.keys() {
+        if !packages.iter().any(|(name, _, _)| name == fingerprint) {
+            let _ = std::fs::remove_file(stamp_path(packages_root, fingerprint));
+        }
+    }
+    let total = packages.iter().map(|(_, _, bytes)| *bytes).sum::<u64>();
     if total <= max_bytes {
-        write_index(packages_root, &index);
         return Ok(());
     }
-    packages.sort_by_key(|(_, _, _, last_used_at)| *last_used_at);
+    packages.sort_by_key(|(name, _, _)| *used_at.get(name).unwrap_or(&UNIX_EPOCH));
     let mut remaining = total;
-    for (name, path, bytes, _) in packages {
+    for (name, path, bytes) in packages {
         if remaining <= max_bytes { break; }
         if name == keep { continue; }
         if retry_access_denied(|| std::fs::remove_dir_all(&path)).is_ok() {
             remaining = remaining.saturating_sub(bytes);
-            index.packages.remove(&name);
+            let _ = std::fs::remove_file(stamp_path(packages_root, &name));
         }
     }
-    write_index(packages_root, &index);
     Ok(())
 }
 
@@ -448,11 +410,10 @@ fn retry_access_denied<T>(mut operation: impl FnMut() -> std::io::Result<T>) -> 
     Err(denied.expect("a denied attempt was recorded"))
 }
 
-/// 解开一个包，并返回实际写出的字节数 —— 索引就是靠它记住"这个包占多大"的。
-fn extract_into(projection: &mut ArchiveProjection, staging: &Path) -> Result<u64, String> {
+/// 解开一个包。
+fn extract_into(projection: &mut ArchiveProjection, staging: &Path) -> Result<(), String> {
     std::fs::create_dir_all(staging)
         .map_err(|error| format!("Cannot create the package staging directory: {error}"))?;
-    let mut written = 0_u64;
     for entry in projection.entries.clone() {
         let mut zip_file = projection.archive.by_index(entry.index)
             .map_err(|error| format!("Cannot read {}: {error}", entry.path))?;
@@ -463,11 +424,10 @@ fn extract_into(projection: &mut ArchiveProjection, staging: &Path) -> Result<u6
         }
         let mut out = File::create(&destination)
             .map_err(|error| format!("Cannot write {}: {error}", entry.path))?;
-        let copied = std::io::copy(&mut zip_file, &mut out)
+        std::io::copy(&mut zip_file, &mut out)
             .map_err(|error| format!("Cannot write {}: {error}", entry.path))?;
-        written = written.saturating_add(copied);
     }
-    Ok(written)
+    Ok(())
 }
 
 fn unpack_blocking(request: &UnpackResourcePackageRequest) -> Result<NativeResourcePackageUnpack, String> {
@@ -502,32 +462,26 @@ fn unpack_blocking(request: &UnpackResourcePackageRequest) -> Result<NativeResou
         if installed != manifest {
             return Err("Package content does not match its fingerprint".to_string());
         }
-        // 大小这次不知道；索引里记过的留着，没记过的留给清理那一步量一次。
-        touch_usage(&root, &declared, None);
+        mark_used(&root, &declared);
         return Ok(NativeResourcePackageUnpack {
             root_path: target.to_string_lossy().to_string(),
-            fingerprint: declared,
         });
     }
 
     let staging = root.join(format!("{STAGING_PREFIX}{}", now_millis()));
     let _ = std::fs::remove_dir_all(&staging);
-    let written = match extract_into(&mut projection, &staging) {
-        Ok(written) => written,
-        Err(error) => {
-            let _ = std::fs::remove_dir_all(&staging);
-            return Err(error);
-        }
-    };
+    if let Err(error) = extract_into(&mut projection, &staging) {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err(error);
+    }
     if let Err(error) = std::fs::rename(&staging, &target) {
         let _ = std::fs::remove_dir_all(&staging);
         return Err(format!("Cannot move the unpacked package into place: {error}"));
     }
-    touch_usage(&root, &declared, Some(written));
+    mark_used(&root, &declared);
     let _ = prune_cache(&root, &declared, MAX_CACHE_BYTES);
     Ok(NativeResourcePackageUnpack {
         root_path: target.to_string_lossy().to_string(),
-        fingerprint: declared,
     })
 }
 
@@ -578,12 +532,12 @@ mod tests {
     }
 
     #[test]
-    fn fingerprints_are_sha256_lines_only() {
+    fn a_note_is_one_line_of_hex() {
         let value = "a".repeat(64);
         // 大小写不敏感：纸条是人能打开看的文件，十六进制的大小写不该决定它读不读得出来。
-        assert_eq!(parse_fingerprint(&format!("sha256:{value}\n")).as_deref(), Some(value.as_str()));
-        assert_eq!(parse_fingerprint(&format!("sha256:{}", value.to_uppercase())).as_deref(), Some(value.as_str()));
-        for text in ["", &value, &format!("sha256:{}", "a".repeat(63)), &format!("sha256:{}", "z".repeat(64))] {
+        assert_eq!(parse_fingerprint(&format!("{value}\n")).as_deref(), Some(value.as_str()));
+        assert_eq!(parse_fingerprint(&value.to_uppercase()).as_deref(), Some(value.as_str()));
+        for text in ["", &format!("sha256:{value}"), &"a".repeat(63), &"a".repeat(65), &"z".repeat(64)] {
             assert!(parse_fingerprint(text).is_none(), "accepted {:?}", text);
         }
     }
@@ -638,14 +592,14 @@ mod tests {
         let expected = expected_fingerprint(&entries);
 
         let path = temp_package_path("fingerprint");
-        write_package(&path, &entries, Some(&format!("sha256:{expected}\n")));
+        write_package(&path, &entries, Some(&format!("{expected}\n")));
         let mut projection = open_archive(&path).unwrap();
         assert_eq!(declared_fingerprint(&mut projection).unwrap(), expected);
         assert_eq!(hash_projection(&mut projection).unwrap(), expected);
 
         // 纸条换成别的值，算出来的还是同一个 —— 它自己被排除在内容之外。
         let rewritten = temp_package_path("fingerprint-rewritten");
-        let zeroes = format!("sha256:{}\n", "0".repeat(64));
+        let zeroes = format!("{}\n", "0".repeat(64));
         write_package(&rewritten, &entries, Some(&zeroes));
         let mut rewritten_projection = open_archive(&rewritten).unwrap();
         assert_eq!(declared_fingerprint(&mut rewritten_projection).unwrap(), "0".repeat(64));
@@ -653,7 +607,7 @@ mod tests {
 
         // 写入顺序不影响值：按包内路径排序是规则的一部分。
         let shuffled = temp_package_path("fingerprint-shuffled");
-        write_package(&shuffled, &[entries[2], entries[0], entries[1]], Some(&format!("sha256:{expected}\n")));
+        write_package(&shuffled, &[entries[2], entries[0], entries[1]], Some(&format!("{expected}\n")));
         let mut shuffled_projection = open_archive(&shuffled).unwrap();
         assert_eq!(hash_projection(&mut shuffled_projection).unwrap(), expected);
 
@@ -692,23 +646,27 @@ mod tests {
         root
     }
 
+    /// 印记的先后靠写文件内容，所以这里按给定顺序逐个盖，中间隔一下让修改时间能分辨。
+    fn stamp_in_order(root: &Path, fingerprints: &[&str]) {
+        for fingerprint in fingerprints {
+            mark_used(root, fingerprint);
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+
     #[test]
     fn prune_drops_the_least_recently_used_package_and_never_the_one_in_use() {
         let root = temp_cache_root("prune", &[("old", 400), ("middle", 400), ("recent", 400)]);
-        let mut index = PackageCacheIndex::default();
-        for (package, last_used_at) in [("old", 1_u64), ("middle", 2), ("recent", 3)] {
-            index.packages.insert(package.to_string(), PackageCacheEntry { last_used_at, bytes: 400 });
-        }
-        write_index(&root, &index);
+        stamp_in_order(&root, &["old", "middle", "recent"]);
 
-        // 上限只够两份：最久没用的 "old" 先走。
+        // 上限只够两份：最久没用到的 "old" 先走。
         prune_cache(&root, "", 800).unwrap();
         assert!(!root.join("old").exists());
         assert!(root.join("middle").is_dir());
         assert!(root.join("recent").is_dir());
-        assert!(!read_index(&root).packages.contains_key("old"));
+        assert!(!stamp_path(&root, "old").exists());
 
-        // 正在解开的那一份永远留下，即使它是最久没用的那个。
+        // 正在解开的那一份永远留下，即使它是最久没用到的那个。
         prune_cache(&root, "middle", 0).unwrap();
         assert!(root.join("middle").is_dir());
         assert!(!root.join("recent").exists());
@@ -717,30 +675,19 @@ mod tests {
     }
 
     #[test]
-    fn the_index_backfills_missing_sizes_and_tolerates_a_broken_file() {
-        let root = temp_cache_root("index", &[("known", 5), ("legacy", 7)]);
+    fn pruning_measures_the_packages_itself_and_clears_stamps_without_a_package() {
+        let root = temp_cache_root("sizes", &[("known", 5), ("legacy", 7)]);
 
-        // 没有任何索引时，清理顺手把每个包的字节数量一次并记下来。
-        prune_cache(&root, "", u64::MAX).unwrap();
-        let index = read_index(&root);
-        assert_eq!(index.packages.get("known").unwrap().bytes, 5);
-        assert_eq!(index.packages.get("legacy").unwrap().bytes, 7);
-
-        // 索引读不出来只是一份空索引：不报错，也不因为读不出来就删掉缓存。
-        std::fs::write(index_file_path(&root), "{ broken").unwrap();
-        assert!(read_index(&root).packages.is_empty());
+        // 没有任何印记时按体积照样算得出来，也照样不删东西。
         prune_cache(&root, "", u64::MAX).unwrap();
         assert!(root.join("known").is_dir());
         assert!(root.join("legacy").is_dir());
 
-        // 目录已经不在的条目随这次清理消失，磁盘上的两个包不受影响。
-        let mut stale = read_index(&root);
-        stale.packages.insert("vanished".to_string(), PackageCacheEntry { last_used_at: 9, bytes: 123 });
-        write_index(&root, &stale);
+        // 目录已经不在了，印记留着只会攒垃圾。
+        mark_used(&root, "vanished");
         prune_cache(&root, "", u64::MAX).unwrap();
-        let after = read_index(&root);
-        assert!(!after.packages.contains_key("vanished"));
-        assert!(after.packages.contains_key("known") && after.packages.contains_key("legacy"));
+        assert!(!stamp_path(&root, "vanished").exists());
+        assert!(root.join("known").is_dir() && root.join("legacy").is_dir());
 
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -756,13 +703,13 @@ mod tests {
     }
 
     /// 解开这一条路以前只能靠人手点一次界面来验证。现在 `unpack_blocking` 只吃请求，
-    /// 所以"目录名是指纹、包目录里没有簿记、簿记在集合目录里且记着真实字节数"可以在测试里说清。
+    /// 所以"目录名就是指纹、目录里只有包自己的文件、用到过会留下印记"可以在测试里说清。
     #[test]
-    fn unpacking_lands_on_the_fingerprint_and_records_its_size_in_the_collection_index() {
+    fn unpacking_lands_on_the_fingerprint_and_leaves_a_usage_stamp_beside_it() {
         let entries = [(MANIFEST_PATH, "{\"name\":\"t\"}"), ("fonts/a.ttf", "aaaa")];
         let fingerprint = expected_fingerprint(&entries);
         let archive = temp_package_path("unpack");
-        write_package(&archive, &entries, Some(&format!("sha256:{fingerprint}\n")));
+        write_package(&archive, &entries, Some(&format!("{fingerprint}\n")));
 
         let root = std::env::temp_dir().join(format!("opencard-cache-unpack-{}", now_millis()));
         let _ = std::fs::remove_dir_all(&root);
@@ -776,20 +723,15 @@ mod tests {
         let package_root = root.join(&fingerprint);
         assert_eq!(unpacked.root_path, package_root.to_string_lossy().to_string());
         assert!(package_root.join(MANIFEST_PATH).is_file());
-        // 包目录里只有包自己的文件：簿记不能混进去，否则"包内文件清单"就不准确了。
-        assert!(!package_root.join(INDEX_FILE_NAME).exists());
+        // 包目录里只有包自己的文件：印记在集合目录里，否则"包内文件清单"就不准确了。
+        assert!(!package_root.join(USED_PREFIX).exists());
+        let stamp = stamp_path(&root, &fingerprint);
+        assert!(stamp.is_file());
 
-        let index = read_index(&root);
-        let entry = index.packages.get(&fingerprint).unwrap();
-        // 记下的字节数必须等于磁盘上真实的大小，否则淘汰时的账目就是假的。
-        assert_eq!(entry.bytes, directory_bytes(&package_root));
-        assert!(entry.bytes > 0);
-        assert!(entry.last_used_at > 0);
-
-        // 再解一次是幂等的：位置不变，也不重复记账。
+        // 再解一次是幂等的：位置不变，印记照旧。
         let again = unpack_blocking(&request()).unwrap();
         assert_eq!(again.root_path, unpacked.root_path);
-        assert_eq!(read_index(&root).packages.get(&fingerprint).unwrap().bytes, entry.bytes);
+        assert!(stamp.is_file());
 
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_file(&archive);

@@ -24,8 +24,6 @@ export type ProjectResourcePackage = {
   readonly manifest: ResourcePackageManifest
   /** 项目里那个 `.ocpack` 文件。它交给 git，是"这个项目装了它"的唯一真相。 */
   readonly archivePath: string
-  /** 内容指纹。解开目录就挂在它上面。 */
-  readonly fingerprint: string
   /**
    * 解开后的目录。`null` 表示**正在解开**，不是"不可用"——解好之后环境会重建一次，
    * 引用它的图标与字体那时候就出现了。真正不可用的包根本不会进这张表。
@@ -143,9 +141,8 @@ async function discoverProjectResourcePackages(options: {
   const entries = (await options.fs.readDirectory(archiveRoot)).filter(isPackageFile)
   entries.sort((left, right) => left.name.localeCompare(right.name))
 
-  // 兜底：有人手工往文件夹里放了第二份。解析一条引用必须落到一个包上，所以同一指纹、
-  // 同一坐标都只留一条（按文件名排序，谁胜出不重要）。应用自己不会制造这种重复。
-  const coordinateByFingerprint = new Set<string>()
+  // 兜底：有人手工往文件夹里放了第二份。解析一条引用必须落到一个包上，所以同一坐标只留一条
+  // （按文件名排序，谁胜出不重要）。应用自己不会制造这种重复。
   for (const entry of entries) {
     const archivePath = `${archiveRoot}/${entry.name}`
     let archive: ResourcePackageArchive
@@ -154,10 +151,8 @@ async function discoverProjectResourcePackages(options: {
     } catch {
       continue
     }
-    if (coordinateByFingerprint.has(archive.fingerprint)) continue
     if (packages.has(archive.coordinate)) continue
     if (options.unusableFingerprints?.has(archive.fingerprint)) continue
-    coordinateByFingerprint.add(archive.fingerprint)
     // "解开了没有"就是"缓存里有没有那个指纹目录"：缓存目录名按指纹算出来，不需要谁再记一份。
     const unpackRoot = `${options.packagesRoot}/${archive.fingerprint}`
     const unpacked = await options.fs.fileExists(unpackRoot)
@@ -165,9 +160,10 @@ async function discoverProjectResourcePackages(options: {
       coordinate: parsePackageCoordinate(archive.coordinate)!,
       manifest: archive.manifest,
       archivePath,
-      fingerprint: archive.fingerprint,
       rootPath: unpacked ? unpackRoot : null,
-      cover: null,
+      cover: unpacked
+        ? await resolveProjectCover({ fs: options.fs, rootPath: unpackRoot, relativePath: archive.manifest.cover })
+        : null,
     })
     // 还没解开的包只排队，不在这里等：加载环境不该被一次解压卡住。
     if (!unpacked) options.onPackagePending?.(archive, archivePath, options.packagesRoot)
@@ -260,16 +256,8 @@ export async function loadProjectResourceEnvironment(options: {
     })
     : new Map<string, ProjectResourcePackage>()
 
-  // 发现到的包一律进目录：包里缺什么，用到它的时候自然报出来。
-  const available = new Map<string, ProjectResourcePackage>()
-  for (const [coordinate, pkg] of packages) {
-    available.set(coordinate, pkg.rootPath
-      ? { ...pkg, cover: await resolveProjectCover({ fs: options.fs, rootPath: pkg.rootPath, relativePath: pkg.manifest.cover }) }
-      : pkg)
-  }
-
   const packageEnvironments = new Map<string, ProjectResourceEnvironment>()
-  for (const [coordinate, pkg] of available) {
+  for (const [coordinate, pkg] of packages) {
     if (!pkg.rootPath) continue
     packageEnvironments.set(coordinate, await loadProjectResourceEnvironment({
       fs: options.fs,
@@ -294,7 +282,7 @@ export async function loadProjectResourceEnvironment(options: {
     fonts: buildProjectFontRegistry(registries.fonts),
     iconDocument: registries.icons,
     iconCatalog,
-    packages: available,
+    packages,
     packageEnvironments,
   }
 }

@@ -28,16 +28,7 @@ export const APP_CACHE_NETWORK_DIRECTORY_NAME = 'network'
 /** 被移出项目、等待撤销的资产字节，随进程生死。 */
 export const APP_CACHE_STAGED_DIRECTORY_NAME = 'staged'
 
-/** 顶层条目的闭合集合：新增一项必须同时改这里和 docs/存储布局.md。 */
-export const APP_STORAGE_TOP_LEVEL_ENTRIES = [
-  APP_SETTINGS_FILE_NAME,
-  APP_UPDATE_STATE_FILE_NAME,
-  APP_FEEDBACK_RECEIPTS_FILE_NAME,
-  APP_PACKAGE_DIRECTORY_NAME,
-  APP_TEMPLATE_DIRECTORY_NAME,
-  APP_CACHE_DIRECTORY_NAME,
-] as const
-
+/** 顶层条目的闭合集合见 docs/存储布局.md。 */
 export async function resolveAppStorageRoot(): Promise<string> {
   return await join(await homeDir(), APP_STORAGE_DIRECTORY_NAME)
 }

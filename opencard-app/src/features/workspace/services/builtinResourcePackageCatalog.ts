@@ -5,10 +5,9 @@
  * - 只负责扫描与投影 不写入任何位置、不处理复制进项目（预装仍走项目自己的加包流程）
  */
 import { join, resolveResource } from '@tauri-apps/api/path'
-import { RESOURCE_PACKAGE_SUFFIX } from '../model/resourcePackage'
 import type { StoredResourcePackage, StoredResourcePackageWarning } from '../model/storedResourcePackage'
 import { fileSystemService, type FileSystemService } from './fileSystemService'
-import { readResourcePackageArchive } from './resourcePackageArchive'
+import { readResourcePackageArchive, scanResourcePackageDirectory } from './resourcePackageArchive'
 
 /** 内置包所在的资源目录，对应 src-tauri/resources/packages。 */
 const BUILTIN_RESOURCE_PACKAGE_DIRECTORY = 'packages'
@@ -27,31 +26,9 @@ export async function loadBuiltinResourcePackages(
   resolve: (path: string) => Promise<string> = resolveResource,
 ): Promise<BuiltinResourcePackageSnapshot> {
   const root = await resolve(BUILTIN_RESOURCE_PACKAGE_DIRECTORY)
-  const packs: StoredResourcePackage[] = []
-  const warnings: StoredResourcePackageWarning[] = []
-
-  let entries
   try {
-    entries = await fs.readDirectory(root)
+    return await scanResourcePackageDirectory({ fs, root, join, read: readResourcePackageArchive })
   } catch {
-    return { packs, warnings }
+    return { packs: [], warnings: [] }
   }
-
-  for (const entry of entries) {
-    if (!entry.isFile || !entry.name.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX)) continue
-    const path = await join(root, entry.name)
-    try {
-      const archive = await readResourcePackageArchive(path)
-      packs.push({
-        path,
-        coordinate: archive.coordinate,
-        title: archive.manifest.title,
-        fingerprint: archive.fingerprint,
-      })
-    } catch (cause) {
-      warnings.push({ path, reason: cause instanceof Error ? cause.message : String(cause) })
-    }
-  }
-
-  return { packs: packs.sort((left, right) => left.title.localeCompare(right.title)), warnings }
 }

@@ -1,6 +1,6 @@
 export { PROJECT_FONT_REGISTRY_FILE_NAME } from './projectStructure'
 import { isRecord } from '../../../shared/model/record'
-import { resolveReferenceSyntax } from './scopedResourcePath'
+import { referenceSyntaxIsValid } from './scopedResourcePath'
 
 export const projectFontKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
 export const projectFontIdPattern = projectFontKeyPattern
@@ -69,8 +69,7 @@ function normalizeName(value: unknown): string | null {
 function normalizeSource(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const source = value.trim()
-  const resolved = resolveReferenceSyntax(source)
-  return resolved.ok && projectFontSourcePattern.test(source) ? source : null
+  return referenceSyntaxIsValid(source) && projectFontSourcePattern.test(source) ? source : null
 }
 
 export function projectFontSources(font: Pick<ProjectFont, 'files'>): string[] {

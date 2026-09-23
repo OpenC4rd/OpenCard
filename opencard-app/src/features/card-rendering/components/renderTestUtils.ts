@@ -25,15 +25,10 @@ import type {
 import { parseRichTextHtml } from '../../../shared/rich-text/richTextHtml'
 import type { PreparedRichTextCatalog } from '../prepareRichText'
 import { EMPTY_PROJECT_ICON_CATALOG, type ProjectIconCatalog } from '../../workspace/services/projectIconCatalog'
-import {
-  createCardRenderResourceContext,
-  type CardResourceResolver,
-} from '../cardRenderResources'
+import type { CardResourceResolver } from '../cardRenderResources'
 
 export function createRendererTestResources(projectIconCatalog: ProjectIconCatalog = EMPTY_PROJECT_ICON_CATALOG): CardResourceResolver {
-  const resourceContext = createCardRenderResourceContext({ projectIconCatalog })
   const resolver: CardResourceResolver = {
-    hostEnvironment: resourceContext.hostEnvironment,
     resolve: request => {
       if (!request.value.trim()) return { kind: 'empty' }
       if (request.expect === 'font') return { kind: 'font', cssFamily: request.value }

@@ -37,7 +37,6 @@ function packageEntry(coordinate: PackageCoordinate, rootPath: string): ProjectR
       public: { fonts: [], iconSeries: [] },
     }).manifest,
     archivePath: `/project/.opencard/packages/${coordinate.name}.ocpack`,
-    fingerprint: `fp-${coordinate.name}`,
     rootPath,
     cover: null,
   }

@@ -1,12 +1,11 @@
 import { join } from '@tauri-apps/api/path'
-import type { DirEntry } from '@tauri-apps/plugin-fs'
 import {
   APP_PACKAGE_DIRECTORY_NAME,
   resolveAppStorageRoot,
 } from '../../../shared/storage/appStoragePaths'
 import { toKeySlug } from '../../../shared/model/keySlug'
 import { fileSystemService, type FileSystemService } from './fileSystemService'
-import { readResourcePackageArchive, type ResourcePackageArchive } from './resourcePackageArchive'
+import { readResourcePackageArchive, scanResourcePackageDirectory } from './resourcePackageArchive'
 import { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from '../model/resourcePackage'
 import type { StoredResourcePackage, StoredResourcePackageSnapshot } from '../model/storedResourcePackage'
 
@@ -18,14 +17,6 @@ export interface StoredResourcePackagePathService {
 const defaultPathService: StoredResourcePackagePathService = {
   appStorageDir: resolveAppStorageRoot,
   join,
-}
-
-function describeError(value: unknown): string {
-  return value instanceof Error ? value.message : String(value)
-}
-
-function isPackageFile(entry: DirEntry): boolean {
-  return entry.isFile && entry.name.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX)
 }
 
 /**
@@ -41,18 +32,12 @@ export class StoredResourcePackageLibraryService {
   async loadLibrary(): Promise<StoredResourcePackageSnapshot> {
     const root = await this.resolveRoot()
     await this.fs.createDirectory(root)
-    const packs: StoredResourcePackage[] = []
-    const warnings: StoredResourcePackageSnapshot['warnings'] = []
-    for (const entry of await this.fs.readDirectory(root)) {
-      if (!isPackageFile(entry)) continue
-      const path = await this.paths.join(root, entry.name)
-      try {
-        packs.push(this.describe(path, await readResourcePackageArchive(path)))
-      } catch (cause) {
-        warnings.push({ path, reason: describeError(cause) })
-      }
-    }
-    return { packs: packs.sort((left, right) => left.title.localeCompare(right.title)), warnings }
+    return await scanResourcePackageDirectory({
+      fs: this.fs,
+      root,
+      join: this.paths.join.bind(this.paths),
+      read: readResourcePackageArchive,
+    })
   }
 
   async pickSourceFile(title: string): Promise<string | null> {
@@ -71,20 +56,16 @@ export class StoredResourcePackageLibraryService {
     const targetPath = await this.resolveAvailablePath(root, toKeySlug(archive.coordinate.replace('/', '-'), 'package'))
     // 归档可能很大，直接复制文件，不把整包读进前端内存。
     await this.fs.copyFile(sourcePath, targetPath)
-    return this.describe(targetPath, archive)
-  }
-
-  async removePackage(path: string): Promise<void> {
-    await this.fs.deleteFile(path)
-  }
-
-  private describe(path: string, archive: ResourcePackageArchive): StoredResourcePackage {
     return {
-      path,
+      path: targetPath,
       coordinate: archive.coordinate,
       title: archive.manifest.title,
       fingerprint: archive.fingerprint,
     }
+  }
+
+  async removePackage(path: string): Promise<void> {
+    await this.fs.deleteFile(path)
   }
 
   private async resolveAvailablePath(root: string, key: string): Promise<string> {

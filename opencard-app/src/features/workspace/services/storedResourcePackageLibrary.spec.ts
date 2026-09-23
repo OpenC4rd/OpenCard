@@ -5,7 +5,9 @@ import { StoredResourcePackageLibraryService } from './storedResourcePackageLibr
 
 const archives = vi.hoisted(() => ({ readResourcePackageArchive: vi.fn() }))
 
-vi.mock('./resourcePackageArchive', () => ({
+// 只替掉"读归档"这一步：目录扫描本身是真的，那条路径也要被测到。
+vi.mock('./resourcePackageArchive', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./resourcePackageArchive')>(),
   readResourcePackageArchive: archives.readResourcePackageArchive,
 }))
 

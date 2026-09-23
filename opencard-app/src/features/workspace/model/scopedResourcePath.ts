@@ -166,9 +166,8 @@ function packageRoot(roots: PackageScopeRoots | undefined, qualifier: PackageQua
  * 注册表在解析阶段用它 —— 那时候还不知道这个项目装了哪些包，也不该知道：一个包还没解开、
  * 或者换台机器上没装，都不该让注册表变成一份读不出来的文件。指得到指不到是使用的时候的事。
  */
-export function resolveReferenceSyntax(reference: string): ScopedResourcePathResult {
-  const parsed = parseReference(reference)
-  return isFailure(parsed) ? parsed : { ok: true, value: parsed.path }
+export function referenceSyntaxIsValid(reference: string): boolean {
+  return !isFailure(parseReference(reference))
 }
 
 export function resolveResourcePath(options: ResolveResourcePathOptions): ScopedResourcePathResult {

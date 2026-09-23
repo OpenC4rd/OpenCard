@@ -151,7 +151,6 @@ describe('buildResourcePackageFromProject', () => {
     })
 
     expect(lastRequest().cover).toBeUndefined()
-    expect(result.imagePaths).toEqual(['/project/images/card.png'])
     expect(result.fingerprint).toBe('fp-built')
   })
 })
