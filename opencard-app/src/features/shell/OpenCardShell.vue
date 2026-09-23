@@ -287,7 +287,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning, addTitleBarNotice, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
 import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -409,7 +409,6 @@ import {
   PROJECT_ENTRY_RENAME_ACTION_KEY,
   PROJECT_ENTRY_REVEAL_ACTION_KEY,
   PROJECT_PACKAGE_ADD_ACTION_KEY,
-  PROJECT_PACKAGE_DELETE_ACTION_KEY,
   useShellFileTree,
 } from './composables/useShellFileTree'
 import ShellSidebar from './components/ShellSidebar.vue'
@@ -518,7 +517,6 @@ const {
   setDirectoryExpanded,
   resetProjectWorkspaceState,
   createEntryWithAvailableName,
-  removeResourcePackage,
   trashFile,
   revealEntryInFileManager,
   getRelativeProjectPath,
@@ -736,6 +734,7 @@ const {
 })
 const exportRendererRef = ref<InstanceType<typeof CardFaceRenderer>>()
 const projectTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
+const projectManagementTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
 
 const {
   availableUpdate,
@@ -1739,6 +1738,7 @@ const { sidebarTailButtons, sidebarBodyGroups } = useShellSidebarLists({
   repositoryReady,
   repositoryNeedsInitialization,
   projectTreeRef,
+  projectManagementTreeRef,
   settingsCategoryKey,
   settingsCategoryTreeData,
   selectedTemplateKey,
@@ -2628,18 +2628,8 @@ async function handleProjectManagementAction(event: OcNodeActionEvent) {
     await pickAndAddResourcePackage()
     return
   }
-  if (event.actionKey !== PROJECT_PACKAGE_DELETE_ACTION_KEY) return
-  // 管理区里包节点的 key 就是那个 `.ocpack` 文件本身。
-  const archivePath = event.key
-  const installed = projectStore.findProjectResourcePackage(archivePath)
-  try {
-    await removeResourcePackage(archivePath)
-    closeSessionsByPath(archivePath)
-    selectedManagementKeys.value = []
-    notifySuccess(t('resourcePackage.deleted', { name: installed?.manifest.title ?? archivePath.split('/').pop() ?? archivePath }))
-  } catch (error) {
-    notifyAppError('OC-E3016', { path: archivePath, error }, locale.value)
-  }
+  // 包那一行就是文件树里的一行，动作走同一套。
+  await runProjectEntryAction(event.actionKey, event.key, projectManagementTreeRef)
 }
 
 async function handleProjectSelectionChange(event: OcNodeSelectionEvent): Promise<void> {
@@ -2681,48 +2671,53 @@ async function handleProjectExternalDrop(event: OcNodeExternalDropEvent): Promis
   if (result.copied === 0 && result.failed === 0) notifyWarning(t('app.notifications.externalDropSkipped'))
 }
 
+/**
+ * 一条"项目里的条目"的动作：文件树和包列表共用同一份实现 —— 动作由同一处生成，
+ * 处理也必须同一处，否则同一个动作在两种列表里会有两套行为。
+ */
+async function runProjectEntryAction(
+  actionKey: string,
+  path: string,
+  tree: Ref<{ beginRename: (key: string) => Promise<void> } | null>,
+): Promise<void> {
+  if (actionKey === PROJECT_ENTRY_RENAME_ACTION_KEY) {
+    await tree.value?.beginRename(path)
+    return
+  }
+
+  if (actionKey === PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY) {
+    await requestPathTrash(path)
+    return
+  }
+  if (actionKey === PROJECT_ENTRY_REVEAL_ACTION_KEY) {
+    try {
+      await revealEntryInFileManager(path)
+    } catch (error) {
+      notifyAppError('OC-E2004', { actionKey, path, error }, locale.value)
+    }
+    return
+  }
+  if (actionKey === PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY) {
+    try {
+      await navigator.clipboard.writeText(getRelativeProjectPath(path))
+    } catch (error) {
+      notifyAppError('OC-E1002', { source: 'project-relative-path', path, error }, locale.value)
+    }
+    return
+  }
+  if (actionKey === PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY) {
+    try {
+      await navigator.clipboard.writeText(path)
+    } catch (error) {
+      notifyAppError('OC-E1002', { source: 'project-absolute-path', path, error }, locale.value)
+    }
+  }
+}
+
 async function handleProjectAction(event: OcNodeActionEvent): Promise<void> {
   const entry = findProjectEntryByKey(event.key)
   if (!entry) return
-
-  if (event.actionKey === PROJECT_ENTRY_RENAME_ACTION_KEY) {
-    await projectTreeRef.value?.beginRename(entry.key)
-    return
-  }
-
-  if (event.actionKey === PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY) {
-    await requestPathTrash(entry.key)
-    return
-  }
-  if (event.actionKey === PROJECT_ENTRY_REVEAL_ACTION_KEY) {
-    console.debug('[workspace-action] reveal:start', { actionKey: event.actionKey, path: entry.key })
-    try {
-      await revealEntryInFileManager(entry.key)
-      console.debug('[workspace-action] reveal:success', { actionKey: event.actionKey, path: entry.key })
-    } catch (error) {
-      notifyAppError('OC-E2004', {
-        actionKey: event.actionKey,
-        path: entry.key,
-        error,
-      }, locale.value)
-    }
-    return
-  }
-  if (event.actionKey === PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY) {
-    try {
-      await navigator.clipboard.writeText(getRelativeProjectPath(entry.key))
-    } catch (error) {
-      notifyAppError('OC-E1002', { source: 'project-relative-path', path: entry.key, error }, locale.value)
-    }
-    return
-  }
-  if (event.actionKey === PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY) {
-    try {
-      await navigator.clipboard.writeText(entry.key)
-    } catch (error) {
-      notifyAppError('OC-E1002', { source: 'project-absolute-path', path: entry.key, error }, locale.value)
-    }
-  }
+  await runProjectEntryAction(event.actionKey, entry.key, projectTreeRef)
 }
 
 async function handleProjectNodeActivate(event: OcNodeActivateEvent): Promise<void> {

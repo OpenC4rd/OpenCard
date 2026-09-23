@@ -4,8 +4,8 @@ import { isNodeTailAction, normalizeNodeTail, type OcNode } from '../../../share
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { resolveFileType } from '../../workspace/model/fileTypes'
 import {
+  PROJECT_ENTRY_MORE_ACTION_KEY,
   PROJECT_PACKAGE_ADD_ACTION_KEY,
-  PROJECT_PACKAGE_DELETE_ACTION_KEY,
   useShellFileTree,
 } from './useShellFileTree'
 
@@ -44,16 +44,11 @@ describe('useShellFileTree package navigation', () => {
     // 标题是文件真正的名字，小字是包自述的坐标 —— 文件叫什么名字不算数。
     expect(tree.projectManagementTreeData.value.items.get(archivePath)?.label)
       .toBe('alice-icons-1.0.0.ocpack')
-    expect(normalizeNodeTail(tree.projectManagementTreeData.value.items.get(archivePath)?.tail))
-      .toEqual([
-        'alice/icons@1.0.0',
-        {
-          key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
-          title: 'resourcePackage.delete',
-          icon: 'action.delete',
-          iconTone: 'danger',
-        },
-      ])
+    expect(normalizeNodeTail(tree.projectManagementTreeData.value.items.get(archivePath)?.tail)[0])
+      .toBe('alice/icons@1.0.0')
+    // 尾部动作和文件树里那一行是同一套（重命名/回收站/显示/复制路径都在那个"更多"里）。
+    expect(actionsOf(tree.projectManagementTreeData.value.items.get(archivePath)?.tail))
+      .toEqual([PROJECT_ENTRY_MORE_ACTION_KEY])
     // 包目录那一行提供一个"添加包"的入口，而选中它只是选中：目录不是一个可以打开的文件。
     expect(actionsOf(tree.projectManagementTreeData.value.items.get(packagesRoot)?.tail))
       .toEqual([PROJECT_PACKAGE_ADD_ACTION_KEY])

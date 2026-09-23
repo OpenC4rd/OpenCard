@@ -75,6 +75,8 @@ type ShellSidebarListsOptions = {
 
   /** 项目文件树实例；侧栏只把绑定后的 beginRename 写回这个 ref。 */
   projectTreeRef: Ref<{ beginRename: (key: string) => Promise<void> } | null>
+  /** 项目结构树实例；包列表那一行也要能就地重命名，理由同上。 */
+  projectManagementTreeRef: Ref<{ beginRename: (key: string) => Promise<void> } | null>
 
   /** 设置页的分类树与当前分类。 */
   settingsCategoryKey: Readonly<Ref<SettingsCategoryKey>>
@@ -166,6 +168,12 @@ type ShellSidebarLists = {
   sidebarBodyGroups: ComputedRef<ShellListGroup[]>
 }
 
+/** 树组件把自己的 `beginRename` 交出来，侧栏只是把它记下来给壳层用。 */
+function captureBeginRename(instance: unknown): { beginRename: (key: string) => Promise<void> } | null {
+  const tree = instance as { beginRename?: (key: string) => Promise<void> } | null
+  return typeof tree?.beginRename === 'function' ? { beginRename: tree.beginRename.bind(tree) } : null
+}
+
 export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSidebarLists {
   const {
     translate: t,
@@ -186,6 +194,7 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
     repositoryReady,
     repositoryNeedsInitialization,
     projectTreeRef,
+    projectManagementTreeRef,
     settingsCategoryKey,
     settingsCategoryTreeData,
     selectedTemplateKey,
@@ -281,10 +290,10 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
   })
 
   function captureProjectTreeInstance(instance: unknown): void {
-    const tree = instance as { beginRename?: (key: string) => Promise<void> } | null
-    projectTreeRef.value = typeof tree?.beginRename === 'function'
-      ? { beginRename: tree.beginRename.bind(tree) }
-      : null
+    projectTreeRef.value = captureBeginRename(instance)
+  }
+  function captureProjectManagementTreeInstance(instance: unknown): void {
+    projectManagementTreeRef.value = captureBeginRename(instance)
   }
 
   const sidebarBodyLists = computed<ShellList[]>(() => {
@@ -478,7 +487,12 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
           activationMode: 'none',
           onSelectionChange: handleProjectManagementSelectionChange,
           onExpansionChange: handleProjectManagementExpansionChange,
+          onRenameCommit: handleProjectRenameCommit,
+          onMove: handleProjectMove,
+          onExternalDrop: handleProjectExternalDrop,
+          externalDrop: projectOpen.value,
           onAction: handleProjectManagementAction,
+          captureInstance: captureProjectManagementTreeInstance,
         },
       },
       {

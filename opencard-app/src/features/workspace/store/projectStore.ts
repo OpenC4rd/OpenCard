@@ -1128,32 +1128,22 @@ function schedulePackageUnpacking(
  * 把一个 `.ocpack` 复制进项目 —— 这就是"装"。装进去就算数：机器上那份删了也不影响，
  * 项目自己带着归档提交进 git。
  *
- * 复制之前先读一遍：读不出身份的归档不进项目，否则它只会在那里当一个谁也叫不出名字的文件。
+ * 走的是"把外面的文件拷进来"的同一条路：名字原样保留，撞名排下一个编号，不覆盖。
+ * 所以同一个文件再装一次会多出一份 `名字 (2).ocpack`，而那一份由包自己说清它是谁。
  *
- * **文件名原样保留**：归档叫什么名字，进项目还叫什么名字。所以同一个文件再装一次就是覆盖
- * 同一份，项目里有且只有一份；也所以两个名字相同而内容不同的包会互相覆盖 —— 名字由人管，
- * 身份由包自己管。
+ * 复制之前先读一遍：读不出身份的归档不进项目，否则它只会在那里当一个谁也叫不出名字的文件。
  */
 async function installResourcePackageFile(sourcePath: string, projectRootPath?: string): Promise<void> {
   const rootPath = projectRootPath ? normalizePath(projectRootPath) : ensureProjectOpen()
-  // 读一遍确认它是个包（结果不用）：读不出来的归档不进项目，否则它只会在那里当一个
-  // 谁也叫不出名字的文件。
   await readResourcePackageArchive(sourcePath)
   const packagesRoot = `${rootPath}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`
   await fileSystemService.createDirectory(packagesRoot)
-  const target = `${packagesRoot}/${getPathBasename(normalizePath(sourcePath))}`
-  // 别把一个文件复制到它自己身上：那会先截断再读，把包毁成 0 字节。
-  if (pathIdentity(normalizePath(sourcePath)) === pathIdentity(target)) return
-  await fileSystemService.copyFile(sourcePath, target)
+  // 源文件本来就在这个目录里时它不复制自己：那会先截断再读，把包毁成 0 字节。
+  if (await copyExternalEntryIntoDirectory(normalizePath(sourcePath), packagesRoot) === 'skipped') {
+    throw new Error(`Cannot install the package: ${sourcePath}`)
+  }
   // 装进一个还没打开的项目（新建项目时的预装）不需要刷新当前项目。
   if (!projectPath.value || pathIdentity(rootPath) !== pathIdentity(projectPath.value)) return
-  await reloadProjectResourceEnvironment()
-  await refreshIndexedEntries()
-}
-
-/** 卸载 = 删掉那个文件。共享的解开缓存不受影响 —— 它是派生的，删了会自动重建。 */
-async function removeResourcePackage(archivePath: string): Promise<void> {
-  await fileSystemService.deleteFile(archivePath)
   await reloadProjectResourceEnvironment()
   await refreshIndexedEntries()
 }
@@ -1576,7 +1566,6 @@ export function useProjectStore() {
     importProjectFontFiles,
     getProjectFontImportConflict,
     installResourcePackageFile,
-    removeResourcePackage,
     findProjectResourcePackage,
     createEntryWithAvailableName,
     trashFile,

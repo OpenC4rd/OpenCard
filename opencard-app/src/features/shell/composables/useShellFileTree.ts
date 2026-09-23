@@ -2,12 +2,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { resolveEntryIcon, resolveFileTypeById, type EntryIconPresentation } from '../../workspace/model/fileTypes'
-import type {
-  OcNode,
-  OcNodeAction,
-  OcNodeCollection,
-  OcNodeRenameSelection,
-} from '../../../shared/ui/node/node.types'
+import { normalizeNodeTail, type OcNode, type OcNodeAction, type OcNodeCollection, type OcNodeRenameSelection } from '../../../shared/ui/node/node.types'
 import type { IconToken } from '../../../shared/ui/icon/iconTokens'
 import { RESOURCE_PACKAGE_SUFFIX } from '../../workspace/model/resourcePackage'
 import { notifyAppError } from '../../notifications/titlebarNotices'
@@ -31,7 +26,6 @@ export const PROJECT_ENTRY_MORE_ACTION_KEY = 'project-entry-more'
 export const PROJECT_ENTRY_DELETE_ACTION_KEY = 'project-entry-delete'
 export const PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY = 'project-entry-confirm-delete'
 export const PROJECT_PACKAGE_ADD_ACTION_KEY = 'project-package-add'
-export const PROJECT_PACKAGE_DELETE_ACTION_KEY = 'project-package-delete'
 
 type ProjectManagementEntry = {
   path: string
@@ -265,35 +259,35 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
         nodeKeyByTargetPath.set(key, key)
       }
       if (entry.packageDirectory) {
-        // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`：节点就是那个文件本身，
-        // 所以节点 key 与目标路径是同一个值，删除直接按路径走。
+        // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`。每一行都用文件树那一行的节点：
+        // 同样的图标、同样的重命名/回收站/在文件管理器显示/复制路径，动作只有一套。
         const packageNodeKeys = options.indexedEntries.value
           .map(candidate => normalizeShellPath(candidate.name))
           .filter(relative => relative.startsWith(`${entry.path}/`))
           .filter(relative => !relative.slice(entry.path.length + 1).includes('/'))
           .filter(relative => relative.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX))
-          .map(relative => normalizeShellPath(`${options.projectPath.value}/${relative}`))
           .sort((left, right) => left.localeCompare(right))
-        for (const nodeKey of packageNodeKeys) {
-          const parts = nodeKey.split('/')
-          // 小字是包自述的坐标：文件叫什么名字不算数，所以列表里这两件事各说各的。
-          const coordinate = options.packageCoordinates?.value.get(nodeKey)
-          items.set(nodeKey, {
-            label: parts[parts.length - 1] ?? nodeKey,
-            visual: { type: 'icon', icon: 'file.package', iconTone: 'config' },
-            tail: [
-              ...(coordinate ? [coordinate] : []),
-              {
-                key: PROJECT_PACKAGE_DELETE_ACTION_KEY,
-                title: options.translate('resourcePackage.delete'),
-                icon: 'action.delete',
-                iconTone: 'danger',
-              },
-            ],
+          .map((relative) => {
+            const nodeKey = normalizeShellPath(`${options.projectPath.value}/${relative}`)
+            const parts = relative.split('/')
+            const node = createProjectEntryNode({
+              key: nodeKey,
+              relativePath: relative,
+              label: parts[parts.length - 1] ?? relative,
+              isDirectory: false,
+              isExpanded: false,
+              children: [],
+            })
+            // 小字是包自述的坐标：文件叫什么名字不算数，所以列表里这两件事各说各的。
+            const coordinate = options.packageCoordinates?.value.get(nodeKey)
+            items.set(nodeKey, {
+              ...node,
+              tail: [...(coordinate ? [coordinate] : []), ...normalizeNodeTail(node.tail)],
+            })
+            targetByNodeKey.set(nodeKey, nodeKey)
+            nodeKeyByTargetPath.set(nodeKey, nodeKey)
+            return nodeKey
           })
-          targetByNodeKey.set(nodeKey, nodeKey)
-          nodeKeyByTargetPath.set(nodeKey, nodeKey)
-        }
         if (packageNodeKeys.length > 0) children.set(key, packageNodeKeys)
       }
       return key

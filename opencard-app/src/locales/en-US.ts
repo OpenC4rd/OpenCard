@@ -1,6 +1,5 @@
 export default {
   resourcePackage: {
-    deleted: 'Package {name} was deleted.',
     builderTitle: 'Create package',
     buildTitle: 'Create package',
     contents: 'Package contents', contentsDescription: 'Choose the fonts and icons provided by the package, plus project images to carry with it.',

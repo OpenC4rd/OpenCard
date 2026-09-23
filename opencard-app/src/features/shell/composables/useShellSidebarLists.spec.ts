@@ -76,6 +76,7 @@ function createSidebarLists(
     repositoryReady: ref(false),
     repositoryNeedsInitialization: ref(false),
     projectTreeRef: ref<{ beginRename: (key: string) => Promise<void> } | null>(null),
+    projectManagementTreeRef: ref<{ beginRename: (key: string) => Promise<void> } | null>(null),
     settingsCategoryKey: ref<SettingsCategoryKey>('appearance'),
     settingsCategoryTreeData: ref(tree()),
     selectedTemplateKey: ref<ProjectTemplateKey | null>(null),

@@ -1,6 +1,5 @@
 export default {
   resourcePackage: {
-    deleted: '包 {name} 已删除。',
     builderTitle: '制作包',
     buildTitle: '制作包',
     contents: '包内容', contentsDescription: '选择包对外提供的字体、图标，以及要随包携带的项目图片。',
