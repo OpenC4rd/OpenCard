@@ -1,5 +1,5 @@
 import type { CardFaceKey } from '../../entities/card/model'
-import { parsePackageQualifier } from '../workspace/model/packageCoordinate'
+import { formatPackageCoordinate, parsePackageQualifier } from '../workspace/model/packageCoordinate'
 import type { ProjectRemoteResourcePolicy } from '../workspace/model/projectMetadata'
 import { isRemoteResourceAllowed } from '../editor-runtime/services/editorResource'
 import {
@@ -9,7 +9,7 @@ import {
   type ResourceReferenceDiagnostic,
 } from '../workspace/services/resourceReference'
 import {
-  resolveProjectResourcePackageCoordinate,
+  resolveProjectResourcePackage,
 } from '../workspace/services/projectResourceEnvironment'
 import { resolveCardResourceEnvironment, type CardRenderResourceContext } from './cardRenderResources'
 import { createCardPipelineIssue, type CardPipelineIssue } from './cardPipelineIssue'
@@ -173,10 +173,11 @@ function validatePackageAssetReference(
   const qualifier = parsePackageQualifier(value.slice(0, hash))
   if (!qualifier) return
   const environment = resolveCardResourceEnvironment(resources, blockId, fieldKey)
-  const resolvedCoordinate = resolveProjectResourcePackageCoordinate(environment, qualifier)
-  const pkg = resolvedCoordinate ? environment.packages?.get(resolvedCoordinate) : undefined
+  const pkg = resolveProjectResourcePackage(environment, qualifier)
   // 正在解开的包不是缺包：文件还没落到磁盘上，解好之后画面自己补齐。
   if (pkg && pkg.rootPath === null) return
+  // 包环境按坐标索引，所以这里要把解析到的那个包再写回坐标。
+  const resolvedCoordinate = pkg ? formatPackageCoordinate(pkg.coordinate) : null
   const packageEnvironment = resolvedCoordinate
     ? resources.packageEnvironments.get(resolvedCoordinate) ?? environment.packageEnvironments?.get(resolvedCoordinate)
     : undefined

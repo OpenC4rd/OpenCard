@@ -16,14 +16,23 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 import { EMPTY_PROJECT_ICON_CATALOG } from './projectIconCatalog'
+import { parsePackageQualifier } from '../model/packageCoordinate'
 import {
   createProjectResourceNamespace,
   loadProjectResourceEnvironment,
   packageScopeRoots,
   projectResourceScopeIdentity,
   resolveProjectEnvironmentFontFamily,
+  resolveProjectResourcePackage,
   type ProjectResourceEnvironment,
 } from './projectResourceEnvironment'
+
+/**
+ * 目录按内容指纹存，所以按坐标取一个包要走和引用同一条路 —— 这也是它在生产里唯一的取法。
+ */
+function packageAt(environment: ProjectResourceEnvironment, coordinate: string) {
+  return resolveProjectResourcePackage(environment, parsePackageQualifier(coordinate)!)
+}
 
 function packageEnvironment(packageId: string): ProjectResourceEnvironment {
   const namespace = createProjectResourceNamespace('package', packageId)
@@ -191,16 +200,15 @@ describe('ProjectResourceEnvironment', () => {
       onPackagePending: (_archive, archivePath) => pending.push(archivePath),
     })
 
-    // 身份来自包自己的清单，文件名不算数。
-    expect([...environment.packages!.keys()].sort()).toEqual(['alice/icons@1.0.0', 'bob/fonts@2.0.0'])
-    expect(environment.packages!.get('alice/icons@1.0.0')?.rootPath).toBeNull()
-    expect(environment.packages!.get('bob/fonts@2.0.0')?.rootPath).toBe(bobRoot)
+    // 身份来自包自己的清单，文件名不算数；目录按内容指纹存，所以取一个包要走解析。
+    expect(packageAt(environment, 'alice/icons@1.0.0')?.rootPath).toBeNull()
+    expect(packageAt(environment, 'bob/fonts@2.0.0')?.rootPath).toBe(bobRoot)
     expect(packageScopeRoots(environment.packages).has('alice/icons@1.0.0')).toBe(false)
     expect(packageScopeRoots(environment.packages).get('bob/fonts@2.0.0')).toBe(bobRoot)
     expect(pending).toEqual([`${PACKAGES_ROOT}/alice-icons.ocpack`])
   })
 
-  it('keeps the packages it can read and stays silent about one it cannot', async () => {
+  it('keeps the packages it can read and reports the archive it cannot', async () => {
     archives.clear()
     registerArchive(`${PACKAGES_ROOT}/good.ocpack`, {
       manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
@@ -214,8 +222,10 @@ describe('ProjectResourceEnvironment', () => {
       fs: memoryFileSystem(projectFiles(`${PACKAGES_ROOT}/broken.ocpack`, `${PACKAGES_ROOT}/good.ocpack`)),
     })
 
-    // 读不出来的归档不是一个包，所以它不进目录；谁引用它谁在渲染时得到 package-unavailable。
-    expect([...environment.packages!.keys()]).toEqual(['alice/icons@1.0.0'])
+    // 读不出来的归档不是一个包，所以它不进目录；但它也不再凭空消失，而是按文件报出来。
+    expect(packageAt(environment, 'alice/icons@1.0.0')?.archivePath).toBe(`${PACKAGES_ROOT}/good.ocpack`)
+    expect(environment.unreadablePackages?.map(entry => entry.archivePath)).toEqual([`${PACKAGES_ROOT}/broken.ocpack`])
+    expect(environment.unreadablePackages?.[0]?.reason).toBeTruthy()
   })
 
   it('an unusable fingerprint keeps the package out of the catalog', async () => {
@@ -238,7 +248,7 @@ describe('ProjectResourceEnvironment', () => {
     expect(environment.packages!.size).toBe(0)
   })
 
-  it('keeps only the first file for a coordinate claimed twice, and the first of identical content', async () => {
+  it('keeps one entry per content, and lets the first file win for a coordinate', async () => {
     archives.clear()
     registerArchive(`${PACKAGES_ROOT}/alice-a.ocpack`, {
       manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
@@ -265,8 +275,11 @@ describe('ProjectResourceEnvironment', () => {
       )),
     })
 
-    expect([...environment.packages!.keys()]).toEqual(['alice/icons@1.0.0'])
-    expect(environment.packages!.get('alice/icons@1.0.0')?.archivePath).toBe(`${PACKAGES_ROOT}/alice-a.ocpack`)
+    // 同一份内容放了两个文件名：连解压目录都一样，所以只留先出现的那个文件名。
+    expect([...environment.packages!.keys()].sort()).toEqual(['fp-other', 'fp-shared'])
+    // 同坐标、内容不同（比如换了一份构建）：两个文件都在，谁也不消失；引用落到文件名靠前的那个。
+    expect(packageAt(environment, 'alice/icons@1.0.0')?.archivePath).toBe(`${PACKAGES_ROOT}/alice-a.ocpack`)
+    expect(environment.packages!.get('fp-other')?.archivePath).toBe(`${PACKAGES_ROOT}/impostor.ocpack`)
   })
 
   it('keeps a package even when its registry names a file the package does not ship', async () => {
@@ -306,11 +319,11 @@ describe('ProjectResourceEnvironment', () => {
       fs: memoryFileSystem(files),
     })
 
-    expect(environment.packages?.get('alice/icons@1.0.0')?.rootPath).toBe(aliceRoot)
+    expect(packageAt(environment, 'alice/icons@1.0.0')?.rootPath).toBe(aliceRoot)
     expect(environment.packageEnvironments?.get('alice/icons@1.0.0')?.iconCatalog.entries[0]?.src)
       .toBe(`asset://${aliceRoot}/icons/warn.svg`)
     // 注册表指到空气不在这里判死：包照旧在目录里，只是那一张画不出来。
-    expect(environment.packages?.get('bob/icons@1.0.0')?.rootPath).toBe(bobRoot)
+    expect(packageAt(environment, 'bob/icons@1.0.0')?.rootPath).toBe(bobRoot)
     expect(environment.packageEnvironments?.get('bob/icons@1.0.0')?.iconCatalog.entries[0]?.src)
       .toBe(`asset://${bobRoot}/icons/gone.svg`)
   })
@@ -339,11 +352,11 @@ describe('ProjectResourceEnvironment', () => {
       fs: memoryFileSystem(files),
     })
 
-    expect(environment.packages?.get('alice/icons@1.0.0')?.cover).toEqual({
+    expect(packageAt(environment, 'alice/icons@1.0.0')?.cover).toEqual({
       relativePath: 'assets/cover.png',
       absolutePath: `${aliceRoot}/assets/cover.png`,
       src: `asset://${aliceRoot}/assets/cover.png`,
     })
-    expect(environment.packages?.get('bob/icons@1.0.0')?.cover).toBeNull()
+    expect(packageAt(environment, 'bob/icons@1.0.0')?.cover).toBeNull()
   })
 })

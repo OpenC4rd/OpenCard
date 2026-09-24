@@ -1,4 +1,4 @@
-import { parsePackageCoordinate, resolvePackageQualifier, type PackageCoordinate, type PackageQualifier } from '../model/packageCoordinate'
+import { formatPackageCoordinate, parsePackageCoordinate, resolvePackageQualifier, type PackageCoordinate, type PackageQualifier } from '../model/packageCoordinate'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { parseResourceReferenceList } from './resourceReference'
 import { RESOURCE_PACKAGE_SUFFIX, type ResourcePackageManifest } from '../model/resourcePackage'
@@ -21,6 +21,8 @@ export type ProjectResourceScopeKind = 'project' | 'package'
 export type ProjectResourcePackage = {
   /** 包在清单里自述的坐标。文件名与目录名都不参与身份。 */
   readonly coordinate: PackageCoordinate
+  /** 内容指纹。解开目录就挂在它上面，也是"同一个包"的判据。 */
+  readonly fingerprint: string
   readonly manifest: ResourcePackageManifest
   /** 项目里那个 `.ocpack` 文件。它交给 git，是"这个项目装了它"的唯一真相。 */
   readonly archivePath: string
@@ -33,6 +35,15 @@ export type ProjectResourcePackage = {
   readonly cover: ProjectCover | null
 }
 
+/**
+ * 项目里装着的包，**一份内容一条**，键就是内容指纹。
+ *
+ * 键不是坐标，因为坐标是文件的属性而不是它的身份：同一个包换了一份构建，坐标一样、内容不一样，
+ * 那是两个文件，谁也不该被悄悄丢掉（换了构建却不显示，等于页面在骗人）。
+ * 反过来，同一份内容放了两个文件名（重复安装、或者手放一份）只留一条 —— 它们连解压目录都一样。
+ *
+ * 于是"同一个坐标该用哪一份"只在**解析引用**的时候才需要答案，见 `resolveProjectResourcePackage`。
+ */
 export type ProjectResourcePackageCatalog = ReadonlyMap<string, ProjectResourcePackage>
 
 /**
@@ -65,11 +76,15 @@ export type ProjectResourceEnvironment = {
  *
  * 这是从 `packages` 推出来的，不在环境上再存一份：包解开在哪只有一个答案。
  * 每个要用它的地方在自己那道边界上算一次（一次渲染、一次浏览），而不是每次解析都算。
+ *
+ * 同一坐标有两份（换了构建的那两个文件）时取**先出现的那一份**：引用只认坐标，
+ * 所以它必须落到唯一一个目录上，规则和解析引用时一致。
  */
 export function packageScopeRoots(packages: ProjectResourcePackageCatalog | undefined): PackageScopeRoots {
   const roots = new Map<string, string>()
-  for (const [coordinate, pkg] of packages ?? []) {
-    if (pkg.rootPath) roots.set(coordinate, pkg.rootPath)
+  for (const pkg of packages?.values() ?? []) {
+    const coordinate = formatPackageCoordinate(pkg.coordinate)
+    if (pkg.rootPath && !roots.has(coordinate)) roots.set(coordinate, pkg.rootPath)
   }
   return roots
 }
@@ -77,15 +92,25 @@ export function packageScopeRoots(packages: ProjectResourcePackageCatalog | unde
 export type ProjectResourceScopeMap = ReadonlyMap<string, ProjectResourceEnvironment>
 
 /**
- * 引用里的限定符解析成具体坐标：写了版本就要那一版，没写版本就取装着的里面**最高的那一版**。
+ * 引用里的限定符解析成**哪一个包**：写了版本就要那一版，没写版本就取装着的里面**最高的那一版**。
  * 所以"不写版本"不存在装错版本这回事，代价是长相会随项目里的包而变。
+ *
+ * 同一坐标有两份时取先出现的那一份（目录按文件名排序，所以是文件名靠前的那个）。
+ * 这一步是"同一个坐标用哪一份"唯一的答案所在 —— 目录里两份都在，只有引用需要选出唯一一个。
  */
-export function resolveProjectResourcePackageCoordinate(
+export function resolveProjectResourcePackage(
   environment: ProjectResourceEnvironment,
   qualifier: PackageQualifier,
-): string | null {
+): ProjectResourcePackage | null {
   const packages = environment.packages
-  return packages ? resolvePackageQualifier(packages.keys(), qualifier) : null
+  if (!packages) return null
+  const firstByCoordinate = new Map<string, ProjectResourcePackage>()
+  for (const pkg of packages.values()) {
+    const coordinate = formatPackageCoordinate(pkg.coordinate)
+    if (!firstByCoordinate.has(coordinate)) firstByCoordinate.set(coordinate, pkg)
+  }
+  const coordinate = resolvePackageQualifier(firstByCoordinate.keys(), qualifier)
+  return coordinate ? firstByCoordinate.get(coordinate) ?? null : null
 }
 
 export function projectResourceScopeIdentity(blockId: string, fieldKey: string): string {
@@ -154,8 +179,8 @@ async function discoverProjectResourcePackages(options: {
   const entries = (await options.fs.readDirectory(archiveRoot)).filter(isPackageFile)
   entries.sort((left, right) => left.name.localeCompare(right.name))
 
-  // 兜底：有人手工往文件夹里放了第二份。解析一条引用必须落到一个包上，所以同一坐标只留一条
-  // （按文件名排序，谁胜出不重要）。应用自己不会制造这种重复。
+  // 同一个坐标或同一份内容出现两次都不算错，是"有人又放了一份"：一份内容只留一条
+  // （同一份内容连解压目录都一样），先出现的那个文件名胜出。
   for (const entry of entries) {
     const archivePath = `${archiveRoot}/${entry.name}`
     let archive: ResourcePackageArchive
@@ -165,13 +190,14 @@ async function discoverProjectResourcePackages(options: {
       unreadable.push({ archivePath, reason: cause instanceof Error ? cause.message : String(cause) })
       continue
     }
-    if (packages.has(archive.coordinate)) continue
+    if (packages.has(archive.fingerprint)) continue
     if (options.unusableFingerprints?.has(archive.fingerprint)) continue
     // "解开了没有"就是"缓存里有没有那个指纹目录"：缓存目录名按指纹算出来，不需要谁再记一份。
     const unpackRoot = `${options.packagesRoot}/${archive.fingerprint}`
     const unpacked = await options.fs.fileExists(unpackRoot)
-    packages.set(archive.coordinate, {
+    packages.set(archive.fingerprint, {
       coordinate: parsePackageCoordinate(archive.coordinate)!,
+      fingerprint: archive.fingerprint,
       manifest: archive.manifest,
       archivePath,
       rootPath: unpacked ? unpackRoot : null,
@@ -272,8 +298,11 @@ export async function loadProjectResourceEnvironment(options: {
   const packages = discovered.packages
 
   const packageEnvironments = new Map<string, ProjectResourceEnvironment>()
-  for (const [coordinate, pkg] of packages) {
+  for (const pkg of packages.values()) {
     if (!pkg.rootPath) continue
+    // 包环境按**坐标**索引：引用只认坐标，所以同一坐标有两份时仍然只建一个环境（先出现的那份）。
+    const coordinate = formatPackageCoordinate(pkg.coordinate)
+    if (packageEnvironments.has(coordinate)) continue
     packageEnvironments.set(coordinate, await loadProjectResourceEnvironment({
       fs: options.fs,
       rootPath: pkg.rootPath,

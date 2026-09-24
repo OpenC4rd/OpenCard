@@ -10,7 +10,7 @@ import {
   type ProjectIconCatalogEntry,
 } from './projectIconCatalog'
 import type { ProjectFontRegistryEntry } from '../model/projectFontRegistry'
-import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackageCoordinate, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
+import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
 import { toCssFontFamily, type FontCatalogEntry } from '../model/projectFonts'
 
 export type ResourceReferenceScope = 'current' | 'host' | 'package'
@@ -165,10 +165,9 @@ function resolveEnvironment(
   }
 
   const source = formatResourceReference(reference)
-  const coordinate = reference.qualifier
-    ? resolveProjectResourcePackageCoordinate(options.environment, reference.qualifier)
+  const pkg = reference.qualifier
+    ? resolveProjectResourcePackage(options.environment, reference.qualifier)
     : null
-  const pkg = coordinate ? options.environment.packages?.get(coordinate) ?? null : null
   if (!pkg) return {
     environment: null,
     diagnostics: [diagnostic('package-unavailable', source, 'Referenced package is not visible from the current environment')],

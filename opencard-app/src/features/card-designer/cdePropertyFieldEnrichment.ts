@@ -27,7 +27,7 @@ import {
   type ProjectIconSource,
 } from '../workspace/services/projectIconCompletion'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
-import { resolveProjectResourcePackageCoordinate } from '../workspace/services/projectResourceEnvironment'
+import { resolveProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
 import { buildResourceFontCatalog } from '../workspace/services/resourceReference'
 import {
   resolveReferenceCompletion,
@@ -221,10 +221,9 @@ function createFontCompletionProvider(
   for (const font of fontCatalog) {
     if (font.source === 'system') continue
     const prefix = font.value.slice(0, font.value.indexOf('font:') + 5)
-    // 引用里写的是**完整坐标**，而资源环境也按坐标索引：解析出来直接查表，否则拿不到显示名。
+    // 引用里写的是**完整坐标**，而资源环境也按坐标索引：解析出来那个包，才拿得到显示名。
     const qualifier = prefix.includes('#') ? parsePackageQualifier(prefix.slice(0, prefix.indexOf('#'))) : null
-    const coordinate = qualifier && environment ? resolveProjectResourcePackageCoordinate(environment, qualifier) : null
-    const pkg = coordinate ? environment?.packages?.get(coordinate) : null
+    const pkg = qualifier && environment ? resolveProjectResourcePackage(environment, qualifier) : null
     scopes.set(prefix, qualifier ? pkg?.manifest.title || formatPackageIdentity(qualifier) : projectLabel)
   }
   return async ({ value, cursor }) => {

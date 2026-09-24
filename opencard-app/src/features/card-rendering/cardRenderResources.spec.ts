@@ -28,6 +28,7 @@ vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc }))
 function packageEntry(coordinate: PackageCoordinate, rootPath: string): ProjectResourcePackage {
   return {
     coordinate,
+    fingerprint: `fp-${coordinate.name}`,
     manifest: normalizeResourcePackageManifest({
       type: 'opencard-resource-package',
       author: coordinate.author,
