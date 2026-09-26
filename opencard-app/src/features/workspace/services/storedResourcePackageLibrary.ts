@@ -20,7 +20,7 @@ const defaultPathService: StoredResourcePackagePathService = {
 }
 
 /**
- * 软件存储里的附加包列表：导入时读一遍归档，确认它是个能说出自己是谁的包。
+ * 软件存储里的包列表：导入时读一遍归档，确认它是个能说出自己是谁的包。
  * 存储里的归档不属于任何项目，所以读它不需要任何项目根 —— 身份来自包自己的清单。
  */
 export class StoredResourcePackageLibraryService {

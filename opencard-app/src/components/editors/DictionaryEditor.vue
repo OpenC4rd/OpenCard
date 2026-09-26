@@ -210,7 +210,7 @@ import type { OcActionMenuEntry } from '../standard/OcActionMenu.vue'
 const props = defineProps<EditorProps>()
 const emit = defineEmits<EditorEmits>()
 const { t } = useI18n()
-const { openContextMenu } = useFloatingMenu()
+const { openContextMenu, openKeyboardContextMenu } = useFloatingMenu()
 const dictionary = ref<ProjectDictionary | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
@@ -502,17 +502,6 @@ function handleLanguageAction(language: string, actionKey: string): void {
   else if (actionKey === 'confirm-delete' && dictionary.value) {
     commit(deleteDictionaryLanguages(dictionary.value, [language]))
   }
-}
-
-function openKeyboardContextMenu(
-  event: KeyboardEvent,
-  items: readonly OcActionMenuEntry[],
-  onSelect: (key: string) => void,
-): void {
-  if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
-  if (!(event.currentTarget instanceof HTMLElement)) return
-  event.preventDefault()
-  openContextMenu({ anchor: event.currentTarget, items, onSelect })
 }
 
 function openRecordContextMenu(event: MouseEvent, recordKey: string): void {

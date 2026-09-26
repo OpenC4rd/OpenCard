@@ -18,11 +18,16 @@ function rowOf(category: SettingsCategoryViewModel, key: string): EditorItem {
   return category.cards.flatMap(card => card.items).find(item => item.key === key)!
 }
 
+/** 缓存面板读的现量占用；这些用例只关心它怎么投影成行。 */
+const cacheUsage = ref({ snapshots: 1.5 * 1024 ** 3, network: 2048, staged: 0 })
+
 describe('useSettingsWorkspace', () => {
   it('projects general settings as cards of single-value rows', () => {
     const categoryKey = ref<SettingsCategoryKey>('general')
+    const projectOpen = ref(false)
     const { categoryTreeData, activeCategory } = useSettingsWorkspace({
-      settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
+      settings: ref(createDefaultAppSettings()), categoryKey, projectOpen,
+      cacheUsage,
       translate: (_key, fallback) => fallback,
     })
 
@@ -35,7 +40,7 @@ describe('useSettingsWorkspace', () => {
       { type: 'icon', icon: 'tool.workspace' },
       { type: 'icon', icon: 'nav.collaboration' },
     ])
-    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting'])
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting', 'cache'])
     expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([
       'appearance.locale',
       'shell.titleBarNoticeHistoryLimit',
@@ -46,9 +51,25 @@ describe('useSettingsWorkspace', () => {
     expect(cardOf(activeCategory.value, 'exporting').items.map(item => item.key)).toEqual([
       'exporting.openCdeWorkbookAfterExport',
     ])
+    const cache = cardOf(activeCategory.value, 'cache')
+    expect(cache.items.map(item => item.key)).toEqual([
+      'cache.snapshots', 'cache.network', 'cache.staged', 'cache.packageLimitGb', 'cache.networkLimitGb',
+    ])
+    // 三行占用是只读展示，体积写成「已用 / 上限」；后面两个上限是可调的滑块。
+    const usageRows = cache.items.slice(0, 3)
+    expect(usageRows.map(item => editor(item).value)).toEqual(['1.5GB / 2GB', '2KB / 1GB', '0B'])
+    expect(usageRows.every(item => editor(item).definition.isReadonly)).toBe(true)
+    expect(editor(cache.items[3]!)).toMatchObject({
+      value: 2,
+      definition: { presentation: 'slider', min: 1, max: 32, step: 1, suffix: 'GB' },
+    })
+    expect(editor(cache.items[4]!)).toMatchObject({ value: 1 })
+    expect(cache.actions).toMatchObject([{ key: 'cache.clear', disabled: false }])
+    projectOpen.value = true
+    expect(cardOf(activeCategory.value, 'cache').actions).toMatchObject([{ key: 'cache.clear', disabled: true }])
     expect(editor(rowOf(activeCategory.value, 'appearance.locale'))).toMatchObject({
       value: 'system',
-      definition: { fieldType: 'string', presentation: 'option-group' },
+      definition: { fieldType: 'string', presentation: 'select' },
     })
     expect(editor(rowOf(activeCategory.value, 'shell.titleBarNoticeHistoryLimit'))).toMatchObject({
       value: 128,
@@ -77,6 +98,7 @@ describe('useSettingsWorkspace', () => {
     const { activeCategory } = useSettingsWorkspace({
       settings: ref(settings), categoryKey, projectOpen: ref(false),
       systemFontFamilies: ref(['Inter', 'Microsoft YaHei UI']),
+      cacheUsage,
       translate: (_key, fallback) => fallback,
     })
 
@@ -115,6 +137,7 @@ describe('useSettingsWorkspace', () => {
     const projectOpen = ref(false)
     const { activeCategory } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen,
+      cacheUsage,
       translate: (_key, fallback) => fallback,
     })
 
@@ -133,6 +156,7 @@ describe('useSettingsWorkspace', () => {
     const categoryKey = ref<SettingsCategoryKey>('workspace')
     const { activeCategory } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
+      cacheUsage,
       translate: (_key, fallback) => fallback,
     })
 
@@ -157,6 +181,7 @@ describe('useSettingsWorkspace', () => {
     const categoryKey = ref<SettingsCategoryKey>('versionControl')
     const { activeCategory } = useSettingsWorkspace({
       settings: settingsRef, categoryKey, projectOpen: ref(false),
+      cacheUsage,
       translate: (_key, fallback) => fallback,
     })
 
@@ -193,6 +218,7 @@ describe('useSettingsWorkspace', () => {
     const categoryKey = ref<SettingsCategoryKey>('general')
     const { settingsAnchorFor } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
+      cacheUsage,
       translate: (_key, fallback) => fallback,
     })
 

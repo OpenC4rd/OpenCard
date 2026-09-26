@@ -1,19 +1,10 @@
 /** Blueprint instance override projection for Card documents. */
 import type {
-    AdditionalFieldDefinitionMap,
     CardBlock,
     CardDocument,
     CardInstanceRecord,
 } from './model'
-
-function cloneAdditionalFieldDefinitions(
-    fields: AdditionalFieldDefinitionMap | undefined,
-): AdditionalFieldDefinitionMap | undefined {
-    if (!fields) return undefined
-    return Object.fromEntries(
-        Object.entries(fields).map(([fieldKey, definition]) => [fieldKey, { ...definition }]),
-    )
-}
+import { cloneAdditionalFieldDefinitions } from './model'
 
 export function isInstanceBlockFieldOverridable(fieldKey: string): boolean {
     return fieldKey !== 'name'

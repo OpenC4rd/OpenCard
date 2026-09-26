@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "templates": [
     "blank",
-    "standard"
+    "standard",
+    "playing-card-reskin"
   ]
 }

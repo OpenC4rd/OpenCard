@@ -3,7 +3,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { resolveEntryIcon, resolveFileTypeById, type EntryIconPresentation } from '../../workspace/model/fileTypes'
 import { normalizeNodeTail, type OcNode, type OcNodeAction, type OcNodeCollection, type OcNodeRenameSelection } from '../../../shared/ui/node/node.types'
-import type { IconToken } from '../../../shared/ui/icon/iconTokens'
+import type { IconToken } from '../../../shared/ui/icon/iconRegistry'
 import { RESOURCE_PACKAGE_SUFFIX } from '../../workspace/model/resourcePackage'
 import { notifyAppError } from '../../notifications/titlebarNotices'
 import {

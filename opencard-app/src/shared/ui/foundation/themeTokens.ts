@@ -206,6 +206,7 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-cover-banner-height',
   '--oc-album-card-min-width',
   '--oc-album-card-aspect-ratio',
+  '--oc-album-cover-zoom',
   '--oc-welcome-cover-tile-width',
   '--oc-welcome-cover-tile-aspect-ratio',
   '--oc-welcome-cover-tile-gap',

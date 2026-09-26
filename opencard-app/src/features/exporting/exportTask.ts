@@ -29,7 +29,6 @@ export type ExportDocumentSnapshot = {
 }
 
 export type ExportPlanEntry = {
-  key: string
   sourcePath: string
   outputPath: string
   faceKey: CardFaceKey
@@ -43,7 +42,7 @@ export type ExportPlan = {
 }
 
 export type ExportPreparationResult =
-  | { ok: true; plan: ExportPlan; warnings: readonly ExportTaskValidationIssue[] }
+  | { ok: true; plan: ExportPlan }
   | { ok: false; issues: readonly ExportTaskValidationIssue[] }
 
 export type ExportFailure = {
@@ -111,12 +110,6 @@ export type PrepareExportTaskOptions = {
 export type ExportProjection = {
   suffix: string
   instance: CardInstanceRecord | null
-}
-
-export type PlannedFace = {
-  source: ExportDocumentSnapshot
-  projection: ExportProjection
-  faceKey: CardFaceKey
 }
 
 export function resolveExportErrorPolicy(task: ProjectExportTask): 'continue' | 'stop' {

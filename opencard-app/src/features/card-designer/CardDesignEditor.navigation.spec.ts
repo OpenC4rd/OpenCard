@@ -8,7 +8,7 @@ import {
   createTextBlock,
   setBlockProperty,
 } from '../../entities/card/model'
-import type { IconToken } from '../../shared/ui/icon/iconTokens'
+import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import type { SessionNavigationToken } from '../editor-runtime/model/editorIssue'
 import { fileSystemService } from '../workspace/services/fileSystemService'
 import {

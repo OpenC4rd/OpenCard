@@ -24,12 +24,21 @@
         "series": "OPENCARD PLAYING CO.",
         "width": "500px",
         "height": "716px",
-        "background": "{{card:paper}}",
-        "borderColor": "{{card:ink}}",
+        "clip": "false",
+        "background": "{{self:paper}}",
+        "borderColor": "{{self:ink}}",
         "borderWidth": "2",
         "borderStyle": "solid",
         "borderRadius": "28px",
         "customCss": "overflow: hidden; box-sizing: border-box; box-shadow: inset 0 0 0 8px rgba(255,255,255,0.22), 0 18px 42px rgba(0,0,0,0.28); font-family: Georgia, 'Times New Roman', serif;",
+        "additionalFieldDefinition": {
+          "paper": { "fieldType": "color", "title": "纸张" },
+          "ink": { "fieldType": "color", "title": "墨色" },
+          "accent": { "fieldType": "color", "title": "强调色" },
+          "rank": { "fieldType": "string", "title": "点数" },
+          "suit": { "fieldType": "string", "title": "花色" },
+          "series": { "fieldType": "string", "title": "系列标识" }
+        },
         "children": [
           {
             "block": {
@@ -43,6 +52,7 @@
               "borderWidth": "2",
               "borderStyle": "solid",
               "borderRadius": "18px",
+              "clip": "false",
               "customCss": "box-sizing: border-box; opacity: 0.78; box-shadow: inset 0 0 0 5px rgba(255,255,255,0.12);",
               "children": []
             },
@@ -63,7 +73,7 @@
               "width": "72px",
               "height": "66px",
               "fontSize": "56px",
-              "fontWeight": "700",
+              "fontWeight": "bold",
               "color": "{{parent:ink}}",
               "textAlign": "center",
               "lineHeight": "66px"
@@ -85,7 +95,7 @@
               "width": "72px",
               "height": "54px",
               "fontSize": "44px",
-              "fontWeight": "700",
+              "fontWeight": "bold",
               "color": "{{parent:accent}}",
               "textAlign": "center",
               "lineHeight": "54px"
@@ -107,7 +117,7 @@
               "width": "270px",
               "height": "300px",
               "fontSize": "240px",
-              "fontWeight": "700",
+              "fontWeight": "bold",
               "color": "{{parent:accent}}",
               "textAlign": "center",
               "verticalAlign": "center",
@@ -133,9 +143,16 @@
               "accent": "{{parent:accent}}",
               "direction": "tb",
               "gap": "0px",
+              "clip": "false",
               "width": "72px",
               "height": "120px",
               "rotation": "180",
+              "additionalFieldDefinition": {
+                "rank": { "fieldType": "string", "title": "点数" },
+                "suit": { "fieldType": "string", "title": "花色" },
+                "ink": { "fieldType": "string", "title": "墨色" },
+                "accent": { "fieldType": "string", "title": "强调色" }
+              },
               "children": [
                 {
                   "block": {
@@ -146,7 +163,7 @@
                     "width": "72px",
                     "height": "66px",
                     "fontSize": "56px",
-                    "fontWeight": "700",
+                    "fontWeight": "bold",
                     "color": "{{parent:ink}}",
                     "textAlign": "center",
                     "lineHeight": "66px"
@@ -167,7 +184,7 @@
                     "width": "72px",
                     "height": "54px",
                     "fontSize": "44px",
-                    "fontWeight": "700",
+                    "fontWeight": "bold",
                     "color": "{{parent:accent}}",
                     "textAlign": "center",
                     "lineHeight": "54px"
@@ -198,8 +215,8 @@
               "width": "270px",
               "height": "24px",
               "fontSize": "11px",
-              "fontFamily": "Consolas, monospace",
-              "fontWeight": "700",
+              "fontFamily": "ui-monospace",
+              "fontWeight": "bold",
               "color": "{{parent:ink}}",
               "textAlign": "center",
               "lineHeight": "24px",

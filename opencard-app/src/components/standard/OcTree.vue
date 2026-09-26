@@ -123,7 +123,6 @@
             :style="labelStyle(entry.item)"
             :tone="entry.item.tone"
             :truncate="true"
-            :tooltip-on-overflow="entry.item.label"
           >
             {{ entry.item.label }}
           </OcText>
@@ -155,6 +154,7 @@ import OcRow from './OcRow.vue'
 import OcText from '../base/OcText.vue'
 import OcVisual from '../base/OcVisual.vue'
 import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
+import { resolveNodeSelection, type OcNodeSelectionMode } from '../../shared/ui/node/nodeSelection'
 import { useFloatingMenu, type FloatingMenuItem } from '../../composables/useFloatingMenu'
 import type {
   OcNode,
@@ -177,7 +177,7 @@ import {
   type ExternalDropZone,
 } from '../../shared/ui/drop/externalFileDrop'
 
-type OcTreeSelectionMode = 'none' | 'single' | 'multiple'
+type OcTreeSelectionMode = OcNodeSelectionMode
 type OcTreeActivationMode = 'none' | 'single-click' | 'double-click'
 type OcTreeRole = 'tree' | 'listbox' | 'menu'
 type OcTreeSelectionInput = 'left' | 'middle' | 'right' | 'keyboard'
@@ -652,37 +652,18 @@ function emitSelectionIntent(
   input: OcTreeSelectionInput,
   range: boolean,
 ): void {
-  if (props.selectionMode === 'none') return
-  const canRangeSelect = props.selectionMode === 'multiple' && range
-  const mode = canRangeSelect
-    ? 'range'
-    : props.selectionMode === 'multiple' && toggle ? 'toggle' : 'replace'
-  let selectedKeys: OcNodeKey[]
-  if (mode === 'range') {
-    const anchorKey = selectionAnchorKey.value && visibleEntries.value.some(entry => entry.key === selectionAnchorKey.value)
-      ? selectionAnchorKey.value
-      : props.selectedKeys[0] ?? key
-    const anchorIndex = visibleEntries.value.findIndex(entry => entry.key === anchorKey)
-    const targetIndex = visibleEntries.value.findIndex(entry => entry.key === key)
-    const rangeKeys = anchorIndex < 0 || targetIndex < 0
-      ? [key]
-      : visibleEntries.value
-        .slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
-        .map(entry => entry.key)
-    const selectedSet = new Set(toggle ? [...props.selectedKeys, ...rangeKeys] : rangeKeys)
-    selectedKeys = visibleEntries.value
-      .filter(entry => selectedSet.has(entry.key))
-      .map(entry => entry.key)
-  } else if (mode === 'toggle') {
-    selectedKeys = [...props.selectedKeys]
-    const index = selectedKeys.indexOf(key)
-    if (index >= 0) selectedKeys.splice(index, 1)
-    else selectedKeys.push(key)
-  } else {
-    selectedKeys = [key]
-  }
-  if (input !== 'right' && mode !== 'range') selectionAnchorKey.value = key
-  emit('selection-change', { triggerKey: key, selectedKeys })
+  const resolution = resolveNodeSelection({
+    mode: props.selectionMode,
+    orderedEntries: visibleEntries.value,
+    selectedKeys: props.selectedKeys,
+    triggerKey: key,
+    anchorKey: selectionAnchorKey.value,
+    toggle,
+    range,
+  })
+  if (!resolution) return
+  if (input !== 'right' && resolution.movesAnchor) selectionAnchorKey.value = key
+  emit('selection-change', { triggerKey: key, selectedKeys: resolution.selectedKeys })
 }
 
 function handleRowClick(event: MouseEvent, key: OcNodeKey): void {

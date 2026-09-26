@@ -1,5 +1,6 @@
 /** Versioned application settings contract and normalization boundary. */
 import { normalizeKeySlug, toKeySlug } from '../../../shared/model/keySlug'
+import { isRecord } from '../../../shared/model/record'
 import {
   OC_EDITABLE_THEME_COLOR_KEYS,
   OC_THEME_REGISTRY,
@@ -21,6 +22,9 @@ export const MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT = 1
 export const MAX_TITLE_BAR_NOTICE_HISTORY_LIMIT = 512
 export const MIN_AUTO_SAVE_INTERVAL_SECONDS = 5
 export const MAX_AUTO_SAVE_INTERVAL_SECONDS = 300
+/** 缓存上限按 GiB 记：低于 1 装不下一个包，高于 32 还不如自己删缓存。 */
+export const MIN_CACHE_LIMIT_GB = 1
+export const MAX_CACHE_LIMIT_GB = 32
 
 export type AppLocale = 'system' | 'zh-CN' | 'en-US'
 export type AppThemePreference = OcThemeId | 'system'
@@ -168,6 +172,8 @@ export type AppSettingKey =
   | 'shell.titleBarNoticeHistoryLimit'
   | 'updates.showReleaseNotesAfterUpdate'
   | 'exporting.openCdeWorkbookAfterExport'
+  | 'cache.packageLimitGb'
+  | 'cache.networkLimitGb'
   | 'workspace.structureTreeSelectionBehavior'
   | 'workspace.structureTreeScrollToSelection'
   | 'workspace.hideDotFiles'
@@ -217,6 +223,13 @@ export interface AppSettings {
   }
   exporting: {
     openCdeWorkbookAfterExport: boolean
+  }
+  /** 两块缓存的字节预算，各自独立；超出上限的部分在下次启动时从最久没用到的开始清。 */
+  cache: {
+    /** 解开的包。 */
+    packageLimitGb: number
+    /** 从网上取过的图片资源。 */
+    networkLimitGb: number
   }
   workspace: {
     autoSave: boolean
@@ -273,6 +286,7 @@ export type SettingsIntent =
   | {
       type: 'project-workspace.reset'
     }
+  | { type: 'cache.clear' }
 
 const DEFAULT_PUBLISHER_KEY = createPublisherKey()
 export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
@@ -310,6 +324,10 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
   exporting: Object.freeze({
     openCdeWorkbookAfterExport: true,
   }),
+  cache: Object.freeze({
+    packageLimitGb: 2,
+    networkLimitGb: 1,
+  }),
   workspace: Object.freeze({
     autoSave: true,
     autoSaveIntervalSeconds: 30,
@@ -329,8 +347,9 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
   }),
 })
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+function clampCacheLimitGb(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(MAX_CACHE_LIMIT_GB, Math.max(MIN_CACHE_LIMIT_GB, Math.round(value)))
 }
 
 function clampSidebarWidth(value: unknown): number {
@@ -743,6 +762,7 @@ export function createDefaultAppSettings(): AppSettings {
     shell: { ...DEFAULT_APP_SETTINGS.shell },
     updates: { ...DEFAULT_APP_SETTINGS.updates },
     exporting: { ...DEFAULT_APP_SETTINGS.exporting },
+    cache: { ...DEFAULT_APP_SETTINGS.cache },
     workspace: { ...DEFAULT_APP_SETTINGS.workspace },
     projectCreation: {
       ...DEFAULT_APP_SETTINGS.projectCreation,
@@ -764,6 +784,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
   const shell = isRecord(value.shell) ? value.shell : {}
   const updates = isRecord(value.updates) ? value.updates : {}
   const exporting = isRecord(value.exporting) ? value.exporting : {}
+  const cache = isRecord(value.cache) ? value.cache : {}
   const workspace = isRecord(value.workspace) ? value.workspace : {}
   const projectCreation = isRecord(value.projectCreation) ? value.projectCreation : {}
 
@@ -856,6 +877,10 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       openCdeWorkbookAfterExport: typeof exporting.openCdeWorkbookAfterExport === 'boolean'
         ? exporting.openCdeWorkbookAfterExport
         : DEFAULT_APP_SETTINGS.exporting.openCdeWorkbookAfterExport,
+    },
+    cache: {
+      packageLimitGb: clampCacheLimitGb(cache.packageLimitGb, DEFAULT_APP_SETTINGS.cache.packageLimitGb),
+      networkLimitGb: clampCacheLimitGb(cache.networkLimitGb, DEFAULT_APP_SETTINGS.cache.networkLimitGb),
     },
     workspace: {
       autoSave: typeof workspace.autoSave === 'boolean'

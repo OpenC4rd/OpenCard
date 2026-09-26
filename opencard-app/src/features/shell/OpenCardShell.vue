@@ -127,6 +127,7 @@
                   @modified="handleEditorModified"
                   @save="handleEditorSave"
                   @open-file="handleOpenFile"
+                  @trash-file="handleEditorTrashFile"
                   @update-viewport-transform="handleViewportTransformUpdate"
                   @update:pixelated="handleImagePreviewPixelatedUpdate"
                   @update:card-designer-mode="handleCardDesignerModeUpdate"
@@ -289,7 +290,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { notifyAppError, notifyError, notifySuccess, notifyWarning, addTitleBarNotice, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
+import { notifyAppError, notifyError, notifySuccess, notifyWarning, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { useProjectStore } from '../workspace/store/projectStore'
 import { projectFontSources } from '../workspace/model/projectFontRegistry'
@@ -305,6 +306,13 @@ import OcButton from '../../components/base/OcButton.vue'
 import OcDialog from '../../components/standard/OcDialog.vue'
 import { normalizeNodeTail } from '../../shared/ui/node/node.types'
 import { getPathDirectory } from '../../shared/model/filePath'
+import { describeError } from '../../shared/model/error'
+import {
+  EMPTY_APP_CACHE_USAGE,
+  clearAppCache,
+  measureAppCacheDirectories,
+  type AppCacheUsage,
+} from '../../shared/storage/appCache'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import type {
   OcNode,
@@ -346,7 +354,6 @@ import type { FeedbackKind, FeedbackPage } from '../feedback/model/feedback'
 import { useFeedbackDiagnostics } from '../feedback/composables/useFeedbackDiagnostics'
 import { useFeedbackInbox } from '../feedback/composables/useFeedbackInbox'
 import { appOutputEntries, clearAppOutputEntries, publishAppOutput } from '../logging/appOutput'
-import { reportAppError } from '../logging/appErrorCatalog'
 import { reportCatalogWarnings } from '../logging/catalogWarningReporter'
 import type {
   CreatedProject,
@@ -361,7 +368,6 @@ import { useStoredResourcePackageStore } from '../workspace/store/storedResource
 import { loadBuiltinResourcePackages } from '../workspace/services/builtinResourcePackageCatalog'
 import { useSettingsWorkspace } from '../settings/composables/useSettingsWorkspace'
 import { useAppSettingsStore } from '../settings/store/appSettingsStore'
-import { registerSettingsNavigator } from '../settings/settingsNavigation'
 import {
   createPublisherKey,
   isSettingsCategoryKey,
@@ -379,6 +385,7 @@ import type {
 import { CARD_DOCUMENT_SUFFIX, resolveFileType } from '../workspace/model/fileTypes'
 import { resolveSessionLabel } from '../workspace/model/sessionLabel'
 import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../workspace/model/projectStructure'
+import { RESOURCE_PACKAGE_SUFFIX } from '../workspace/model/resourcePackage'
 import { formatPackageCoordinate } from '../workspace/model/packageCoordinate'
 import { useProjectExport } from './composables/useProjectExport'
 import ProjectExportDialog from '../exporting/components/ProjectExportDialog.vue'
@@ -418,6 +425,7 @@ import {
   classifyExternalOpenPath,
 } from './services/externalOpenService'
 import { fileSystemService } from '../workspace/services/fileSystemService'
+import { networkResourceCacheService } from '../network-resources/services/networkResourceCacheService'
 import type {
   ShellAction,
   ShellWorkspaceAction,
@@ -501,7 +509,7 @@ const projectStore = useProjectStore()
 const {
   projectPath,
   projectProfile,
-  projectInformation,
+  resolvedProject,
   projectFontFamilies,
   fontRegistryReady,
   renderEnvironment: projectRenderEnvironment,
@@ -629,9 +637,6 @@ const developerMode = ref(false)
 const debugHideCdeOverlays = ref(false)
 const debugTransparentCdeViewport = ref(false)
 const debugPassiveCdeViewport = ref(false)
-const DEBUG_NOTICE_COUNT = 128
-const DEBUG_NOTICE_INTERVAL_MS = 40
-let debugNoticeTimer: number | null = null
 const usesNativeMacosWindowControls = typeof navigator !== 'undefined'
   && /Macintosh|Mac OS X/.test(navigator.userAgent)
 const SHELL_SHORTCUT_KEYS = {
@@ -691,17 +696,32 @@ const settingsFocusKey = computed(() => (
 ))
 const projectOpen = computed(() => Boolean(projectPath.value))
 const systemFontFamilies = ref<readonly string[]>([])
+const appCacheUsage = ref<AppCacheUsage>(EMPTY_APP_CACHE_USAGE)
+
+/** 面板显示的是现量结果：进设置页量一次，清完再量一次。 */
+async function refreshAppCacheUsage(): Promise<void> {
+  const [directories, network] = await Promise.all([
+    measureAppCacheDirectories(),
+    networkResourceCacheService.usage(),
+  ])
+  appCacheUsage.value = { ...directories, network }
+}
+
+watch(isSettingsMode, isSettings => {
+  if (isSettings) void refreshAppCacheUsage()
+})
+
 const { categoryTreeData: settingsCategoryTreeData, activeCategory: activeSettingsCategory, settingsAnchorFor } = useSettingsWorkspace({
   settings: settingsStore.settings,
   categoryKey: settingsCategoryKey,
   projectOpen,
   systemFontFamilies,
+  cacheUsage: appCacheUsage,
   translate: t,
 })
 
 /**
  * 跳转到某个设置项：切到它所在的分类并把该行带到前台。
- * 供 shell 内部与 settingsNavigation 的通用入口共用同一实现。
  */
 function openSettingsAt(key: AppSettingKey): void {
   const anchor = settingsAnchorFor(key)
@@ -909,6 +929,7 @@ const {
   fileChangeRevision,
   getRelativeProjectPath,
   moveProjectEntryToTrash: trashFile,
+  openSetting: openSettingsAt,
   settings: settingsStore.settings,
 })
 const diffSessionState = useOcdocumentDiffSession({
@@ -1131,7 +1152,7 @@ async function handleProjectCreated(project: CreatedProject): Promise<void> {
  * 建项目时挑中的包：把归档**复制**进新项目就是"装"。身份来自包自己的清单，所以机器上那份
  * 删掉、换台机器重新导入，项目都还是同一个项目。
  *
- * 创建本身就是复制模板加改名，因此附加包装在项目打开之后才安装：一个包失败只影响那一个包，
+ * 创建本身就是复制模板加改名，因此包要等项目打开之后才安装：一个包失败只影响那一个包，
  * 项目本身照常可用。
  */
 async function installAttachedResourcePackages(): Promise<void> {
@@ -1475,7 +1496,7 @@ async function loadStoredResourcePackages(): Promise<void> {
 }
 const projectName = computed(() => {
   if (!projectPath.value) return ''
-  return projectInformation.value?.name || projectPath.value.split(/[/\\]/).pop() || ''
+  return resolvedProject.value?.name || projectPath.value.split(/[/\\]/).pop() || ''
 })
 
 const projectFolderName = computed(() => {
@@ -1839,16 +1860,6 @@ const debugMenuActions = computed<readonly OcActionMenuEntry[]>(() => (
         title: debugPassiveCdeViewport.value ? t('app.debug.interactiveCdeViewport') : t('app.debug.passiveCdeViewport'),
         icon: debugPassiveCdeViewport.value ? 'action.check' : 'format.code-braces',
       },
-      {
-        key: 'send-debug-test-messages',
-        title: t('app.debug.sendTestMessages'),
-        icon: 'action.refresh',
-      },
-      {
-        key: 'send-debug-output-entries',
-        title: t('app.debug.sendOutputEntries'),
-        icon: 'action.refresh',
-      },
     ]
     : []
 ))
@@ -2067,7 +2078,7 @@ const workspaceActions = computed<ShellWorkspaceAction[]>(() => {
       { type: 'selection', key: DIFF_BEFORE_ACTION_KEY, icon: 'file.git', value: formatRevisionLabel(beforeOption, t('sidebar.diffViewer.versionA')), hoverTip: t('sidebar.diffViewer.versionA'), options: createRevisionMenu(DIFF_BEFORE_ACTION_KEY, beforeId) },
       afterOption?.shortId ?? afterOption?.label ?? t('sidebar.diffViewer.diskVersion'),
       { type: 'selection', key: DIFF_AFTER_ACTION_KEY, icon: 'file.git', value: formatRevisionLabel(afterOption, t('sidebar.diffViewer.versionB')), hoverTip: t('sidebar.diffViewer.versionB'), options: createRevisionMenu(DIFF_AFTER_ACTION_KEY, afterId) },
-      { key: DIFF_EXIT_ACTION_KEY, icon: 'nav.arrow-left', hoverTip: t('settings.actions.back', 'Back') },
+      { key: DIFF_EXIT_ACTION_KEY, icon: 'nav.arrow-left', hoverTip: t('sidebar.diffViewer.exitComparison') },
     ]
   }
   if (isActiveDictionaryEditor.value) return [
@@ -2557,6 +2568,17 @@ async function handleSettingsIntent(intent: SettingsIntent): Promise<void> {
     return
   }
 
+  if (intent.type === 'cache.clear') {
+    try {
+      await clearAppCache(fileSystemService)
+      networkResourceCacheService.forget()
+      await refreshAppCacheUsage()
+    } catch (error) {
+      notifyError(describeError(error))
+    }
+    return
+  }
+
   await resetProjectWorkspaceState()
 }
 
@@ -2580,6 +2602,11 @@ async function performPathTrash(path: string): Promise<void> {
   await trashFile(path)
   closeSessionsByPath(path)
   selectedProjectEntryKeys.value = selectedProjectEntryKeys.value.filter(key => key !== path)
+  // 一个包的本体就是项目里那个归档文件，所以删掉它得让包页当场少一张卡，
+  // 而不是等文件监视那一拍；删别的文件不用重扫一遍包目录。
+  if (path.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX)) {
+    await projectStore.reloadProjectResourceEnvironment()
+  }
 }
 
 function handleOpenedEditorSelectionChange(event: OcNodeSelectionEvent): void {
@@ -2843,38 +2870,6 @@ function createUntitledOpenCard() {
   })
 }
 
-function stopDebugTestMessages(): void {
-  if (debugNoticeTimer == null) return
-  window.clearInterval(debugNoticeTimer)
-  debugNoticeTimer = null
-}
-
-function sendDebugTestMessages(): void {
-  stopDebugTestMessages()
-  let sent = 0
-  const sendNext = () => {
-    sent += 1
-    addTitleBarNotice({
-      message: `testmessage ${sent}`,
-      tone: 'success',
-      icon: 'action.check',
-    })
-    if (sent >= DEBUG_NOTICE_COUNT) stopDebugTestMessages()
-  }
-  sendNext()
-  debugNoticeTimer = window.setInterval(sendNext, DEBUG_NOTICE_INTERVAL_MS)
-}
-
-function sendDebugOutputEntries(): void {
-  isBottomPanelExpanded.value = true
-  activeBottomTab.value = 'output'
-  publishAppOutput({ severity: 'info', message: t('app.debug.outputInfo') })
-  publishAppOutput({ severity: 'success', message: t('app.debug.outputSuccess') })
-  publishAppOutput({ severity: 'warning', message: t('app.debug.outputWarning'), detail: t('app.debug.outputWarningDetail') })
-  publishAppOutput({ severity: 'error', message: t('app.debug.outputError') })
-  reportAppError('OC-E2003', { path: 'cards/output-test.ocdocument' })
-}
-
 async function runShellCommand(actionKey: string) {
   if ((isCreateProjectMode.value && isProjectTemplateBusy.value) || isExportTemplateBusy.value) return
 
@@ -2907,16 +2902,6 @@ async function runShellCommand(actionKey: string) {
   if (actionKey === 'toggle-developer-mode' && import.meta.env.DEV) {
     developerMode.value = !developerMode.value
     stopDeveloperUpdatePreview()
-    return
-  }
-
-  if (actionKey === 'send-debug-test-messages' && import.meta.env.DEV) {
-    sendDebugTestMessages()
-    return
-  }
-
-  if (actionKey === 'send-debug-output-entries' && import.meta.env.DEV) {
-    sendDebugOutputEntries()
     return
   }
 
@@ -3355,6 +3340,15 @@ async function handleOpenFile(path: string): Promise<EditorSession | null> {
   }
 }
 
+/** 编辑器里的"移除包"：删项目里的文件只有一条路，这里和文件树里删一个文件走的是同一个入口。 */
+async function handleEditorTrashFile(path: string): Promise<void> {
+  try {
+    await requestPathTrash(path)
+  } catch (error) {
+    notifyAppError('OC-E3016', { path, error }, locale.value)
+  }
+}
+
 async function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.key === SHELL_SHORTCUT_KEYS.fullscreen) {
     event.preventDefault()
@@ -3443,7 +3437,6 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('focus', handleWindowFocus)
   disposeUnhandledExternalDrop = registerUnhandledExternalDrop((paths) => { void handleExternalOpenPaths(paths) })
-  registerSettingsNavigator(openSettingsAt)
   void startShellWindow()
   void startAppUpdater()
   void startFeedbackInbox()
@@ -3454,10 +3447,8 @@ onMounted(() => {
 
 
 onUnmounted(() => {
-  stopDebugTestMessages()
   removeShellProgressTask(UPDATE_PROGRESS_TASK_KEY)
   disposeEditorHost()
-  registerSettingsNavigator(null)
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   disposeUnhandledExternalDrop?.()

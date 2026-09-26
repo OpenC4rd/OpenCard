@@ -67,6 +67,7 @@ import { useI18n } from 'vue-i18n'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
+import { clamp } from '../../shared/model/number'
 import {
   VIEWPORT_WHEEL_ZOOM_SENSITIVITY,
   VIEWPORT_ZOOM_ANIMATION_EPSILON,
@@ -407,10 +408,6 @@ function hasSameTransform(left: ViewportTransform | null, right: ViewportTransfo
     && Math.abs(left!.x - right.x) < TRANSFORM_EPSILON
     && Math.abs(left!.y - right.y) < TRANSFORM_EPSILON
     && Math.abs(left!.scale - right.scale) < TRANSFORM_EPSILON
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
 }
 
 function save(): void {

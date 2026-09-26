@@ -56,8 +56,4 @@ export function setTitleBarNoticeHistoryLimit(value: number): void {
   }
 }
 
-export function dismissTitleBarNotice(id: number): void {
-  notices.value = notices.value.filter(notice => notice.id !== id)
-}
-
 export const titleBarNotices = readonly(notices)

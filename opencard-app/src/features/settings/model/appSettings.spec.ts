@@ -45,6 +45,7 @@ describe('appSettings', () => {
       shell: { sidebarWidth: 420, sidebarCollapsed: true, titleBarNoticeHistoryLimit: 128 },
       updates: { showReleaseNotesAfterUpdate: true },
       exporting: { openCdeWorkbookAfterExport: true },
+      cache: { packageLimitGb: 2, networkLimitGb: 1 },
       versionControl: { committerName: '', committerEmail: '', createInitialCommit: true },
       workspace: {
         autoSave: true,

@@ -378,6 +378,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
     return
   }
   if (actionKey === 'project-workspace.reset') emit('intent', { type: 'project-workspace.reset' })
+  if (actionKey === 'cache.clear') emit('intent', { type: 'cache.clear' })
 }
 </script>
 

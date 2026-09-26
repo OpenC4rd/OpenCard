@@ -13,8 +13,7 @@
       <span v-if="relativePath" class="project-cover-field__info">
         <span class="project-cover-field__title">
           <OcIcon name="file.image" size="sm" tone="muted" />
-          <OcText class="project-cover-field__path" tone="muted" size="xs" :truncate="true"
-            :tooltip-on-overflow="relativePath">
+          <OcText class="project-cover-field__path" tone="muted" size="xs" :truncate="true">
             {{ relativePath }}
           </OcText>
         </span>
@@ -171,8 +170,10 @@ function clear(): void {
 /* 相册卡片的信息条语言：路径是标题、移除是尾部操作，悬停整幅横幅才出现。 */
 .project-cover-field__info {
   position: absolute;
-  inset-inline: 0;
-  inset-block-end: 0;
+  /* 信息条挂在 stage 上（按钮里放不下按钮），所以按边框宽度内缩一格才贴到横幅内缘；
+     否则它会压在那 1px 边框上，圆角也跟卡片内缘对不上。 */
+  inset-inline: var(--oc-border-width);
+  inset-block-end: var(--oc-border-width);
   display: flex;
   min-width: 0;
   align-items: center;

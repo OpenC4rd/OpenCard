@@ -39,27 +39,23 @@ describe('OcCard', () => {
     })
 
     expect(wrapper.get('section').classes()).toContain('oc-card--variant-surface')
-    expect(wrapper.get('section').classes()).toContain('oc-card--radius-md')
     expect(wrapper.get('section').classes()).not.toContain('oc-card--fill')
     expect(wrapper.find('.oc-card__header').exists()).toBe(false)
     expect(wrapper.get('.oc-card__content .body').text()).toBe('Body')
   })
 
-  it('maps variant, radius and fill to root modifier classes', () => {
+  it('maps variant and fill to root modifier classes', () => {
     const wrapper = mount(OcCard, {
       ...withRealTransition,
-      props: { variant: 'glass', radius: 'lg', fill: true },
+      props: { variant: 'glass', fill: true },
     })
 
     expect(wrapper.classes()).toContain('oc-card--variant-glass')
-    expect(wrapper.classes()).toContain('oc-card--radius-lg')
     expect(wrapper.classes()).toContain('oc-card--fill')
     expect(wrapper.classes()).not.toContain('oc-card--variant-surface')
-    expect(wrapper.classes()).not.toContain('oc-card--radius-md')
 
-    const plain = mount(OcCard, { ...withRealTransition, props: { variant: 'plain', radius: 'none' } })
+    const plain = mount(OcCard, { ...withRealTransition, props: { variant: 'plain' } })
     expect(plain.classes()).toContain('oc-card--variant-plain')
-    expect(plain.classes()).toContain('oc-card--radius-none')
   })
 
   it('renders the header only once a title, an icon or an action exists', () => {

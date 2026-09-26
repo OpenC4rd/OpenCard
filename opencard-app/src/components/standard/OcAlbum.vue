@@ -40,36 +40,37 @@
           @keydown="handleCardKeydown($event, entry.key)"
           @focus="activeKey = entry.key"
         >
-          <span class="oc-album__media">
-            <OcCover :visual="entry.item.cover ?? null" :label="entry.item.label" />
-          </span>
-
-          <span class="oc-album__info">
-            <span class="oc-album__title">
-              <OcVisual
-                v-if="entry.item.visual"
-                :visual="entry.item.visual"
-                :label="entry.item.label"
-                size="md"
-              />
-              <OcText
-                class="oc-album__label"
-                :style="entry.item.labelFont ? { fontFamily: entry.item.labelFont } : undefined"
-                :tone="entry.item.tone"
-                :truncate="true"
-                :tooltip-on-overflow="entry.item.label"
-              >
-                {{ entry.item.label }}
-              </OcText>
+          <span class="oc-album__clip">
+            <span class="oc-album__media">
+              <OcCover :visual="entry.item.cover ?? null" :label="entry.item.label" />
             </span>
-            <span class="oc-album__meta">
-              <OcNodeTail
-                v-if="entry.item.tail"
-                class="oc-album__tail"
-                :tail="entry.item.tail"
-                :action-visibility="props.actionVisibility"
-                @action="emitActionIntent(entry.key, $event.key)"
-              />
+
+            <span class="oc-album__info">
+              <span class="oc-album__title">
+                <OcVisual
+                  v-if="entry.item.visual"
+                  :visual="entry.item.visual"
+                  :label="entry.item.label"
+                  size="md"
+                />
+                <OcText
+                  class="oc-album__label"
+                  :style="entry.item.labelFont ? { fontFamily: entry.item.labelFont } : undefined"
+                  :tone="entry.item.tone"
+                  :truncate="true"
+                >
+                  {{ entry.item.label }}
+                </OcText>
+              </span>
+              <span class="oc-album__meta">
+                <OcNodeTail
+                  v-if="entry.item.tail"
+                  class="oc-album__tail"
+                  :tail="entry.item.tail"
+                  :action-visibility="props.actionVisibility"
+                  @action="emitActionIntent(entry.key, $event.key)"
+                />
+              </span>
             </span>
           </span>
         </div>
@@ -92,8 +93,9 @@ import type {
   OcNodeKey,
   OcNodeSelectionEvent,
 } from '../../shared/ui/node/node.types'
+import { resolveNodeSelection, type OcNodeSelectionMode } from '../../shared/ui/node/nodeSelection'
 
-type OcAlbumSelectionMode = 'none' | 'single' | 'multiple'
+type OcAlbumSelectionMode = OcNodeSelectionMode
 type OcAlbumActivationMode = 'none' | 'single-click' | 'double-click'
 
 interface OcAlbumProps {
@@ -187,38 +189,18 @@ function handleCardDoubleClick(event: MouseEvent, key: OcNodeKey): void {
 }
 
 function emitSelectionIntent(key: OcNodeKey, toggle: boolean, range: boolean): void {
-  if (props.selectionMode === 'none') return
-  const canRangeSelect = props.selectionMode === 'multiple' && range
-  const mode = canRangeSelect
-    ? 'range'
-    : props.selectionMode === 'multiple' && toggle ? 'toggle' : 'replace'
-  let selectedKeys: OcNodeKey[]
-
-  if (mode === 'range') {
-    const anchorKey = selectionAnchorKey.value
-      && entries.value.some(entry => entry.key === selectionAnchorKey.value)
-      ? selectionAnchorKey.value
-      : props.selectedKeys[0] ?? key
-    const anchorIndex = entries.value.findIndex(entry => entry.key === anchorKey)
-    const targetIndex = entries.value.findIndex(entry => entry.key === key)
-    const rangeKeys = anchorIndex < 0 || targetIndex < 0
-      ? [key]
-      : entries.value
-        .slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
-        .map(entry => entry.key)
-    const selectedSet = new Set(toggle ? [...props.selectedKeys, ...rangeKeys] : rangeKeys)
-    selectedKeys = entries.value.filter(entry => selectedSet.has(entry.key)).map(entry => entry.key)
-  } else if (mode === 'toggle') {
-    selectedKeys = [...props.selectedKeys]
-    const index = selectedKeys.indexOf(key)
-    if (index >= 0) selectedKeys.splice(index, 1)
-    else selectedKeys.push(key)
-  } else {
-    selectedKeys = [key]
-  }
-
-  if (mode !== 'range') selectionAnchorKey.value = key
-  emit('selection-change', { triggerKey: key, selectedKeys })
+  const resolution = resolveNodeSelection({
+    mode: props.selectionMode,
+    orderedEntries: entries.value,
+    selectedKeys: props.selectedKeys,
+    triggerKey: key,
+    anchorKey: selectionAnchorKey.value,
+    toggle,
+    range,
+  })
+  if (!resolution) return
+  if (resolution.movesAnchor) selectionAnchorKey.value = key
+  emit('selection-change', { triggerKey: key, selectedKeys: resolution.selectedKeys })
 }
 
 function moveActiveCard(key: OcNodeKey, step: number): void {
@@ -300,6 +282,19 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
     background-color var(--oc-duration-fast) var(--oc-ease);
 }
 
+/*
+ * 圆角只由这一层切：它贴在边框内缘（卡片的 padding box），所以里面的东西一律不要圆角。
+ * 信息条是 backdrop-filter 合成层、图片也可能被提升，它们会逃过祖先的 overflow 裁剪 —— 所以
+ * 这里除了 overflow 还写 clip-path：那条裁剪随合成一起生效，探不出圆角去。
+ */
+.oc-album__clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
+  clip-path: inset(0 round calc(var(--oc-radius-md) - var(--oc-border-width)));
+}
+
 .oc-album__card:hover {
   border-color: var(--oc-border-strong);
 }
@@ -328,6 +323,23 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 图片自己也按内缘圆角收边：卡片那圈的裁剪在这个 WebView 里管不到被提升的图片层，
+     否则图片的直角会从圆角处探出来（信息条同理）。几何与 .oc-album__clip 完全一致。 */
+  overflow: hidden;
+  border-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
+  /* 卡片可点时封面自己放大一点：手指/光标按下去的确实是这张图。 */
+  transition: transform var(--oc-duration-normal) var(--oc-ease);
+}
+
+.oc-album__card:hover .oc-album__media,
+.oc-album__card:focus-visible .oc-album__media {
+  transform: scale(var(--oc-album-cover-zoom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-album__media {
+    transition-duration: 0.01ms;
+  }
 }
 
 .oc-album__info {
@@ -339,8 +351,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   gap: var(--oc-space-1);
   min-width: 0;
   padding: var(--oc-space-1) var(--oc-space-3);
-  /* The strip sits on the card's inner bottom corners, so it must round itself: a composited
-     backdrop-filter layer can escape the ancestor's overflow clip and paint square corners. */
+  /* 与图片同理：这一层带 backdrop-filter，祖先的圆角裁剪对它不生效，所以它自己按内缘圆角收边。 */
   border-end-start-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
   border-end-end-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
   background: var(--oc-bg-glass);

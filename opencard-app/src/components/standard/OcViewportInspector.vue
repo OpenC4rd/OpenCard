@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+import { clamp } from '../../shared/model/number'
 import OcCard, { type OcCardAction } from './OcCard.vue'
 import OcResizeTrack from './OcResizeTrack.vue'
 import type { OcResizeHandleChange } from './OcResizeHandle.vue'
@@ -145,10 +146,6 @@ function handleGeometryResize(): void {
 function readCssPixels(styles: CSSStyleDeclaration, key: string): number {
   const value = Number.parseFloat(styles.getPropertyValue(key))
   return Number.isFinite(value) ? value : 0
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
 }
 
 watch(() => [props.expanded, props.height], () => void nextTick(() => {

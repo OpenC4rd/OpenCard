@@ -1,13 +1,13 @@
 <template>
     <div :data-block-id="block.id" :style="blockStyle" @click.stop="handleClick">
-        <CardBlockRenderer v-for="child in orderedChildren" :key="child.block.id" :block="child.block"
-            :parent-block="block" :placement="{ kind: 'flow', location: child.location }" />
+        <NativeBlockRenderer v-for="child in orderedChildren" :key="child.block.id" :block="child.block"
+            :placement="{ kind: 'flow', location: child.location }" />
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import CardBlockRenderer from './CardBlockRenderer.vue'
+import NativeBlockRenderer from './NativeBlockRenderer.vue'
 import { useCardEditorContext } from './cardEditorContext'
 import type { RenderReadyFlowContainerBlock } from '../render.types'
 import { getBlockRenderPlacementStyles, type BlockRenderPlacement } from './blockRenderPlacement'

@@ -9,7 +9,6 @@ import { parseCardDocument } from '../../../entities/card/storage'
 import { normalizePath } from '../../../shared/model/filePath'
 import { prepareExportTask } from '../../exporting/exportPlanner'
 import { runExportPlan } from '../../exporting/exportRunner'
-import { ExportRenderDiagnosticsError } from '../../exporting/exportRenderingError'
 import type {
   ExportDocumentSnapshot,
   ExportFaceRenderer,
@@ -27,7 +26,7 @@ import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
 import { waitForProjectFonts } from '../../workspace/services/projectFontLoader'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
-import { exportCardAsImage } from '../../../utils/exportCard'
+import domtoimage from 'dom-to-image-more'
 import { reportAppError } from '../../logging/appErrorCatalog'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning } from '../../notifications/titlebarNotices'
 import { useShellProgressTasks } from './useShellProgressTasks'
@@ -36,7 +35,6 @@ const PROJECT_EXPORT_PROGRESS_KEY = 'project-export'
 
 type ExportRendererInstance = {
   getCanvasElement?: () => HTMLElement | undefined
-  getRuntimeIssues?: () => readonly import('../../card-rendering/cardPipelineIssue').CardPipelineIssue[]
 }
 
 type UseProjectExportOptions = {
@@ -205,12 +203,10 @@ export function useProjectExport(options: UseProjectExportOptions) {
       await waitForExportAssets(canvas)
       await waitForProjectFonts()
       await waitForNextPaint()
-      const runtimeIssues = options.exportRendererRef.value?.getRuntimeIssues?.() ?? []
-      if (runtimeIssues.length > 0) throw new ExportRenderDiagnosticsError(runtimeIssues)
       if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
       const restoreProjectIcons = await inlineProjectIconSources(canvas)
       try {
-        return dataUrlToBytes(await exportCardAsImage(canvas, { scale: request.scale, format: 'png' }))
+        return dataUrlToBytes(await domtoimage.toPng(canvas, { scale: request.scale }))
       } finally {
         restoreProjectIcons()
       }

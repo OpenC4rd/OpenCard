@@ -4,7 +4,6 @@ import type { FeedbackSubmission } from '../model/feedback'
 import {
   createFeedbackEnvironment,
   FeedbackServiceError,
-  getFeedbackStatus,
   getFeedbackStatuses,
   isFeedbackServiceConfigured,
   submitFeedback,
@@ -48,39 +47,6 @@ describe('feedback service', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://feedback.example.com', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify(submission),
-    }))
-  })
-
-  it('queries a report with its receipt token and validates the public projection', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
-      reportId: 'report-1',
-      status: 'answered',
-      submittedAt: submission.submittedAt,
-      updatedAt: '2026-08-01T03:00:00.000Z',
-      officialResponse: {
-        text: 'Fixed in the latest version.',
-        updatedAt: '2026-08-01T03:00:00.000Z',
-      },
-      issueNumber: 12,
-    }))
-
-    await expect(getFeedbackStatus('report-1', 'receipt-token', {
-      endpoint: 'https://feedback.example.com/feedback',
-      fetch: fetchMock,
-    })).resolves.toEqual({
-      reportId: 'report-1',
-      status: 'answered',
-      submittedAt: submission.submittedAt,
-      updatedAt: '2026-08-01T03:00:00.000Z',
-      officialResponse: {
-        text: 'Fixed in the latest version.',
-        updatedAt: '2026-08-01T03:00:00.000Z',
-      },
-    })
-
-    expect(fetchMock).toHaveBeenCalledWith('https://feedback.example.com/feedback/report-1', expect.objectContaining({
-      method: 'GET',
-      headers: expect.objectContaining({ Authorization: 'Bearer receipt-token' }),
     }))
   })
 

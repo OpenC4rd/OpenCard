@@ -41,6 +41,25 @@ export function coverImageExtension(relativePath: string): string | null {
   return (COVER_IMAGE_EXTENSIONS as readonly string[]).includes(extension) ? extension : null
 }
 
+const COVER_MIME_BY_EXTENSION = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+} as const satisfies Record<typeof COVER_IMAGE_EXTENSIONS[number], string>
+
+/**
+ * 封面字节从归档里取出来时没有文件路径可依，得自己带上类型：SVG 不是靠魔数认的，
+ * 没有 `image/svg+xml` 的 blob 在 `<img>` 里根本不画。
+ */
+export function coverImageMimeType(relativePath: string): string {
+  const extension = coverImageExtension(relativePath) as keyof typeof COVER_MIME_BY_EXTENSION | null
+  return extension ? COVER_MIME_BY_EXTENSION[extension] : ''
+}
+
 /** 封面路径既要是安全的宿主相对路径，也要是可渲染的图片文件。 */
 export function isProjectCoverPath(value: string): boolean {
   const normalized = normalizeProjectRelativeCoverPath(value)

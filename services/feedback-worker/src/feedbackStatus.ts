@@ -2,7 +2,6 @@ export type FeedbackStatus = 'received' | 'answered' | 'closed'
 
 export type GitHubIssueSnapshot = {
   state: 'open' | 'closed'
-  createdAt: string
   updatedAt: string
 }
 
@@ -19,7 +18,6 @@ export type FeedbackStatusResult = {
     text: string
     updatedAt: string
   }
-  warnings: string[]
 }
 
 const MAX_OFFICIAL_RESPONSE_BYTES = 8 * 1024
@@ -28,7 +26,6 @@ export function resolveFeedbackStatus(
   issue: GitHubIssueSnapshot,
   comments: GitHubCommentSnapshot[],
 ): FeedbackStatusResult {
-  const warnings: string[] = []
   const trustedComments = comments
     .filter(comment => comment.trustedAuthor)
     .map(comment => ({ comment, text: comment.body.trim() }))
@@ -50,6 +47,5 @@ export function resolveFeedbackStatus(
       ? officialResponse.updatedAt
       : issue.updatedAt,
     officialResponse,
-    warnings,
   }
 }

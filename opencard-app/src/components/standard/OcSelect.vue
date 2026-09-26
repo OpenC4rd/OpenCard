@@ -29,7 +29,8 @@
         @keydown="handleTriggerKeydown"
       >
         <span class="oc-select__value" :class="{ 'is-placeholder': !selectedOption }"
-          :style="selectedOption?.labelStyle">
+          :style="selectedOption?.labelStyle"
+          :data-tooltip="selectedOption?.label ?? placeholder" data-tooltip-overflow>
           {{ selectedOption?.label ?? placeholder }}
         </span>
         <OcIcon
@@ -73,7 +74,8 @@
           @click="selectOption(option)"
         >
           <template #title>
-            <span class="oc-select__option-label" :style="option.labelStyle">{{ option.label }}</span>
+            <span class="oc-select__option-label" :style="option.labelStyle"
+              :data-tooltip="option.label" data-tooltip-overflow>{{ option.label }}</span>
           </template>
           <template v-if="option.value === modelValue" #append>
             <OcIcon name="action.check" size="sm" tone="active" />

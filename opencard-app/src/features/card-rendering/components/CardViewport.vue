@@ -17,8 +17,7 @@
             :transform-disabled-block-ids="transformDisabledBlockIds" :clip-to-face="clipToFace"
             :resource-context="props.comparison.before.resourceContext"
             :visual-readiness="visualReadiness"
-            :diff-highlights="props.comparison.before.diffHighlights ?? []" @block-click="handleBlockClick"
-            @runtime-issues-change="comparisonDiagnostics.replace('before', $event)" />
+            :diff-highlights="props.comparison.before.diffHighlights ?? []" @block-click="handleBlockClick" />
         </div>
       </div>
       <div ref="comparisonAfterLayerRef" class="card-viewport-comparison-layer" :class="{ 'is-transitioning': comparisonTransitioning }"
@@ -30,8 +29,7 @@
             :transform-disabled-block-ids="transformDisabledBlockIds" :clip-to-face="clipToFace"
             :resource-context="props.comparison.after.resourceContext"
             :visual-readiness="visualReadiness"
-            :diff-highlights="props.comparison.after.diffHighlights ?? []" @block-click="handleBlockClick"
-            @runtime-issues-change="comparisonDiagnostics.replace('after', $event)" />
+            :diff-highlights="props.comparison.after.diffHighlights ?? []" @block-click="handleBlockClick" />
         </div>
       </div>
     </template>
@@ -39,8 +37,7 @@
       <CardFaceRenderer :face="face" :transform-disabled-block-ids="transformDisabledBlockIds"
         :clip-to-face="clipToFace" :resource-context="resourceContext"
         :visual-readiness="visualReadiness"
-        :diff-highlights="diffHighlights" @block-click="handleBlockClick"
-        @runtime-issues-change="emit('runtime-issues-change', $event)" />
+        :diff-highlights="diffHighlights" @block-click="handleBlockClick" />
       <Transition name="card-info-fade">
         <aside v-if="$slots.info && showInfo" class="card-viewport-info" :style="viewportInfoStyle">
           <slot name="info" />
@@ -279,6 +276,7 @@ export interface CardViewportComparison {
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
+import { clamp } from '../../../shared/model/number'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
 import type { OcActionMenuEntry } from '../../../components/standard/OcActionMenu.vue'
@@ -291,10 +289,10 @@ import CardLayerView from './CardLayerView.vue'
 import { buildCardLayerGroups } from './cardLayerModel'
 import type { RenderReadyCardBlock, RenderReadyCardFace } from '../render.types'
 import type { CardRenderResourceContext } from '../cardRenderResources'
-import { createCardViewportComparisonDiagnostics } from './cardViewportComparisonDiagnostics'
 import {
   snapMoveRect,
   snapResizeRect,
+  type ResizeSnapLock,
   type ResizeSnapLocks,
   type ResizeSnapTarget,
 } from './resizeSnapping'
@@ -378,7 +376,6 @@ const emit = defineEmits<{
   (e: 'z-index-step', payload: { delta: -1 | 1; existingLayersOnly: boolean }): void
   (e: 'diff-divider-change', value: number): void
   (e: 'render-readiness-change', value: CardVisualReadinessState): void
-  (e: 'runtime-issues-change', value: readonly import('../cardPipelineIssue').CardPipelineIssue[]): void
 }>()
 
 const props = withDefaults(defineProps<{
@@ -460,7 +457,6 @@ const props = withDefaults(defineProps<{
 
 const visualReadiness = createCardVisualReadiness(state => emit('render-readiness-change', state))
 visualReadiness.reset()
-const comparisonDiagnostics = createCardViewportComparisonDiagnostics(issues => emit('runtime-issues-change', issues))
 
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
@@ -572,21 +568,6 @@ const stageStyle = computed(() => ({
 const comparisonDivider = computed(() => Math.min(1, Math.max(0, props.comparison?.divider ?? 0.5)))
 const comparisonTransitioning = ref(false)
 const comparisonDividerDragging = ref(false)
-watch(() => props.comparison?.before.face.id, (next, previous) => {
-  if (previous !== undefined && next !== previous) comparisonDiagnostics.remove('before')
-})
-watch(() => props.comparison?.after.face.id, (next, previous) => {
-  if (previous !== undefined && next !== previous) comparisonDiagnostics.remove('after')
-})
-watch(() => props.comparison?.before.placeholder, placeholder => {
-  if (placeholder) comparisonDiagnostics.remove('before')
-})
-watch(() => props.comparison?.after.placeholder, placeholder => {
-  if (placeholder) comparisonDiagnostics.remove('after')
-})
-watch(() => Boolean(props.comparison), comparisonActive => {
-  if (!comparisonActive) comparisonDiagnostics.reset()
-})
 watch(() => props.comparison?.viewMode, (next, previous) => {
   if (next && previous && next !== previous) comparisonTransitioning.value = true
 })
@@ -1283,10 +1264,6 @@ function stopZoomAnimation() {
   targetPanY.value = panY.value
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
-}
-
 function handleBlockClick(blockId: string, event: MouseEvent) {
   emit('block-click', blockId, event)
 }
@@ -1751,6 +1728,9 @@ function handleTransformMove(event: PointerEvent) {
     )
   }
 
+  // 按住 Shift 就是等比：文本流里高度由内容决定，等比没有意义，所以这条路不参与。
+  const proportionalResize = resizeMode.value === 'absolute' && event.shiftKey && activeHandle.value !== null
+
   if (props.alignmentSnappingEnabled && isMovingSelection.value && alignmentSnapDistances.value) {
     const snapped = snapMoveRect({
       rect: interactionPreview,
@@ -1761,6 +1741,19 @@ function handleTransformMove(event: PointerEvent) {
     })
     Object.assign(preview, snapped.rect)
     alignmentSnapLocks.value = snapped.locks
+  } else if (proportionalResize && activeHandle.value && alignmentSnapDistances.value) {
+    const constrained = constrainProportionalResize(
+      interactionPreview,
+      activeHandle.value,
+      measurement.worldRect,
+      {
+        targets: alignmentSnapTargets.value,
+        distances: alignmentSnapDistances.value,
+        previousLocks: alignmentSnapLocks.value,
+      },
+    )
+    Object.assign(preview, constrained.rect)
+    alignmentSnapLocks.value = constrained.locks
   } else if (props.alignmentSnappingEnabled
     && activeHandle.value
     && resizeMode.value === 'absolute'
@@ -1777,7 +1770,12 @@ function handleTransformMove(event: PointerEvent) {
     Object.assign(preview, snapped.rect)
     alignmentSnapLocks.value = snapped.locks
   } else {
-    Object.assign(preview, interactionPreview)
+    Object.assign(
+      preview,
+      proportionalResize && activeHandle.value
+        ? constrainResizeToRatio(interactionPreview, activeHandle.value, measurement.worldRect)
+        : interactionPreview,
+    )
     alignmentSnapLocks.value = {}
   }
 
@@ -1876,6 +1874,125 @@ function stopTransform() {
   window.removeEventListener('pointerup', stopTransform)
   window.removeEventListener('pointercancel', stopTransform)
   requestSelectionFrameSync()
+}
+
+/** 等比缩放的最小缩放系数：两条边都不能小于最小选择尺寸。 */
+function minProportionalScale(start: SelectionFrame): number {
+  const smaller = Math.min(start.width, start.height)
+  return smaller > 0 ? MIN_SELECTION_SIZE / smaller : 1
+}
+
+/**
+ * 按住 Shift 缩放＝等比缩放：保持按下那一刻的宽高比。
+ * 跟手的是**比较长的那条边**（拖边时就是那条边自己）：整段拖拽只有一个轴在跟指针，
+ * 不会拖到一半换轴、来回抖；另一条边按比例跟上。对角的那个角（边手柄是另一条边）留在原处，
+ * 自由的那一轴就地居中，手感就是"整块按比例放大缩小"。
+ */
+function constrainResizeToRatio(
+  raw: SelectionFrame,
+  handle: ResizeHandle,
+  start: SelectionFrame,
+): SelectionFrame {
+  if (start.width <= 0 || start.height <= 0) return raw
+
+  const widthDriven = handle === 'l' || handle === 'r'
+    || (handle !== 't' && handle !== 'b' && start.width >= start.height)
+  const proposed = (widthDriven ? raw.width : raw.height) / (widthDriven ? start.width : start.height)
+  return proportionalResizeRect(start, handle, Math.max(minProportionalScale(start), proposed))
+}
+
+/** 由一个缩放系数算出等比缩放后的矩形；锚点、居中与最小尺寸都归这里管。 */
+function proportionalResizeRect(start: SelectionFrame, handle: ResizeHandle, scale: number): SelectionFrame {
+  const width = start.width * scale
+  const height = start.height * scale
+  const right = start.left + start.width
+  const bottom = start.top + start.height
+  const anchoredLeft = handle === 'rt' || handle === 'rb' || handle === 'r'
+  const anchoredTop = handle === 'lb' || handle === 'rb' || handle === 'b'
+  return {
+    left: anchoredLeft
+      ? start.left
+      : handle === 't' || handle === 'b'
+        ? start.left + (start.width - width) / 2
+        : right - width,
+    top: anchoredTop
+      ? start.top
+      : handle === 'l' || handle === 'r'
+        ? start.top + (start.height - height) / 2
+        : bottom - height,
+    width,
+    height,
+  }
+}
+
+/** 让某条边精确落在吸附目标上所需的缩放系数；小于最小尺寸就作废（那会把块缩没）。 */
+function proportionalScaleForLock(lock: ResizeSnapLock, start: SelectionFrame): number | null {
+  const horizontal = lock.axis === 'x'
+  const dimension = horizontal ? start.width : start.height
+  if (dimension <= 0) return null
+  const anchor = horizontal
+    ? (lock.movingEdge === 'left' ? start.left + start.width : start.left)
+    : (lock.movingEdge === 'top' ? start.top + start.height : start.top)
+  const grows = lock.movingEdge === 'right' || lock.movingEdge === 'bottom'
+  const scale = (grows ? lock.position - anchor : anchor - lock.position) / dimension
+  return Number.isFinite(scale) && scale >= minProportionalScale(start) ? scale : null
+}
+
+/**
+ * 等比缩放里的吸附。等比只有一个自由度，两条边不可能各自都吸在自己的目标上，所以：
+ * 先按比例约束出预览（跟手那条边就是鼠标位置，另一条边由比例决定），再拿**这个预览**去各轴找目标
+ * —— 找的必须是被比例约束之后的边，否则算出来的目标离实际边很远，一吸就是一次大跳。
+ * 最后挑一条（离目标更近的那条，跟手的那条在同样近时优先），用它的目标位置反算缩放系数：
+ * 比例不变、那条边精确落在线上；另一条边的锁丢掉 —— 留着只会把引导线画在一条其实没吸上的边上。
+ */
+function constrainProportionalResize(
+  raw: SelectionFrame,
+  handle: ResizeHandle,
+  start: SelectionFrame,
+  snap: {
+    targets: readonly ResizeSnapTarget[]
+    distances: { enter: number; release: number }
+    previousLocks: ResizeSnapLocks
+  },
+): { rect: SelectionFrame; locks: ResizeSnapLocks } {
+  const proportional = constrainResizeToRatio(raw, handle, start)
+  const snapped = snapResizeRect({
+    rect: proportional,
+    handle,
+    targets: snap.targets,
+    enterDistance: snap.distances.enter,
+    releaseDistance: snap.distances.release,
+    previousLocks: snap.previousLocks,
+    minSize: MIN_SELECTION_SIZE,
+  })
+
+  const driverAxis: 'x' | 'y' = handle === 'l' || handle === 'r'
+    ? 'x'
+    : handle === 't' || handle === 'b' ? 'y' : start.width >= start.height ? 'x' : 'y'
+  let chosen: ResizeSnapLock | null = null
+  let chosenDistance = Number.POSITIVE_INFINITY
+  let chosenScale: number | null = null
+  for (const axis of ['x', 'y'] as const) {
+    const lock = snapped.locks[axis]
+    if (!lock) continue
+    const scale = proportionalScaleForLock(lock, start)
+    if (scale === null) continue
+    const distance = Math.abs((axis === 'x'
+      ? lock.movingEdge === 'left' ? proportional.left : proportional.left + proportional.width
+      : lock.movingEdge === 'top' ? proportional.top : proportional.top + proportional.height) - lock.position)
+    const preferred = axis === driverAxis
+    if (distance < chosenDistance || (distance === chosenDistance && preferred)) {
+      chosen = lock
+      chosenDistance = distance
+      chosenScale = scale
+    }
+  }
+
+  if (!chosen || chosenScale === null) return { rect: proportional, locks: {} }
+  return {
+    rect: proportionalResizeRect(start, handle, chosenScale),
+    locks: { [chosen.axis]: chosen },
+  }
 }
 
 function constrainResizePreview(

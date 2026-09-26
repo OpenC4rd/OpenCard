@@ -1,4 +1,5 @@
 import { isProjectCoverPath } from '../../workspace/model/projectCover'
+import { isRecord } from '../../../shared/model/record'
 
 export const PROJECT_TEMPLATE_SCHEMA_VERSION = 1 as const
 export const PROJECT_TEMPLATE_NAME_MAX_LENGTH = 80
@@ -123,10 +124,6 @@ export class TemplateServiceError extends Error {
 const WINDOWS_RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i
 const INVALID_PROJECT_NAME_CHARACTERS = /[<>:"/\\|?*\u0000-\u001f]/
 const SAFE_TEMPLATE_ID = /^[a-z0-9][a-z0-9-]*$/
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function parseLocalizedText(value: unknown): ProjectTemplateLocalizedText | null {
   if (!isRecord(value)) return null

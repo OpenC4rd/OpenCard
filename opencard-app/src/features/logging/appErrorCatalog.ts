@@ -138,7 +138,7 @@ export const APP_ERROR_CATALOG = {
   'OC-E3017': {
     area: '项目与资源',
     meaning: { 'zh-CN': '无法解开资源包', 'en-US': 'Could not unpack the resource package' },
-    solution: '确认归档完整、磁盘剩余空间足够且缓存目录可写；删掉 ~/.opencard/cache/packages 可以让程序重新解一次。',
+    solution: '确认归档完整、磁盘剩余空间足够且缓存目录可写；删掉 ~/.opencard/cache/snapshots 可以让程序重新解一次。',
   },
   'OC-E4001': {
     area: '编辑器与文档',
@@ -209,12 +209,9 @@ export const APP_ERROR_CATALOG = {
 
 export type AppErrorCode = keyof typeof APP_ERROR_CATALOG
 
-const APP_ERROR_REPORT_TAG = Symbol.for('opencard.app-error-report')
-
 export type AppErrorReport = Error & {
   readonly code: AppErrorCode
   readonly details?: unknown
-  readonly [APP_ERROR_REPORT_TAG]: true
 }
 
 export function getAppErrorMeaning(code: AppErrorCode, locale: string): string {
@@ -226,16 +223,7 @@ export function createAppErrorReport(code: AppErrorCode, details?: unknown): App
     name: 'OpenCardError',
     code,
     details,
-    [APP_ERROR_REPORT_TAG]: true as const,
   })
-}
-
-export function isAppErrorReport(value: unknown): value is AppErrorReport {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<AppErrorReport>
-  return candidate[APP_ERROR_REPORT_TAG] === true
-    && typeof candidate.code === 'string'
-    && candidate.code in APP_ERROR_CATALOG
 }
 
 function formatValue(value: unknown): string {

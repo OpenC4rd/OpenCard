@@ -26,7 +26,7 @@ describe('FilePathPropertyField', () => {
         }).manifest,
         archivePath: '/project/.opencard/packages/theme.ocpack',
         fingerprint: 'fp-theme',
-        rootPath: '/cache/packages/aa11', cover: null,
+        rootPath: '/cache/snapshots/aa11', cover: null,
       }]]),
     }, { readDirectoryEntries })
     const wrapper = mount(FilePathPropertyField, {
@@ -45,7 +45,7 @@ describe('FilePathPropertyField', () => {
       ])
       rootMenu.vm.$emit('select', rootMenu.props('items').find(item => item.label === 'Theme Pack')!.key)
       await flushPromises()
-      expect(readDirectoryEntries).toHaveBeenLastCalledWith('/cache/packages/aa11', 1)
+      expect(readDirectoryEntries).toHaveBeenLastCalledWith('/cache/snapshots/aa11', 1)
       const menu = wrapper.getComponent(OcAutocompletePopover)
       expect(menu.props('items').map(item => item.label)).toEqual(['icon:', 'image.png', '..'])
       menu.vm.$emit('select', menu.props('items').find(item => item.label === '..')!.key)

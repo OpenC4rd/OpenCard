@@ -29,16 +29,7 @@ import {
 
 /** 清单文件名。缓存根里只有它一个文件，其余都是项目目录。 */
 const INDEX_FILE_NAME = 'index.json'
-/** 缓存总字节上限。超了按"最后一次用到"从旧到新删整个项目目录。 */
-const MAX_CACHE_BYTES = 1024 * 1024 * 1024
 const EPOCH = new Date(0).toISOString()
-
-export type NetworkResourceProgress = {
-  url: string
-  receivedBytes: number
-  totalBytes: number | null
-  progress: number | null
-}
 
 export type CachedNetworkResource = {
   url: string
@@ -48,14 +39,7 @@ export type CachedNetworkResource = {
 
 export interface NetworkResourceCacheProject {
   getCached(url: string): Promise<CachedNetworkResource | null>
-  refresh(url: string, onProgress?: (progress: NetworkResourceProgress) => void): Promise<CachedNetworkResource>
-  listUrls(): Promise<string[]>
-}
-
-type DownloadProgressPayload = {
-  url: string
-  receivedBytes: number
-  totalBytes?: number | null
+  refresh(url: string): Promise<CachedNetworkResource>
 }
 
 type DownloadResult = {
@@ -68,7 +52,6 @@ type DownloadTransport = (
   destinationPath: string,
   /** 缓存根：下载只能落在这里面，所以校验它的也是同一个根。 */
   cacheRoot: string,
-  onProgress: (progress: NetworkResourceProgress) => void,
 ) => Promise<DownloadResult>
 
 type CacheServiceDependencies = {
@@ -81,27 +64,19 @@ type CacheServiceDependencies = {
   now: () => Date
 }
 
+/**
+ * 下载进度目前没有界面消费，但 Rust 命令要求这个通道存在，所以照旧带上一个空通道。
+ */
 async function defaultDownload(
   url: string,
   destinationPath: string,
   cacheRoot: string,
-  onProgress: (progress: NetworkResourceProgress) => void,
 ): Promise<DownloadResult> {
-  const channel = new Channel<DownloadProgressPayload>()
-  channel.onmessage = payload => {
-    const totalBytes = typeof payload.totalBytes === 'number' ? payload.totalBytes : null
-    onProgress({
-      url: payload.url,
-      receivedBytes: payload.receivedBytes,
-      totalBytes,
-      progress: totalBytes && totalBytes > 0 ? Math.min(1, payload.receivedBytes / totalBytes) : null,
-    })
-  }
   return await invoke<DownloadResult>('download_network_resource', {
     url,
     destinationPath,
     cacheRoot,
-    onProgress: channel,
+    onProgress: new Channel(),
   })
 }
 
@@ -167,8 +142,9 @@ export class NetworkResourceCacheService {
   /**
    * 只该在软件没在用这些缓存时调用（启动维护一处）。它删索引之外的孤儿目录，
    * 把指向已消失目录的条目清掉，并在超上限时按"最后一次用到"淘汰整个项目目录。
+   * 上限由调用方按设置给出。
    */
-  async prune(): Promise<void> {
+  async prune(maxBytes: number): Promise<void> {
     const root = await this.root()
     if (!await this.dependencies.fs.fileExists(root)) return
     const index = await this.loadIndex()
@@ -185,7 +161,7 @@ export class NetworkResourceCacheService {
     let total = cachedDirectories.reduce((sum, name) => sum + projectCacheBytes(index.projects[name]!), 0)
     const overLimit: string[] = []
     for (const name of oldestFirst) {
-      if (total <= MAX_CACHE_BYTES) break
+      if (total <= maxBytes) break
       overLimit.push(name)
       total -= projectCacheBytes(index.projects[name]!)
     }
@@ -201,6 +177,19 @@ export class NetworkResourceCacheService {
         ),
       }))
     }
+  }
+
+  /** 缓存占用的字节数，取索引里的簿记；给人看的度量，不遍历磁盘。 */
+  async usage(): Promise<number> {
+    const index = await this.loadIndex()
+    return Object.values(index.projects).reduce((total, project) => total + projectCacheBytes(project), 0)
+  }
+
+  /** 缓存目录被外部清掉之后丢掉记忆，否则下一次写入会落到一个已经不存在的目录里。 */
+  forget(): void {
+    this.rootPromise = null
+    this.indexPromise = null
+    this.projects.clear()
   }
 
   private async root(): Promise<string> {
@@ -274,10 +263,7 @@ export class NetworkResourceCacheService {
       const path = await resourcePath(entry)
       return await this.dependencies.fs.fileExists(path) ? { url, path, refreshedAt: entry.refreshedAt } : null
     }
-    const refresh = async (
-      source: string,
-      onProgress: (progress: NetworkResourceProgress) => void = () => undefined,
-    ): Promise<CachedNetworkResource> => {
+    const refresh = async (source: string): Promise<CachedNetworkResource> => {
       const url = normalizeNetworkResourceUrl(source)
       if (!url) throw new Error('Network resources must use a valid HTTPS URL')
       const existingRequest = refreshRequests.get(url)
@@ -291,7 +277,7 @@ export class NetworkResourceCacheService {
         )
         let committed!: CachedNetworkResource
         try {
-          const download = await this.dependencies.download(url, temporaryPath, await this.root(), onProgress)
+          const download = await this.dependencies.download(url, temporaryPath, await this.root())
           const extension = known?.extension ?? networkResourceExtension(url, download.contentType)
           const finalPath = await this.dependencies.joinPath(directory, `${uid}${extension}`)
           const backupPath = await this.dependencies.joinPath(directory, `${uid}.backup`)
@@ -343,7 +329,6 @@ export class NetworkResourceCacheService {
     return {
       getCached,
       refresh,
-      listUrls: async () => Object.keys((await loadEntry()).resources),
     }
   }
 }

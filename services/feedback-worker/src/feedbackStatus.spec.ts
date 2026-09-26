@@ -3,7 +3,6 @@ import { resolveFeedbackStatus } from './feedbackStatus'
 
 const issue = {
   state: 'open',
-  createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T01:00:00.000Z',
 } as const
 

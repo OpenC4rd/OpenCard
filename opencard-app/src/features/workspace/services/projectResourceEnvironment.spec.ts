@@ -39,7 +39,7 @@ function packageEnvironment(packageId: string): ProjectResourceEnvironment {
   return {
     kind: 'package',
     namespace,
-    rootPath: `/cache/packages/${packageId}`,
+    rootPath: `/cache/snapshots/${packageId}`,
     fontDocument: {},
     fonts: { body: { kind: 'family', name: 'Body', family: { key: 'body', name: 'Body', files: {} } } },
     iconDocument: {},
@@ -71,8 +71,8 @@ function memoryFileSystem(files: Map<string, string>) {
 }
 
 const PACKAGES_ROOT = '/project/.opencard/packages'
-/** 软件存储里的包缓存根：解开目录挂在指纹上，"解开了没有"就是这里有没有那个目录。 */
-const CACHE_PACKAGES_ROOT = '/cache/packages'
+/** 软件存储里的包快照根：解开目录挂在指纹上，"解开了没有"就是这里有没有那个目录。 */
+const SNAPSHOTS_ROOT = '/cache/snapshots'
 
 function manifest(identity: { author: string, name: string, version: string }, extra: Record<string, unknown> = {}) {
   return JSON.stringify({
@@ -93,7 +93,7 @@ function registerArchive(archivePath: string, archive: Partial<ArchivedPackage> 
 
 /** 把一个包标记成"已经解开"：缓存里存在它的指纹目录。 */
 function unpacked(files: Map<string, string>, fingerprint: string): Map<string, string> {
-  files.set(`${CACHE_PACKAGES_ROOT}/${fingerprint}`, '')
+  files.set(`${SNAPSHOTS_ROOT}/${fingerprint}`, '')
   return files
 }
 
@@ -130,7 +130,7 @@ describe('ProjectResourceEnvironment', () => {
     ]])
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(files),
@@ -166,7 +166,7 @@ describe('ProjectResourceEnvironment', () => {
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       iconCatalog: providedCatalog,
@@ -188,12 +188,12 @@ describe('ProjectResourceEnvironment', () => {
       manifestJson: manifest({ author: 'bob', name: 'fonts', version: '2.0.0' }),
     })
     const files = projectFiles(`${PACKAGES_ROOT}/alice-icons.ocpack`, `${PACKAGES_ROOT}/whatever-the-file-is-called.ocpack`)
-    const bobRoot = `${CACHE_PACKAGES_ROOT}/fp-whatever-the-file-is-called.ocpack`
+    const bobRoot = `${SNAPSHOTS_ROOT}/fp-whatever-the-file-is-called.ocpack`
     unpacked(files, 'fp-whatever-the-file-is-called.ocpack')
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(files),
@@ -216,7 +216,7 @@ describe('ProjectResourceEnvironment', () => {
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(projectFiles(`${PACKAGES_ROOT}/broken.ocpack`, `${PACKAGES_ROOT}/good.ocpack`)),
@@ -237,7 +237,7 @@ describe('ProjectResourceEnvironment', () => {
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(projectFiles(`${PACKAGES_ROOT}/alice.ocpack`)),
@@ -265,7 +265,7 @@ describe('ProjectResourceEnvironment', () => {
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(projectFiles(
@@ -277,6 +277,15 @@ describe('ProjectResourceEnvironment', () => {
 
     // 同一份内容放了两个文件名：连解压目录都一样，所以只留先出现的那个文件名。
     expect([...environment.packages!.keys()].sort()).toEqual(['fp-other', 'fp-shared'])
+    // 但"文件夹里有哪些包"按文件算：三个归档就是三条，重复的那份也在。
+    expect(environment.packageFiles?.map(file => file.archivePath)).toEqual([
+      `${PACKAGES_ROOT}/alice-a.ocpack`,
+      `${PACKAGES_ROOT}/alice-b.ocpack`,
+      `${PACKAGES_ROOT}/impostor.ocpack`,
+    ])
+    expect(environment.packageFiles?.map(file => file.fingerprint)).toEqual([
+      'fp-shared', 'fp-shared', 'fp-other',
+    ])
     // 同坐标、内容不同（比如换了一份构建）：两个文件都在，谁也不消失；引用落到文件名靠前的那个。
     expect(packageAt(environment, 'alice/icons@1.0.0')?.archivePath).toBe(`${PACKAGES_ROOT}/alice-a.ocpack`)
     expect(environment.packages!.get('fp-other')?.archivePath).toBe(`${PACKAGES_ROOT}/impostor.ocpack`)
@@ -292,8 +301,8 @@ describe('ProjectResourceEnvironment', () => {
       manifestJson: manifest({ author: 'bob', name: 'icons', version: '1.0.0' }),
       fingerprint: 'fp-bob',
     })
-    const aliceRoot = `${CACHE_PACKAGES_ROOT}/fp-alice`
-    const bobRoot = `${CACHE_PACKAGES_ROOT}/fp-bob`
+    const aliceRoot = `${SNAPSHOTS_ROOT}/fp-alice`
+    const bobRoot = `${SNAPSHOTS_ROOT}/fp-bob`
     const files = projectFiles(`${PACKAGES_ROOT}/alice.ocpack`, `${PACKAGES_ROOT}/bob.ocpack`)
     unpacked(files, 'fp-alice')
     unpacked(files, 'fp-bob')
@@ -313,7 +322,7 @@ describe('ProjectResourceEnvironment', () => {
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(files),
@@ -338,7 +347,7 @@ describe('ProjectResourceEnvironment', () => {
       manifestJson: manifest({ author: 'bob', name: 'icons', version: '1.0.0' }, { cover: 'assets/missing.png' }),
       fingerprint: 'fp-bob',
     })
-    const aliceRoot = `${CACHE_PACKAGES_ROOT}/fp-alice`
+    const aliceRoot = `${SNAPSHOTS_ROOT}/fp-alice`
     const files = projectFiles(`${PACKAGES_ROOT}/alice.ocpack`, `${PACKAGES_ROOT}/bob.ocpack`)
     unpacked(files, 'fp-alice')
     unpacked(files, 'fp-bob')
@@ -346,7 +355,7 @@ describe('ProjectResourceEnvironment', () => {
 
     const environment = await loadProjectResourceEnvironment({
       rootPath: '/project',
-      packagesRoot: CACHE_PACKAGES_ROOT,
+      snapshotsRoot: SNAPSHOTS_ROOT,
       kind: 'project',
       identity: 'project',
       fs: memoryFileSystem(files),

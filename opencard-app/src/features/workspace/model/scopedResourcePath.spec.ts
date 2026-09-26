@@ -15,9 +15,9 @@ function expectIssue(result: ScopedResourcePathResult, code: string): void {
 }
 
 const project = 'D:/project'
-const themeRoot = 'C:/Users/Me/.opencard/cache/packages/aa11'
-const newerThemeRoot = 'C:/Users/Me/.opencard/cache/packages/bb22'
-const iconsRoot = 'C:/Users/Me/.opencard/cache/packages/cc33'
+const themeRoot = 'C:/Users/Me/.opencard/cache/snapshots/aa11'
+const newerThemeRoot = 'C:/Users/Me/.opencard/cache/snapshots/bb22'
+const iconsRoot = 'C:/Users/Me/.opencard/cache/snapshots/cc33'
 const packageRoots: PackageScopeRoots = new Map([
   ['alice/theme@1.0.0', themeRoot],
   ['alice/theme@1.2.0', newerThemeRoot],

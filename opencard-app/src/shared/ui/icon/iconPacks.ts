@@ -175,7 +175,6 @@ import {
   mdiWindowRestore,
   mdiXml,
 } from '@mdi/js'
-import type { IconToken } from './iconTokens'
 import type { IconGlyph } from './icon.types'
 
 function glyph(path: string, viewBox?: string): IconGlyph {
@@ -374,4 +373,7 @@ export const iconGlyphs = {
   'folder.open': glyph(mdiFolderOpen),
   'folder.src': glyph(mdiFileCodeOutline),
   'folder.views': glyph(mdiViewDashboardOutline),
-} satisfies Record<IconToken, IconGlyph>
+}
+
+/** 语义 token 就是字形表的键：一处声明，`glyph()` 的返回类型保证每个键都有字形。 */
+export type IconToken = keyof typeof iconGlyphs

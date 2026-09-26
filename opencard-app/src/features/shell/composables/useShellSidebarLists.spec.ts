@@ -208,7 +208,7 @@ describe('useShellSidebarLists', () => {
 
     expect(listKeysOf(groups)).toEqual([SETTINGS_CATEGORIES_LIST_KEY])
     expect(groups[0]!.headButtons).toEqual([
-      { key: 'return-primary-page', icon: 'nav.arrow-left', title: 'Back' },
+      { key: 'return-primary-page', icon: 'nav.arrow-left', title: 'app.shell.back', disabled: false },
     ])
 
     const list = listOf(groups, SETTINGS_CATEGORIES_LIST_KEY)
@@ -342,7 +342,7 @@ describe('useShellSidebarLists', () => {
     expect(groups[0]!.key).toBe('primary')
     expect(listKeysOf(groups)).toEqual([])
     expect(groups[0]!.headButtons).toEqual([
-      { key: 'return-primary-page', icon: 'nav.arrow-left', title: 'app.about.back' },
+      { key: 'return-primary-page', icon: 'nav.arrow-left', title: 'app.shell.back', disabled: false },
     ])
   })
 

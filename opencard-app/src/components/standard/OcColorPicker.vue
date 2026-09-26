@@ -153,6 +153,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch, type CSSProperties } from 'vue'
+import { clamp } from '../../shared/model/number'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcFloatingLayer from './OcFloatingLayer.vue'
@@ -590,10 +591,6 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 
 function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value))
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
 }
 </script>
 

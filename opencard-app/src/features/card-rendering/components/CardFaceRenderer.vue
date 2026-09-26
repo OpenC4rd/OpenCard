@@ -2,13 +2,13 @@
 <template>
     <div ref="cardCanvasRef" class="card-canvas" :class="{ 'card-canvas--clipped': props.clipToFace }"
         :style="canvasStyle">
-        <CardBlockRenderer :block="rootContainerBlock" :placement="{ kind: 'root' }" />
+        <NativeBlockRenderer :block="rootContainerBlock" :placement="{ kind: 'root' }" />
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed, provide, ref, watch, nextTick, onMounted } from 'vue'
-import CardBlockRenderer from './CardBlockRenderer.vue'
+import NativeBlockRenderer from './NativeBlockRenderer.vue'
 import { cardEditorContextKey } from './cardEditorContext'
 import type { RenderReadyCardFace, RenderReadySimpleContainerBlock } from '../render.types'
 import {
@@ -16,13 +16,10 @@ import {
     type CardRenderResourceContext,
 } from '../cardRenderResources'
 import type { CardVisualReadinessRegistrar } from './cardRenderReadiness'
-import { createCardRenderDiagnosticRegistry } from '../cardRenderDiagnosticRegistry'
-import type { CardPipelineIssue } from '../cardPipelineIssue'
 
 const emit = defineEmits<{
     /** 块点击事件：上抛被点击 blockId 与原始鼠标事件。 */
     (e: 'block-click', blockId: string, event: MouseEvent): void
-    (e: 'runtime-issues-change', issues: readonly CardPipelineIssue[]): void
 }>()
 
 const props = withDefaults(defineProps<{
@@ -46,8 +43,6 @@ const props = withDefaults(defineProps<{
 })
 
 const cardCanvasRef = ref<HTMLElement>()
-const diagnostics = createCardRenderDiagnosticRegistry()
-watch(diagnostics.issues, issues => emit('runtime-issues-change', issues), { immediate: true, flush: 'post' })
 async function applyDiffHighlights(highlights: readonly { blockId: string; kind: 'added' | 'removed' | 'changed' }[]) {
   await nextTick()
   const root = cardCanvasRef.value
@@ -121,12 +116,10 @@ provide(cardEditorContextKey, {
     faceKey: props.face.faceKey,
     bindingProject: computed(() => props.resourceContext.bindingProject),
     bindingDictionary: computed(() => props.resourceContext.bindingDictionary),
-    diagnostics,
 	})
 
 defineExpose({
 	    getCanvasElement: () => cardCanvasRef.value,
-    getRuntimeIssues: () => diagnostics.snapshot(),
 	})
 </script>
 

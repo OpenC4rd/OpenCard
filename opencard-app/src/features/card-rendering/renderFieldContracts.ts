@@ -66,13 +66,13 @@ function textContracts(type: 'text-block' | 'markdown-text-block'): Record<strin
   return {
     ...baseBlockContracts(type),
     content: { kind: 'string', defaultValue: '' },
-    fontSize: { kind: 'css-length', defaultValue: '' },
+    fontSize: { kind: 'css-length', defaultValue: '16px' },
     fontFamily: { kind: 'string', defaultValue: '' },
     fontWeight: { kind: 'option', defaultValue: 'normal', options: ['light', 'normal', 'bold'] },
     color: { kind: 'color', defaultValue: '#000000', displayFieldKey: 'textColor' },
     textAlign: { kind: 'option', defaultValue: 'start', options: alignOptions },
     verticalAlign: { kind: 'option', defaultValue: 'top', options: verticalAlignOptions },
-    lineHeight: { kind: 'css-length', defaultValue: '' },
+    lineHeight: { kind: 'css-length', defaultValue: '1.4em' },
     writingMode: {
       kind: 'option',
       defaultValue: 'horizontal-tb',

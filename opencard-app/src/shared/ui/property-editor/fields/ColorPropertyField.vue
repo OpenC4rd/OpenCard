@@ -1,6 +1,6 @@
 <!-- 属性颜色字段：把值与只读协议适配到标准颜色字段。 -->
 <template>
-  <OcColorField :model-value="stringValue" :label="definition.title"
+  <OcColorPicker variant="field" :model-value="stringValue" :label="definition.title"
     :disabled="definition.isReadonly" :allow-alpha="definition.allowAlpha ?? true"
     @preview="emit('preview:value', $event)" @cancel="emit('cancel:value')"
     @update:model-value="emit('update:value', $event)" />
@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
-import OcColorField from '../../../../components/standard/OcColorField.vue'
+import OcColorPicker from '../../../../components/standard/OcColorPicker.vue'
 
 interface ColorPropertyFieldProps {
   /** 当前字段值。 */

@@ -78,6 +78,8 @@ export interface EditorEmits {
   (e: 'update-diff-ui-state', value: EditorDiffUiState): void
   (e: 'issue-snapshot', snapshot: EditorIssueSnapshot): void
   (e: 'open-file', path: string): void
+  /** 请壳层把一个项目文件移到回收站：编辑器不自己删文件，删除只有壳层那一条路。 */
+  (e: 'trash-file', path: string): void
 }
 
 // 编辑器接口定义

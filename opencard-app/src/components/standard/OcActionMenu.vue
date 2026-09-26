@@ -49,7 +49,8 @@
             class="oc-action-menu__icon"
           />
           <span v-else class="oc-action-menu__icon-spacer" />
-          <OcInlineMarkup class="oc-action-menu__label" :source="entry.title ?? entry.key" />
+          <OcInlineMarkup class="oc-action-menu__label" :source="entry.title ?? entry.key"
+            :data-tooltip="entry.title ?? entry.key" data-tooltip-overflow />
           <span v-if="hasActionBadge(entry.badge)" class="oc-number-badge" aria-hidden="true">
             {{ formatActionBadge(entry.badge) }}
           </span>

@@ -34,7 +34,6 @@ futures-util = "0.3"
 reqwest = { version = "0.13", features = ["stream"] }
 tokio = { version = "1", features = ["fs", "io-util"] }
 sha2 = "0.10"
-uuid = { version = "1", features = ["v4"] }
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 unicode-normalization = "0.1"
 

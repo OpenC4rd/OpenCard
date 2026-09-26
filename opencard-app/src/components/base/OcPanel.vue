@@ -9,7 +9,6 @@
 <script lang="ts">
 import type { ExtractPropTypes, PropType } from 'vue'
 
-export const OC_PANEL_DIRECTIONS = ['horizontal', 'vertical'] as const
 export const OC_PANEL_GAPS = ['none', '1', '2', '3', '4', '5', '6', '8'] as const
 export const OC_PANEL_PADDINGS = ['none', '1', '2', '3', '4', '5', '6'] as const
 export const OC_PANEL_ALIGNS = ['start', 'center', 'end', 'stretch'] as const
@@ -19,7 +18,6 @@ export const OC_PANEL_RADII = ['none', 'sm', 'md', 'lg'] as const
 export const OC_PANEL_SHADOWS = ['none', 'sm', 'md', 'lg'] as const
 export const OC_PANEL_OVERFLOWS = ['visible', 'hidden', 'auto', 'scroll'] as const
 
-export type OcPanelDirection = (typeof OC_PANEL_DIRECTIONS)[number]
 export type OcPanelGap = (typeof OC_PANEL_GAPS)[number]
 export type OcPanelPadding = (typeof OC_PANEL_PADDINGS)[number]
 export type OcPanelAlign = (typeof OC_PANEL_ALIGNS)[number]
@@ -34,11 +32,6 @@ export const ocPanelProps = {
   as: {
     type: String,
     default: 'div',
-  },
-  /** 排列方向。默认 'vertical' */
-  direction: {
-    type: String as PropType<OcPanelDirection>,
-    default: 'vertical',
   },
   /** 间距。默认 'none' */
   gap: {
@@ -80,11 +73,6 @@ export const ocPanelProps = {
     type: Boolean,
     default: false,
   },
-  /** flex:1。默认 false */
-  grow: {
-    type: Boolean,
-    default: false,
-  },
   /** 溢出。默认 'visible' */
   overflow: {
     type: String as PropType<OcPanelOverflow>,
@@ -113,7 +101,6 @@ const forwardedAttrs = computed(() => {
 })
 
 const panelClasses = computed(() => [
-  `oc-panel--direction-${props.direction}`,
   `oc-panel--gap-${props.gap}`,
   `oc-panel--padding-${props.padding}`,
   `oc-panel--align-${props.align}`,
@@ -121,10 +108,7 @@ const panelClasses = computed(() => [
   `oc-panel--border-${props.border}`,
   `oc-panel--radius-${props.radius}`,
   `oc-panel--shadow-${props.shadow}`,
-  {
-    'oc-panel--fill': props.fill,
-    'oc-panel--grow': props.grow,
-  },
+  { 'oc-panel--fill': props.fill },
 ])
 
 const panelStyles = computed<CSSProperties>(() => ({
@@ -136,21 +120,13 @@ const panelStyles = computed<CSSProperties>(() => ({
 .oc-panel {
   box-sizing: border-box;
   display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   transition:
     background-color var(--oc-duration-fast) var(--oc-ease),
     border-color var(--oc-duration-fast) var(--oc-ease),
     box-shadow var(--oc-duration-fast) var(--oc-ease);
-}
-
-/* Direction */
-.oc-panel--direction-vertical {
-  flex-direction: column;
-}
-
-.oc-panel--direction-horizontal {
-  flex-direction: row;
 }
 
 /* Gap */
@@ -315,13 +291,9 @@ const panelStyles = computed<CSSProperties>(() => ({
   box-shadow: var(--oc-shadow-lg);
 }
 
-/* Fill & Grow */
+/* Fill */
 .oc-panel--fill {
   width: 100%;
   height: 100%;
-}
-
-.oc-panel--grow {
-  flex: 1 1 0;
 }
 </style>

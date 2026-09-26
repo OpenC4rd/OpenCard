@@ -53,9 +53,9 @@ import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../settings/model/workspaceState'
 import { taskScheduler } from '../../../utils/taskScheduler'
 import type { OcNodeDropPosition } from '../../../shared/ui/node/node.types'
-import { getPathBasename, normalizePath } from '../../../shared/model/filePath'
+import { getPathBasename, getPathDirectory, normalizePath } from '../../../shared/model/filePath'
 import {
-  APP_CACHE_PACKAGES_DIRECTORY_NAME,
+  APP_CACHE_SNAPSHOTS_DIRECTORY_NAME,
   resolveAppCachePath,
 } from '../../../shared/storage/appStoragePaths'
 import { reportAppError } from '../../logging/appErrorCatalog'
@@ -73,7 +73,6 @@ import {
   buildProjectIconCatalog,
   EMPTY_PROJECT_ICON_CATALOG,
   type ProjectIconCatalog,
-  type ProjectIconLoadError,
 } from '../services/projectIconCatalog'
 import { readProjectIconDimensions } from '../services/projectIconDimensions'
 import {
@@ -95,6 +94,7 @@ import {
   DEFAULT_PROJECT_FONT_DIRECTORY,
 } from '../model/projectFonts'
 import {
+  markResourcePackagesUsed,
   readResourcePackageArchive,
   unpackResourcePackage,
   type ResourcePackageArchive,
@@ -104,8 +104,8 @@ import {
   loadProjectResourceEnvironment,
   packageScopeRoots,
   type ProjectResourceEnvironment,
-  type ProjectResourcePackage,
   type ProjectResourcePackageCatalog,
+  type ProjectResourcePackageFile,
   type UnreadableProjectPackage,
 } from '../services/projectResourceEnvironment'
 import {
@@ -129,10 +129,6 @@ const FILE_CHANGE_RESOURCE_ENVIRONMENT_REFRESH_KEY = 'project-resource-environme
 const PROJECT_FONT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc'])
 const PROJECT_ICON_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg'])
 
-export type ImportedProjectFontFile = {
-  source: string
-  copied: boolean
-}
 export type ImportedProjectFontFiles = {
   sources: readonly string[]
   copied: boolean
@@ -190,13 +186,13 @@ const fontRegistryReady = ref(false)
 const projectFontLoadErrors = ref<readonly ProjectFontLoadError[]>([])
 const projectIconSeries = ref<readonly ProjectIconSeries[]>([])
 const iconRegistryError = ref<string | null>(null)
-const iconRegistryReady = ref(false)
 const projectIconCatalog = ref<ProjectIconCatalog>(EMPTY_PROJECT_ICON_CATALOG)
-const projectIconLoadErrors = ref<readonly ProjectIconLoadError[]>([])
 const projectDictionary = ref<ProjectDictionary | null>(null)
 const resolvedDictionary = ref<ResolvedProjectDictionary | null>(null)
 const dictionaryError = ref<string | null>(null)
 const projectResourcePackages = shallowRef<ProjectResourcePackageCatalog>(new Map())
+/** 项目里每一个归档文件，含内容相同的那几份：包管理器按文件列，引用解析仍按指纹去重。 */
+const projectResourcePackageFiles = shallowRef<readonly ProjectResourcePackageFile[]>([])
 /** 说不出身份的归档：包管理器整页要能让人看到它们，而不是留一个解释不了的空缺。 */
 const unreadableProjectResourcePackages = shallowRef<readonly UnreadableProjectPackage[]>([])
 const projectResourceEnvironments = shallowRef<ReadonlyMap<string, ProjectResourceEnvironment>>(new Map())
@@ -422,8 +418,6 @@ function clearProjectIconRegistry() {
   projectIconSeries.value = []
   iconRegistryError.value = null
   projectIconCatalog.value = EMPTY_PROJECT_ICON_CATALOG
-  projectIconLoadErrors.value = []
-  iconRegistryReady.value = false
 }
 
 async function syncRegisteredProjectFonts(
@@ -479,7 +473,6 @@ function syncRegisteredProjectIcons(iconSeries: readonly ProjectIconSeries[]): v
   )
   if (version !== projectIconLoadVersion) return
   projectIconCatalog.value = catalog
-  projectIconLoadErrors.value = catalog.errors
 }
 
 function clearProjectDictionary() {
@@ -493,15 +486,18 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
   const expectedProjectPath = projectPath.value
   if (!expectedProjectPath) {
     projectResourcePackages.value = new Map()
+    projectResourcePackageFiles.value = []
     unreadableProjectResourcePackages.value = []
     projectResourceEnvironments.value = new Map()
+    stampedPackageUsageFor = null
     return false
   }
   try {
+    const snapshotsRoot = await resolveAppCachePath(APP_CACHE_SNAPSHOTS_DIRECTORY_NAME)
     const environment = await loadProjectResourceEnvironment({
       fs: fileSystemService,
       rootPath: expectedProjectPath,
-      packagesRoot: await resolveAppCachePath(APP_CACHE_PACKAGES_DIRECTORY_NAME),
+      snapshotsRoot,
       kind: 'project',
       identity: expectedProjectPath,
       generation: fileChangeRevision.value,
@@ -511,12 +507,15 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
     })
     if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
     projectResourcePackages.value = environment.packages ?? new Map()
+    projectResourcePackageFiles.value = environment.packageFiles ?? []
     unreadableProjectResourcePackages.value = environment.unreadablePackages ?? []
     projectResourceEnvironments.value = environment.packageEnvironments ?? new Map()
+    stampPackageUsage(expectedProjectPath, snapshotsRoot)
     return true
   } catch (error) {
     if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
     projectResourcePackages.value = new Map()
+    projectResourcePackageFiles.value = []
     unreadableProjectResourcePackages.value = []
     projectResourceEnvironments.value = new Map()
     reportAppError('OC-E3016', { path: `${expectedProjectPath}/.opencard/packages`, error })
@@ -578,7 +577,6 @@ async function reloadProjectIconRegistry(): Promise<boolean> {
   const path = resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)
   if (!await fileSystemService.fileExists(path)) {
     clearProjectIconRegistry()
-    iconRegistryReady.value = true
     return false
   }
   try {
@@ -589,7 +587,6 @@ async function reloadProjectIconRegistry(): Promise<boolean> {
     projectIconSeries.value = document.iconSeries ?? []
     await syncRegisteredProjectIcons(projectIconSeries.value)
     iconRegistryError.value = null
-    iconRegistryReady.value = true
     return true
   } catch (error) {
     clearProjectIconRegistry()
@@ -1107,6 +1104,22 @@ async function getProjectFontImportConflict(
   )
 }
 
+/** 已盖过使用印记的项目：一个项目每次打开补一次，环境反复重建不重复写。 */
+let stampedPackageUsageFor: string | null = null
+
+/**
+ * 盖"最后用到"印记。缓存淘汰按这个时间排序，而"用到"是这里 —— 加载环境那一次；
+ * 已经解开的包不会再走 unpack，所以印记得由这一次补。写不上只影响淘汰顺序，不阻止缓存使用。
+ */
+function stampPackageUsage(projectRoot: string, snapshotsRoot: string): void {
+  if (stampedPackageUsageFor === projectRoot) return
+  stampedPackageUsageFor = projectRoot
+  const inUse = [...projectResourcePackages.value]
+    .filter(([, entry]) => entry.rootPath)
+    .map(([fingerprint]) => fingerprint)
+  void markResourcePackagesUsed(snapshotsRoot, inUse).catch(() => undefined)
+}
+
 /** 解不开的包：别再排一次队，也别指望它。为什么解不开已经报在发生处了。 */
 const unusableFingerprints = new Set<string>()
 
@@ -1117,9 +1130,9 @@ const unusableFingerprints = new Set<string>()
 function schedulePackageUnpacking(
   archive: ResourcePackageArchive,
   archivePath: string,
-  packagesRoot: string,
+  snapshotsRoot: string,
 ): void {
-  void unpackResourcePackage(archive, archivePath, packagesRoot).then(
+  void unpackResourcePackage(archive, archivePath, snapshotsRoot).then(
     () => reloadProjectResourceEnvironment(),
     (error: unknown) => {
       // 错误对象就在手边，报一次就够；不再往别的地方挂第二份文案。
@@ -1152,13 +1165,6 @@ async function installResourcePackageFile(sourcePath: string, projectRootPath?: 
   if (!projectPath.value || pathIdentity(rootPath) !== pathIdentity(projectPath.value)) return
   await reloadProjectResourceEnvironment()
   await refreshIndexedEntries()
-}
-
-/** 按归档路径找项目里的那个包。文件名不参与身份，所以路径是它在项目里的唯一标识。 */
-function findProjectResourcePackage(archivePath: string): ProjectResourcePackage | null {
-  const identity = pathIdentity(normalizePath(archivePath))
-  return [...projectResourcePackages.value.values()]
-    .find(candidate => pathIdentity(candidate.archivePath) === identity) ?? null
 }
 
 async function createEntryWithAvailableName(
@@ -1220,16 +1226,6 @@ function getRelativeProjectPathIfInside(path: string): string | null {
     : null
 }
 
-function getPathDirname(path: string) {
-  const normalizedPath = normalizePath(path)
-  const lastSlashIndex = normalizedPath.lastIndexOf('/')
-  if (lastSlashIndex === -1) {
-    return ''
-  }
-
-  return normalizedPath.slice(0, lastSlashIndex)
-}
-
 function isSameOrDescendantPath(targetPath: string, ancestorPath: string) {
   const normalizedTargetPath = pathIdentity(targetPath)
   const normalizedAncestorPath = pathIdentity(ancestorPath)
@@ -1282,7 +1278,7 @@ function resolveFileTreeDestination({ key, targetKey, position }: WorkspaceEntry
   if (targetPath) {
     destinationDirectory = position === 'inside'
       ? targetPath
-      : getPathDirname(targetPath) || normalizePath(projectPath.value)
+      : getPathDirectory(targetPath) || normalizePath(projectPath.value)
   }
 
   return {
@@ -1360,7 +1356,7 @@ async function renameEntry(path: string, nextName: string): Promise<RenameEntryR
     return { ok: false, reason: 'invalid-name' }
   }
 
-  const targetDirectory = getPathDirname(sourcePath)
+  const targetDirectory = getPathDirectory(sourcePath)
   const targetPath = `${targetDirectory}/${trimmedName}`
   if (targetPath === sourcePath) {
     return { ok: false, reason: 'same-path' }
@@ -1449,7 +1445,7 @@ function resolveExternalDropDirectory({ targetKey, position }: WorkspaceExternal
   const targetIsDirectory = indexedEntries.value.some(entry =>
     Boolean(entry.isDirectory) && normalizePath(resolveProjectPath(entry.name)) === targetPath)
   if (position === 'inside' && targetIsDirectory) return targetPath
-  return getPathDirname(targetPath) || projectRoot
+  return getPathDirectory(targetPath) || projectRoot
 }
 
 async function copyDirectoryIntoProject(sourceDirectory: string, targetDirectory: string): Promise<void> {
@@ -1514,7 +1510,6 @@ export function useProjectStore() {
     projectPath: readonly(projectPath),
     projectProfile: readonly(projectProfile),
     resolvedProject: readonly(resolvedProject),
-    projectInformation: readonly(resolvedProject),
     profileError: readonly(profileError),
     projectFontFamilies: readonly(projectFontFamilies),
     projectFontCompositions: readonly(projectFontCompositions),
@@ -1524,12 +1519,11 @@ export function useProjectStore() {
     projectFontLoadErrors: readonly(projectFontLoadErrors),
     projectIconSeries: readonly(projectIconSeries),
     iconRegistryError: readonly(iconRegistryError),
-    iconRegistryReady: readonly(iconRegistryReady),
     projectIconCatalog: readonly(projectIconCatalog),
     renderEnvironment,
-    projectIconLoadErrors: readonly(projectIconLoadErrors),
     projectDictionary: readonly(projectDictionary),
     projectResourcePackages: readonly(projectResourcePackages),
+    projectResourcePackageFiles,
     unreadableProjectResourcePackages,
     projectResourceEnvironment,
     resolvedDictionary: readonly(resolvedDictionary),
@@ -1539,7 +1533,6 @@ export function useProjectStore() {
       return projectPath.value.split('/').pop() || ''
     }),
     indexedEntries: readonly(indexedEntries),
-    registeredDirectories: readonly(registeredDirectories),
     expandedDirectories: readonly(expandedDirectories),
     isWatching: readonly(isWatching),
     fileChangeRevision: readonly(fileChangeRevision),
@@ -1573,7 +1566,6 @@ export function useProjectStore() {
     importProjectFontFiles,
     getProjectFontImportConflict,
     installResourcePackageFile,
-    findProjectResourcePackage,
     createEntryWithAvailableName,
     trashFile,
     revealEntryInFileManager,

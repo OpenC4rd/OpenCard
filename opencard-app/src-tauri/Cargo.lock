@@ -27,7 +27,6 @@ dependencies = [
  "tokio",
  "trash",
  "unicode-normalization",
- "uuid",
  "windows-sys 0.59.0",
  "zip",
 ]

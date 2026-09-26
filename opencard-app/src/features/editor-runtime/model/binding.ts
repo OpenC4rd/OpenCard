@@ -8,7 +8,3 @@ export function isBindingCompatible(target: BindingValueKind, source: BindingVal
 export function isBindingExpression(value: unknown): value is string {
   return typeof value === 'string' && /^\s*\{\{\s*[^{}]+?\s*\}\}\s*$/.test(value)
 }
-
-export function createBindingExpression(token: string): string {
-  return `{{${token.trim()}}}`
-}

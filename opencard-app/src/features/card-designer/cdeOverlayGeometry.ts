@@ -1,4 +1,5 @@
 import type { ViewportInsets } from '../../shared/ui/viewport/viewportNavigation'
+import { clamp } from '../../shared/model/number'
 
 export type CdeOverlayGeometryConfig = Readonly<{
   collapsedExtent: number
@@ -97,8 +98,4 @@ function assertGeometryConfig(config: CdeOverlayGeometryConfig): void {
   if (config.expandDragThreshold < 0 || config.collapseDragThreshold < 0 || config.floatingGap < 0) {
     throw new RangeError('CDE overlay thresholds are invalid')
   }
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
 }

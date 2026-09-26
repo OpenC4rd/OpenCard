@@ -5,7 +5,7 @@
  * - 不决定包属于哪个项目，不删任何文件，不写项目里的东西。
  *
  * 项目里的 `.opencard/packages/` 只放归档文件；解开的文件住在软件存储的
- * `cache/packages/<指纹>/` 里，所有项目共用。所以"读"只随机访问归档里两个小条目，**不解开**；
+ * `cache/snapshots/<指纹>/` 里，所有项目共用。所以"读"只随机访问归档里两个小条目，**不解开**；
  * "解开"才真正落盘，而且解到哪个目录完全由内容指纹决定 —— 与文件名、与哪个项目都无关。
  *
  * 缓存根由调用方传入：布局只有一个出口（shared/storage/appStoragePaths），这里不拼路径。
@@ -66,20 +66,42 @@ const unpacking = new Map<string, Promise<string>>()
 export function unpackResourcePackage(
   archive: ResourcePackageArchive,
   sourcePath: string,
-  packagesRoot: string,
+  snapshotsRoot: string,
 ): Promise<string> {
   const pending = unpacking.get(archive.fingerprint)
   if (pending) return pending
   const started = invoke<{ rootPath: string }>('unpack_resource_package', {
-    request: { sourcePath, fingerprint: archive.fingerprint, packagesRoot },
+    request: { sourcePath, fingerprint: archive.fingerprint, snapshotsRoot },
   }).then(result => result.rootPath)
   unpacking.set(archive.fingerprint, started)
   return started.finally(() => unpacking.delete(archive.fingerprint))
 }
 
-/** 清掉中断留下的半个解压目录，并把缓存降回大小上限以内。 */
-export async function recoverResourcePackageCache(packagesRoot: string): Promise<void> {
-  await invoke('recover_resource_package_cache', { packagesRoot })
+/** 清掉中断留下的半个解压目录，并把缓存降回上限以内；上限由调用方按设置给出。 */
+export async function recoverResourcePackageCache(snapshotsRoot: string, maxBytes: number): Promise<void> {
+  await invoke('recover_resource_package_cache', { snapshotsRoot, maxBytes })
+}
+
+/**
+ * 读封面那一个条目，返回可直接给 `<img>` 用的 blob 地址；没有封面返回空串。
+ * 详情视图展示的是这个文件自己的内容，所以既不查项目包表、也不解开它。
+ * 类型由调用方给（封面文件自己的扩展名）：归档里取出的字节没有路径可依，SVG 尤其需要它。
+ */
+export async function readResourcePackageCover(sourcePath: string, type = ''): Promise<string> {
+  const bytes = await invoke<ArrayBuffer>('read_resource_package_cover', { request: { sourcePath } })
+  return bytes && bytes.byteLength > 0 ? URL.createObjectURL(new Blob([bytes], { type })) : ''
+}
+
+/**
+ * 盖"最后用到"印记：淘汰按这个时间排序，而"用到"是项目加载环境那一次 —— 已经解开的包
+ * 不会再走 unpack，所以印记得在这里补。没有指纹就什么都不做；写不上只影响淘汰顺序。
+ */
+export async function markResourcePackagesUsed(
+  snapshotsRoot: string,
+  fingerprints: readonly string[],
+): Promise<void> {
+  if (fingerprints.length === 0) return
+  await invoke('mark_resource_packages_used', { snapshotsRoot, fingerprints })
 }
 
 /**

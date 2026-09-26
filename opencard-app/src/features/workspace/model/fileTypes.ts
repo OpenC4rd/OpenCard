@@ -26,12 +26,6 @@ export interface FileTypeDefinition {
   language?: string
   editorId: string
   previewable?: boolean
-  projectTreePriority?: number
-}
-
-export interface ProjectTreeFilePresentation {
-  annotationKey: string
-  priority: number
 }
 
 export interface EntryIconPresentation {
@@ -83,7 +77,6 @@ const fileTypes: FileTypeDefinition[] = [
     language: 'json',
     editorId: 'project-config',
     previewable: true,
-    projectTreePriority: 0,
   },
   {
     id: 'opencard-font-registry',
@@ -94,7 +87,6 @@ const fileTypes: FileTypeDefinition[] = [
     language: 'json',
     editorId: 'font-registry',
     previewable: true,
-    projectTreePriority: 1,
   },
   {
     id: 'opencard-icon-registry',
@@ -105,7 +97,6 @@ const fileTypes: FileTypeDefinition[] = [
     language: 'json',
     editorId: 'icon-registry',
     previewable: true,
-    projectTreePriority: 2,
   },
   {
     id: 'opencard-dictionary',
@@ -116,7 +107,6 @@ const fileTypes: FileTypeDefinition[] = [
     language: 'json',
     editorId: 'dictionary',
     previewable: true,
-    projectTreePriority: 3,
   },
   {
     id: 'opencard-resource-package',
@@ -347,16 +337,6 @@ export function resolveFileTypeById(fileTypeId: string | null | undefined): File
 
   const fileType = fileTypes.find((definition) => definition.id === fileTypeId)
   return fileType ?? defaultFileType
-}
-
-export function resolveProjectTreeFilePresentation(
-  path: string,
-  projectRoot: string,
-): ProjectTreeFilePresentation | null {
-  const fileType = resolveFileType(path, projectRoot)
-  return fileType.projectTreePriority === undefined
-    ? null
-    : { annotationKey: fileType.labelKey, priority: fileType.projectTreePriority }
 }
 
 export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryIconPresentation {

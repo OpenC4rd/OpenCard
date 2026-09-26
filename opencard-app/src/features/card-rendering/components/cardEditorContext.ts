@@ -2,7 +2,6 @@ import { inject, type ComputedRef, type InjectionKey } from 'vue'
 import type { CardResourceResolver } from '../cardRenderResources'
 import type { CardFaceKey } from '../../../entities/card/model'
 import type { ProjectInformation } from '../../workspace/model/projectMetadata'
-import type { CardRenderDiagnosticRegistry } from '../cardRenderDiagnosticRegistry'
 import type { PreparedRichTextCatalog } from '../prepareRichText'
 import type { CardVisualReadinessRegistrar } from './cardRenderReadiness'
 
@@ -16,7 +15,6 @@ export interface CardEditorContext {
   faceKey: CardFaceKey
   bindingProject?: ComputedRef<Readonly<ProjectInformation> | null | undefined>
   bindingDictionary?: ComputedRef<Readonly<Record<string, string>> | null | undefined>
-  diagnostics: CardRenderDiagnosticRegistry
 }
 
 export const cardEditorContextKey: InjectionKey<CardEditorContext> = Symbol('card-editor-context')

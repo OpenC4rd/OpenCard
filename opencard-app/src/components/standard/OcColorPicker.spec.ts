@@ -187,4 +187,35 @@ describe('OcColorPicker', () => {
     expect(updates[updates.length - 1]).toEqual(['#FF223340'])
     wrapper.unmount()
   })
+
+  it('keeps the field variant labelled, alpha-limited and disabled-aware', async () => {
+    const wrapper = mount(OcColorPicker, {
+      props: { modelValue: '#112233', variant: 'field', label: 'Border color', allowAlpha: false },
+    })
+
+    expect(wrapper.get('.oc-color-picker__field-trigger').attributes('aria-label')).toBe('Border color')
+    const input = wrapper.get('.oc-color-picker__field-input')
+    expect(input.attributes('aria-label')).toBe('Border color')
+    expect(input.attributes('maxlength')).toBe('7')
+
+    const disabled = mount(OcColorPicker, {
+      props: { modelValue: '#112233', variant: 'field', disabled: true },
+      attachTo: document.body,
+    })
+    expect(disabled.get('.oc-color-picker__field-trigger').attributes('disabled')).toBeDefined()
+    disabled.get('.oc-color-picker__field-trigger').element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await disabled.vm.$nextTick()
+    expect(document.body.querySelector('.oc-color-picker__panel')).toBeNull()
+    disabled.unmount()
+  })
+
+  it('follows an external model change in the field variant', async () => {
+    const wrapper = mount(OcColorPicker, {
+      props: { modelValue: '#112233', variant: 'field' },
+    })
+
+    await wrapper.setProps({ modelValue: '#445566' })
+
+    expect((wrapper.get('.oc-color-picker__field-input').element as HTMLInputElement).value).toBe('#445566')
+  })
 })

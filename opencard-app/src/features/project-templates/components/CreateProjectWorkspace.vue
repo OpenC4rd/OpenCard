@@ -199,7 +199,7 @@ defineOptions({ name: 'CreateProjectWorkspace' })
 
 const props = withDefaults(defineProps<{
   selectedKey: ProjectTemplateKey | null
-  /** 创建后要装入新项目的附加包，由外壳从软件存储解析。 */
+  /** 创建后要装入新项目的包，由外壳从软件存储解析。 */
   attachedResourcePackages?: readonly StoredResourcePackage[]
   externalBusy?: boolean
 }>(), {

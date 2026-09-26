@@ -114,45 +114,6 @@ export async function submitFeedback(
   }
 }
 
-export async function getFeedbackStatus(
-  reportId: string,
-  receiptToken: string,
-  options: GetFeedbackStatusOptions = {},
-): Promise<FeedbackStatusResult> {
-  const endpoint = options.endpoint ?? getFeedbackEndpoint()
-  if (!isFeedbackServiceConfigured(endpoint)) {
-    throw new FeedbackServiceError('unavailable', 'feedback service is not configured')
-  }
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-
-  try {
-    const response = await (options.fetch ?? fetch)(feedbackStatusEndpoint(endpoint as string, reportId), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${receiptToken}`,
-      },
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      throw new FeedbackServiceError('rejected', `feedback service rejected the request (${response.status})`)
-    }
-
-    const result = parseStatusResult(await response.json())
-    if (result.reportId !== reportId) {
-      throw new FeedbackServiceError('rejected', 'feedback service returned an invalid response')
-    }
-    return result
-  } catch (error) {
-    if (error instanceof FeedbackServiceError) throw error
-    throw new FeedbackServiceError('network', 'feedback service could not be reached', error)
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
 export async function getFeedbackStatuses(
   receipts: FeedbackReceiptCredential[],
   options: GetFeedbackStatusOptions = {},
@@ -194,12 +155,6 @@ export async function getFeedbackStatuses(
   } finally {
     clearTimeout(timeout)
   }
-}
-
-function feedbackStatusEndpoint(endpoint: string, reportId: string): string {
-  const url = new URL(endpoint)
-  url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(reportId)}`
-  return url.toString()
 }
 
 function feedbackBatchEndpoint(endpoint: string): string {

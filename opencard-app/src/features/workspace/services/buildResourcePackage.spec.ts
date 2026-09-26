@@ -30,7 +30,7 @@ class MemoryFileSystem implements Pick<FileSystemService,
 }
 
 /** 装着 alice/support 的那个包解开在哪。包在项目外面，所以只有环境知道这个位置。 */
-const SUPPORT_ROOT = '/cache/packages/aa11'
+const SUPPORT_ROOT = '/cache/snapshots/aa11'
 const packageRoots = new Map([['alice/support@1.2.0', SUPPORT_ROOT]])
 
 const IDENTITY = { author: 'alice', name: 'theme', version: '1.0.0', title: 'Theme' }

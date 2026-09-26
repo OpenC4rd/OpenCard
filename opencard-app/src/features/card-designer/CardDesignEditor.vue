@@ -63,7 +63,6 @@
                   @face-dimension-change="handleFaceDimensionChange"
                   @viewport-transform-change="handleViewportTransformChange"
                   @viewport-size-change="handleViewportSizeChange"
-                  @runtime-issues-change="handleRuntimeRenderIssuesChange"
                   @render-readiness-change="handleRenderReadinessChange">
                   <template #info>
                     <section class="card-design-editor__card-info" :aria-label="t('cardDesigner.info.title')">
@@ -1326,16 +1325,6 @@ const renderTargetInstance = computed(() => (
 const renderEnvironment = computed(() => ({
   ...projectStore.renderEnvironment.value,
 }))
-const runtimeRenderIssues = ref<readonly import('../card-rendering/cardPipelineIssue').CardPipelineIssue[]>([])
-function handleRuntimeRenderIssuesChange(
-  issues: readonly import('../card-rendering/cardPipelineIssue').CardPipelineIssue[],
-): void {
-  if (
-    runtimeRenderIssues.value.length === issues.length
-    && runtimeRenderIssues.value.every((issue, index) => issue.id === issues[index]?.id)
-  ) return
-  runtimeRenderIssues.value = issues
-}
 const renderResourceRootPath = computed(() => props.resourceRootPath ?? null)
 const renderSourceFilePath = computed(() => props.filePath?.startsWith('draft://') ? null : props.filePath ?? null)
 const {
@@ -1627,7 +1616,7 @@ const {
 const propertyFieldWarnings = computed<ReadonlyMap<string, string>>(() => {
   const warnings = new Map<string, string>()
   const message = t('propertyEditor.currentValueRenderWarning')
-  for (const issue of [...(renderPipelineResult.value?.issues ?? []), ...runtimeRenderIssues.value]) {
+  for (const issue of renderPipelineResult.value?.issues ?? []) {
     const inputIds = new Set([issue.location.owner.id, issue.location.blockId].filter((id): id is string => Boolean(id)))
     for (const inputId of inputIds) warnings.set(`${inputId}\u0000${issue.location.fieldKey}`, message)
   }
@@ -1638,7 +1627,7 @@ const editorIssueSnapshot = computed(() => createCardDesignerIssueSnapshot({
   instance: renderTargetInstance.value,
   result: renderPipelineResult.value ? {
     ...renderPipelineResult.value,
-    issues: [...renderPipelineResult.value.issues, ...runtimeRenderIssues.value],
+    issues: renderPipelineResult.value.issues,
   } : null,
   translate: (key, parameters) => t(key, parameters ?? {}),
   resolveFieldLabel: (fieldKey) => {

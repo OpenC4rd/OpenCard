@@ -1,7 +1,7 @@
 <!-- Base 条目栏：icon + title + append 的水平结构行。 -->
 
 <template>
-  <div class="oc-bar" :class="{ 'oc-bar--has-hover-append': hasHoverAppend }" v-bind="$attrs">
+  <div class="oc-bar" v-bind="$attrs">
     <div class="oc-bar__leading">
       <div v-if="hasIcon" class="oc-bar__icon">
         <slot name="icon">
@@ -11,20 +11,15 @@
 
       <div v-if="hasTitle" class="oc-bar__title">
         <slot name="title">
-          <OcText :truncate="truncate">
+          <OcText truncate>
             {{ title }}
           </OcText>
         </slot>
       </div>
     </div>
 
-    <div v-if="hasAppend" class="oc-bar__append">
-      <div v-if="$slots.append" class="oc-bar__append-default">
-        <slot name="append" />
-      </div>
-      <div v-if="hasHoverAppend" class="oc-bar__append-hover">
-        <slot name="append-hover" />
-      </div>
+    <div v-if="$slots.append" class="oc-bar__append">
+      <slot name="append" />
     </div>
   </div>
 </template>
@@ -38,26 +33,20 @@ import OcText from '../base/OcText.vue'
 interface Props {
   icon?: IconToken
   title?: string
-  truncate?: boolean
 }
 
 defineOptions({ name: 'OcBar', inheritAttrs: false })
 
-const props = withDefaults(defineProps<Props>(), {
-  truncate: true,
-})
+const props = defineProps<Props>()
 
 const slots = defineSlots<{
   icon?: () => any
   title?: () => any
   append?: () => any
-  'append-hover'?: () => any
 }>()
 
 const hasIcon = computed(() => Boolean(props.icon) || Boolean(slots.icon))
 const hasTitle = computed(() => Boolean(props.title) || Boolean(slots.title))
-const hasHoverAppend = computed(() => Boolean(slots['append-hover']))
-const hasAppend = computed(() => Boolean(slots.append) || hasHoverAppend.value)
 </script>
 
 <style scoped>
@@ -101,34 +90,6 @@ const hasAppend = computed(() => Boolean(slots.append) || hasHoverAppend.value)
   justify-content: flex-end;
   gap: var(--oc-space-2);
   flex: 0 0 auto;
-}
-
-.oc-bar__append-default,
-.oc-bar__append-hover {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--oc-space-2);
-}
-
-.oc-bar--has-hover-append .oc-bar__append-hover {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
-}
-
-.oc-bar--has-hover-append:hover .oc-bar__append-default,
-.oc-bar--has-hover-append:focus-within .oc-bar__append-default {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
-}
-
-.oc-bar--has-hover-append:hover .oc-bar__append-hover,
-.oc-bar--has-hover-append:focus-within .oc-bar__append-hover {
-  opacity: 1;
-  pointer-events: auto;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
 }
 
 .oc-bar:focus-visible {

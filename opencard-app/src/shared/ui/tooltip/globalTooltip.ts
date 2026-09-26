@@ -5,6 +5,8 @@ const TOOLTIP_SELECTOR = '[data-tooltip]';
 const TOOLTIP_LAYER_ID = 'oc-tooltip-layer';
 const TOOLTIP_GAP = 10;
 const TOOLTIP_EDGE_PADDING = 8;
+/** 盒子比裁剪它的祖先宽出这么多像素才算被切掉，避免边框与取整在这儿误判。 */
+const TOOLTIP_CLIP_TOLERANCE = 1;
 const TOOLTIP_POINTER_DELAY_MS = 350;
 /**
  * How long one group stays warm after its last tooltip was shown. Inside that window the next
@@ -51,12 +53,26 @@ type TooltipBox = Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>;
 type TooltipSize = Pick<DOMRect, 'width' | 'height'>;
 type TooltipAnchor = { left: number; top: number };
 
-function getTooltipTarget(target: EventTarget | null): HTMLElement | null {
+/**
+ * 一次命中调查的结果。最里面声明提示的那个元素优先，但"文字其实放得下"的那个是透明的：
+ * 它不该挡住外面那层的提示；而它也确实声明过提示，所以还得告诉调用方"这段文字不需要提示"，
+ * 好把已经亮着的收起来 —— 与从未声明提示的普通元素区别开。
+ */
+type TooltipHit = { target: HTMLElement | null; declared: boolean };
+
+function resolveTooltipHit(target: EventTarget | null): TooltipHit {
   if (!(target instanceof Element)) {
-    return null;
+    return { target: null, declared: false };
   }
 
-  return target.closest<HTMLElement>(TOOLTIP_SELECTOR);
+  let candidate = target.closest<HTMLElement>(TOOLTIP_SELECTOR);
+  const declared = candidate !== null;
+  while (candidate) {
+    if (getTooltipText(candidate)) return { target: candidate, declared };
+    candidate = candidate.parentElement?.closest<HTMLElement>(TOOLTIP_SELECTOR) ?? null;
+  }
+
+  return { target: null, declared };
 }
 
 function isTooltipPlacement(value: string | null | undefined): value is TooltipPlacement {
@@ -111,8 +127,31 @@ function clampToViewport(value: number, size: number, viewportSize: number): num
   );
 }
 
+/**
+ * 文字是不是真的被切掉了。自己滚不下是最常见的一种；省略号也可以做在容器上
+ * （行标题、菜单项、下拉值），这时文字自己的盒子一个像素都没超出，得看它有没有
+ * 探出最近一个会裁剪的祖先 —— 拿第一个 overflow 不是 visible 的祖先当裁剪盒。
+ */
+function isTextClipped(target: HTMLElement): boolean {
+  if (target.scrollWidth > target.clientWidth) return true;
+
+  const box = target.getBoundingClientRect();
+  let ancestor: HTMLElement | null = target.parentElement;
+  while (ancestor) {
+    const style = getComputedStyle(ancestor);
+    if (style.overflowX !== 'visible' || style.overflowY !== 'visible') {
+      const clip = ancestor.getBoundingClientRect();
+      return box.right > clip.right + TOOLTIP_CLIP_TOLERANCE
+        || box.left < clip.left - TOOLTIP_CLIP_TOLERANCE;
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  return false;
+}
+
 function getTooltipText(target: HTMLElement): string {
-  if (target.hasAttribute('data-tooltip-overflow') && target.scrollWidth <= target.clientWidth) return '';
+  if (target.hasAttribute('data-tooltip-overflow') && !isTextClipped(target)) return '';
   return target.getAttribute('data-tooltip')?.trim() ?? '';
 }
 
@@ -275,10 +314,14 @@ export function setupGlobalTooltip(): void {
   document.addEventListener(
     'mouseover',
     (event) => {
-      const target = getTooltipTarget(event.target);
-      if (target) {
-        scheduleTooltip(target);
+      const hit = resolveTooltipHit(event.target);
+      if (hit.target) {
+        scheduleTooltip(hit.target);
+        return;
       }
+      // 声明了提示但这段文字放得下：把它当作"这里没有提示"，收起已经亮着的那个。
+      // 完全没声明提示的普通元素不在此列 —— 那由 mouseout 负责，免得打断同一组的连续提示。
+      if (hit.declared) dismissTooltip();
     },
     true
   );
@@ -324,10 +367,12 @@ export function setupGlobalTooltip(): void {
   document.addEventListener(
     'focusin',
     (event) => {
-      const target = getTooltipTarget(event.target);
-      if (target) {
-        showTooltip(target, false);
+      const hit = resolveTooltipHit(event.target);
+      if (hit.target) {
+        showTooltip(hit.target, false);
+        return;
       }
+      if (hit.declared) dismissTooltip();
     },
     true
   );

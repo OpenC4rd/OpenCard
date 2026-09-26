@@ -226,7 +226,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { openContextMenu } = useFloatingMenu()
+const { openContextMenu, openKeyboardContextMenu } = useFloatingMenu()
 const fieldEditorModes = usePropertyFieldEditorModes()
 const rootRef = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
@@ -495,17 +495,6 @@ function fieldCommands(field: CdeDataTableFieldRow): OcActionMenuEntry[] {
       deleteFieldAction(),
     ] : []),
   ]
-}
-
-function openKeyboardContextMenu(
-  event: KeyboardEvent,
-  items: readonly OcActionMenuEntry[],
-  onSelect: (key: string) => void,
-): void {
-  if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
-  if (items.length === 0 || !(event.currentTarget instanceof HTMLElement)) return
-  event.preventDefault()
-  openContextMenu({ anchor: event.currentTarget, items, onSelect })
 }
 
 function openColumnContextMenu(event: MouseEvent, column: CdeDataTableColumn): void {

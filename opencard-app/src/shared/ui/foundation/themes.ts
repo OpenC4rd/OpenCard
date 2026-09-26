@@ -96,6 +96,7 @@ export const OC_SHARED_THEME_TOKENS = {
   '--oc-cover-banner-height': '180px',
   '--oc-album-card-min-width': '168px',
   '--oc-album-card-aspect-ratio': '1 / 1.4142',
+  '--oc-album-cover-zoom': '1.05',
   '--oc-welcome-cover-tile-width': '168px',
   '--oc-welcome-cover-tile-aspect-ratio': '1 / 1.4142',
   '--oc-welcome-cover-tile-gap': '16px',

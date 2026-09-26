@@ -20,6 +20,7 @@
     class="oc-visual oc-visual--image"
     :src="visual.src"
     :alt="visual.label ?? label"
+    draggable="false"
     @error="emit('image-error')"
   />
 </template>

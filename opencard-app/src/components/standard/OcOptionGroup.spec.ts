@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { h } from 'vue'
+import { h, nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 import OcOptionGroup from './OcOptionGroup.vue'
 
@@ -47,6 +47,12 @@ describe('OcOptionGroup', () => {
     expect(radios.map((radio) => radio.attributes('tabindex'))).toEqual(['-1', '0', '-1', '-1'])
     expect(radios[1].attributes('aria-checked')).toBe('true')
     expect(radios.every(radio => radio.attributes('data-tooltip') == null)).toBe(true)
+    // 按钮上的文字自己带全文提示：真的放不下才出现（data-tooltip-overflow 由全局提示判定）。
+    const labels = wrapper.findAll('.oc-button__label')
+    await nextTick()
+    expect(labels.map(label => label.attributes('data-tooltip')))
+      .toEqual(['Left', 'Center', 'Right', 'Bottom left'])
+    expect(labels.every(label => label.attributes('data-tooltip-overflow') != null)).toBe(true)
 
     await radios[1].trigger('keydown', { key: 'ArrowDown' })
     expect(wrapper.emitted('update:modelValue')).toEqual([['left']])

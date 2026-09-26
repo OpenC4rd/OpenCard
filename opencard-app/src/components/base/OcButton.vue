@@ -18,7 +18,13 @@
         :size="resolvedIconSize"
       />
       <slot name="icon" />
-      <span v-if="!isIconOnly" class="oc-button__label">
+      <span
+        v-if="!isIconOnly"
+        ref="labelElement"
+        class="oc-button__label"
+        :data-tooltip="labelText || undefined"
+        data-tooltip-overflow
+      >
         <slot />
       </span>
       <OcIcon
@@ -33,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useAttrs, useSlots } from 'vue'
+import { computed, onMounted, onUpdated, ref, useAttrs, useSlots } from 'vue'
 import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
 import OcIcon, { type OcIconSize } from './OcIcon.vue'
 
@@ -131,6 +137,21 @@ const forwardedAttrs = computed(() => {
 
 const hasDefaultSlot = computed(() => Boolean(slots.default?.().length))
 const isIconOnly = computed(() => props.iconOnly || (!hasDefaultSlot.value && Boolean(props.icon)))
+
+/**
+ * 省略号盖掉的是文字全文，所以提示的全文就是这里渲染出来的字 —— 自己读一遍 DOM，
+ * 调用方不必再把同一段文字抄进一个 prop（OcText 的 `truncate` 是同一套做法）。
+ * 只在真的放不下时才提示：放得下时这段文字不打扰，外面那层的提示也不会被它挡住。
+ */
+const labelElement = ref<HTMLElement | null>(null)
+const labelText = ref('')
+
+function captureLabelText(): void {
+  labelText.value = labelElement.value?.textContent?.trim() ?? ''
+}
+
+onMounted(captureLabelText)
+onUpdated(captureLabelText)
 
 const resolvedIconSize = computed<OcIconSize>(() => {
   if (props.iconSize) return props.iconSize

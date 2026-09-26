@@ -207,13 +207,13 @@ describe('cardRenderResources', () => {
   it('resolves a package path through the host environment and a project path through the # anchor', () => {
     const packageEnvironment: ProjectResourceEnvironment = {
       kind: 'package', namespace: 'package-alice-theme-1.0.0',
-      rootPath: '/cache/packages/aa11',
+      rootPath: '/cache/snapshots/aa11',
       fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
     const hostEnvironment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project', rootPath: 'D:/Cards',
       fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-      packages: new Map([['alice/theme@1.0.0', packageEntry({ author: 'alice', name: 'theme', version: '1.0.0' }, '/cache/packages/aa11')]]),
+      packages: new Map([['alice/theme@1.0.0', packageEntry({ author: 'alice', name: 'theme', version: '1.0.0' }, '/cache/snapshots/aa11')]]),
     }
     const projectContext = createCardRenderResourceContext({
       resourceRootPath: 'D:/Cards',
@@ -221,7 +221,7 @@ describe('cardRenderResources', () => {
       hostEnvironment,
     })
     expect(resolveCardResource({ value: 'alice/theme@1.0.0#images/frame.png', expect: 'asset' }, projectContext))
-      .toEqual({ kind: 'url', src: 'asset:///cache/packages/aa11/images/frame.png' })
+      .toEqual({ kind: 'url', src: 'asset:///cache/snapshots/aa11/images/frame.png' })
 
     // 包里的文件属于包的作用域；要拿项目里的东西就用 `#` 锚点走出去。
     const packageContext = createCardRenderResourceContext({
@@ -230,7 +230,7 @@ describe('cardRenderResources', () => {
       hostEnvironment: packageEnvironment,
     })
     expect(resolveCardResource({ value: 'images/frame.png', expect: 'asset' }, packageContext))
-      .toEqual({ kind: 'url', src: 'asset:///cache/packages/aa11/images/frame.png' })
+      .toEqual({ kind: 'url', src: 'asset:///cache/snapshots/aa11/images/frame.png' })
     expect(resolveCardResource({ value: '#images/logo.png', expect: 'asset' }, packageContext))
       .toEqual({ kind: 'url', src: 'asset://D:/Cards/images/logo.png' })
   })

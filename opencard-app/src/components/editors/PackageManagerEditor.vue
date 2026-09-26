@@ -4,13 +4,14 @@
       {{ t('packageManager.empty') }}
     </OcEmpty>
     <div v-else class="package-manager-editor__view">
-      <!-- 相册卡片：封面由 OcAlbum 用 OcCover 画出来，动作就是节点尾部那两条命令。 -->
+      <!-- 相册卡片：封面由 OcAlbum 用 OcCover 画出来，动作都挂在节点尾部。 -->
       <OcAlbum
         fill
         :data="treeData"
         :aria-label="t('packageManager.title')"
         selection-mode="none"
-        activation-mode="none"
+        activation-mode="single-click"
+        @node-activate="handleNodeActivate"
         @action="handleNodeAction"
       />
     </div>
@@ -22,7 +23,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
-import type { OcNode, OcNodeActionEvent, OcNodeCollection } from '../../shared/ui/node/node.types'
+import type { OcNode, OcNodeAction, OcNodeActionEvent, OcNodeActivateEvent, OcNodeCollection } from '../../shared/ui/node/node.types'
 import { formatPackageCoordinate } from '../../features/workspace/model/packageCoordinate'
 import { getPathBasename } from '../../shared/model/filePath'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
@@ -36,54 +37,74 @@ const { t } = useI18n()
 const projectStore = useProjectStore()
 
 const REVEAL_ACTION_KEY = 'package-manager.reveal'
-const COPY_ACTION_KEY = 'package-manager.copy-coordinate'
+const REMOVE_ACTION_KEY = 'package-manager.remove'
+const CONFIRM_REMOVE_ACTION_KEY = 'package-manager.confirm-remove'
+
+const REVEAL_ACTION: OcNodeAction = {
+  key: REVEAL_ACTION_KEY,
+  title: t('packageManager.reveal'),
+  icon: 'status.folder-open',
+}
 
 /**
- * 这一页只说两件事："项目里有哪些包"，以及"它们各自现在是什么状态"。
+ * 移除包 = 把这个归档移到回收站。破坏性动作两步走：先点删除，菜单里再确认一次 ——
+ * 和文件树里删一个文件是同一套，确认那一项的标题带上文件名。
+ */
+function removeAction(name: string): OcNodeAction {
+  return {
+    key: REMOVE_ACTION_KEY,
+    title: t('packageManager.remove'),
+    icon: 'action.delete',
+    children: [{
+      key: CONFIRM_REMOVE_ACTION_KEY,
+      title: t('packageManager.confirmRemove', { name }),
+      icon: 'action.delete',
+      iconTone: 'danger',
+    }],
+  }
+}
+
+/**
+ * 这一页就是侧栏那个包文件夹的相册版：标题是文件名，小字是包自述的坐标 —— 和侧栏里那一行字字相同。
+ * 相册只多做一件事：把包内的封面画在卡片上。
  *
- * 状态不是另做一次校验得出的：发现阶段读每个归档本来就是为了知道它是谁，所以
- * "解开了没有"就是缓存里有没有那个指纹目录，"读不出来"就是那一次读取的结果。页面只负责显示。
+ * 文件是唯一的事实：有几份归档就有几张卡，内容相同的两份也各占一张，读不出身份的也照样列出来。
+ * 至于"解开了没有"，看封面有没有画出来就够了。
  */
 const treeData = computed<OcNodeCollection>(() => {
+  const catalog = projectStore.projectResourcePackages.value
+  const files = [...projectStore.projectResourcePackageFiles.value].sort((left, right) => (
+    getPathBasename(left.archivePath).localeCompare(getPathBasename(right.archivePath))
+  ))
+
   const items = new Map<string, OcNode>()
-  for (const pkg of [...projectStore.projectResourcePackages.value.values()]
-    .sort((left, right) => left.manifest.title.localeCompare(right.manifest.title))) {
-    const coordinate = formatPackageCoordinate(pkg.coordinate)
-    items.set(pkg.archivePath, {
-      label: pkg.manifest.title,
-      visual: { type: 'icon', icon: 'file.package', iconTone: pkg.rootPath ? 'success' : 'warning' },
-      // 封面是包解开之后的资源：没解开的包没有封面，媒体区留空 —— 这本身就是状态。
-      ...(pkg.cover ? { cover: { type: 'image' as const, src: pkg.cover.src, label: `${coordinate} ${t('packageManifest.coverAlt')}` } } : {}),
-      tail: [
-        coordinate,
-        // 状态是文字而不是只靠配色：一眼就能扫出哪些解开了、哪些还没有。
-        pkg.rootPath ? t('packageManager.unpacked') : t('packageManager.unpacking'),
-        ROW_ACTIONS.copy,
-        ROW_ACTIONS.reveal,
-      ],
+  for (const file of files) {
+    const title = getPathBasename(file.archivePath)
+    const pkg = catalog.get(file.fingerprint)
+    const coordinate = pkg ? formatPackageCoordinate(pkg.coordinate) : ''
+    items.set(file.archivePath, {
+      label: title,
+      visual: { type: 'icon', icon: 'file.package', iconTone: 'opencard' },
+      // 封面是包解开之后的资源：没解开的包没有封面，媒体区留空。
+      ...(pkg?.cover ? { cover: { type: 'image' as const, src: pkg.cover.src, label: `${coordinate || title} ${t('packageManifest.coverAlt')}` } } : {}),
+      tail: [...(coordinate ? [coordinate] : []), REVEAL_ACTION, removeAction(title)],
     })
   }
   for (const broken of projectStore.unreadableProjectResourcePackages.value) {
+    const title = getPathBasename(broken.archivePath)
     items.set(broken.archivePath, {
-      label: getPathBasename(broken.archivePath),
+      label: title,
       visual: { type: 'icon', icon: 'file.package', iconTone: 'danger' },
-      tail: [t('packageManager.unreadable'), broken.reason, ROW_ACTIONS.reveal],
+      // 读不出来的归档更要能从这里清掉：它当不了包，留在文件夹里只会每次打开都报一遍。
+      tail: [t('packageManager.unreadable'), broken.reason, REVEAL_ACTION, removeAction(title)],
     })
   }
   return { rootKeys: [...items.keys()], items, children: new Map() }
 })
 
-const ROW_ACTIONS = {
-  reveal: {
-    key: REVEAL_ACTION_KEY,
-    title: t('packageManager.reveal'),
-    icon: 'status.folder-open' as const,
-  },
-  copy: {
-    key: COPY_ACTION_KEY,
-    title: t('packageManager.copyCoordinate'),
-    icon: 'action.copy' as const,
-  },
+/** 点卡片就是打开那个归档：详情由包清单编辑器给出，和从文件树打开同一个文件是同一条路。 */
+function handleNodeActivate(event: OcNodeActivateEvent): void {
+  emit('open-file', event.key)
 }
 
 function handleNodeAction(event: OcNodeActionEvent): void {
@@ -91,11 +112,8 @@ function handleNodeAction(event: OcNodeActionEvent): void {
     void projectStore.revealEntryInFileManager(event.key)
     return
   }
-  if (event.actionKey === COPY_ACTION_KEY) {
-    const coordinate = treeData.value.items.get(event.key)?.tail
-    const text = Array.isArray(coordinate) ? coordinate.find(part => typeof part === 'string') : coordinate
-    if (typeof text === 'string') void navigator.clipboard.writeText(text)
-  }
+  // 移文件的事归壳层：它顺手管好开着的标签页，也顺手让这一页少一张卡。
+  if (event.actionKey === CONFIRM_REMOVE_ACTION_KEY) emit('trash-file', event.key)
 }
 
 const presentation = computed<EditorPresentation>(() => ({

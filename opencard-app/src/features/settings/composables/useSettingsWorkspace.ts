@@ -3,6 +3,7 @@ import { computed, type ComputedRef, type DeepReadonly, type Ref } from 'vue'
 import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
 import type { IconToken } from '../../../shared/ui/icon/iconRegistry'
 import type { OcNodeCollection } from '../../../shared/ui/node/node.types'
+import { CACHE_GIB_BYTES, formatCacheUsage, type AppCacheUsage } from '../../../shared/storage/appCache'
 import type {
   EditorItem,
   EditorItemEditorPart,
@@ -17,9 +18,11 @@ import {
 import {
   APP_THEME_PRESETS,
   MAX_AUTO_SAVE_INTERVAL_SECONDS,
+  MAX_CACHE_LIMIT_GB,
   MAX_PHASE_IMAGE_SPEED,
   MAX_TITLE_BAR_NOTICE_HISTORY_LIMIT,
   MIN_AUTO_SAVE_INTERVAL_SECONDS,
+  MIN_CACHE_LIMIT_GB,
   MIN_PHASE_IMAGE_SPEED,
   MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT,
   SETTINGS_CATEGORY_KEYS,
@@ -60,6 +63,8 @@ interface UseSettingsWorkspaceOptions {
   categoryKey: Readonly<Ref<SettingsCategoryKey>>
   projectOpen: Readonly<Ref<boolean>>
   systemFontFamilies?: Readonly<Ref<readonly string[]>>
+  /** `cache/` 的现量占用；进设置页时由 shell 量一次。 */
+  cacheUsage: Readonly<Ref<AppCacheUsage>>
   translate: (key: string, fallback: string) => string
 }
 
@@ -145,7 +150,7 @@ export function useSettingsWorkspace(
             fieldItem('appearance.locale', {
               title: options.translate('settings.fields.language', 'Language'),
               fieldType: 'string',
-              presentation: 'option-group',
+              presentation: 'select',
               options: ['system', 'zh-CN', 'en-US'],
               optionLabels: {
                 system: options.translate('settings.values.systemLanguage', 'System'),
@@ -175,6 +180,47 @@ export function useSettingsWorkspace(
             }, settings.exporting.openCdeWorkbookAfterExport,
             options.translate('settings.descriptions.openCdeWorkbookAfterExport', 'Opens the exported CDE workbook; turn it off to only write the file.')),
           ], { icon: 'action.export' }),
+          card('cache', options.translate('settings.cards.cache', 'Cache'), [
+            fieldItem('cache.snapshots', {
+              title: options.translate('settings.fields.cachePackages', 'Unpacked packages'),
+              fieldType: 'string', isReadonly: true,
+            }, formatCacheUsage(options.cacheUsage.value.snapshots, settings.cache.packageLimitGb * CACHE_GIB_BYTES),
+            options.translate('settings.descriptions.cachePackages', 'Cleared on the next start once it is over the limit.')),
+            fieldItem('cache.network', {
+              title: options.translate('settings.fields.cacheNetwork', 'Downloaded images'),
+              fieldType: 'string', isReadonly: true,
+            }, formatCacheUsage(options.cacheUsage.value.network, settings.cache.networkLimitGb * CACHE_GIB_BYTES),
+            options.translate('settings.descriptions.cacheNetwork', 'Cleared on the next start once it is over the limit.')),
+            fieldItem('cache.staged', {
+              title: options.translate('settings.fields.cacheStaged', 'Undo staging'),
+              fieldType: 'string', isReadonly: true,
+            }, formatCacheUsage(options.cacheUsage.value.staged),
+            options.translate('settings.descriptions.cacheStaged', 'Undo bytes; cleared on the next start anyway.')),
+            fieldItem('cache.packageLimitGb', {
+              title: options.translate('settings.fields.cachePackageLimit', 'Package cache limit'),
+              fieldType: 'number', presentation: 'slider',
+              min: MIN_CACHE_LIMIT_GB, max: MAX_CACHE_LIMIT_GB, step: 1,
+              ticks: [1, 2, 4, 8, 16, 32],
+              suffix: 'GB',
+            }, settings.cache.packageLimitGb),
+            fieldItem('cache.networkLimitGb', {
+              title: options.translate('settings.fields.cacheNetworkLimit', 'Image cache limit'),
+              fieldType: 'number', presentation: 'slider',
+              min: MIN_CACHE_LIMIT_GB, max: MAX_CACHE_LIMIT_GB, step: 1,
+              ticks: [1, 2, 4, 8, 16, 32],
+              suffix: 'GB',
+            }, settings.cache.networkLimitGb),
+          ], {
+            icon: 'file.package',
+            actions: [
+              cardAction(
+                'cache.clear',
+                options.translate('settings.actions.clearCache', 'Clear cache'),
+                'action.delete',
+                options.projectOpen.value,
+              ),
+            ],
+          }),
         ],
       }
     }

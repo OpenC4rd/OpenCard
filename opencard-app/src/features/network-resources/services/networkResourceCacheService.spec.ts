@@ -101,9 +101,8 @@ function createService(fake: ReturnType<typeof createFakeFileSystem>, overrides:
     projectKey: async () => KEY,
     joinPath: async (...segments: string[]) => segments.join('/'),
     randomUuid: uuidFactory(),
-    download: async (url, destination, _cacheRoot, onProgress) => {
+    download: async (_url, destination) => {
       await fake.fs.writeBinaryFile(destination, new Uint8Array([1, 2, 3]))
-      onProgress({ url, receivedBytes: 3, totalBytes: 3, progress: 1 })
       return { contentType: 'image/jpeg', receivedBytes: 3 }
     },
     ...overrides,
@@ -129,7 +128,6 @@ describe('NetworkResourceCacheService', () => {
     expect(second.path).toBe(first.path)
     expect(first.refreshedAt).toBe('2026-08-29T12:00:00.000Z')
     expect(second.refreshedAt).toBe('2026-08-30T12:00:00.000Z')
-    expect(await project.listUrls()).toEqual(['https://example.com/image.PNG'])
 
     const index = JSON.parse(fake.files.get(`${ROOT}/index.json`) as string)
     expect(Object.keys(index.projects)).toEqual([KEY])
@@ -223,7 +221,7 @@ describe('NetworkResourceCacheService', () => {
       ],
     })
 
-    await createService(fake).prune()
+    await createService(fake).prune(1024 * mebibyte)
 
     expect(fake.directories.has(`${ROOT}/orphan-44444444`)).toBe(false)
     expect(fake.directories.has(`${ROOT}/old-11111111`)).toBe(false)

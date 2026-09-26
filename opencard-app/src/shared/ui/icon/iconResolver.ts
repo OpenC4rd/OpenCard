@@ -4,8 +4,7 @@
  * 职责边界：
  * - 负责 token 回退与缺失告警，不承载颜色/尺寸策略
  */
-import { iconGlyphs } from './iconPacks'
-import type { IconToken } from './iconTokens'
+import { iconGlyphs, type IconToken } from './iconPacks'
 import type { IconGlyph } from './icon.types'
 
 export type IconResolvable = IconToken | IconGlyph

@@ -12,6 +12,7 @@ use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
 
+mod app_storage;
 mod external_open;
 mod file_type_icons;
 mod git_service;
@@ -451,8 +452,11 @@ pub fn run() {
             git_service::git_abort_operation,
             external_open::take_external_open_requests,
             resource_package::read_resource_package,
+            resource_package::read_resource_package_cover,
             resource_package::unpack_resource_package,
+            resource_package::mark_resource_packages_used,
             resource_package::recover_resource_package_cache,
+            app_storage::measure_directories_bytes,
             resource_package_builder::build_resource_package,
         ])
         .build(tauri::generate_context!())

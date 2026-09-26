@@ -261,19 +261,13 @@ export function useShellSidebarLists(options: ShellSidebarListsOptions): ShellSi
   } = options
 
   const sidebarHeadButtons = computed<ShellButton[]>(() => {
-    if (isCreateProjectMode.value || isExportTemplateMode.value) {
+    if (isAuxiliaryMode.value) {
       return [{
         key: 'return-primary-page',
         icon: 'nav.arrow-left',
-        title: t('projectTemplates.actions.back'),
+        title: t('app.shell.back'),
         disabled: isProjectTemplateBusy.value || isExportTemplateBusy.value,
       }]
-    }
-    if (isSettingsMode.value) {
-      return [{ key: 'return-primary-page', icon: 'nav.arrow-left', title: t('settings.actions.back', 'Back') }]
-    }
-    if (isAboutMode.value) {
-      return [{ key: 'return-primary-page', icon: 'nav.arrow-left', title: t('app.about.back') }]
     }
     if (isWelcomeMode.value) {
       return [

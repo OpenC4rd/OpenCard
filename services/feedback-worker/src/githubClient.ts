@@ -54,7 +54,6 @@ export async function getIssue(
 
   return {
     state,
-    createdAt: requireGitHubText(body.created_at, 'issue created_at'),
     updatedAt: requireGitHubText(body.updated_at, 'issue updated_at'),
     commentCount,
   }

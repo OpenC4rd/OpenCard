@@ -75,6 +75,18 @@ function openContextMenu(options: OpenContextMenuOptions): boolean {
   return true
 }
 
+/** Opens the context menu from the keyboard gesture the tree and grid rows share. */
+function openKeyboardContextMenu(
+  event: KeyboardEvent,
+  items: readonly FloatingMenuItem[],
+  onSelect?: (key: string) => void,
+): void {
+  if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
+  if (!(event.currentTarget instanceof HTMLElement)) return
+  event.preventDefault()
+  openContextMenu({ anchor: event.currentTarget, items, onSelect })
+}
+
 function closeMenu(): void {
   const focusTarget = returnFocusTarget
   state.value = {
@@ -99,6 +111,7 @@ export function useFloatingMenu() {
     state: publicState,
     openMenu,
     openContextMenu,
+    openKeyboardContextMenu,
     closeMenu,
     selectMenuItem,
   }

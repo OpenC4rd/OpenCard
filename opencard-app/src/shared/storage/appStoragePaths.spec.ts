@@ -3,7 +3,7 @@ import { homeDir, join } from '@tauri-apps/api/path'
 import {
   APP_CACHE_DIRECTORY_NAME,
   APP_CACHE_NETWORK_DIRECTORY_NAME,
-  APP_CACHE_PACKAGES_DIRECTORY_NAME,
+  APP_CACHE_SNAPSHOTS_DIRECTORY_NAME,
   APP_CACHE_STAGED_DIRECTORY_NAME,
   APP_STORAGE_DIRECTORY_NAME,
   APP_TEMPLATE_DIRECTORY_NAME,
@@ -34,10 +34,10 @@ describe('appStoragePaths', () => {
   it('keeps every throwaway cache under one directory of its own', async () => {
     expect([
       APP_CACHE_DIRECTORY_NAME,
-      APP_CACHE_PACKAGES_DIRECTORY_NAME,
+      APP_CACHE_SNAPSHOTS_DIRECTORY_NAME,
       APP_CACHE_NETWORK_DIRECTORY_NAME,
       APP_CACHE_STAGED_DIRECTORY_NAME,
-    ]).toEqual(['cache', 'packages', 'network', 'staged'])
+    ]).toEqual(['cache', 'snapshots', 'network', 'staged'])
     await expect(resolveAppCachePath(APP_CACHE_NETWORK_DIRECTORY_NAME)).resolves.toBe(
       'C:/Users/Test/.opencard/cache/network',
     )

@@ -68,7 +68,7 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
             {{ t('app.menu.viewFeedback') }}
           </OcButton>
           <OcButton icon="nav.arrow-left" variant="outline" @click="emit('back')">
-            {{ t('app.about.back') }}
+            {{ t('app.shell.back') }}
           </OcButton>
         </div>
       </footer>

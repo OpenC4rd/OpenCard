@@ -203,7 +203,7 @@ function onResizePointerDown(event: PointerEvent): void {
         <div class="shell-sidebar-body" :class="{ 'is-resizing-list': resizingListPair }">
           <section v-for="(list, index) in activeLists" :key="list.key" class="shell-sidebar-list" :class="{ collapsed: isListCollapsed(list.key) }" :style="listSectionStyle(list)">
             <div class="shell-sidebar-list-head">
-              <button v-if="!collapsed" class="shell-sidebar-list-toggle" type="button" :data-tooltip="isListCollapsed(list.key) ? expandListTooltip || null : collapseListTooltip || null" @click.stop="toggleListCollapsed(list.key)"><OcText class="shell-sidebar-list-title" :truncate="true" :tooltip-on-overflow="list.title">{{ list.title }}</OcText><OcIcon class="shell-sidebar-list-chevron" name="nav.chevron-down" size="sm" :class="{ collapsed: isListCollapsed(list.key) }" /></button>
+              <button v-if="!collapsed" class="shell-sidebar-list-toggle" type="button" :data-tooltip="isListCollapsed(list.key) ? expandListTooltip || null : collapseListTooltip || null" @click.stop="toggleListCollapsed(list.key)"><OcText class="shell-sidebar-list-title" :truncate="true">{{ list.title }}</OcText><OcIcon class="shell-sidebar-list-chevron" name="nav.chevron-down" size="sm" :class="{ collapsed: isListCollapsed(list.key) }" /></button>
               <OcActionRail :actions="actionDefinitionsByList.get(list.key) ?? []" @select="emit('list-button-clicked', list.key, $event.key)" />
             </div>
             <div class="shell-sidebar-list-content-wrap" :class="{ collapsed: isListCollapsed(list.key) }"><div class="shell-sidebar-list-content"><slot name="list-content" :list="list"><ShellSidebarContent :list="list" /></slot></div></div>

@@ -29,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useAttrs, watch } from 'vue'
+import { clamp } from '../../shared/model/number'
 
 defineOptions({ name: 'OcResizeHandle', inheritAttrs: false })
 
@@ -100,10 +101,6 @@ function normalizeValue(value: number): number {
   const minimum = Math.min(props.minimum, props.maximum)
   const maximum = Math.max(props.minimum, props.maximum)
   return clamp(value, minimum, maximum)
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
 }
 
 function getCoordinate(event: PointerEvent): number {

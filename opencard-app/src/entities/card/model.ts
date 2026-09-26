@@ -10,6 +10,7 @@ import {
     additionalFieldTypes,
     createPropertyDefaultValue,
     exposesPropertyReference,
+    getDefault,
     getPropertyValueKind,
     getTypePropertyEditorSchema,
     parseAdditionalFieldDefinitions,
@@ -183,17 +184,11 @@ export function isCardStoredValue(value: unknown): value is CardStoredValue {
     return Object.values(value).every(item => isCardStoredValue(item))
 }
 
-function setIfDefined(target: Record<string, unknown>, key: string, value: unknown): void {
-    if (value !== undefined) {
-        target[key] = value
-    }
-}
-
 function materializeAdditionalFieldDefinitions(value: unknown): AdditionalFieldDefinitionMap {
     return parseAdditionalFieldDefinitions(value)
 }
 
-function cloneAdditionalFieldDefinitions(
+export function cloneAdditionalFieldDefinitions(
     fields: AdditionalFieldDefinitionMap | undefined,
 ): AdditionalFieldDefinitionMap | undefined {
     if (!fields) return undefined
@@ -396,50 +391,51 @@ function getDefaultBlockName(type: CardBlock['type']): string {
     }
 }
 
+/**
+ * 出厂就带值的字段：这里只声明"带哪些字段"，值一律取自 schema 默认值。
+ * 未列出的字段保持缺省，在属性面板里显示为"尚未添加"，由用户按需添加。
+ */
+const blockSeedFieldKeys: Record<CardBlock['type'], readonly string[]> = {
+    'text-block': ['width', 'height', 'fontSize', 'fontWeight', 'color', 'textAlign', 'verticalAlign', 'lineHeight'],
+    'markdown-text-block': ['width', 'height', 'fontSize', 'fontWeight', 'color', 'textAlign', 'verticalAlign', 'lineHeight'],
+    'image-block': ['width', 'height'],
+    'qrcode-block': ['width', 'height'],
+    'shape-block': ['width', 'height'],
+    'simple-container-block': ['width', 'height'],
+    'flow-container-block': ['width', 'height'],
+}
+
+function createBlockSeed(type: CardBlock['type']): Record<string, unknown> {
+    return Object.fromEntries(blockSeedFieldKeys[type].flatMap(fieldKey => {
+        const value = getDefault(type, fieldKey)
+        return value === undefined ? [] : [[fieldKey, value] as const]
+    }))
+}
+
 export function createTextBlock(init: TextBlockInit = {}): TextBlock {
-    const block: Record<string, unknown> = {
+    return {
         ...createBlockIdentity({
             id: init.id ?? createBlockId('text-block'),
             name: init.name ?? getDefaultBlockName('text-block'),
+            ...createBlockSeed('text-block'),
             ...init,
         }),
         type: 'text-block',
         content: init.content ?? '',
-    }
-
-    setIfDefined(block, 'fontSize', init.fontSize)
-    setIfDefined(block, 'fontFamily', init.fontFamily)
-    setIfDefined(block, 'fontWeight', init.fontWeight)
-    setIfDefined(block, 'color', init.color)
-    setIfDefined(block, 'textAlign', init.textAlign)
-    setIfDefined(block, 'verticalAlign', init.verticalAlign)
-    setIfDefined(block, 'lineHeight', init.lineHeight)
-    setIfDefined(block, 'writingMode', init.writingMode)
-
-    return block as TextBlock
+    } as TextBlock
 }
 
 export function createMarkdownTextBlock(init: MarkdownTextBlockInit = {}): MarkdownTextBlock {
-    const block: Record<string, unknown> = {
+    return {
         ...createBlockIdentity({
             id: init.id ?? createBlockId('markdown-text-block'),
             name: init.name ?? getDefaultBlockName('markdown-text-block'),
+            ...createBlockSeed('markdown-text-block'),
             ...init,
         }),
         type: 'markdown-text-block',
         content: init.content ?? '',
-    }
-
-    setIfDefined(block, 'fontSize', init.fontSize)
-    setIfDefined(block, 'fontFamily', init.fontFamily)
-    setIfDefined(block, 'fontWeight', init.fontWeight)
-    setIfDefined(block, 'color', init.color)
-    setIfDefined(block, 'textAlign', init.textAlign)
-    setIfDefined(block, 'verticalAlign', init.verticalAlign)
-    setIfDefined(block, 'lineHeight', init.lineHeight)
-    setIfDefined(block, 'writingMode', init.writingMode)
-
-    return block as MarkdownTextBlock
+    } as MarkdownTextBlock
 }
 
 export function createImageBlock(init: ImageBlockInit = {}): ImageBlock {
@@ -447,6 +443,7 @@ export function createImageBlock(init: ImageBlockInit = {}): ImageBlock {
         ...createBlockIdentity({
             id: init.id ?? createBlockId('image-block'),
             name: init.name ?? getDefaultBlockName('image-block'),
+            ...createBlockSeed('image-block'),
             ...init,
         }),
         type: 'image-block',
@@ -462,6 +459,7 @@ export function createQrCodeBlock(init: QrCodeBlockInit = {}): QrCodeBlock {
         ...createBlockIdentity({
             id: init.id ?? createBlockId('qrcode-block'),
             name: init.name ?? getDefaultBlockName('qrcode-block'),
+            ...createBlockSeed('qrcode-block'),
             ...init,
         }),
         type: 'qrcode-block',
@@ -478,6 +476,7 @@ export function createShapeBlock(init: ShapeBlockInit = {}): ShapeBlock {
         ...createBlockIdentity({
             id: init.id ?? createBlockId('shape-block'),
             name: init.name ?? getDefaultBlockName('shape-block'),
+            ...createBlockSeed('shape-block'),
             ...init,
         }),
         type: 'shape-block',
@@ -497,6 +496,7 @@ export function createSimpleContainerBlock(init: SimpleContainerBlockInit = {}):
         ...createBlockIdentity({
             id: init.id ?? createBlockId('simple-container-block'),
             name: init.name ?? getDefaultBlockName('simple-container-block'),
+            ...createBlockSeed('simple-container-block'),
             ...init,
         }),
         type: 'simple-container-block',
@@ -513,6 +513,7 @@ export function createFlowContainerBlock(init: FlowContainerBlockInit = {}): Flo
         ...createBlockIdentity({
             id: init.id ?? createBlockId('flow-container-block'),
             name: init.name ?? getDefaultBlockName('flow-container-block'),
+            ...createBlockSeed('flow-container-block'),
             ...init,
         }),
         type: 'flow-container-block',
@@ -550,9 +551,4 @@ export function createBlock(type: CardBlock['type'], init: unknown = {}): CardBl
         case 'flow-container-block':
             return createFlowContainerBlock(init as FlowContainerBlockInit)
     }
-}
-
-export function isCardBlock(target: any): target is CardBlock {
-    //检查对象的type属性是否以-block结尾，以区分是否为CardBlock类型
-    return target && typeof target === 'object' && typeof target.type === 'string' && target.type.endsWith('-block')
 }

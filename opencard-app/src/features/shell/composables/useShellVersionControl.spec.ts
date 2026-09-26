@@ -18,7 +18,6 @@ vi.mock('../../version-control/gitService', () => mocks)
 
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { createDefaultAppSettings, defaultCommitterEmail } from '../../settings/model/appSettings'
-import { registerSettingsNavigator } from '../../settings/settingsNavigation'
 import { titleBarNotices } from '../../notifications/titlebarNotices'
 import { useShellVersionControl } from './useShellVersionControl'
 
@@ -90,6 +89,7 @@ function workspaceSession(): EditorSession {
 
 function createVersionControl(
   committer: Partial<{ committerName: string; committerEmail: string; createInitialCommit: boolean }> = {},
+  openSetting: (key: string) => void = vi.fn(),
 ) {
   const projectPath = ref('')
   const activeSession = ref<EditorSession | null>(null)
@@ -106,6 +106,7 @@ function createVersionControl(
     fileChangeRevision,
     getRelativeProjectPath: path => path.slice(`${PROJECT_ROOT}/`.length),
     moveProjectEntryToTrash: vi.fn(),
+    openSetting,
     settings,
   })
   return { versionControl, projectPath, activeSession, fileChangeRevision, settings }
@@ -329,9 +330,8 @@ describe('useShellVersionControl', () => {
 
   it('opens the committer setting when git rejects the identity', async () => {
     const navigator = vi.fn()
-    registerSettingsNavigator(navigator)
     const noticeCount = titleBarNotices.value.length
-    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
+    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' }, navigator)
     projectPath.value = PROJECT_ROOT
     mocks.initializeRepository.mockResolvedValueOnce(failure('bad identity', 'invalid-input'))
 
@@ -340,7 +340,6 @@ describe('useShellVersionControl', () => {
     expect(navigator).toHaveBeenCalledWith('versionControl.committerName')
     expect(noticesAfter(noticeCount)).toEqual(['bad identity'])
     expect(mocks.stageAll).not.toHaveBeenCalled()
-    registerSettingsNavigator(null)
   })
 
   it('reports an initialization failure without leaving the busy state on', async () => {

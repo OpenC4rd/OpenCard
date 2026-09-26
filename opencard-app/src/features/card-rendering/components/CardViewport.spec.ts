@@ -4,11 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RenderReadyCardFace } from '../render.types'
 import { createTextBlock } from '../../../entities/card/model'
 import CardViewport from './CardViewport.vue'
-import CardFaceRenderer from './CardFaceRenderer.vue'
 import { parseRenderReadyBlockForTest } from './renderTestUtils'
 import { useFloatingMenu } from '../../../composables/useFloatingMenu'
 import { createCardRenderResourceContext } from '../cardRenderResources'
-import { createCardPipelineIssue } from '../cardPipelineIssue'
 
 const resourceContext = createCardRenderResourceContext({})
 
@@ -106,10 +104,10 @@ describe('CardViewport wheel zoom API', () => {
         y = originY
         window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y }))
       },
-      moveBy(deltaX: number, deltaY: number): void {
+      moveBy(deltaX: number, deltaY: number, modifiers: { shiftKey?: boolean } = {}): void {
         x += deltaX
         y += deltaY
-        window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y }))
+        window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y, ...modifiers }))
       },
     }
   }
@@ -694,6 +692,181 @@ describe('CardViewport wheel zoom API', () => {
     })
   })
 
+  it('keeps the original aspect ratio while Shift resizes from a corner', async () => {
+    const SelectionRendererStub = defineComponent({
+      name: 'CardFaceRenderer',
+      setup() {
+        return () => h('div', { class: 'card-canvas' }, [
+          h('div', { 'data-block-id': 'selected' }),
+        ])
+      },
+    })
+    const wrapper = mount(CardViewport, {
+      props: { resourceContext,
+        face: snappingFace,
+        selectedBlockId: null,
+        selectedLocationType: 'simple-container-location',
+        selectedAnchor: 'lt',
+        alignmentSnappingEnabled: false,
+      },
+      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+    })
+    const viewport = wrapper.get<HTMLElement>('.card-viewport')
+    const parent = wrapper.get('.card-canvas')
+    const selected = wrapper.get('[data-block-id="selected"]')
+    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
+    })
+    Object.defineProperty(parent.element, 'getBoundingClientRect', {
+      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
+    })
+    Object.defineProperty(selected.element, 'getBoundingClientRect', {
+      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
+    })
+
+    await wrapper.setProps({ selectedBlockId: 'selected' })
+    await nextTick()
+    await flushPromises()
+    await wrapper.get('.selection-handle-rb').trigger('pointerdown')
+
+    const drag = createSelectionDrag()
+    drag.begin()
+    // 100×80 是"宽的那边"更长，所以跟手的是宽：只往右拉 40，高按比例跟到 112，左上角待着不动。
+    drag.moveBy(40, 0, { shiftKey: true })
+    await nextTick()
+    expect(wrapper.get('.selection-frame').attributes('style')).toContain('height: 112px')
+
+    window.dispatchEvent(new Event('pointerup'))
+    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
+      blockId: 'selected',
+      width: 140,
+      height: 112,
+      x: 50,
+      y: 50,
+    })
+  })
+
+  it('follows the taller edge when Shift resizing a selection that is taller than it is wide', async () => {
+    const SelectionRendererStub = defineComponent({
+      name: 'CardFaceRenderer',
+      setup() {
+        return () => h('div', { class: 'card-canvas' }, [
+          h('div', { 'data-block-id': 'selected' }),
+        ])
+      },
+    })
+    const wrapper = mount(CardViewport, {
+      props: { resourceContext,
+        face: snappingFace,
+        selectedBlockId: null,
+        selectedLocationType: 'simple-container-location',
+        selectedAnchor: 'lt',
+        alignmentSnappingEnabled: false,
+      },
+      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+    })
+    const viewport = wrapper.get<HTMLElement>('.card-viewport')
+    const parent = wrapper.get('.card-canvas')
+    const selected = wrapper.get('[data-block-id="selected"]')
+    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
+    })
+    Object.defineProperty(parent.element, 'getBoundingClientRect', {
+      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
+    })
+    Object.defineProperty(selected.element, 'getBoundingClientRect', {
+      value: () => ({ left: 150, top: 150, width: 60, height: 150, right: 210, bottom: 300 }),
+    })
+
+    await wrapper.setProps({ selectedBlockId: 'selected' })
+    await nextTick()
+    await flushPromises()
+    await wrapper.get('.selection-handle-rb').trigger('pointerdown')
+
+    const drag = createSelectionDrag()
+    drag.begin()
+    // 竖着比横着长，所以这一回跟手的是高：往下拉 30 就是高 +30，宽按 60:150 跟到 72。
+    drag.moveBy(0, 30, { shiftKey: true })
+    await nextTick()
+    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 72px')
+
+    window.dispatchEvent(new Event('pointerup'))
+    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
+      blockId: 'selected',
+      width: 72,
+      height: 180,
+      x: 50,
+      y: 50,
+    })
+  })
+
+  it('snaps the ratio-driven edge while Shift resizing, and claims only the edge that really landed on the target', async () => {
+    const SelectionRendererStub = defineComponent({
+      name: 'CardFaceRenderer',
+      setup() {
+        return () => h('div', { class: 'card-canvas' }, [
+          h('div', { 'data-block-id': 'selected' }),
+          h('div', { 'data-block-id': 'sibling' }),
+        ])
+      },
+    })
+    const wrapper = mount(CardViewport, {
+      props: { resourceContext,
+        face: snappingFace,
+        selectedBlockId: null,
+        selectedLocationType: 'simple-container-location',
+        selectedAnchor: 'lt',
+      },
+      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+    })
+    const viewport = wrapper.get<HTMLElement>('.card-viewport')
+    const parent = wrapper.get('[class="card-canvas"]')
+    const selected = wrapper.get('[data-block-id="selected"]')
+    const sibling = wrapper.get('[data-block-id="sibling"]')
+    viewport.element.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
+    viewport.element.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
+    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
+    })
+    Object.defineProperty(parent.element, 'getBoundingClientRect', {
+      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
+    })
+    Object.defineProperty(selected.element, 'getBoundingClientRect', {
+      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
+    })
+    // 兄弟块上边在世界坐标 165：等比缩放后的底边（162）离它 3px，宽的那条边离另一条线 6px —— 该吸的是底边。
+    Object.defineProperty(sibling.element, 'getBoundingClientRect', {
+      value: () => ({ left: 300, top: 265, width: 80, height: 60, right: 380, bottom: 325 }),
+    })
+
+    await wrapper.setProps({ selectedBlockId: 'selected' })
+    await nextTick()
+    await flushPromises()
+    await wrapper.get('.selection-handle-rb').trigger('pointerdown')
+
+    const drag = createSelectionDrag()
+    drag.begin()
+    // 跟手的是宽（100 > 80）：横拉 40 本会让 100×80 变成 140×112，底边 162 被兄弟块吸到 165。
+    drag.moveBy(40, 0, { shiftKey: true })
+    await nextTick()
+
+    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 143.75px')
+    expect(wrapper.get('.selection-frame').attributes('style')).toContain('height: 115px')
+    // 只有真的落在线上的那条边有引导线：另一条边只是按比例跟过来，不该画在目标上。
+    const guides = wrapper.findAll('.selection-alignment-guides line')
+    expect(guides).toHaveLength(1)
+    expect(guides[0]!.attributes()).toMatchObject({ x1: '150', x2: '380', y1: '265', y2: '265' })
+
+    window.dispatchEvent(new Event('pointerup'))
+    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
+      blockId: 'selected',
+      width: 143.75,
+      height: 115,
+      x: 50,
+      y: 50,
+    })
+  })
+
   it('snaps absolute resize and move edges to a direct sibling with aligned previews', async () => {
     const SelectionRendererStub = defineComponent({
       name: 'CardFaceRenderer',
@@ -825,51 +998,4 @@ describe('CardViewport wheel zoom API', () => {
     ])
   })
 
-  it('merges comparison runtime issues and clears a placeholder side', async () => {
-    const issueFor = (id: string) => createCardPipelineIssue({
-      type: 'card-designer.rich-text.invalid-html',
-      location: {
-        documentId: id,
-        instanceId: null,
-        faceKey: 'front',
-        owner: { kind: 'face', id },
-        fieldKey: 'content',
-      },
-    })
-    const beforeFace = { ...face, id: 'before-face' }
-    const afterFace = { ...face, id: 'after-face' }
-    const wrapper = mount(CardViewport, {
-      props: {
-        resourceContext,
-        face,
-        comparison: {
-          before: { face: beforeFace, resourceContext },
-          after: { face: afterFace, resourceContext },
-          divider: 0.5,
-          viewMode: 'split',
-        },
-      },
-      global: { stubs: { CardFaceRenderer: true } },
-    })
-    const renderers = wrapper.findAllComponents(CardFaceRenderer)
-    renderers[0]!.vm.$emit('runtime-issues-change', [issueFor('before-face')])
-    renderers[1]!.vm.$emit('runtime-issues-change', [issueFor('after-face')])
-    await nextTick()
-
-    const snapshots = wrapper.emitted('runtime-issues-change') ?? []
-    expect(snapshots[snapshots.length - 1]?.[0]).toEqual([issueFor('before-face'), issueFor('after-face')])
-
-    await wrapper.setProps({
-      comparison: {
-        before: { face: beforeFace, resourceContext, placeholder: true },
-        after: { face: afterFace, resourceContext },
-        divider: 0.5,
-        viewMode: 'split',
-      },
-    })
-    await nextTick()
-    const clearedSnapshots = wrapper.emitted('runtime-issues-change') ?? []
-    expect(clearedSnapshots[clearedSnapshots.length - 1]?.[0]).toEqual([issueFor('after-face')])
-    wrapper.unmount()
-  })
 })

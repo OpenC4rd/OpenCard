@@ -2,6 +2,7 @@
 import { readonly, ref, type DeepReadonly, type Ref } from 'vue'
 import type { OcEditableThemeColorKey, OcThemeId } from '../../../shared/ui/foundation'
 import { OC_EDITABLE_THEME_COLOR_KEYS } from '../../../shared/ui/foundation'
+import { describeError } from '../../../shared/model/error'
 import {
   APP_THEME_PRESETS,
   createDefaultAppSettings,
@@ -44,10 +45,6 @@ export interface AppSettingsStore {
   resetSection(section: SettingsSection): void
   resetAll(): void
   flush(): Promise<void>
-}
-
-function describeError(value: unknown): string {
-  return value instanceof Error ? value.message : String(value)
 }
 
 export function createAppSettingsStore(
@@ -122,6 +119,10 @@ export function createAppSettingsStore(
       candidate.updates.showReleaseNotesAfterUpdate = value === true
     } else if (key === 'exporting.openCdeWorkbookAfterExport') {
       candidate.exporting.openCdeWorkbookAfterExport = value as boolean
+    } else if (key === 'cache.packageLimitGb') {
+      candidate.cache.packageLimitGb = value as number
+    } else if (key === 'cache.networkLimitGb') {
+      candidate.cache.networkLimitGb = value as number
     } else if (key === 'workspace.structureTreeSelectionBehavior') {
       candidate.workspace.structureTreeSelectionBehavior = value as AppSettings['workspace']['structureTreeSelectionBehavior']
     } else if (key === 'workspace.structureTreeScrollToSelection') {

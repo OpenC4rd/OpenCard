@@ -1,6 +1,6 @@
 /**
  * 模块说明：
- * - 描述软件存储里的“附加包”：沿用项目的 `.ocpack` 归档格式（见 model/resourcePackage），
+ * - 描述软件存储里的包：沿用项目的 `.ocpack` 归档格式（见 model/resourcePackage），
  *   但不属于任何项目，创建项目时按需复制进项目。
  * 职责边界：
  * - 只有数据类型；存储目录名在 shared/storage/appStoragePaths，读写、校验和归档命名都在

@@ -78,7 +78,6 @@ export async function prepareExportTask(options: PrepareExportTaskOptions): Prom
     }
   }
   if (loadIssues.length > 0) return { ok: false, issues: loadIssues }
-  const warnings: ExportTaskValidationIssue[] = []
 
   const usedFileNames = new Set<string>()
   const entries: ExportPlanEntry[] = []
@@ -97,7 +96,6 @@ export async function prepareExportTask(options: PrepareExportTaskOptions): Prom
         for (const faceKey of ['front', 'back'] as const) {
           const fileName = uniqueFileName(sourceStem, `${projection.suffix}_${faceKey}`, usedFileNames)
           entries.push({
-            key: `${snapshot.sourcePath}\0${projection.suffix}\0${faceKey}`,
             sourcePath: snapshot.sourcePath,
             outputPath: joinPath(options.task.outputDirectory, fileName),
             faceKey,
@@ -121,5 +119,5 @@ export async function prepareExportTask(options: PrepareExportTaskOptions): Prom
     entries,
     outputDirectory: options.task.outputDirectory,
   }
-  return { ok: true, plan, warnings }
+  return { ok: true, plan }
 }

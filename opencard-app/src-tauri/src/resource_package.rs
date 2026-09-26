@@ -15,6 +15,7 @@
 //! 缓存根由调用方（前端）传入 —— 布局只有一个出口（`src/shared/storage/appStoragePaths.ts`），
 //! 这里不拼 `.opencard`。根**内部**的一切由本模块拥有，包括集合目录里的 `index.json`。
 
+use crate::app_storage::directory_bytes;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -47,7 +48,6 @@ pub(crate) const CONTENT_HASH_TAG: &[u8] = b"opencard-resource-package-content\0
 /// "最后一次用到"的印记：缓存根下一个 `.used.<指纹>` 文件，清理时按它的修改时间排序
 /// 决定先删谁。放在根上、不放进包目录 —— 包目录里多一个文件会让"包内文件清单"这句话不准确。
 const USED_PREFIX: &str = ".used.";
-const MAX_CACHE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// 解压到一半的目录以 `.` 开头，而指纹永远是十六进制，所以两者不会相撞。
 const STAGING_PREFIX: &str = ".unpack-";
@@ -74,8 +74,8 @@ pub struct UnpackResourcePackageRequest {
     pub source_path: String,
     /// 调用方读到的指纹。归档在读取之后被换掉的话，这里就对不上了。
     pub fingerprint: String,
-    /// 包缓存根（`<软件存储>/cache/packages`）。
-    pub packages_root: String,
+    /// 包缓存根（`<软件存储>/cache/snapshots`）。
+    pub snapshots_root: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -281,7 +281,7 @@ fn hash_projection(projection: &mut ArchiveProjection) -> Result<String, String>
 
 /// 缓存根来自前端，所以这里确认它是绝对路径：相对路径会落在进程的工作目录上，
 /// 那是"缓存跑到了谁都找不到的地方"，不是可以接受的降级。
-fn absolute_packages_root(raw: &str) -> Result<PathBuf, String> {
+fn absolute_snapshots_root(raw: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(raw);
     if !path.is_absolute() {
         return Err("The package cache root must be an absolute path".to_string());
@@ -296,14 +296,14 @@ fn now_millis() -> u64 {
         .as_millis() as u64
 }
 
-fn stamp_path(packages_root: &Path, fingerprint: &str) -> PathBuf {
-    packages_root.join(format!("{USED_PREFIX}{fingerprint}"))
+fn stamp_path(snapshots_root: &Path, fingerprint: &str) -> PathBuf {
+    snapshots_root.join(format!("{USED_PREFIX}{fingerprint}"))
 }
 
 /// 记下"这个包刚被用到"。写在文件内容里而不是靠长度：非空写入才一定会刷新修改时间。
 /// 写不进去不算失败 —— 最坏只是清理时先删它。
-fn mark_used(packages_root: &Path, fingerprint: &str) {
-    let _ = std::fs::write(stamp_path(packages_root, fingerprint), now_millis().to_string());
+fn mark_used(snapshots_root: &Path, fingerprint: &str) {
+    let _ = std::fs::write(stamp_path(snapshots_root, fingerprint), now_millis().to_string());
 }
 
 fn modified_at(path: &Path) -> SystemTime {
@@ -312,23 +312,9 @@ fn modified_at(path: &Path) -> SystemTime {
         .unwrap_or(UNIX_EPOCH)
 }
 
-fn directory_bytes(path: &Path) -> u64 {
-    let Ok(entries) = std::fs::read_dir(path) else { return 0 };
-    let mut total = 0_u64;
-    for entry in entries.flatten() {
-        let Ok(metadata) = entry.metadata() else { continue };
-        if metadata.is_dir() {
-            total = total.saturating_add(directory_bytes(&entry.path()));
-        } else {
-            total = total.saturating_add(metadata.len());
-        }
-    }
-    total
-}
-
 /// 半个解压目录是进程被中断时留下的，直接删；用户手删缓存也不需要任何恢复。
-fn recover_unpacking(packages_root: &Path) -> Result<(), String> {
-    let entries = match std::fs::read_dir(packages_root) {
+fn recover_unpacking(snapshots_root: &Path) -> Result<(), String> {
+    let entries = match std::fs::read_dir(snapshots_root) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(format!("Cannot read the package cache: {error}")),
@@ -349,8 +335,8 @@ fn recover_unpacking(packages_root: &Path) -> Result<(), String> {
 /// "最后用到"取自 `.used.<指纹>` 的修改时间，没有印记的按最旧算（刚解开就盖了印记，
 /// 所以没有印记只意味着印记被删了）。占用字节数现量一次：目录名是内容指纹，量出来的
 /// 值不会变，而省这一次遍历不值得再维护一份必须和磁盘保持一致的清单。
-fn prune_cache(packages_root: &Path, keep: &str, max_bytes: u64) -> Result<(), String> {
-    let entries = match std::fs::read_dir(packages_root) {
+fn prune_cache(snapshots_root: &Path, max_bytes: u64) -> Result<(), String> {
+    let entries = match std::fs::read_dir(snapshots_root) {
         Ok(entries) => entries,
         // 还没有任何包被解开过：没有东西要清，这不是错误。
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -373,7 +359,7 @@ fn prune_cache(packages_root: &Path, keep: &str, max_bytes: u64) -> Result<(), S
     // 目录已经不在的印记留着只会攒垃圾，顺手清掉。
     for fingerprint in used_at.keys() {
         if !packages.iter().any(|(name, _, _)| name == fingerprint) {
-            let _ = std::fs::remove_file(stamp_path(packages_root, fingerprint));
+            let _ = std::fs::remove_file(stamp_path(snapshots_root, fingerprint));
         }
     }
     let total = packages.iter().map(|(_, _, bytes)| *bytes).sum::<u64>();
@@ -384,10 +370,9 @@ fn prune_cache(packages_root: &Path, keep: &str, max_bytes: u64) -> Result<(), S
     let mut remaining = total;
     for (name, path, bytes) in packages {
         if remaining <= max_bytes { break; }
-        if name == keep { continue; }
         if retry_access_denied(|| std::fs::remove_dir_all(&path)).is_ok() {
             remaining = remaining.saturating_sub(bytes);
-            let _ = std::fs::remove_file(stamp_path(packages_root, &name));
+            let _ = std::fs::remove_file(stamp_path(snapshots_root, &name));
         }
     }
     Ok(())
@@ -451,7 +436,7 @@ fn unpack_blocking(request: &UnpackResourcePackageRequest) -> Result<NativeResou
         return Err("Package content does not match its fingerprint".to_string());
     }
 
-    let root = absolute_packages_root(&request.packages_root)?;
+    let root = absolute_snapshots_root(&request.snapshots_root)?;
     std::fs::create_dir_all(&root)
         .map_err(|error| format!("Cannot create the package cache: {error}"))?;
     recover_unpacking(&root)?;
@@ -479,7 +464,9 @@ fn unpack_blocking(request: &UnpackResourcePackageRequest) -> Result<NativeResou
         return Err(format!("Cannot move the unpacked package into place: {error}"));
     }
     mark_used(&root, &declared);
-    let _ = prune_cache(&root, &declared, MAX_CACHE_BYTES);
+    // 这里不淘汰：会话中缓存是活的，另一个打开的项目可能正在读某个包目录；工作集超过上限时，
+    // 「解开这份就淘汰那份」还会和前端的重新排队形成死循环。淘汰只在启动维护做一次。
+    // ponytail: 上限是全局的，需要超过它的项目每次启动都要重解压；真有人抱怨再把上限做成设置。
     Ok(NativeResourcePackageUnpack {
         root_path: target.to_string_lossy().to_string(),
     })
@@ -498,6 +485,41 @@ pub async fn read_resource_package(
     Ok(NativeResourcePackageInspection { manifest_json, fingerprint })
 }
 
+/// 清单自述的封面路径。只在**已经校验过的条目表**里按名字查，所以这里不需要再做路径校验：
+/// 查不到就是没有封面（清单里那个路径指向不存在的文件，和缺失同义）。
+fn manifest_cover(manifest_json: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(manifest_json).ok()?;
+    let cover = value.get("cover")?.as_str()?.trim();
+    (!cover.is_empty()).then(|| cover.to_lowercase())
+}
+
+/// 详情视图要的是"这个文件自己长什么样"：只多读封面那一个条目，不解开、也不看项目里的包表。
+/// 没有封面、封面比上限大、读不出来都不是错误 —— 返回空字节，界面自己留空。
+#[tauri::command]
+pub async fn read_resource_package_cover(
+    request: ReadResourcePackageRequest,
+) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let source = std::fs::canonicalize(&request.source_path)
+            .map_err(|error| format!("Cannot access package: {error}"))?;
+        let mut projection = open_archive(&source)?;
+        let manifest_json = manifest_text(&mut projection)?;
+        // 条目表在 open_archive 里已经过路径、大小、压缩比校验，所以匹配到的字节可以直读。
+        let index = manifest_cover(&manifest_json).and_then(|cover| {
+            projection.entries.iter()
+                .find(|entry| entry.path.to_lowercase() == cover)
+                .map(|entry| entry.index)
+        });
+        let Some(index) = index else {
+            return Ok(tauri::ipc::Response::new(Vec::new()));
+        };
+        let bytes = read_zip_entry(&mut projection.archive, index, MAX_FILE_BYTES)?;
+        Ok(tauri::ipc::Response::new(bytes))
+    })
+    .await
+    .map_err(|error| format!("Cannot read the package cover: {error}"))?
+}
+
 #[tauri::command]
 pub async fn unpack_resource_package(
     request: UnpackResourcePackageRequest,
@@ -507,13 +529,35 @@ pub async fn unpack_resource_package(
         .map_err(|error| format!("Cannot unpack the package: {error}"))?
 }
 
-/// 应用启动时清一次：删掉中断留下的半个解压目录，并把缓存降回大小上限以内。
+/// 盖使用印记。淘汰按"最后一次用到"从旧到新排序，而"用到"发生在项目加载环境那一次 ——
+/// 已经解开的包不会再走 unpack，所以印记只能在这里补。指纹不合法就跳过，写不上也不报错：
+/// 印记只影响淘汰顺序，不得阻止缓存使用。
 #[tauri::command]
-pub async fn recover_resource_package_cache(packages_root: String) -> Result<(), String> {
+pub async fn mark_resource_packages_used(
+    snapshots_root: String,
+    fingerprints: Vec<String>,
+) -> Result<(), String> {
+    let root = absolute_snapshots_root(&snapshots_root)?;
+    if !root.is_dir() {
+        return Ok(());
+    }
+    for fingerprint in fingerprints.iter().filter_map(|value| parse_fingerprint(value)) {
+        mark_used(&root, &fingerprint);
+    }
+    Ok(())
+}
+
+/// 应用启动时清一次：删掉中断留下的半个解压目录，并把缓存降回传入的上限以内。
+/// 上限由设置决定，所以由前端传进来；它只影响淘汰顺序，不影响任何包能不能用。
+#[tauri::command]
+pub async fn recover_resource_package_cache(
+    snapshots_root: String,
+    max_bytes: u64,
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let root = absolute_packages_root(&packages_root)?;
+        let root = absolute_snapshots_root(&snapshots_root)?;
         recover_unpacking(&root)?;
-        prune_cache(&root, "", MAX_CACHE_BYTES)
+        prune_cache(&root, max_bytes)
     })
     .await
     .map_err(|error| format!("Cannot clean the package cache: {error}"))?
@@ -634,6 +678,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_cover_note_comes_from_the_manifest_and_is_matched_case_insensitively() {
+        assert_eq!(manifest_cover("{\"cover\":\" Covers/Cover.PNG \"}"), Some("covers/cover.png".to_string()));
+        assert_eq!(manifest_cover("{}"), None);
+        assert_eq!(manifest_cover("{\"cover\":\"   \"}"), None);
+        assert_eq!(manifest_cover("not json"), None);
+    }
+
     /// 造一个假缓存根：每个名字一个目录，里面一个若干字节的文件。
     fn temp_cache_root(name: &str, packages: &[(&str, u64)]) -> PathBuf {
         let root = std::env::temp_dir().join(format!("opencard-cache-{name}-{}", now_millis()));
@@ -654,22 +706,42 @@ mod tests {
         }
     }
 
+    /// 印记的名字按归一化后的指纹算：目录名是小写十六进制，印记大写了就永远对不上包目录，
+    /// 会被当成"目录已不在"的垃圾清掉 —— 于是"最后用到"排序又退化回解压顺序。
     #[test]
-    fn prune_drops_the_least_recently_used_package_and_never_the_one_in_use() {
+    fn a_usage_stamp_is_written_for_a_valid_fingerprint_and_nothing_for_the_rest() {
+        let root = temp_cache_root("stamp", &[("known", 4)]);
+        let uppercase = "AB".repeat(32);
+
+        for value in [uppercase.as_str(), "not-a-fingerprint", "../escape"] {
+            if let Some(fingerprint) = parse_fingerprint(value) {
+                mark_used(&root, &fingerprint);
+            }
+        }
+
+        assert!(stamp_path(&root, &"ab".repeat(32)).exists());
+        assert!(!root.join(format!("{USED_PREFIX}not-a-fingerprint")).exists());
+        assert!(!root.join(USED_PREFIX).exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn prune_drops_the_least_recently_used_package() {
         let root = temp_cache_root("prune", &[("old", 400), ("middle", 400), ("recent", 400)]);
         stamp_in_order(&root, &["old", "middle", "recent"]);
 
         // 上限只够两份：最久没用到的 "old" 先走。
-        prune_cache(&root, "", 800).unwrap();
+        prune_cache(&root, 800).unwrap();
         assert!(!root.join("old").exists());
         assert!(root.join("middle").is_dir());
         assert!(root.join("recent").is_dir());
         assert!(!stamp_path(&root, "old").exists());
 
-        // 正在解开的那一份永远留下，即使它是最久没用到的那个。
-        prune_cache(&root, "middle", 0).unwrap();
-        assert!(root.join("middle").is_dir());
-        assert!(!root.join("recent").exists());
+        // 再降到只够一份：下一个最久没用到的 "middle" 走，最新的 "recent" 留下。
+        prune_cache(&root, 400).unwrap();
+        assert!(!root.join("middle").exists());
+        assert!(root.join("recent").is_dir());
 
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -679,13 +751,13 @@ mod tests {
         let root = temp_cache_root("sizes", &[("known", 5), ("legacy", 7)]);
 
         // 没有任何印记时按体积照样算得出来，也照样不删东西。
-        prune_cache(&root, "", u64::MAX).unwrap();
+        prune_cache(&root, u64::MAX).unwrap();
         assert!(root.join("known").is_dir());
         assert!(root.join("legacy").is_dir());
 
         // 目录已经不在了，印记留着只会攒垃圾。
         mark_used(&root, "vanished");
-        prune_cache(&root, "", u64::MAX).unwrap();
+        prune_cache(&root, u64::MAX).unwrap();
         assert!(!stamp_path(&root, "vanished").exists());
         assert!(root.join("known").is_dir() && root.join("legacy").is_dir());
 
@@ -698,7 +770,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
 
         // 全新安装、或者刚被手工删掉缓存目录时，启动维护不该因此报错。
-        assert!(prune_cache(&root, "", MAX_CACHE_BYTES).is_ok());
+        assert!(prune_cache(&root, u64::MAX).is_ok());
         assert!(recover_unpacking(&root).is_ok());
     }
 
@@ -716,7 +788,7 @@ mod tests {
         let request = || UnpackResourcePackageRequest {
             source_path: archive.to_string_lossy().to_string(),
             fingerprint: fingerprint.clone(),
-            packages_root: root.to_string_lossy().to_string(),
+            snapshots_root: root.to_string_lossy().to_string(),
         };
 
         let unpacked = unpack_blocking(&request()).unwrap();

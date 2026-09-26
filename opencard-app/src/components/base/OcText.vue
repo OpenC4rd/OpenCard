@@ -2,17 +2,18 @@
 <template>
   <component
     :is="as"
+    ref="rootElement"
     class="oc-text"
     :class="textClass"
-    :data-tooltip="truncate ? tooltipOnOverflow : undefined"
-    :data-tooltip-overflow="truncate && tooltipOnOverflow ? '' : undefined"
+    :data-tooltip="truncate ? text : undefined"
+    :data-tooltip-overflow="truncate ? '' : undefined"
   >
     <slot />
   </component>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUpdated, ref } from 'vue'
 
 /**
  * Text tone options for semantic color control.
@@ -49,11 +50,9 @@ interface OcTextProps {
    */
   bold?: boolean
   /**
-   * 是否单行省略，默认 false
+   * 单行省略。省略时这段文字自己就是 hover 提示的全文：真的放不下才提示，放得下就不打扰。
    */
   truncate?: boolean
-  /** 仅在单行文本实际溢出时显示的完整内容提示。 */
-  tooltipOnOverflow?: string
 }
 
 defineOptions({ name: 'OcText' })
@@ -64,16 +63,29 @@ const props = withDefaults(defineProps<OcTextProps>(), {
   mono: false,
   bold: false,
   truncate: false,
-  tooltipOnOverflow: undefined,
 })
 
 const textClass = computed(() => [
   `oc-text--tone-${props.tone}`,
-  props.size ? `oc-text--size-${props.size}` : null,
+  props.size ? `oc-text--size-${props.size}` : undefined,
   { 'oc-text--mono': props.mono },
   { 'oc-text--bold': props.bold },
   { 'oc-text--truncate': props.truncate },
 ])
+
+/**
+ * 省略号盖掉的是全文，所以提示的全文就是这里渲染出来的字 —— 组件自己读一遍 DOM，
+ * 调用方不必再把同一段文字抄进一个 prop；抄漏一处，那一处就永远看不到全文。
+ */
+const rootElement = ref<HTMLElement | null>(null)
+const text = ref('')
+
+function captureText(): void {
+  text.value = rootElement.value?.textContent?.trim() ?? ''
+}
+
+onMounted(captureText)
+onUpdated(captureText)
 </script>
 
 <style scoped>

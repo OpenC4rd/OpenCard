@@ -4,9 +4,9 @@
  * 职责边界：
  * - 只聚合 token/type/resolver，不承载具体库映射实现
  */
-import type { IconToken } from './iconTokens'
+import type { IconToken } from './iconPacks'
 import type { IconGlyph } from './icon.types'
-import { iconTokens } from './iconTokens'
+import { iconGlyphs } from './iconPacks'
 import {
   DEFAULT_ICON_TOKEN,
   UNKNOWN_ICON_TOKEN,
@@ -45,7 +45,7 @@ export type IconTone =
   | 'block-flow-container'
 
 export {
-  iconTokens,
+  iconGlyphs,
   DEFAULT_ICON_TOKEN,
   UNKNOWN_ICON_TOKEN,
   resolveIcon,

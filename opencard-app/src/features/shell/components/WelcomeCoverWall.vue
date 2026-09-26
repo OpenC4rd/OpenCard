@@ -25,6 +25,7 @@
               <img
                 class="welcome-cover-wall__tile-artwork"
                 :src="tile.src"
+                :style="tile.artworkStyle"
                 alt=""
                 decoding="async"
                 draggable="false"
@@ -63,6 +64,11 @@ type WelcomeCoverWallTile = {
   readonly key: string
   /** 内置封面，始终作为瓦片的底图。 */
   readonly src: string
+  /**
+   * 底图的取景：同一张图在不同格子里露出的是不同的一块。
+   * 每次打开应用重新取一次，所以整面墙不会次次长得一模一样。
+   */
+  readonly artworkStyle?: CSSProperties
   /** 占用这个格子的项目封面；就绪后淡入覆盖在底图之上。 */
   readonly coverSrc?: string
   /** 淡入的错峰序号，让封面依次浮现而不是十几格同时换掉。 */
@@ -85,9 +91,11 @@ defineOptions({ name: 'WelcomeCoverWall' })
 /**
  * 每行瓦片数与行样式的循环周期。
  * 行变体越多、每行越长，整面墙重复得越晚（横向周期 ≥ 一行宽度，纵向周期 = 行变体数行）。
+ * 行数取偶数不是随便定的：封面格的行列都隔一格，行数为奇数时首尾两行在环绕处相邻
+ * （第 4 行与第 0 行），两张封面就会挨在一起；偶数行让封面格在任何方向都不相邻。
  */
 const TILES_PER_ROW = 10
-const ROW_VARIANTS = 5
+const ROW_VARIANTS = 6
 const MAX_ROW_COUNT = 20
 
 /** 固定种子的伪随机数，保证同一批内容在任意次渲染中排布一致。 */
@@ -99,6 +107,19 @@ function createSeededRandom(seed: number): () => number {
     result = (result + Math.imul(result ^ (result >>> 7), 61 | result)) ^ result
     return ((result ^ (result >>> 14)) >>> 0) / 4294967296
   }
+}
+
+/**
+ * 这一次打开的种子。墙面是背景，次次同一个排布会显得像张静态壁纸；换一次打开换一次排布。
+ * 一次打开期间它是常量：封面到齐、选中变化、窗口缩放都不该让墙重新排布。
+ */
+const launchSeed = createLaunchSeed()
+
+function createLaunchSeed(): number {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    return crypto.getRandomValues(new Uint32Array(1))[0]!
+  }
+  return Math.floor(Math.random() * 0xffffffff)
 }
 
 function hashText(value: string): number {
@@ -139,8 +160,6 @@ const artworkPool = computed<readonly WelcomeCoverWallTile[]>(() => (
 
 const highlightedKeys = computed(() => new Set(props.highlightKeys))
 
-const layoutSeed = computed(() => hashText(artworkPool.value.map(entry => entry.key).join('|')))
-
 function wrapIndex(value: number, size: number): number {
   return ((value % size) + size) % size
 }
@@ -151,7 +170,7 @@ function wrapIndex(value: number, size: number): number {
  */
 function buildPattern(): readonly (readonly WelcomeCoverWallTile[])[] {
   const pool = artworkPool.value
-  const random = createSeededRandom(layoutSeed.value)
+  const random = createSeededRandom(launchSeed)
   const pattern: (WelcomeCoverWallTile | null)[][] = Array.from(
     { length: ROW_VARIANTS },
     () => Array.from({ length: TILES_PER_ROW }, () => null),
@@ -175,7 +194,14 @@ function buildPattern(): readonly (readonly WelcomeCoverWallTile[])[] {
     const allowed = pool.filter(entry => !taken.has(entry.src))
     const candidates = allowed.length > 0 ? allowed : pool
     const entry = candidates[Math.floor(random() * candidates.length)]!
-    return { key: `tile-${row}-${column}`, src: entry.src }
+    // 取景也随机：同一张封面在不同格子里露出不同的一块，整面墙就不会是一排重复的缩略图。
+    return {
+      key: `tile-${row}-${column}`,
+      src: entry.src,
+      artworkStyle: {
+        objectPosition: `${Math.round(random() * 100)}% ${Math.round(random() * 100)}%`,
+      },
+    }
   }
 
   // 行优先填一遍：每格只避开已经放好的邻居。
@@ -233,7 +259,7 @@ const coverSlots = computed<ReadonlyMap<string, { cover: WelcomeCoverWallCover; 
     ),
   )
 
-  const random = createSeededRandom(hashText(covers.map(cover => cover.projectKey).join('|')))
+  const random = createSeededRandom(hashText(covers.map(cover => cover.projectKey).join('|')) ^ launchSeed)
   for (let index = lattice.length - 1; index > 0; index -= 1) {
     const swap = Math.floor(random() * (index + 1))
     const held = lattice[index]!

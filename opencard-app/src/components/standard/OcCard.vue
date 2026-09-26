@@ -50,8 +50,6 @@ interface OcCardProps {
   icon?: IconToken
   /** 外观变体。默认 'surface' */
   variant?: 'plain' | 'surface' | 'glass'
-  /** 圆角。默认 'md' */
-  radius?: 'none' | 'sm' | 'md' | 'lg'
   /** 头部操作按钮定义 */
   actions?: OcCardAction[]
   /** 是否折叠内容。默认 false */
@@ -74,7 +72,6 @@ const props = withDefaults(defineProps<OcCardProps>(), {
   title: undefined,
   icon: undefined,
   variant: 'surface',
-  radius: 'md',
   actions: () => [],
   collapsed: false,
   fill: false,
@@ -91,7 +88,6 @@ const forwardedAttrs = computed(() => {
 const hasHeader = computed(() => Boolean(props.title || props.icon || props.actions?.length))
 const cardClasses = computed(() => [
   `oc-card--variant-${props.variant}`,
-  `oc-card--radius-${props.radius}`,
   { 'oc-card--fill': props.fill, 'oc-card--collapsed': props.collapsed },
   attrs.class,
 ])
@@ -178,6 +174,7 @@ function leaveContent(element: Element, done: () => void): void {
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
+  border-radius: var(--oc-radius-md);
   transition:
     background-color var(--oc-duration-fast) var(--oc-ease),
     border-color var(--oc-duration-fast) var(--oc-ease),
@@ -204,11 +201,6 @@ function leaveContent(element: Element, done: () => void): void {
   backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
   box-shadow: var(--oc-shadow-md);
 }
-
-.oc-card--radius-none { border-radius: 0; }
-.oc-card--radius-sm { border-radius: var(--oc-radius-sm); }
-.oc-card--radius-md { border-radius: var(--oc-radius-md); }
-.oc-card--radius-lg { border-radius: var(--oc-radius-lg); }
 
 .oc-card--fill {
   width: 100%;

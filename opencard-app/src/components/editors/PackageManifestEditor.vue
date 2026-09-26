@@ -1,86 +1,131 @@
+<!-- 业务 包清单预览：内容特征码、清单与封面都读自被打开的那个归档，不查项目包表，也不解开它。 -->
 <template>
   <ProjectRegistryEditorShell>
     <OcEmpty v-if="!manifest" tone="muted" inset="comfortable">
       {{ t('packageManifest.unavailable') }}
     </OcEmpty>
     <div v-else class="package-manifest-editor">
-      <OcPanel v-if="cover" gap="3" padding="4" border="muted" radius="md">
-        <h2>{{ t('packageManifest.cover') }}</h2>
+      <OcCard v-if="coverSrc" :title="t('packageManifest.cover')" icon="file.image">
         <div class="package-manifest-editor__cover">
-          <OcCover :visual="{ type: 'image', src: cover.src, label: t('packageManifest.coverAlt') }" />
+          <OcCover :visual="{ type: 'image', src: coverSrc, label: t('packageManifest.coverAlt') }" />
         </div>
-      </OcPanel>
+      </OcCard>
 
-      <OcPanel gap="3" padding="4" border="muted" radius="md">
-        <h2>{{ t('packageManifest.information') }}</h2>
-        <dl class="package-manifest-editor__details">
-          <div><dt>{{ t('packageManifest.coordinate') }}</dt><dd><code>{{ coordinate }}</code></dd></div>
-          <div><dt>{{ t('packageManifest.name') }}</dt><dd>{{ manifest.title }}</dd></div>
-          <div><dt>{{ t('packageManifest.fingerprint') }}</dt><dd><code>{{ fingerprint }}</code></dd></div>
-        </dl>
-      </OcPanel>
+      <OcCard
+        :title="t('packageManifest.information')"
+        icon="file.package"
+        :actions="identityActions"
+        @action="handleIdentityAction"
+      >
+        <OcRow v-for="row in identityRows" :key="row.key">
+          <template #title>
+            <OcText tone="muted">{{ row.label }}</OcText>
+          </template>
+          <template #append>
+            <OcText mono size="sm" truncate>{{ row.value }}</OcText>
+          </template>
+        </OcRow>
+      </OcCard>
 
-      <OcPanel gap="3" padding="4" border="muted" radius="md">
-        <h2>{{ t('packageManifest.fonts') }}</h2>
+      <OcCard :title="t('packageManifest.fonts')" icon="data.symbol-string">
         <OcEmpty v-if="manifest.public.fonts.length === 0" tone="muted" inset="compact">
           {{ t('packageManifest.noFonts') }}
         </OcEmpty>
-        <ul v-else class="package-manifest-editor__resources">
-          <li v-for="font in manifest.public.fonts" :key="font.key">
-            <span>{{ font.title }}</span><code>{{ font.key }}</code>
-          </li>
-        </ul>
-      </OcPanel>
+        <OcRow v-for="font in manifest.public.fonts" :key="font.key">
+          <template #title>{{ font.title }}</template>
+          <template #append>
+            <OcText tone="muted" size="sm" mono>{{ font.key }}</OcText>
+          </template>
+        </OcRow>
+      </OcCard>
 
-      <OcPanel gap="3" padding="4" border="muted" radius="md">
-        <h2>{{ t('packageManifest.iconSeries') }}</h2>
+      <OcCard :title="t('packageManifest.iconSeries')" icon="file.project-icon">
         <OcEmpty v-if="manifest.public.iconSeries.length === 0" tone="muted" inset="compact">
           {{ t('packageManifest.noIconSeries') }}
         </OcEmpty>
-        <ul v-else class="package-manifest-editor__resources">
-          <li v-for="series in manifest.public.iconSeries" :key="series.key">
-            <span>{{ series.title }}</span>
-            <code>{{ series.key }}</code>
-            <span>{{ t('packageManifest.iconCount', { count: series.count }) }}</span>
-          </li>
-        </ul>
-      </OcPanel>
+        <OcRow v-for="series in manifest.public.iconSeries" :key="series.key">
+          <template #title>{{ series.title }}</template>
+          <template #append>
+            <OcText tone="muted" size="sm">{{ t('packageManifest.iconCount', { count: series.count }) }}</OcText>
+            <OcText tone="muted" size="sm" mono>{{ series.key }}</OcText>
+          </template>
+        </OcRow>
+      </OcCard>
     </div>
   </ProjectRegistryEditorShell>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { getPathBasename } from '../../shared/model/filePath'
-import { readResourcePackageArchive, type ResourcePackageArchive } from '../../features/workspace/services/resourcePackageArchive'
-import { useProjectStore } from '../../features/workspace/store/projectStore'
+import { coverImageMimeType } from '../../features/workspace/model/projectCover'
+import {
+  readResourcePackageArchive,
+  readResourcePackageCover,
+  type ResourcePackageArchive,
+} from '../../features/workspace/services/resourcePackageArchive'
 import OcEmpty from '../base/OcEmpty.vue'
-import OcPanel from '../base/OcPanel.vue'
+import OcText from '../base/OcText.vue'
+import type { OcActionButtonAction, OcActionButtonSelectPayload } from '../standard/OcActionButton.vue'
+import OcCard from '../standard/OcCard.vue'
 import OcCover from '../standard/OcCover.vue'
+import OcRow from '../standard/OcRow.vue'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
+
+const COPY_COORDINATE_ACTION_KEY = 'manifest.copy-coordinate'
+const COPY_FINGERPRINT_ACTION_KEY = 'manifest.copy-fingerprint'
 
 const props = defineProps<EditorProps>()
 const emit = defineEmits<EditorEmits>()
 const { t } = useI18n()
-const projectStore = useProjectStore()
 
 /**
  * 预览回答的是"这个文件是什么"，所以读的就是这个文件 —— 不查项目的包表。
  * 项目里是不是装了它、它是重复件还是还没解开，都不该改变它是什么。
  */
 const archive = ref<ResourcePackageArchive | null>(null)
+const coverSrc = ref('')
 watch(() => props.filePath, async path => {
   archive.value = await readResourcePackageArchive(path).catch(() => null)
+  releaseCover()
+  // 封面也只读这个归档里的那一个条目：没解开也能看，重复件看的也是自己那份。
+  const coverPath = archive.value?.manifest.cover
+  coverSrc.value = coverPath
+    ? await readResourcePackageCover(path, coverImageMimeType(coverPath)).catch(() => '')
+    : ''
 }, { immediate: true })
+onBeforeUnmount(releaseCover)
+
+/** blob 地址要自己回收，否则每换一个文件都会留下一份图片字节。 */
+function releaseCover(): void {
+  if (!coverSrc.value) return
+  URL.revokeObjectURL?.(coverSrc.value)
+  coverSrc.value = ''
+}
 
 const manifest = computed(() => archive.value?.manifest ?? null)
 const coordinate = computed(() => archive.value?.coordinate ?? '')
 const fingerprint = computed(() => archive.value?.fingerprint ?? '')
-// 封面是唯一需要解开目录的东西：包表里认得这个文件就顺手显示，不认得就不显示。
-const cover = computed(() => projectStore.findProjectResourcePackage(props.filePath)?.cover ?? null)
+
+const identityRows = computed(() => [
+  { key: 'coordinate', label: t('packageManifest.coordinate'), value: coordinate.value },
+  { key: 'name', label: t('packageManifest.name'), value: manifest.value?.title ?? '' },
+  { key: 'fingerprint', label: t('packageManifest.fingerprint'), value: fingerprint.value },
+])
+
+const identityActions = computed<OcActionButtonAction[]>(() => [
+  { key: COPY_COORDINATE_ACTION_KEY, title: t('packageManager.copyCoordinate'), icon: 'action.copy' },
+  { key: COPY_FINGERPRINT_ACTION_KEY, title: t('packageManifest.copyFingerprint'), icon: 'action.copy' },
+])
+
+/** 复制动作跟相册卡片上那两条同款：坐标照抄，特征码也照抄一次好贴给别人比对。 */
+function handleIdentityAction(payload: OcActionButtonSelectPayload): void {
+  if (payload.key === COPY_COORDINATE_ACTION_KEY) void navigator.clipboard.writeText(coordinate.value)
+  else if (payload.key === COPY_FINGERPRINT_ACTION_KEY) void navigator.clipboard.writeText(fingerprint.value)
+}
 
 const presentation = computed<EditorPresentation>(() => ({
   // 主标题是这个文件本身叫什么，小字是它自述的坐标。文件叫什么名字不算数 —— 那是"它是谁"，
@@ -102,18 +147,6 @@ watch(() => props.filePath, () => emit('modified', false), { immediate: true })
   gap: var(--oc-space-4);
 }
 
-.package-manifest-editor h2,
-.package-manifest-editor dl,
-.package-manifest-editor dd,
-.package-manifest-editor ul {
-  margin: 0;
-}
-
-.package-manifest-editor h2 {
-  font-size: var(--oc-text-md);
-  color: var(--oc-fg-default);
-}
-
 /* 几何与边框归这个框所有；OcCover 只负责把封面铺满框内。 */
 .package-manifest-editor__cover {
   width: var(--oc-cover-preview-width);
@@ -121,34 +154,5 @@ watch(() => props.filePath, () => emit('modified', false), { immediate: true })
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-md);
-}
-
-.package-manifest-editor__details,
-.package-manifest-editor__resources {
-  display: flex;
-  flex-direction: column;
-  gap: var(--oc-space-2);
-  padding: 0;
-}
-
-.package-manifest-editor__details > div,
-.package-manifest-editor__resources > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--oc-space-2);
-}
-
-.package-manifest-editor__details dt {
-  color: var(--oc-fg-muted);
-}
-
-.package-manifest-editor__resources > li {
-  list-style: none;
-}
-
-.package-manifest-editor code {
-  overflow-wrap: anywhere;
-  color: var(--oc-fg-muted);
 }
 </style>

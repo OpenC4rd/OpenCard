@@ -176,9 +176,6 @@ async function loadFeedbackStatus(
     ? await getIssueComments(env, installationToken, receipt.issueNumber, issue.commentCount)
     : []
   const status = resolveFeedbackStatus(issue, comments)
-  for (const warning of status.warnings) {
-    console.warn(JSON.stringify({ event: 'feedback_configuration_warning', reportId: receipt.reportId, warning }))
-  }
   return {
     reportId: receipt.reportId,
     status: status.status,

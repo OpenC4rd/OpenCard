@@ -23,8 +23,7 @@ import { changedPathsUnder, decorateChangedPathTree } from '../../version-contro
 import { gitignorePatternForExtension, gitignorePatternForPath } from '../../version-control/gitignorePatterns'
 import { useProjectTimeline } from '../../version-control/useProjectTimeline'
 import { notifyError, notifyWarning } from '../../notifications/titlebarNotices'
-import { resolveCommitterIdentity, type AppSettings } from '../../settings/model/appSettings'
-import { openSetting } from '../../settings/settingsNavigation'
+import { resolveCommitterIdentity, type AppSettingKey, type AppSettings } from '../../settings/model/appSettings'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { isRepositorySidebarReady } from '../shellSidebarConfig'
 
@@ -47,6 +46,8 @@ type ShellVersionControlOptions = {
   getRelativeProjectPath: (path: string) => string
   /** 把项目相对路径移入回收站：放弃新增内容时用它，磁盘上的文件还留得下来。 */
   moveProjectEntryToTrash: (relativePath: string) => Promise<void>
+  /** 跳到某个设置项：提交者身份不合法时用它把用户带到该行。 */
+  openSetting: (key: AppSettingKey) => void
   /** 应用设置：初始化仓库时直接取提交者身份与是否创建首次提交。 */
   settings: Readonly<Ref<DeepReadonly<AppSettings>>>
 }
@@ -285,7 +286,7 @@ export function useShellVersionControl(options: ShellVersionControlOptions): She
           const failure = initialized.error
           if (failure?.kind === 'invalid-input') {
             notifyWarning(failure.message)
-            openSetting('versionControl.committerName')
+            options.openSetting('versionControl.committerName')
             return
           }
           notifyError(failure?.message ?? t('sidebar.initializeFailed'))

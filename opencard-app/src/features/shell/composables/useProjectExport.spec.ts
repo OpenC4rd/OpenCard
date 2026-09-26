@@ -3,10 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../../workspace/services/projectIconCatalog'
 import { inlineProjectIconSources, useProjectExport } from './useProjectExport'
-import { createCardRenderResourceContext } from '../../card-rendering/cardRenderResources'
-import { createCardPipelineIssue } from '../../card-rendering/cardPipelineIssue'
-import type { PreparedCardRender } from '../../card-rendering/renderPipeline'
-import { exportCardAsImage } from '../../../utils/exportCard'
 
 const notificationMocks = vi.hoisted(() => ({
   notifyAppError: vi.fn(),
@@ -15,8 +11,8 @@ const notificationMocks = vi.hoisted(() => ({
   notifyWarning: vi.fn(),
 }))
 
-vi.mock('../../../utils/exportCard', () => ({
-  exportCardAsImage: vi.fn(async () => 'data:image/png;base64,AQ=='),
+vi.mock('dom-to-image-more', () => ({
+  default: { toPng: vi.fn(async () => 'data:image/png;base64,AQ==') },
 }))
 vi.mock('../../workspace/services/projectFontLoader', () => ({
   waitForProjectFonts: vi.fn(async () => undefined),
@@ -39,7 +35,6 @@ function createAdapter(
   readProjectFile = vi.fn(async () => content('640')),
   exportRendererRef = ref<{
     getCanvasElement?: () => HTMLElement | undefined
-    getRuntimeIssues?: () => ReturnType<typeof createCardPipelineIssue>[]
   }>(),
 ) {
   return {
@@ -117,41 +112,3 @@ describe('useProjectExport project icon assets', () => {
   })
 })
 
-describe('useProjectExport runtime diagnostics', () => {
-  it('checks runtime issues before capturing the hidden renderer', async () => {
-    const issue = createCardPipelineIssue({
-      type: 'card-designer.render-parse.invalid-type',
-      location: {
-        documentId: 'document', instanceId: null, faceKey: 'front',
-        owner: { kind: 'block', id: 'custom' }, blockId: 'custom', fieldKey: 'content',
-      },
-    })
-    const canvas = document.createElement('div')
-    const { adapter } = createAdapter([], undefined, ref({
-      getCanvasElement: () => canvas,
-      getRuntimeIssues: () => [issue],
-    }))
-    const front = {
-      type: 'card-face' as const, id: 'front', faceKey: 'front' as const,
-      width: 540, height: 850, background: '#fff', children: [],
-    }
-    const render: PreparedCardRender = {
-      document: {
-        type: 'card-document', id: 'document', name: 'Document', version: '1', description: '', notes: '',
-        faces: { front, back: { ...front, id: 'back', faceKey: 'back' } },
-      },
-      issues: [],
-      resources: createCardRenderResourceContext({ projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG }),
-    }
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      callback(0)
-      return 1
-    })
-    vi.mocked(exportCardAsImage).mockClear()
-
-    expect(await adapter.renderCardImages(render, ['front'], 1)).toBeNull()
-    expect(exportCardAsImage).not.toHaveBeenCalled()
-    expect(notificationMocks.notifyAppError).toHaveBeenCalledWith('OC-E5006', expect.any(Error))
-    vi.unstubAllGlobals()
-  })
-})

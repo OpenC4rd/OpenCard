@@ -1,4 +1,5 @@
 import { basename, join, resolveResource } from '@tauri-apps/api/path'
+import { describeError } from '../../../shared/model/error'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { parseCardDocument } from '../../../entities/card/storage'
@@ -69,10 +70,6 @@ const defaultPathService: ProjectTemplatePathService = {
   basename,
   join,
   resolveResource,
-}
-
-function describeError(value: unknown): string {
-  return value instanceof Error ? value.message : String(value)
 }
 
 function parseJson(value: string, code: 'invalid-catalog' | 'invalid-manifest', path: string): unknown {

@@ -19,6 +19,7 @@ import type {
   RenderReadySimpleContainerLocation,
 } from './render.types'
 import { joinBlockPath } from './renderBlockPath'
+import { isRecord } from '../../shared/model/record'
 
 type SourceRecord = Record<string, unknown>
 type BlockType = CardBlock['type']
@@ -685,10 +686,6 @@ function formatIssueValue(value: unknown): string {
 
 function primitiveString(value: unknown): string {
   return typeof value === 'string' ? value : ''
-}
-
-function isRecord(value: unknown): value is SourceRecord {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
 function toRecord(value: unknown): SourceRecord {

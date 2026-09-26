@@ -17,6 +17,7 @@ import {
 } from "./features/shell/services/windowBackdropMaterial";
 import { warmCodeEditorOnIdle } from "./features/editor-runtime/services/warmCodeEditor";
 import { runStorageMaintenance } from "./features/shell/services/storageMaintenance";
+import { CACHE_GIB_BYTES } from "./shared/storage/appCache";
 import "./features/shell/shell.css";
 import "./styles.css";
 
@@ -194,7 +195,11 @@ async function bootstrap(): Promise<void> {
   createApp(App).use(i18n).mount("#app");
   recordStartupTiming("Vue mounted");
   // 启动维护不占启动路径：清暂存与缓存淘汰都是后台的事，失败也不该拦住首帧。
-  void runStorageMaintenance();
+  // 两个上限来自设置（上面已经加载过），所以维护不用自己去读设置文档。
+  void runStorageMaintenance({
+    packageCacheBytes: settingsStore.settings.value.cache.packageLimitGb * CACHE_GIB_BYTES,
+    networkCacheBytes: settingsStore.settings.value.cache.networkLimitGb * CACHE_GIB_BYTES,
+  });
   window.requestAnimationFrame(() => {
     dismissStartupCover();
     // 首帧之后再预热代码编辑器，既不占用启动路径，又能让首次打开文件时已经就绪。

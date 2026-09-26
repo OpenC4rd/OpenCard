@@ -1,5 +1,4 @@
 type ScheduledTask = {
-  delay: number
   run: () => Promise<void> | void
   timer: ReturnType<typeof setTimeout>
 }
@@ -15,7 +14,7 @@ class TaskScheduler {
       await run()
     }, delay)
 
-    this.tasks.set(key, { delay, run, timer })
+    this.tasks.set(key, { run, timer })
   }
 
   cancel(key: string) {
@@ -24,23 +23,6 @@ class TaskScheduler {
 
     clearTimeout(task.timer)
     this.tasks.delete(key)
-  }
-
-  async flush(key: string) {
-    const task = this.tasks.get(key)
-    if (!task) return
-
-    clearTimeout(task.timer)
-    this.tasks.delete(key)
-    await task.run()
-  }
-
-  cancelAll() {
-    for (const task of this.tasks.values()) {
-      clearTimeout(task.timer)
-    }
-
-    this.tasks.clear()
   }
 }
 

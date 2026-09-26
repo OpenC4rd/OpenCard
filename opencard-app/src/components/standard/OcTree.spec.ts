@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   OcNode,
@@ -96,7 +97,7 @@ describe('OcTree', () => {
     }])
   })
 
-  it('keeps a badge-only tail as a standalone part of the row', () => {
+  it('keeps a badge-only tail as a standalone part of the row', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -107,6 +108,8 @@ describe('OcTree', () => {
         }),
       },
     })
+    // OcText 的提示全文取自它自己渲染出来的字，所以挂载后一拍才挂上属性。
+    await nextTick()
 
     // The trailing line lives in the row's append container, so the chip carries its own width next
     // to the title instead of being squeezed inside a box of its own. The tree's tail line is

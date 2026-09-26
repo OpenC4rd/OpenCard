@@ -280,7 +280,7 @@ function writeExportCell(
   target.protection = { locked: false }
   applyCellValidation(target, definition)
   if (kind === 'instance' && cell.inherited) {
-    const blueprintColumn = getColumnLetter(FIRST_DATA_COLUMN)
+    const blueprintColumn = worksheet.getColumn(FIRST_DATA_COLUMN).letter
     target.value = { formula: `$${blueprintColumn}${rowNumber}`, result: encodeCellValue(cell.value) }
     return
   }
@@ -319,7 +319,7 @@ function readColumnTargets(
       const instanceName = readString(worksheet.getCell(2, columnNumber).value)
       if (!instanceName) {
         if (columnHasData(worksheet, columnNumber)) {
-          throw new CardDataWorkbookError(`Column ${getColumnLetter(columnNumber)} has data but no instance name`)
+          throw new CardDataWorkbookError(`Column ${worksheet.getColumn(columnNumber).letter} has data but no instance name`)
         }
         continue
       }
@@ -428,15 +428,4 @@ function setCell(
   value: string,
 ): void {
   worksheet.getCell(rowNumber, columnNumber).value = value
-}
-
-function getColumnLetter(columnNumber: number): string {
-  let value = columnNumber
-  let result = ''
-  while (value > 0) {
-    const remainder = (value - 1) % 26
-    result = String.fromCharCode(65 + remainder) + result
-    value = Math.floor((value - 1) / 26)
-  }
-  return result
 }

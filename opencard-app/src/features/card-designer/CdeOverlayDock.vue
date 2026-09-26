@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+import { clamp } from '../../shared/model/number'
 import OcResizeTrack from '../../components/standard/OcResizeTrack.vue'
 import {
   resolveCdeOverlayDockGeometry,
@@ -168,10 +169,6 @@ const splitHandleStyle = computed<CSSProperties>(() => ({
   top: `${resolvedTopSize.value}px`,
   height: `${props.splitGap}px`,
 }))
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
-}
 
 function measureTopSize(): void {
   measuredStackHeight.value = stackRef.value?.getBoundingClientRect().height ?? 0

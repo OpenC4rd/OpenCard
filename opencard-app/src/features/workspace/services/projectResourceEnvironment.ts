@@ -67,8 +67,18 @@ export type ProjectResourceEnvironment = {
   readonly iconDocument: ProjectIconRegistryDocument
   readonly iconCatalog: ProjectIconCatalog
   readonly packages?: ProjectResourcePackageCatalog
+  /**
+   * 项目作用域里每一个归档**文件**，含内容相同的那几份。引用解析按指纹去重（见 `packages`），
+   * 但"文件夹里有哪些包"是另一件事：相册按文件列，重复的一份也是文件。
+   */
+  readonly packageFiles?: readonly ProjectResourcePackageFile[]
   readonly unreadablePackages?: readonly UnreadableProjectPackage[]
   readonly packageEnvironments?: ReadonlyMap<string, ProjectResourceEnvironment>
+}
+
+export type ProjectResourcePackageFile = {
+  archivePath: string
+  fingerprint: string
 }
 
 /**
@@ -166,15 +176,20 @@ function isPackageFile(entry: DirEntry): boolean {
 async function discoverProjectResourcePackages(options: {
   fs: EnvironmentFs
   root: string
-  /** 包缓存根（`<软件存储>/cache/packages`）：解开目录就挂在指纹上，所以"解开了没有"在这里回答。 */
-  packagesRoot: string
+  /** 包快照根（`<软件存储>/cache/snapshots`）：解开目录就挂在指纹上，所以"解开了没有"在这里回答。 */
+  snapshotsRoot: string
   unusableFingerprints?: ReadonlySet<string>
-  onPackagePending?: (archive: ResourcePackageArchive, archivePath: string, packagesRoot: string) => void
-}): Promise<{ packages: Map<string, ProjectResourcePackage>, unreadable: UnreadableProjectPackage[] }> {
+  onPackagePending?: (archive: ResourcePackageArchive, archivePath: string, snapshotsRoot: string) => void
+}): Promise<{
+  packages: Map<string, ProjectResourcePackage>
+  packageFiles: ProjectResourcePackageFile[]
+  unreadable: UnreadableProjectPackage[]
+}> {
   const packages = new Map<string, ProjectResourcePackage>()
+  const packageFiles: ProjectResourcePackageFile[] = []
   const unreadable: UnreadableProjectPackage[] = []
   const archiveRoot = `${options.root}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`
-  if (!await options.fs.fileExists(archiveRoot)) return { packages, unreadable }
+  if (!await options.fs.fileExists(archiveRoot)) return { packages, packageFiles, unreadable }
 
   const entries = (await options.fs.readDirectory(archiveRoot)).filter(isPackageFile)
   entries.sort((left, right) => left.name.localeCompare(right.name))
@@ -190,10 +205,11 @@ async function discoverProjectResourcePackages(options: {
       unreadable.push({ archivePath, reason: cause instanceof Error ? cause.message : String(cause) })
       continue
     }
+    packageFiles.push({ archivePath, fingerprint: archive.fingerprint })
     if (packages.has(archive.fingerprint)) continue
     if (options.unusableFingerprints?.has(archive.fingerprint)) continue
     // "解开了没有"就是"缓存里有没有那个指纹目录"：缓存目录名按指纹算出来，不需要谁再记一份。
-    const unpackRoot = `${options.packagesRoot}/${archive.fingerprint}`
+    const unpackRoot = `${options.snapshotsRoot}/${archive.fingerprint}`
     const unpacked = await options.fs.fileExists(unpackRoot)
     packages.set(archive.fingerprint, {
       coordinate: parsePackageCoordinate(archive.coordinate)!,
@@ -206,9 +222,9 @@ async function discoverProjectResourcePackages(options: {
         : null,
     })
     // 还没解开的包只排队，不在这里等：加载环境不该被一次解压卡住。
-    if (!unpacked) options.onPackagePending?.(archive, archivePath, options.packagesRoot)
+    if (!unpacked) options.onPackagePending?.(archive, archivePath, options.snapshotsRoot)
   }
-  return { packages, unreadable }
+  return { packages, unreadable, packageFiles }
 }
 
 /** 注册表读不出来就当作空的：它是描述性的，读不动不该把整个作用域判死。 */
@@ -254,10 +270,10 @@ export async function loadProjectResourceEnvironment(options: {
   rootPath: string | null
   projectRootPath?: string | null
   /**
-   * 包缓存根（`<软件存储>/cache/packages`）。它决定"包解开了没有"这个问题的答案在哪找，
+   * 包快照根（`<软件存储>/cache/snapshots`）。它决定"包解开了没有"这个问题的答案在哪找，
    * 所以由调用方解析一次传进来，而不是每个包各自去问。
    */
-  packagesRoot: string
+  snapshotsRoot: string
   kind: ProjectResourceScopeKind
   identity: string
   generation?: number
@@ -272,15 +288,15 @@ export async function loadProjectResourceEnvironment(options: {
    */
   unusableFingerprints?: ReadonlySet<string>
   /**
-   * 发现一个还没解开的包时叫一次，并把包缓存根一起交给它。加载本身**不等**它：那是后台的事，
+   * 发现一个还没解开的包时叫一次，并把包快照根一起交给它。加载本身**不等**它：那是后台的事，
    * 解好之后重建一次环境，画面自己补齐。
    */
-  onPackagePending?: (archive: ResourcePackageArchive, archivePath: string, packagesRoot: string) => void
+  onPackagePending?: (archive: ResourcePackageArchive, archivePath: string, snapshotsRoot: string) => void
 }): Promise<ProjectResourceEnvironment> {
   const namespace = createProjectResourceNamespace(options.kind, options.identity)
   const root = options.rootPath?.replace(/[\\/]+$/, '') ?? null
   const projectRoot = options.projectRootPath?.replace(/[\\/]+$/, '') ?? root ?? ''
-  const packagesRoot = options.packagesRoot.replace(/[\\/]+$/, '')
+  const snapshotsRoot = options.snapshotsRoot.replace(/[\\/]+$/, '')
 
   const registries = root
     ? await readScopeRegistries(options.fs, root)
@@ -290,11 +306,11 @@ export async function loadProjectResourceEnvironment(options: {
     ? await discoverProjectResourcePackages({
       fs: options.fs,
       root,
-      packagesRoot,
+      snapshotsRoot,
       unusableFingerprints: options.unusableFingerprints,
       onPackagePending: options.onPackagePending,
     })
-    : { packages: new Map<string, ProjectResourcePackage>(), unreadable: [] }
+    : { packages: new Map<string, ProjectResourcePackage>(), unreadable: [], packageFiles: [] }
   const packages = discovered.packages
 
   const packageEnvironments = new Map<string, ProjectResourceEnvironment>()
@@ -307,7 +323,7 @@ export async function loadProjectResourceEnvironment(options: {
       fs: options.fs,
       rootPath: pkg.rootPath,
       projectRootPath: projectRoot,
-      packagesRoot,
+      snapshotsRoot,
       kind: 'package',
       identity: coordinate,
       generation: options.generation,
@@ -327,6 +343,7 @@ export async function loadProjectResourceEnvironment(options: {
     iconDocument: registries.icons,
     iconCatalog,
     packages,
+    packageFiles: discovered.packageFiles,
     unreadablePackages: discovered.unreadable,
     packageEnvironments,
   }
