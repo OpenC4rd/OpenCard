@@ -33,12 +33,10 @@ type CdeShortcutScope = 'canvas' | 'instance-tree' | 'structure-tree'
 type CdeShortcutBinding = {
   key: string
   mod?: boolean
-  shift?: boolean
 }
 
 export type CdeShortcutCommand = {
   key: CdeShortcutCommandKey
-  shortcut: readonly CdeShortcutBinding[]
   scopes?: readonly CdeShortcutScope[]
   canRun: () => boolean
   run: () => void | Promise<void>
@@ -47,16 +45,16 @@ export type CdeShortcutCommand = {
 type UseCdeShortcutsOptions = {
   rootElement: Readonly<Ref<HTMLElement | null>>
   commands: readonly CdeShortcutCommand[]
+  /** True while another owner (Layer View) is arbitrating the canvas, so bare letters skip routing. */
+  suspendLetterShortcuts: () => boolean
 }
 
 type ShortcutContext = {
   rootElement: Readonly<Ref<HTMLElement | null>>
   commands: readonly CdeShortcutCommand[]
+  suspendLetterShortcuts: () => boolean
   scope: CdeShortcutScope
 }
-
-const contexts: ShortcutContext[] = []
-let globalListeners = 0
 
 const commandBindings: Readonly<Record<CdeShortcutCommandKey, readonly CdeShortcutBinding[]>> = {
   'selection.fill-parent': [{ key: 'f' }],
@@ -85,15 +83,10 @@ const commandBindings: Readonly<Record<CdeShortcutCommandKey, readonly CdeShortc
   'view.diff-divider-right': [{ key: 'd' }],
 }
 
-export function getCdeShortcutBindings(key: CdeShortcutCommandKey): readonly CdeShortcutBinding[] {
-  return commandBindings[key]
-}
-
 export function getCdeShortcutParts(key: CdeShortcutCommandKey): readonly OcShortcutPart[] {
   const binding = commandBindings[key][0]!
   const parts: OcShortcutPart[] = []
   if (binding.mod) parts.push(isMacPlatform() ? '⌘' : 'Ctrl')
-  if (binding.shift) parts.push(isMacPlatform() ? '⇧' : 'Shift')
   parts.push(displayKey(binding.key))
   return parts
 }
@@ -105,61 +98,47 @@ export function formatCdeShortcutMarkup(key: CdeShortcutCommandKey): string {
     .join(' + ')
 }
 
-export function useCdeShortcuts(options: UseCdeShortcutsOptions) {
+// The shell mounts one card designer at a time (a keyed editor slot), so routing state is module
+// level: the newest mount owns it and the window listeners are registered once.
+let activeContext: ShortcutContext | null = null
+let listening = false
+
+export function useCdeShortcuts(options: UseCdeShortcutsOptions): void {
   const context: ShortcutContext = {
     rootElement: options.rootElement,
     commands: options.commands,
+    suspendLetterShortcuts: options.suspendLetterShortcuts,
     scope: 'canvas',
   }
 
-  function handleKeydown(event: KeyboardEvent): void {
-    dispatchShortcut(event, context)
-  }
-
-  function handlePointerdown(event: PointerEvent): void {
-    const root = options.rootElement.value
-    if (!root || !(event.target instanceof Node) || !root.contains(event.target)) return
-    context.scope = resolveScopeFromPath(event.composedPath()) ?? 'canvas'
-  }
-
   onMounted(() => {
-    contexts.push(context)
-    globalListeners += 1
-    if (globalListeners === 1) {
-      window.addEventListener('keydown', handleGlobalKeydown, true)
-      window.addEventListener('pointerdown', handleGlobalPointerdown, true)
-    }
-    window.addEventListener('pointerdown', handlePointerdown, true)
+    activeContext = context
+    if (listening) return
+    listening = true
+    window.addEventListener('keydown', handleWindowKeydown, true)
+    window.addEventListener('pointerdown', handleWindowPointerdown, true)
   })
 
   onUnmounted(() => {
-    const index = contexts.indexOf(context)
-    if (index >= 0) contexts.splice(index, 1)
-    globalListeners -= 1
-    window.removeEventListener('pointerdown', handlePointerdown, true)
-    if (globalListeners === 0) {
-      window.removeEventListener('keydown', handleGlobalKeydown, true)
-      window.removeEventListener('pointerdown', handleGlobalPointerdown, true)
-    }
+    if (activeContext !== context) return
+    activeContext = null
+    listening = false
+    window.removeEventListener('keydown', handleWindowKeydown, true)
+    window.removeEventListener('pointerdown', handleWindowPointerdown, true)
   })
-
-  return { handleKeydown }
 }
 
-function handleGlobalKeydown(event: KeyboardEvent): void {
-  for (let index = contexts.length - 1; index >= 0; index -= 1) {
-    if (dispatchShortcut(event, contexts[index]!)) return
-  }
+function handleWindowKeydown(event: KeyboardEvent): void {
+  const context = activeContext
+  if (context) dispatchShortcut(event, context)
 }
 
-function handleGlobalPointerdown(event: PointerEvent): void {
-  for (let index = contexts.length - 1; index >= 0; index -= 1) {
-    const context = contexts[index]!
-    const root = context.rootElement.value
-    if (!root || !(event.target instanceof Node) || !root.contains(event.target)) continue
-    context.scope = resolveScopeFromPath(event.composedPath()) ?? 'canvas'
-    return
-  }
+function handleWindowPointerdown(event: PointerEvent): void {
+  const context = activeContext
+  if (!context) return
+  const root = context.rootElement.value
+  if (!root || !(event.target instanceof Node) || !root.contains(event.target)) return
+  context.scope = resolveScopeFromPath(event.composedPath()) ?? 'canvas'
 }
 
 function dispatchShortcut(event: KeyboardEvent, context: ShortcutContext): boolean {
@@ -174,7 +153,9 @@ function dispatchShortcut(event: KeyboardEvent, context: ShortcutContext): boole
 
   for (const command of context.commands) {
     if (command.scopes && !command.scopes.includes(context.scope)) continue
-    if (!command.shortcut.some(binding => matchesBinding(event, binding))) continue
+    const bindings = commandBindings[command.key]
+    if (!bindings.some(binding => matchesBinding(event, binding))) continue
+    if (context.suspendLetterShortcuts() && bindings.some(binding => !binding.mod && binding.key.length === 1)) continue
     if (!command.canRun()) continue
     event.preventDefault()
     event.stopPropagation()
@@ -205,8 +186,7 @@ function matchesBinding(event: KeyboardEvent, binding: CdeShortcutBinding): bool
   const expectedKey = binding.key.length === 1 ? binding.key.toLowerCase() : binding.key
   const hasMod = event.ctrlKey || event.metaKey
   if (Boolean(binding.mod) !== hasMod) return false
-  if (binding.shift === true && !event.shiftKey) return false
-  if (binding.shift !== true && event.shiftKey && binding.key !== '+') return false
+  if (event.shiftKey && binding.key !== '+') return false
   return key === expectedKey
 }
 

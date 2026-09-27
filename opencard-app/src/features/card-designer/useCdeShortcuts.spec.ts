@@ -1,7 +1,7 @@
 import { defineComponent, h, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
-import { getCdeShortcutBindings, useCdeShortcuts } from './useCdeShortcuts'
+import { useCdeShortcuts } from './useCdeShortcuts'
 
 function createHarness() {
   const duplicateBlock = vi.fn()
@@ -9,44 +9,41 @@ function createHarness() {
   const fitViewport = vi.fn()
   const toggleSnapping = vi.fn()
   const enabled = ref(true)
+  const suspended = ref(false)
   const fillParent = vi.fn()
 
   const Host = defineComponent({
     setup() {
       const rootElement = ref<HTMLElement | null>(null)
-      const shortcuts = useCdeShortcuts({
+      useCdeShortcuts({
         rootElement,
+        suspendLetterShortcuts: () => suspended.value,
         commands: [
           {
             key: 'instance.delete',
-            shortcut: getCdeShortcutBindings('instance.delete'),
             scopes: ['instance-tree'],
             canRun: () => enabled.value,
             run: deleteInstance,
           },
           {
             key: 'block.duplicate',
-            shortcut: getCdeShortcutBindings('block.duplicate'),
             scopes: ['canvas', 'structure-tree'],
             canRun: () => enabled.value,
             run: duplicateBlock,
           },
           {
             key: 'viewport.fit',
-            shortcut: getCdeShortcutBindings('viewport.fit'),
             canRun: () => enabled.value,
             run: fitViewport,
           },
           {
             key: 'view.toggle-snapping',
-            shortcut: getCdeShortcutBindings('view.toggle-snapping'),
             scopes: ['canvas'],
             canRun: () => enabled.value,
             run: toggleSnapping,
           },
           {
             key: 'selection.fill-parent',
-            shortcut: getCdeShortcutBindings('selection.fill-parent'),
             scopes: ['canvas', 'structure-tree'],
             canRun: () => enabled.value,
             run: fillParent,
@@ -57,7 +54,6 @@ function createHarness() {
         ref: rootElement,
         class: 'root',
         tabindex: -1,
-        onKeydown: shortcuts.handleKeydown,
       }, [
         h('div', { class: 'instances', 'data-cde-shortcut-scope': 'instance-tree' }, [
           h('button', { class: 'instance-row' }, 'Instance'),
@@ -71,7 +67,16 @@ function createHarness() {
     },
   })
 
-  return { deleteInstance, duplicateBlock, enabled, fillParent, fitViewport, toggleSnapping, wrapper: mount(Host) }
+  return {
+    deleteInstance,
+    duplicateBlock,
+    enabled,
+    suspended,
+    fillParent,
+    fitViewport,
+    toggleSnapping,
+    wrapper: mount(Host, { attachTo: document.body }),
+  }
 }
 
 describe('useCdeShortcuts', () => {
@@ -97,6 +102,20 @@ describe('useCdeShortcuts', () => {
     await wrapper.get('.root').trigger('keydown', { key: 's' })
     await wrapper.get('.block-row').trigger('keydown', { key: 's' })
     expect(fitViewport).toHaveBeenCalledTimes(1)
+    expect(toggleSnapping).toHaveBeenCalledTimes(1)
+  })
+
+  it('yields bare letters while Layer View arbitrates, keeping modified shortcuts live', async () => {
+    const { fitViewport, suspended, toggleSnapping, wrapper } = createHarness()
+
+    suspended.value = true
+    await wrapper.get('.root').trigger('keydown', { key: 's' })
+    await wrapper.get('.root').trigger('keydown', { key: '0', ctrlKey: true })
+    expect(toggleSnapping).not.toHaveBeenCalled()
+    expect(fitViewport).toHaveBeenCalledTimes(1)
+
+    suspended.value = false
+    await wrapper.get('.root').trigger('keydown', { key: 's' })
     expect(toggleSnapping).toHaveBeenCalledTimes(1)
   })
 

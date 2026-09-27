@@ -22,7 +22,7 @@ type ZIndexIntent = {
 
 type UseCdeLayerViewInteractionOptions = {
   rootElement: Readonly<Ref<HTMLElement | null>>
-  hasRenderableFace: Readonly<Ref<boolean>>
+  layerViewAvailable: Readonly<Ref<boolean>>
   selectedBlockId: Readonly<Ref<string | null>>
   viewportPort: Readonly<Ref<CdeLayerViewPort | null>>
   selectBlock: (blockId: string) => void
@@ -50,7 +50,7 @@ export function useCdeLayerViewInteraction(options: UseCdeLayerViewInteractionOp
       // Tab is the one key the canvas claims from anywhere inside the editor, but an editable
       // control owns Tab. The shortcut router exempts editables the same way.
       if (isEditableEventPath(event.composedPath())) return
-      if (options.hasRenderableFace.value) layerViewActive.value = true
+      if (options.layerViewAvailable.value) layerViewActive.value = true
       consume(event)
       return
     }

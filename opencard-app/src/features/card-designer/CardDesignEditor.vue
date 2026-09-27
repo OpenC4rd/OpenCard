@@ -298,7 +298,6 @@ import {
 } from './useCdeLayerViewInteraction'
 import {
   formatCdeShortcutMarkup,
-  getCdeShortcutBindings,
   getCdeShortcutParts,
   useCdeShortcuts,
   type CdeShortcutCommand,
@@ -1404,6 +1403,7 @@ const {
 
 const interactionSelectedBlockId = computed(() => selectedBlock.value?.id ?? null)
 const hasRenderableFace = computed(() => viewFace.value !== null)
+const layerViewAvailable = computed(() => props.mode !== 'diff' && hasRenderableFace.value)
 const {
   handleCanvasPointerDown,
   handleLayerZIndexStep,
@@ -1413,7 +1413,7 @@ const {
   spaceHeld,
 } = useCdeLayerViewInteraction({
   rootElement: editorRootRef,
-  hasRenderableFace,
+  layerViewAvailable,
   selectedBlockId: interactionSelectedBlockId,
   viewportPort: cardViewportRef,
   selectBlock: selectViewportBlock,
@@ -1433,21 +1433,18 @@ const layerViewAtomicBlockIds = computed(() => {
 const cdeShortcutCommands = [
   ...(['fill-parent', 'center', 'inset', 'outset'] as const).map(actionKey => ({
     key: `selection.${actionKey}` as const,
-    shortcut: getCdeShortcutBindings(`selection.${actionKey}` as const),
     scopes: ['canvas', 'structure-tree'] as const,
-    canRun: () => workspaceMode.value === 'design' && !layerViewActive.value && selectedLocationType.value === 'simple-container-location' && Boolean(selectedBlock.value),
+    canRun: () => workspaceMode.value === 'design' && selectedLocationType.value === 'simple-container-location' && Boolean(selectedBlock.value),
     run: () => { void cardViewportRef.value?.runSelectionQuickAction(actionKey) },
   })),
   ...(['fill-cross-axis', 'center-cross-axis'] as const).map(actionKey => ({
     key: `selection.${actionKey}` as const,
-    shortcut: getCdeShortcutBindings(`selection.${actionKey}` as const),
     scopes: ['canvas', 'structure-tree'] as const,
-    canRun: () => workspaceMode.value === 'design' && !layerViewActive.value && selectedLocationType.value === 'flow-container-location' && Boolean(selectedBlock.value),
+    canRun: () => workspaceMode.value === 'design' && selectedLocationType.value === 'flow-container-location' && Boolean(selectedBlock.value),
     run: () => { void cardViewportRef.value?.runSelectionQuickAction(actionKey) },
   })),
   {
     key: 'instance.rename',
-    shortcut: getCdeShortcutBindings('instance.rename'),
     scopes: ['instance-tree'],
     canRun: () => canMutateSelectedInstance.value,
     run: () => {
@@ -1457,21 +1454,18 @@ const cdeShortcutCommands = [
   },
   {
     key: 'instance.duplicate',
-    shortcut: getCdeShortcutBindings('instance.duplicate'),
     scopes: ['instance-tree'],
     canRun: () => canMutateSelectedInstance.value,
     run: () => triggerInstanceAction('duplicate-instance'),
   },
   {
     key: 'instance.delete',
-    shortcut: getCdeShortcutBindings('instance.delete'),
     scopes: ['instance-tree'],
     canRun: () => canMutateSelectedInstance.value,
     run: () => triggerInstanceAction('delete-instance'),
   },
   {
     key: 'block.rename',
-    shortcut: getCdeShortcutBindings('block.rename'),
     scopes: ['canvas', 'structure-tree'],
     canRun: () => workspaceMode.value === 'design' && Boolean(selectedBlock.value),
     run: () => {
@@ -1481,95 +1475,81 @@ const cdeShortcutCommands = [
   },
   {
     key: 'block.copy',
-    shortcut: getCdeShortcutBindings('block.copy'),
     scopes: ['canvas', 'structure-tree'],
     canRun: () => workspaceMode.value === 'design' && selectedBlockKeys.value.length > 0,
     run: copySelectedBlocks,
   },
   {
     key: 'block.paste',
-    shortcut: getCdeShortcutBindings('block.paste'),
     scopes: ['canvas', 'structure-tree'],
     canRun: () => workspaceMode.value === 'design' && Boolean(activeFace.value),
     run: pasteClipboardBlocks,
   },
   {
     key: 'block.duplicate',
-    shortcut: getCdeShortcutBindings('block.duplicate'),
     scopes: ['canvas', 'structure-tree'],
     canRun: () => workspaceMode.value === 'design' && Boolean(selectedBlock.value),
     run: () => handleRootAction('duplicate-selected'),
   },
   {
     key: 'block.delete',
-    shortcut: getCdeShortcutBindings('block.delete'),
     scopes: ['canvas', 'structure-tree'],
     canRun: () => workspaceMode.value === 'design' && selectedBlockKeys.value.length > 0,
     run: () => handleRootAction('delete-selected'),
   },
   {
     key: 'viewport.fit',
-    shortcut: getCdeShortcutBindings('viewport.fit'),
     canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: fitViewport,
   },
   {
     key: 'viewport.zoom-in',
-    shortcut: getCdeShortcutBindings('viewport.zoom-in'),
     canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: zoomViewportIn,
   },
   {
     key: 'viewport.zoom-out',
-    shortcut: getCdeShortcutBindings('viewport.zoom-out'),
     canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: zoomViewportOut,
   },
   {
     key: 'view.diff-divider-left',
-    shortcut: getCdeShortcutBindings('view.diff-divider-left'),
     scopes: ['canvas'],
     canRun: () => props.mode === 'diff' && hasRenderableFace.value,
     run: () => setDiffDividerPreset(0),
   },
   {
     key: 'view.diff-divider-center',
-    shortcut: getCdeShortcutBindings('view.diff-divider-center'),
     scopes: ['canvas'],
     canRun: () => props.mode === 'diff' && hasRenderableFace.value,
     run: () => setDiffDividerPreset(0.5),
   },
   {
     key: 'view.diff-divider-right',
-    shortcut: getCdeShortcutBindings('view.diff-divider-right'),
     scopes: ['canvas'],
     canRun: () => props.mode === 'diff' && hasRenderableFace.value,
     run: () => setDiffDividerPreset(1),
   },
   {
     key: 'view.toggle-snapping',
-    shortcut: getCdeShortcutBindings('view.toggle-snapping'),
     scopes: ['canvas'],
-    canRun: () => workspaceMode.value === 'design' && !layerViewActive.value && hasRenderableFace.value,
+    canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: toggleAlignmentSnapping,
   },
   {
     key: 'view.toggle-clip',
-    shortcut: getCdeShortcutBindings('view.toggle-clip'),
     scopes: ['canvas'],
-    canRun: () => workspaceMode.value === 'design' && !layerViewActive.value && hasRenderableFace.value,
+    canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: toggleFaceClip,
   },
   {
     key: 'view.switch-face',
-    shortcut: getCdeShortcutBindings('view.switch-face'),
     scopes: ['canvas'],
-    canRun: () => workspaceMode.value === 'design' && !layerViewActive.value && hasRenderableFace.value,
+    canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: toggleActiveFace,
   },
   {
     key: 'view.toggle-diff-mode',
-    shortcut: getCdeShortcutBindings('view.toggle-diff-mode'),
     scopes: ['canvas'],
     canRun: () => props.mode === 'diff' && hasRenderableFace.value,
     run: toggleDiffViewMode,
@@ -1579,6 +1559,7 @@ const cdeShortcutCommands = [
 useCdeShortcuts({
   rootElement: editorRootRef,
   commands: cdeShortcutCommands,
+  suspendLetterShortcuts: () => layerViewActive.value,
 })
 
 const selectionInfo = computed<CardViewportSelectionInfo | null>(() => {

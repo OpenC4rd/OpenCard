@@ -9,7 +9,7 @@ import {
 type LayerViewInteraction = ReturnType<typeof useCdeLayerViewInteraction>
 
 function createHarness() {
-  const hasRenderableFace = ref(true)
+  const layerViewAvailable = ref(true)
   const selectedBlockId = ref<string | null>('selected')
   const nudgeSelection = vi.fn(() => true)
   const runSelectionQuickAction = vi.fn(() => true)
@@ -36,7 +36,7 @@ function createHarness() {
       const rootElement = ref<HTMLElement | null>(null)
       interaction = useCdeLayerViewInteraction({
         rootElement,
-        hasRenderableFace,
+        layerViewAvailable,
         selectedBlockId,
         viewportPort,
         selectBlock,
@@ -62,7 +62,7 @@ function createHarness() {
     cycleLayerByInitial,
     focusLayerBlock,
     getFocusedLayerBlockId,
-    hasRenderableFace,
+    layerViewAvailable,
     interaction,
     nudgeSelection,
     selectBlock,
@@ -116,13 +116,13 @@ describe('useCdeLayerViewInteraction', () => {
   })
 
   it('owns Tab activation and clears transient state on keyup, blur, and unmount', async () => {
-    const { hasRenderableFace, interaction, wrapper } = createHarness()
+    const { layerViewAvailable, interaction, wrapper } = createHarness()
     const root = wrapper.get('.root')
 
-    hasRenderableFace.value = false
+    layerViewAvailable.value = false
     await root.trigger('keydown', { key: 'Tab' })
     expect(interaction.layerViewActive.value).toBe(false)
-    hasRenderableFace.value = true
+    layerViewAvailable.value = true
     await root.trigger('keydown', { key: 'Tab' })
     expect(interaction.layerViewActive.value).toBe(true)
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Tab' }))
