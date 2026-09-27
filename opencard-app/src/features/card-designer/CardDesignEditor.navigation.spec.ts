@@ -796,8 +796,11 @@ describe('CardDesignEditor issue navigation', () => {
     expect(wrapper.get('.card-design-editor__stage').classes()).toContain('is-layer-view-active')
     await root.trigger('keydown', { key: 'ArrowUp' })
     await root.trigger('keydown', { key: 'a' })
+    await root.trigger('keydown', { key: 's' })
+    await root.trigger('keydown', { key: 'x' })
+    await root.trigger('keydown', { key: 'b' })
     expect(stepLayer).toHaveBeenCalledWith(-1, false)
-    expect(cycleLayerByInitial).toHaveBeenCalledWith('a', false)
+    expect(cycleLayerByInitial.mock.calls).toEqual([['a', false], ['s', false], ['x', false], ['b', false]])
     expect(runSelectionQuickAction).not.toHaveBeenCalled()
 
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Tab' }))
