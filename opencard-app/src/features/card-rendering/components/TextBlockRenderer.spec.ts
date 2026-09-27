@@ -157,8 +157,7 @@ describe('TextBlockRenderer', () => {
         seriesKey: 'mc-wu-pin', source: '.opencard/icons/mc-wu-pin/carrot.svg', src: 'asset://icons/carrot.svg',
         imageWidth: 16, imageHeight: 16,
         iconKey: 'r3-c16', name: 'Carrot on a Stick', tint: 'original', pixelated: true, rotation: 180,
-      }],
-      errors: [],
+      }]
     } as const
 
     const wrapper = mount(TextBlockRenderer, {

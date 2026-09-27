@@ -24,17 +24,9 @@ export type ProjectIconSeriesRuntime = {
   key: string
 }
 
-export type ProjectIconLoadError = {
-  seriesKey: string
-  source: string
-  reason: 'load-failed'
-  iconKey?: string
-}
-
 export type ProjectIconCatalog = {
   series: readonly ProjectIconSeriesRuntime[]
   entries: readonly ProjectIconCatalogEntry[]
-  errors: readonly ProjectIconLoadError[]
   /** Case-insensitive runtime indexes. Optional only for hand-authored test catalogs. */
   seriesByKey?: ReadonlyMap<string, ProjectIconSeriesRuntime>
   entriesByIdentity?: ReadonlyMap<string, ProjectIconCatalogEntry>
@@ -53,7 +45,6 @@ export type ProjectIconDimensionReader = (entry: ProjectIconCatalogEntry) => { w
 export const EMPTY_PROJECT_ICON_CATALOG: ProjectIconCatalog = {
   series: [],
   entries: [],
-  errors: [],
   seriesByKey: new Map(),
   entriesByIdentity: new Map(),
 }
@@ -79,7 +70,6 @@ export function buildProjectIconCatalog(
   return {
     series: runtimeSeries,
     entries,
-    errors: [],
     seriesByKey: new Map(runtimeSeries.map(item => [item.key.toLowerCase(), item])),
     entriesByIdentity: new Map(entries.map(entry => [projectIconIdentity(entry.seriesKey, entry.iconKey), entry])),
   }

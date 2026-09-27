@@ -165,6 +165,9 @@ defineExpose({
 .oc-field-input--plain {
   background: transparent;
   border: var(--oc-field-surface-border-width, 1px) solid transparent;
+  /* `plain` 不画自己的表面，但内缩仍是它自己的：字段边框归 frame，内容内缩归这里。
+     上下文可用 `--oc-field-content-padding` 归零（属性面板用它把内边距交给整行）。 */
+  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
   color: var(--oc-fg-default);
   transition: border-color var(--oc-duration-fast) var(--oc-ease);
 }

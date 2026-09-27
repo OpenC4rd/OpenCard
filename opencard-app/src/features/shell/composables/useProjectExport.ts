@@ -59,8 +59,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
     const reader = new FileReader()
     reader.addEventListener('load', () => typeof reader.result === 'string'
       ? resolve(reader.result)
-      : reject(new Error('Could not encode the project icon atlas')))
-    reader.addEventListener('error', () => reject(reader.error ?? new Error('Could not read the project icon atlas')))
+      : reject(new Error('Could not encode the project icon image')))
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('Could not read the project icon image')))
     reader.readAsDataURL(blob)
   })
 }
@@ -69,8 +69,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 const PROJECT_ICON_PAINT_PROPERTIES = ['--oc-project-icon-background-image', '--oc-project-icon-mask-image'] as const
 
 /**
- * Collects every icon source the rendered DOM actually paints. Reading the DOM keeps export correct
- * for both model shapes: one atlas per set, or one standalone SVG per icon.
+ * Collects every icon source the rendered DOM actually paints, which keeps export correct without
+ * asking the registry again: an icon is exported only because something was drawn with it.
  */
 function projectIconPaintSources(root: HTMLElement): string[] {
   const sources = new Set<string>()

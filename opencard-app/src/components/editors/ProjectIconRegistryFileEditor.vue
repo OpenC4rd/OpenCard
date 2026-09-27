@@ -7,7 +7,8 @@
       :default-open-path="iconDirectory" :pack-busy="packTaskBusy"
       :project-icon-catalog="projectStore.projectIconCatalog.value"
       @update:series="updateIconSeries" @key-conflicts="updateKeyConflicts"
-      @export-pack="exportIconPack" @remove-series="openSeriesRemovalDialog" />
+      @export-pack="exportIconPack" @remove-series="openSeriesRemovalDialog"
+      @add-icons="openAddIconsDialog" />
 
     <ProjectRegistryRepairEditor v-else :model-value="props.modelValue ?? ''" :theme-id="themeId"
       :theme-overrides="themeOverrides" :heading="t('iconRegistry.invalid')" :description="t('iconRegistry.repair')"
@@ -35,7 +36,7 @@
     </OcDialog>
 
     <ProjectIconRegistrationDialog :open="registrationDialogOpen" :series="document?.iconSeries"
-      :default-open-path="iconDirectory"
+      :target-series="registrationTargetSeries" :default-open-path="iconDirectory"
       @close="closeRegistrationDialog" @submit="registerIconSet" />
     <ProjectIconPackImportDialog :open="packImportDialogOpen" :series="document?.iconSeries"
       :default-open-path="projectDirectory" @close="closeImportPackDialog" @submit="importIconPack" />
@@ -106,6 +107,8 @@ const { t } = useI18n()
 const projectStore = useProjectStore()
 const document = ref<ProjectIconRegistryDocument | null>(null)
 const registrationDialogOpen = ref(false)
+/** 打开注册对话框时选定的追加目标；为空表示这次是新建图标集。 */
+const registrationTargetSeries = ref<ProjectIconSeries | undefined>(undefined)
 const packImportDialogOpen = ref(false)
 const pendingRemovalSeriesKey = ref<string>()
 const cleanupOrphanedFiles = ref(true)
@@ -262,6 +265,15 @@ function updateKeyConflicts(conflicts: readonly ProjectIconKeyConflict[]): void 
 
 function openCreatePackDialog(): void {
   if (!document.value || packTaskBusy.value) return
+  registrationTargetSeries.value = undefined
+  registrationDialogOpen.value = true
+}
+
+function openAddIconsDialog(seriesKey: string): void {
+  if (!document.value || packTaskBusy.value) return
+  const target = findRegisteredSeries(seriesKey)
+  if (!target) return
+  registrationTargetSeries.value = target
   registrationDialogOpen.value = true
 }
 
@@ -272,6 +284,7 @@ function openImportPackDialog(): void {
 
 function closeRegistrationDialog(): void {
   registrationDialogOpen.value = false
+  registrationTargetSeries.value = undefined
 }
 
 function closeImportPackDialog(): void {
@@ -371,23 +384,39 @@ async function registerIconSet(request: ProjectIconRegistrationRequest): Promise
   if (!document.value || packTaskBusy.value) return
   // The dialog already guarantees a unique Key, so closing it up front is safe: the copy itself
   // runs in the background and reports through the global progress bar.
+  const target = registrationTargetSeries.value
   registrationDialogOpen.value = false
+  registrationTargetSeries.value = undefined
+  const seriesKey = target?.key ?? request.key
   await runIconPackTask({
-    title: t('projectConfig.icons.creatingSet', { name: request.name }),
+    title: target
+      ? t('projectConfig.icons.addingIcons', { name: target.name })
+      : t('projectConfig.icons.creatingSet', { name: request.name }),
     // Preparation and copy each report once per icon, so the bar covers both halves.
     total: request.icons.length * 2,
     errorCode: 'OC-E3011',
     run: async report => {
-      const icons = await writeIconSetFiles(request.icons, request.key, report)
+      const icons = await writeIconSetFiles(request.icons, seriesKey, report, target)
       // Re-read so edits made while the files were copying are not clobbered.
       const iconSeries = [...(document.value?.iconSeries ?? [])]
-      iconSeries.push({ name: request.name, key: request.key, icons })
+      const targetIndex = target
+        ? iconSeries.findIndex(candidate => sameKey(candidate.key, seriesKey))
+        : -1
+      if (target && targetIndex < 0) throw new Error(`Icon set '${seriesKey}' is no longer registered`)
+      if (target) {
+        const current = iconSeries[targetIndex]!
+        iconSeries[targetIndex] = { ...current, icons: [...current.icons, ...icons] }
+      } else {
+        iconSeries.push({ name: request.name, key: request.key, icons })
+      }
       applyCompletedIconSeries(iconSeries)
       await nextTick()
-      await workbenchRef.value?.selectSeries(request.key)
+      await workbenchRef.value?.selectSeries(seriesKey)
       return icons.length
     },
-    success: count => t('projectConfig.icons.setCreated', { name: request.name, count }),
+    success: count => target
+      ? t('projectConfig.icons.iconsAdded', { name: target.name, count })
+      : t('projectConfig.icons.setCreated', { name: request.name, count }),
   })
 }
 
@@ -405,15 +434,21 @@ async function registerIconSet(request: ProjectIconRegistrationRequest): Promise
  *
  * Preparing up front also means a file that cannot be read aborts the import before anything is
  * written, instead of leaving already-copied files on disk with no registry entry.
+ *
+ * An existing set keeps its own folder: the set already lives there, and a folder left behind by an
+ * earlier set is not free to be reused by a new one, so only a brand-new set goes looking for one.
  */
 async function writeIconSetFiles(
   imports: readonly ProjectIconImport[],
   seriesKey: string,
   report: (completed: number, total?: number) => void,
+  targetSeries?: ProjectIconSeries,
 ): Promise<ProjectIcon[]> {
   // Preparation and copy both report, so the bar keeps moving through the slow half.
   report(0, imports.length * 2)
-  const directory = await resolveIconSetDirectory(seriesKey)
+  const directory = targetSeries
+    ? seriesIconDirectory(targetSeries)
+    : await resolveIconSetDirectory(seriesKey)
   let prepared = 0
   const staged = await mapWithConcurrency(imports, ICON_IMPORT_CONCURRENCY, async item => {
     const bytes = await fileSystemService.readBinaryFile(item.sourcePath)
@@ -476,6 +511,30 @@ async function iconSetDirectoryIsOccupied(directory: string): Promise<boolean> {
     // An unreadable folder counts as occupied, so its contents are never mixed into a new set.
     return true
   }
+}
+
+/**
+ * The folder a set's own files already live in, so adding or replacing an icon lands next to them.
+ *
+ * The folder is read from the set's first icon rather than rebuilt from its Key: a set that was
+ * renamed keeps its folder, and a set whose files sit outside the managed icon root keeps its own
+ * place instead of being split across two folders. A set with no files yet uses the canonical folder.
+ */
+function seriesIconDirectory(series: ProjectIconSeries): string {
+  const source = series.icons[0]?.source.replace(/\\/g, '/')
+  const managedPrefix = `${PROJECT_INTERNAL_DIRECTORY_NAME}/`
+  if (!source?.startsWith(managedPrefix)) return projectIconSetDirectory(series.key)
+  const segments = source.slice(managedPrefix.length).split('/')
+  segments.pop()
+  return segments.join('/') || projectIconSetDirectory(series.key)
+}
+
+function sameKey(left: string, right: string): boolean {
+  return left.toLocaleLowerCase() === right.toLocaleLowerCase()
+}
+
+function findRegisteredSeries(seriesKey: string): ProjectIconSeries | null {
+  return (document.value?.iconSeries ?? []).find(candidate => sameKey(candidate.key, seriesKey)) ?? null
 }
 
 async function importIconPack(request: ProjectIconPackImportRequest): Promise<void> {

@@ -27,7 +27,7 @@ describe('ImageBlockRenderer', () => {
       tint: 'theme' as const, imageWidth: 64, imageHeight: 64,
     }
     const resources = createCardResourceResolver(createCardRenderResourceContext({
-      projectIconCatalog: { series: [], entries: [entry], errors: [] },
+      projectIconCatalog: { series: [], entries: [entry] },
     }))
     const wrapper = mount(ImageBlockRenderer, {
       props: { block: createBlock('icon:status/warning', fit), placement: { kind: 'root' } },

@@ -1,11 +1,12 @@
 <template>
   <OcDialog class="project-icon-registration-dialog" :open="open"
-    :title="t('projectConfig.icons.createPack')" as="form" size="md"
-    close-on-backdrop @request-close="close" @submit="submit">
+    :title="appendMode ? t('projectConfig.icons.addIconsToSet', { name: targetSeries?.name ?? '' })
+      : t('projectConfig.icons.createPack')"
+    as="form" size="md" close-on-backdrop @request-close="close" @submit="submit">
     <section class="project-icon-registration-dialog__summary">
       <template v-if="hasSelection">
         <OcText as="strong">{{ t('projectConfig.icons.selectedIconsCount', { count: icons.length }) }}</OcText>
-        <OcText tone="muted" size="sm">{{ iconSetName }} / {{ effectiveKey }}</OcText>
+        <OcText tone="muted" size="sm">{{ summaryTarget }}</OcText>
       </template>
       <OcText v-else tone="muted" size="sm">{{ t('projectConfig.icons.chooseFileHint') }}</OcText>
       <div class="project-icon-registration-dialog__summary-actions">
@@ -15,13 +16,14 @@
         <OcButton type="button" icon="folder.open" variant="outline" @click="pickFolder">
           {{ t('projectConfig.icons.chooseFolder') }}
         </OcButton>
-        <OcButton type="button" variant="ghost" icon="tool.settings" @click="advancedOpen = !advancedOpen">
+        <OcButton v-if="!appendMode" type="button" variant="ghost" icon="tool.settings"
+          @click="advancedOpen = !advancedOpen">
           {{ advancedOpen ? t('projectConfig.icons.simpleSettings') : t('projectConfig.icons.advancedSettings') }}
         </OcButton>
       </div>
     </section>
 
-    <template v-if="advancedOpen">
+    <template v-if="advancedOpen && !appendMode">
       <label class="project-icon-registration-dialog__field">
         <span>{{ t('projectConfig.icons.packName') }}</span>
         <OcFieldInput full-width autofocus :value="iconSetName"
@@ -53,7 +55,7 @@
     <template #footer>
       <OcButton type="button" @click="close">{{ t('projectConfig.icons.cancel') }}</OcButton>
       <OcButton type="submit" variant="solid" :disabled="!canSubmit">
-        {{ t('projectConfig.icons.createPack') }}
+        {{ appendMode ? t('projectConfig.icons.addIcons') : t('projectConfig.icons.createPack') }}
       </OcButton>
     </template>
   </OcDialog>
@@ -84,6 +86,7 @@ import { useI18n } from 'vue-i18n'
 import {
   createAvailableProjectIconKey,
   createAvailableProjectIconSeriesKey,
+  PROJECT_ICON_FILE_EXTENSIONS,
   projectIconKeyPattern,
   projectIconSourcePattern,
   type ProjectIconSeries,
@@ -98,30 +101,37 @@ const props = withDefaults(defineProps<{
   open: boolean
   series?: readonly ProjectIconSeries[]
   defaultOpenPath?: string
+  /**
+   * 给了目标图标集就是"追加"：图标集已经存在，名称与 Key 不再由这个对话框决定，
+   * 新图标的引用名称也必须避开它已有的那些。
+   */
+  targetSeries?: ProjectIconSeries
 }>(), {
   series: () => [],
   defaultOpenPath: undefined,
+  targetSeries: undefined,
 })
 const emit = defineEmits<{
   close: []
   submit: [request: ProjectIconRegistrationRequest]
 }>()
 
-const ICON_FILE_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'webp']
-
 type RegistrationDraft = { name: string; key: string; keyEdited: boolean }
+
 const { t } = useI18n()
 const advancedOpen = ref(false)
 const draft = ref<RegistrationDraft>({ name: '', key: '', keyEdited: false })
 const selectedPaths = ref<readonly string[]>([])
 const localError = ref('')
 
+const appendMode = computed(() => props.targetSeries !== undefined)
+const reservedIconKeys = computed(() => (props.targetSeries?.icons ?? []).map(icon => ({ iconKey: icon.iconKey })))
 /** Identity only: the Key is derived from the file name, which needs no read. */
 const icons = computed<readonly ProjectIconImport[]>(() => {
   const next: ProjectIconImport[] = []
   for (const path of selectedPaths.value) {
     const name = fileStem(path) || 'Icon'
-    next.push({ sourcePath: path, iconKey: createAvailableProjectIconKey(name, next), name })
+    next.push({ sourcePath: path, iconKey: createAvailableProjectIconKey(name, [...reservedIconKeys.value, ...next]), name })
   }
   return next
 })
@@ -131,11 +141,14 @@ const normalizedName = computed(() => iconSetName.value.trim())
 const hasSelection = computed(() => selectedPaths.value.length > 0)
 const generatedKey = computed(() => createAvailableProjectIconSeriesKey(iconSetName.value, props.series))
 const effectiveKey = computed(() => iconSetKey.value || generatedKey.value)
-const validName = computed(() => normalizedName.value.length > 0)
-const validKey = computed(() => projectIconKeyPattern.test(effectiveKey.value))
-const uniqueKey = computed(() => !props.series.some(series => (
+const validName = computed(() => appendMode.value || normalizedName.value.length > 0)
+const validKey = computed(() => appendMode.value || projectIconKeyPattern.test(effectiveKey.value))
+const uniqueKey = computed(() => appendMode.value || !props.series.some(series => (
   series.key.toLocaleLowerCase() === effectiveKey.value.toLocaleLowerCase()
 )))
+const summaryTarget = computed(() => appendMode.value
+  ? `${props.targetSeries!.name} / ${props.targetSeries!.key}`
+  : `${iconSetName.value} / ${effectiveKey.value}`)
 const canSubmit = computed(() => hasSelection.value && validName.value && validKey.value && uniqueKey.value)
 const validationMessage = computed(() => {
   if (!hasSelection.value) return ''
@@ -158,7 +171,7 @@ async function pickFiles(): Promise<void> {
   const paths = await fileSystemService.pickFiles({
     title: t('projectConfig.icons.pickFilesTitle'),
     fileTypeName: t('projectConfig.icons.fileType'),
-    extensions: ICON_FILE_EXTENSIONS,
+    extensions: [...PROJECT_ICON_FILE_EXTENSIONS],
     defaultPath: props.defaultOpenPath,
   })
   if (paths.length === 0) return
@@ -212,7 +225,11 @@ function close(): void {
 
 function submit(): void {
   if (!canSubmit.value) return
-  emit('submit', { name: normalizedName.value, key: effectiveKey.value, icons: icons.value })
+  emit('submit', {
+    name: appendMode.value ? props.targetSeries!.name : normalizedName.value,
+    key: appendMode.value ? props.targetSeries!.key : effectiveKey.value,
+    icons: icons.value,
+  })
 }
 
 function fileName(path: string): string {

@@ -134,7 +134,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
     expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
   })
 
-  it('selects project icon series without exposing spritesheet files', async () => {
+  it('selects project icon series without exposing their files', async () => {
     const wrapper = mountBuilder()
     const tree = wrapper.findComponent(OcTree)
     let data = tree.props('data') as OcNodeCollection

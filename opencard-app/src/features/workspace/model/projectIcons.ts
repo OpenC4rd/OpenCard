@@ -4,6 +4,8 @@ import { referenceSyntaxIsValid } from './scopedResourcePath'
 export const projectIconKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
 /** Every standalone icon file format a set may hold: vector sources and raster sources alike. */
 export const projectIconSourcePattern = /\.(?:svg|png|jpe?g|webp)$/i
+/** 同一个清单喂养文件选择器与打开对话框：能选的文件格式只有这一处。 */
+export const PROJECT_ICON_FILE_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'webp'] as const
 export const projectIconVectorSourcePattern = /\.svg$/i
 export const DEFAULT_PROJECT_ICON_DIRECTORY = 'icons'
 export const PROJECT_ICON_ROTATIONS = [0, 90, 180, 270] as const

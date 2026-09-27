@@ -157,12 +157,6 @@ function moveItem(index: number, offset: -1 | 1): void {
   align-items: center;
 }
 
-.array-property-field__actions :deep(.oc-button),
-.array-property-field__add.oc-button {
-  min-width: var(--oc-size-sm);
-  height: var(--oc-size-sm);
-}
-
 .array-property-field__add {
   align-self: flex-start;
 }

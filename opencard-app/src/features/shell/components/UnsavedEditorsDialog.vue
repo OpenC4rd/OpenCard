@@ -379,15 +379,13 @@ function handleCancel(): void {
 }
 
 .unsaved-editors-dialog__batch-actions {
-  display: flex;
-  justify-content: flex-end;
+  /* 网格列按内容取宽：按钮保持自身尺寸，不必再去改按钮内部的 flex。 */
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
   gap: var(--oc-space-2);
   padding-block: var(--oc-space-3);
   border-top: 1px solid var(--oc-border-muted);
-}
-
-.unsaved-editors-dialog__batch-actions :deep(.oc-button) {
-  flex: 0 0 auto;
 }
 
 .unsaved-editors-dialog__discard-button:not(:disabled) {

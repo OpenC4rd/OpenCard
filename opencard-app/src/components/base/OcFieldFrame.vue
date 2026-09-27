@@ -10,6 +10,7 @@
         'oc-field-frame--readonly': readonly,
         'oc-field-frame--invalid': invalid,
         'oc-field-frame--busy': busy,
+        'oc-field-frame--wrap': wrap,
       },
     ]"
     :aria-disabled="disabled || undefined"
@@ -32,6 +33,11 @@ interface Props {
   readonly?: boolean
   invalid?: boolean
   busy?: boolean
+  /**
+   * 控件区是否换行排布。默认单行，且每个子项都撑满宽度；开启后交给内容自己排：
+   * 标签与输入框同一层的字段（引用 Token 字段）需要它，行才会断在"最后一个标签与输入框之间"。
+   */
+  wrap?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
@@ -41,6 +47,7 @@ withDefaults(defineProps<Props>(), {
   readonly: false,
   invalid: false,
   busy: false,
+  wrap: false,
 })
 
 defineOptions({ name: 'OcFieldFrame' })
@@ -100,12 +107,6 @@ defineOptions({ name: 'OcFieldFrame' })
   gap: var(--oc-space-1);
 }
 
-.oc-field-frame__prefix > :deep(.oc-icon),
-.oc-field-frame__suffix > :deep(.oc-icon) {
-  position: relative;
-  inset-block-start: var(--oc-field-affix-icon-offset-y);
-}
-
 .oc-field-frame__control {
   position: relative;
   display: flex;
@@ -122,5 +123,18 @@ defineOptions({ name: 'OcFieldFrame' })
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
+}
+
+/* 换行模式：子项按内容取宽，行断在子项之间（对齐用文字基线，标签与输入框的文字落在同一条线上）。 */
+.oc-field-frame--wrap .oc-field-frame__control {
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-content: center;
+  gap: var(--oc-space-1);
+}
+
+.oc-field-frame--wrap .oc-field-frame__control > :deep(*) {
+  flex: 0 1 auto;
+  width: auto;
 }
 </style>

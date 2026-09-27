@@ -19,7 +19,7 @@ vi.mock('../../features/workspace/services/projectIconCatalog', async (importOri
   const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
   return {
     ...actual,
-    buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [], errors: [] })),
+    buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [] })),
   }
 })
 

@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectIconRegistryFileEditor from './ProjectIconRegistryFileEditor.vue'
+import ProjectIconRegistryWorkbench from './ProjectIconRegistryWorkbench.vue'
 import ProjectIconRegistrationDialog from './ProjectIconRegistrationDialog.vue'
 import { useShellProgressTasks } from '../../features/shell/composables/useShellProgressTasks'
 
@@ -26,7 +27,7 @@ vi.mock('../../features/editor-runtime/history/editorHistoryManager', () => ({
 }))
 vi.mock('../../features/workspace/services/projectIconCatalog', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
-  return { ...actual, buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [], errors: [] })) }
+  return { ...actual, buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [] })) }
 })
 vi.mock('../../features/workspace/services/projectIconFileFacts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconFileFacts')>()
@@ -48,7 +49,7 @@ vi.mock('../../features/workspace/services/fileSystemService', () => ({
 vi.mock('../../features/workspace/store/projectStore', () => ({
   useProjectStore: () => ({
     projectPath: { value: 'D:/Demo' },
-    projectIconCatalog: { value: { series: [], entries: [], errors: [] } },
+    projectIconCatalog: { value: { series: [], entries: [] } },
     resolveResourceAssetSrcFromFile: (_file: string, source: string) => `asset://${source}`,
     resolveResourcePathFromFile: (file: string, source: string) => `${file}/../${source}`,
     resolveProjectInternalPath: (relative: string) => `D:/Demo/.opencard/${relative}`,
@@ -276,6 +277,39 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     release()
     await flushPromises()
     expect(progress.tasks.value.some(task => task.key === TASK_KEY)).toBe(false)
+  })
+
+  it('adds new icons to the folder the set already owns instead of opening a second one', async () => {
+    // The set's Key and its folder name need not agree: it may have been renamed, or its folder may
+    // carry a suffix from an earlier set. Adding must follow the files, not rebuild the folder name.
+    const wrapper = mount(ProjectIconRegistryFileEditor, {
+      props: {
+        filePath: 'D:/Demo/.opencard/icons/icons.json',
+        modelValue: JSON.stringify({
+          iconSeries: [{
+            name: 'Outline', key: 'outline',
+            icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline-2/warn.svg', tint: 'theme' }],
+          }],
+        }),
+      },
+    })
+
+    wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('add-icons', 'outline')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('targetSeries'))
+      .toMatchObject({ key: 'outline' })
+
+    wrapper.getComponent(ProjectIconRegistrationDialog).vm.$emit('submit', {
+      name: 'Outline', key: 'outline',
+      icons: [{ sourcePath: 'D:/Icons/Gem.svg', iconKey: 'gem', name: 'Gem' }],
+    })
+    await flushPromises()
+
+    expect(mocks.writeBinaryFile.mock.calls.map(call => call[0]))
+      .toEqual(['D:/Demo/.opencard/icons/outline-2/gem.svg'])
+    expect(lastRegistry(wrapper).iconSeries[0].icons.map((icon: { iconKey: string }) => icon.iconKey))
+      .toEqual(['warn', 'gem'])
+    expect(notificationMocks.notifySuccess).toHaveBeenCalledWith('projectConfig.icons.iconsAdded')
   })
 
   it('unpacks an imported icon pack into a folder named after the set', async () => {

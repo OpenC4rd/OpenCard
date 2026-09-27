@@ -5,7 +5,6 @@ import { renderMarkdown } from './renderMarkdown'
 const catalog: ProjectIconCatalog = {
   series: [{ name: 'Status icons', key: 'status' }],
   entries: [{ iconKey: 'wide', name: 'Wide', source: 'icons/wide.svg', tint: 'theme', seriesKey: 'status', src: 'asset://status' }],
-  errors: [],
 }
 /** Sizes as the resolver reports them once the icon has been painted. */
 const readSize = () => ({ width: 16, height: 8 })

@@ -1,7 +1,7 @@
 <!-- 多项字符串字段：已提交的项显示为标签，最后一段用输入框编辑；值仍是单个字符串，分隔符见 definition.listSeparator。 -->
 <template>
   <div class="reference-string-token-field-shell">
-    <OcFieldFrame class="reference-string-token-field" full-width :readonly="definition.isReadonly"
+    <OcFieldFrame class="reference-string-token-field" full-width wrap :readonly="definition.isReadonly"
       :invalid="hasInvalidToken">
       <span v-for="(token, index) in tokens" :key="`${index}:${token}`"
         class="reference-string-token-field__token" :class="{ 'is-invalid': isInvalidToken(token) }">
@@ -312,26 +312,12 @@ function handleKeydown(event: KeyboardEvent): void {
 }
 
 /* 标签会换行，所以外壳按内容长高，而不是固定一行。 */
+/* 标签与输入框的排布交给 OcFieldFrame 的 `wrap`（见该 prop 的说明）：标签直接是控件区的子项，
+   行才会断在"最后一个标签与输入框之间"。 */
 .reference-string-token-field {
   height: auto;
   min-height: var(--oc-field-control-height, var(--oc-size-md));
   padding: var(--oc-space-1);
-}
-
-/* 真正排布标签与输入框的是 OcFieldFrame 的 __control：它默认不换行，还把每个子项都撑成 100% 宽。
-   标签必须是它的直接子项、和输入框同一层，行断开才会发生在"最后一个标签与输入框之间"；
-   若把标签包在中间层里，那一层的基准宽度是"所有标签排一行"，输入框就永远被挤到下一行。
-   对齐用 baseline：标签里的文字和输入框里的文字共用一条文字基线（不是各自盒子的中线）。 */
-.reference-string-token-field :deep(.oc-field-frame__control) {
-  flex-wrap: wrap;
-  align-items: baseline;
-  align-content: center;
-  gap: var(--oc-space-1);
-}
-
-.reference-string-token-field :deep(.oc-field-frame__control > *) {
-  flex: 0 1 auto;
-  width: auto;
 }
 
 .reference-string-token-field__token {

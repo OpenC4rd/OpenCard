@@ -48,7 +48,7 @@ describe('OcAutocompletePopover', () => {
     wrapper.unmount()
   })
 
-  it('opts atlas crop thumbnails into the shared project-icon renderer', () => {
+  it('opts project-icon thumbnails into the shared project-icon renderer', () => {
     const anchor = document.createElement('input')
     document.body.appendChild(anchor)
     const wrapper = mount(OcAutocompletePopover, {

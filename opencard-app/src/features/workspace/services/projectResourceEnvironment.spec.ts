@@ -160,8 +160,7 @@ describe('ProjectResourceEnvironment', () => {
         iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg',
         tint: 'theme' as const, seriesKey: 'outline', src: 'asset:///warn.svg',
         imageWidth: 8, imageHeight: 4,
-      }],
-      errors: [],
+      }]
     }
 
     const environment = await loadProjectResourceEnvironment({

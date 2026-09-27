@@ -51,7 +51,8 @@ describe('workspace pages', () => {
 
     const toggle = wrapper.getComponent(OcSwitch)
     expect(toggle.props('checked')).toBe(true)
-    expect(toggle.props('label')).toBe('Background effects')
+    // The caller renders the label itself (so it can carry the cover-wall text shadow), not via prop.
+    expect(toggle.text()).toContain('Background effects')
     expect(wrapper.findComponent(WelcomeCoverWall).exists()).toBe(true)
     expect(wrapper.findComponent(WelcomeGravityField).exists()).toBe(true)
 

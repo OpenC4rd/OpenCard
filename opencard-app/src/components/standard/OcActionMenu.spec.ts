@@ -62,7 +62,7 @@ describe('OcActionMenu', () => {
     expect(wrapper.get('[role="menuitem"]').attributes('aria-label')).toBe('Fill F')
   })
 
-  it('opts atlas crop thumbnails into the shared project-icon renderer', () => {
+  it('opts project-icon thumbnails into the shared project-icon renderer', () => {
     const wrapper = mount(OcActionMenu, {
       props: {
         actions: [{

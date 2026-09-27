@@ -4,26 +4,20 @@
       <OcIcon name="file.image" size="lg" tone="muted" />
       <OcText as="strong">{{ t('projectConfig.icons.emptyIconList') }}</OcText>
     </div>
-    <div v-else class="project-icon-set-workspace__tree-pane">
+    <div v-else class="project-icon-set-workspace__grid-pane">
       <OcFieldFrame class="project-icon-set-workspace__filter" full-width>
-        <template #prefix><OcIcon name="action.search" size="sm" tone="muted" /></template>
         <OcFieldInput variant="plain" full-width :value="filterQuery"
           :placeholder="t('projectConfig.icons.filterPlaceholder')"
           :aria-label="t('projectConfig.icons.filterPlaceholder')" @input="updateFilter" />
         <template v-if="filterQuery" #suffix>
           <OcButton icon-only size="sm" icon="action.close" variant="ghost"
-            :aria-label="t('projectConfig.icons.clearFilter')"
-            :data-tooltip="t('projectConfig.icons.clearFilter')" @click="filterQuery = ''" />
+            :aria-label="t('projectConfig.icons.clearFilter')" @click="filterQuery = ''" />
         </template>
       </OcFieldFrame>
-      <div class="project-icon-set-workspace__tree-scroll">
-        <OcTree v-if="filteredIconIndexes.length" class="project-icon-set-workspace__icon-tree" fill
-          virtualized scroll-to-selection role="listbox" :data="iconTreeData"
-          :action-overflow-title="t('projectConfig.icons.iconActions')"
-          :selected-keys="selectedTreeKeys" selection-mode="multiple"
-          @selection-change="handleSelectionChange" @action="handleNodeAction" @move="handleNodeMove" />
-        <OcEmpty v-else tone="muted">{{ t('projectConfig.icons.noMatchingIcons') }}</OcEmpty>
-      </div>
+      <OcAlbum v-if="filteredIconIndexes.length" class="project-icon-set-workspace__icon-album" fill
+        :data="iconAlbumData" :selected-keys="selectedIconKeys"
+        selection-mode="multiple" @selection-change="handleSelectionChange" @action="handleNodeAction" />
+      <OcEmpty v-else tone="muted">{{ t('projectConfig.icons.noMatchingIcons') }}</OcEmpty>
     </div>
   </div>
 </template>
@@ -33,11 +27,10 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   duplicateProjectIcon,
-  moveProjectIcon,
   type ProjectIconSeries,
 } from '../../features/workspace/model/projectIcons'
 import {
-  createProjectIconStyle,
+  createProjectIconPreviewStyle,
   projectIconIdentity,
   type ProjectIconCatalogEntry,
 } from '../../features/workspace/services/projectIconCatalog'
@@ -47,17 +40,15 @@ import type {
   OcNodeAction,
   OcNodeActionEvent,
   OcNodeCollection,
-  OcNodeContextEntry,
-  OcNodeMoveEvent,
   OcNodeSelectionEvent,
 } from '../../shared/ui/node/node.types'
+import OcAlbum from '../standard/OcAlbum.vue'
 import OcButton from '../base/OcButton.vue'
 import OcEmpty from '../base/OcEmpty.vue'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
-import OcTree from '../standard/OcTree.vue'
 
 const props = defineProps<{
   series: ProjectIconSeries
@@ -74,13 +65,9 @@ const filterQuery = ref('')
 const selectedIconIndexes = computed(() => props.selectedIconIndexes.filter(index => (
   Number.isInteger(index) && index >= 0 && index < props.series.icons.length
 )))
-const selectedIconIndex = computed(() => selectedIconIndexes.value[0] ?? null)
 
-/** Boundary moves are disabled on the node that cannot move further, with the reason the action button surfaces. */
-function iconNodeActions(index: number): {
-  inline: readonly OcNodeAction[]
-  context: readonly OcNodeContextEntry[]
-} {
+/** Boundary moves are disabled on the icon that cannot move further, with the reason the command surfaces. */
+function iconActions(index: number): readonly OcNodeAction[] {
   const atTop = index === 0
   const atBottom = index === props.series.icons.length - 1
   const boundary = (blocked: boolean, reason: string): Partial<OcNodeAction> => (
@@ -106,19 +93,7 @@ function iconNodeActions(index: number): {
   const remove: OcNodeAction = {
     key: 'delete', title: t('projectConfig.icons.removeIcon'), icon: 'action.delete', iconTone: 'danger',
   }
-  return {
-    inline: [duplicate, moveTop, moveUp, moveDown, moveBottom, remove],
-    context: [
-      duplicate,
-      { type: 'divider', key: 'icon-move-divider' },
-      moveTop,
-      moveUp,
-      moveDown,
-      moveBottom,
-      { type: 'divider', key: 'icon-delete-divider' },
-      remove,
-    ],
-  }
+  return [duplicate, moveTop, moveUp, moveDown, moveBottom, remove]
 }
 
 const entriesByIdentity = computed(() => new Map(props.entries.map(entry => (
@@ -141,31 +116,34 @@ const filteredIconIndexes = computed(() => {
       : []
   ))
 })
-const iconTreeData = computed<OcNodeCollection>(() => {
-  const rootKeys = filteredIconIndexes.value.map(index => `icon:${index}`)
-  return {
-    rootKeys,
-    items: new Map(filteredIconIndexes.value.map((index): [string, OcNode] => {
-      const key = `icon:${index}`
-      const icon = props.series.icons[index]!
-      const entry = catalogEntry(index)
-      const actions = iconNodeActions(index)
-      return [key, {
-        label: icon.name,
-        visual: entry
-          ? { type: 'style' as const, style: createProjectIconStyle(entry, readProjectIconSize), label: icon.name }
-          : { type: 'icon' as const, icon: 'file.image' },
-        draggable: true,
-        tail: actions.inline,
-        contextActions: actions.context,
-      }]
-    })),
-    children: new Map(),
-  }
-})
-const selectedTreeKeys = computed(() => selectedIconIndexes.value.map(index => `icon:${index}`))
+const iconAlbumData = computed<OcNodeCollection>(() => ({
+  rootKeys: filteredIconIndexes.value.map(index => `icon:${index}`),
+  items: new Map(filteredIconIndexes.value.map((index): [string, OcNode] => {
+    const key = `icon:${index}`
+    const icon = props.series.icons[index]!
+    const entry = catalogEntry(index)
+    return [key, {
+      label: icon.name,
+      // 卡片正面就是这个图标本身。字号用封面框的尺寸表达（媒体盒是尺寸容器），按自身比例缩放，
+      // 于是图标铺满封面框、信息条压在它的下半部分上——和图片封面卡同一种结构。
+      cover: entry
+        ? {
+            type: 'style' as const,
+            style: {
+              ...createProjectIconPreviewStyle(entry, readProjectIconSize),
+              fontSize: 'min(100cqw, 100cqh)',
+            },
+            label: icon.name,
+          }
+        : { type: 'icon' as const, icon: 'file.image' },
+      tail: iconActions(index),
+    }]
+  })),
+  children: new Map(),
+}))
+const selectedIconKeys = computed(() => selectedIconIndexes.value.map(index => `icon:${index}`))
 
-function treeIndex(key: string | null): number | null {
+function albumIndex(key: string | null): number | null {
   if (!key?.startsWith('icon:')) return null
   const index = Number(key.slice('icon:'.length))
   return Number.isInteger(index) ? index : null
@@ -177,45 +155,24 @@ function updateFilter(event: Event): void {
 
 function handleSelectionChange(event: OcNodeSelectionEvent): void {
   emit('update:selectedIconIndexes', event.selectedKeys
-    .map(key => treeIndex(key))
+    .map(key => albumIndex(key))
     .filter((index): index is number => index !== null))
 }
 
-function handleNodeMove(event: OcNodeMoveEvent): void {
-  const fromIndex = treeIndex(event.key)
-  const targetIndex = treeIndex(event.targetKey)
-  if (fromIndex === null || targetIndex === null) return
-  let toIndex = targetIndex + (event.position === 'after' ? 1 : 0)
-  if (fromIndex < toIndex) toIndex -= 1
-  moveIcon(fromIndex, toIndex)
+/** A card command applies to the whole selection only when the card itself is part of it. */
+function actionTargets(index: number): number[] {
+  return selectedIconIndexes.value.includes(index) ? selectedIconIndexes.value : [index]
 }
 
 function handleNodeAction(event: OcNodeActionEvent): void {
-  const index = treeIndex(event.key)
+  const index = albumIndex(event.key)
   if (index === null) return
-  const indexes = event.source === 'context' && ['delete', 'move-top', 'move-up', 'move-down', 'move-bottom'].includes(event.actionKey)
-    ? selectedIconIndexes.value
-    : selectedIconIndex.value === null ? [index] : [selectedIconIndex.value]
-  if (event.actionKey === 'duplicate') duplicateIcon(indexes[0] ?? index)
-  else if (event.actionKey === 'delete') removeIcons(indexes)
-  else if (event.actionKey === 'move-top') moveIcons(indexes, 'top')
-  else if (event.actionKey === 'move-up') moveIcons(indexes, 'up')
-  else if (event.actionKey === 'move-down') moveIcons(indexes, 'down')
-  else if (event.actionKey === 'move-bottom') moveIcons(indexes, 'bottom')
-}
-
-function moveIcon(fromIndex: number, toIndex: number): void {
-  if (toIndex < 0 || toIndex >= props.series.icons.length || fromIndex === toIndex) return
-  emit('update:series', moveProjectIcon(props.series, fromIndex, toIndex))
-  const nextSelected = selectedIconIndexes.value.map(index => {
-    if (index === fromIndex) return toIndex
-    if (fromIndex < toIndex && index > fromIndex && index <= toIndex) return index - 1
-    if (fromIndex > toIndex && index >= toIndex && index < fromIndex) return index + 1
-    return index
-  }).sort((a, b) => a - b)
-  if (nextSelected.some((index, position) => index !== selectedIconIndexes.value[position])) {
-    emit('update:selectedIconIndexes', nextSelected)
-  }
+  if (event.actionKey === 'duplicate') duplicateIcon(index)
+  else if (event.actionKey === 'delete') removeIcons(actionTargets(index))
+  else if (event.actionKey === 'move-top') moveIcons(actionTargets(index), 'top')
+  else if (event.actionKey === 'move-up') moveIcons(actionTargets(index), 'up')
+  else if (event.actionKey === 'move-down') moveIcons(actionTargets(index), 'down')
+  else if (event.actionKey === 'move-bottom') moveIcons(actionTargets(index), 'bottom')
 }
 
 function removeIcons(indexes: readonly number[]): void {
@@ -283,26 +240,27 @@ function moveIcons(indexes: readonly number[], direction: 'top' | 'up' | 'down' 
 <style scoped>
 .project-icon-set-workspace {
   display: grid;
+  /* 一格有界的行：高度由调用方给定，图标网格再高也只在相册里滚动，不会把整页撑破。 */
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
   min-width: 0;
-  min-height: var(--oc-project-icon-inspector-min-height);
-  border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-md);
+  min-height: 0;
+  overflow: hidden;
 }
 
-.project-icon-set-workspace.is-empty { border-style: dashed; }
+.project-icon-set-workspace.is-empty { border: var(--oc-border-width) dashed var(--oc-border-muted); border-radius: var(--oc-radius-md); }
 
 .project-icon-set-workspace__empty {
   display: grid;
   min-width: 0;
-  min-height: var(--oc-project-icon-inspector-min-height);
   place-content: center;
   justify-items: center;
   gap: var(--oc-space-2);
-  padding: var(--oc-space-4);
+  padding: var(--oc-space-6);
   text-align: center;
 }
 
-.project-icon-set-workspace__tree-pane {
+.project-icon-set-workspace__grid-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
@@ -315,19 +273,11 @@ function moveIcons(indexes: readonly number[], direction: 'top' | 'up' | 'down' 
   width: auto;
 }
 
-.project-icon-set-workspace__tree-scroll {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.project-icon-set-workspace__icon-tree {
-  position: absolute;
-  inset: 0;
-}
-
-.project-icon-set-workspace__icon-tree :deep(.oc-tree__node) {
-  content-visibility: auto;
-  contain-intrinsic-block-size: var(--oc-size-md);
+/*
+ * 图标格是固定高的：卡片的高度不再由宽度按封面比例推出（那个竖版比例是给书封式封面卡用的），
+ * 于是同一屏的节奏稳定。这个固定值是相册的公开旋钮，不是页面去改它的内部规则。
+ */
+.project-icon-set-workspace__icon-album {
+  --oc-album-cell-block-size: var(--oc-album-card-min-width);
 }
 </style>

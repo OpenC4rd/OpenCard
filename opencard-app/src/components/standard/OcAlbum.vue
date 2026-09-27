@@ -257,6 +257,9 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 .oc-album__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--oc-album-card-min-width), 1fr));
+  /* 调用方给 `--oc-album-cell-block-size` 时格子是固定高的：行高不再由卡宽按封面比例推出。
+     图标格那种"小字形 + 大留白"的内容需要它，封面卡不需要，所以默认不设、留 auto。 */
+  grid-auto-rows: var(--oc-album-cell-block-size, auto);
   gap: var(--oc-space-3);
 }
 
@@ -272,6 +275,8 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   display: block;
   min-width: 0;
   aspect-ratio: var(--oc-album-card-aspect-ratio);
+  /* 固定格高时把按比例算出的高度夹回行高；不设 token 时是 `none`，封面卡的行为一点不变。 */
+  max-block-size: var(--oc-album-cell-block-size, none);
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-md);
@@ -284,7 +289,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 
 /*
  * 圆角只由这一层切：它贴在边框内缘（卡片的 padding box），所以里面的东西一律不要圆角。
- * 信息条是 backdrop-filter 合成层、图片也可能被提升，它们会逃过祖先的 overflow 裁剪 —— 所以
+ * 信息条是独立的合成层、图片也可能被提升，它们会逃过祖先的 overflow 裁剪 —— 所以
  * 这里除了 overflow 还写 clip-path：那条裁剪随合成一起生效，探不出圆角去。
  */
 .oc-album__clip {
@@ -309,7 +314,10 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 }
 
 .oc-album__card.is-selected .oc-album__info {
-  background: var(--oc-bg-selected);
+  /* 选中是叠在玻璃上的一层色，不是把玻璃换掉：`background` 简写会把 `--oc-bg-glass` 一起清掉，
+     于是选中那张卡的信息条变成近乎透明的色块、背后内容一览无余，和同一张卡片上其它信息条
+     （以及没有选中态的相册）就不是同一种材质了。 */
+  background-image: linear-gradient(var(--oc-bg-selected), var(--oc-bg-selected));
 }
 
 .oc-album__card.is-disabled {
@@ -327,6 +335,9 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
      否则图片的直角会从圆角处探出来（信息条同理）。几何与 .oc-album__clip 完全一致。 */
   overflow: hidden;
   border-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
+  /* 封面可以按封面框的尺寸给自己定尺寸（`cqw`/`cqh`）：图标那种按 em 计量的视觉靠它铺满封面框，
+     而不是缩在自己的一小块里。媒体盒自身由 `inset: 0` 定尺寸，不依赖内容，所以尺寸包含没有副作用。 */
+  container-type: size;
   /* 卡片可点时封面自己放大一点：手指/光标按下去的确实是这张图。 */
   transition: transform var(--oc-duration-normal) var(--oc-ease);
 }

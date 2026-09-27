@@ -152,4 +152,29 @@ describe('ProjectIconRegistrationDialog', () => {
     expect(wrapper.text()).not.toContain('projectConfig.icons.selectedIconsCount')
     expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
+
+  it('adds to an existing set without asking for its name or Key, and avoids the Keys it holds', async () => {
+    mocks.pickFiles.mockResolvedValue(['D:/Icons/Warn.svg', 'D:/Icons/Gem.svg'])
+    const outline = {
+      name: 'Outline', key: 'outline',
+      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' as const }],
+    }
+    const wrapper = mountDialog({ series: [outline], targetSeries: outline })
+
+    expect(wrapper.text()).toContain('projectConfig.icons.addIconsToSet')
+    expect(wrapper.text()).not.toContain('projectConfig.icons.advancedSettings')
+
+    await chooseFiles(wrapper)
+    await flushPromises()
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({
+      name: 'Outline',
+      key: 'outline',
+      icons: [
+        { sourcePath: 'D:/Icons/Warn.svg', iconKey: 'warn-2', name: 'Warn' },
+        { sourcePath: 'D:/Icons/Gem.svg', iconKey: 'gem', name: 'Gem' },
+      ],
+    })
+  })
 })

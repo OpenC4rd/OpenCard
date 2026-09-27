@@ -211,23 +211,28 @@ const stateClasses = computed(() => ({
   width: 100%;
 }
 
-/* Size variants */
+/* 撑满宽度的按钮也要让内容区撑满：调用方才能靠自己的 class 决定内容是居中还是靠左、长文字能否截断。 */
+.oc-button--block .oc-button__content {
+  width: 100%;
+}
+
+/* Size variants：高度可用 `--oc-control-height` 由上下文覆盖（选项组的方形格子就是这么撑满格子的）。 */
 .oc-button--size-sm {
-  height: var(--oc-size-sm);
+  height: var(--oc-control-height, var(--oc-size-sm));
   padding: 0 var(--oc-space-3);
   font-size: var(--oc-text-sm);
   gap: var(--oc-space-2);
 }
 
 .oc-button--size-md {
-  height: var(--oc-size-md);
+  height: var(--oc-control-height, var(--oc-size-md));
   padding: 0 var(--oc-space-4);
   font-size: var(--oc-text-base);
   gap: var(--oc-space-3);
 }
 
 .oc-button--size-lg {
-  height: var(--oc-size-lg);
+  height: var(--oc-control-height, var(--oc-size-lg));
   padding: 0 var(--oc-space-4);
   font-size: var(--oc-text-lg);
   gap: var(--oc-space-3);
@@ -299,18 +304,23 @@ const stateClasses = computed(() => ({
 /* Icon-only mode */
 .oc-button--icon-only {
   width: var(--oc-size-sm);
-  height: var(--oc-size-sm);
+  height: var(--oc-control-height, var(--oc-size-sm));
   padding: 0;
 }
 
 .oc-button--icon-only.oc-button--size-md {
   width: var(--oc-size-md);
-  height: var(--oc-size-md);
+  height: var(--oc-control-height, var(--oc-size-md));
 }
 
 .oc-button--icon-only.oc-button--size-lg {
   width: var(--oc-size-lg);
-  height: var(--oc-size-lg);
+  height: var(--oc-control-height, var(--oc-size-lg));
+}
+
+/* `block` 是形状决定，不受 icon-only 的固定宽度影响。 */
+.oc-button--icon-only.oc-button--block {
+  width: 100%;
 }
 
 /* Content wrapper */

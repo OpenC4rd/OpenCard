@@ -99,7 +99,7 @@ describe('cardRenderResources', () => {
     }
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project', fontDocument: {}, fonts: {},
-      iconDocument: {}, iconCatalog: { series: [], entries: [icon], errors: [] },
+      iconDocument: {}, iconCatalog: { series: [], entries: [icon] },
     }
     const root = createCardResourceResolver(createCardRenderResourceContext({ hostEnvironment: environment }))
     const derived = root.withScopes(new Map([
@@ -139,7 +139,7 @@ describe('cardRenderResources', () => {
     const packageEnvironment: ProjectResourceEnvironment = {
       kind: 'package', namespace: 'package-alice-theme-1.0.0',
       rootPath: '/project/.opencard/packages/alice/theme/1.0.0',
-      fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: { series: [], entries: [icon], errors: [] },
+      fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: { series: [], entries: [icon] },
     }
     const hostEnvironment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project', rootPath: '/project', fontDocument: {}, fonts: {},

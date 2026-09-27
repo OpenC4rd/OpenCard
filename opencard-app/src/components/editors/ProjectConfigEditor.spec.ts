@@ -19,7 +19,7 @@ vi.mock('../../features/workspace/services/projectIconCatalog', async (importOri
   const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
   return {
     ...actual,
-    buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [], errors: [] })),
+    buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [] })),
   }
 })
 
@@ -129,7 +129,9 @@ describe('ProjectConfigEditor', () => {
     expect(wrapper.findAllComponents(ProjectConfigSection).map(section => section.props('contentIndent')))
       .toEqual(['single', 'single', 'single'])
     expect(wrapper.find('.project-profile-editor__outline').text()).not.toContain('projectConfig.outline.title')
-    expect(wrapper.getComponent(ProjectConfigSection).getComponent(OcButton).props('icon')).toBe('tree.chevron-right')
+    // 折叠箭头是这一层自己渲染的内容（走按钮的 icon 插槽），所以按元素断言而不是按钮的 prop。
+    expect(wrapper.getComponent(ProjectConfigSection).getComponent(OcButton).find('.project-config-section__chevron').exists())
+      .toBe(true)
     await wrapper.get('#project-profile-section-information .project-config-section__toggle').trigger('click')
 
     expect(wrapper.get('#project-profile-section-information-content').attributes('aria-hidden')).toBe('true')

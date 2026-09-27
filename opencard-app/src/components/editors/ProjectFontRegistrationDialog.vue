@@ -366,9 +366,7 @@ function fontNameFromPath(path: string): string { return projectAssetName(path).
 .project-font-dialog__slot-weight { white-space: nowrap; }
 .project-font-dialog__slot-cell { min-width: 0; }
 .project-font-dialog__slot-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--oc-space-1); min-width: 0; }
-.project-font-dialog__slot-source { width: 100%; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; justify-content: flex-start; overflow: hidden; }
+.project-font-dialog__slot-source { width: 100%; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; justify-content: flex-start; overflow: hidden; text-align: left; }
 .project-font-dialog__slot-source:hover:not(:disabled) { background-color: transparent; }
 .project-font-dialog__slot-source--fallback { color: var(--oc-fg-muted); }
-:deep(.project-font-dialog__slot-source .oc-button__content) { width: 100%; justify-content: flex-start; overflow: hidden; }
-:deep(.project-font-dialog__slot-source .oc-button__label) { display: block; width: 100%; text-align: left; }
 </style>

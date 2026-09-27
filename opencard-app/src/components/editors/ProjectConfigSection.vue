@@ -3,10 +3,14 @@
     :class="`project-config-section--indent-${sectionIndent}`">
     <header class="project-config-section__header">
       <OcButton class="project-config-section__toggle" :class="{ 'is-expanded': !collapsed }"
-        icon="tree.chevron-right" icon-only size="sm" variant="ghost"
+        icon-only size="sm" variant="ghost"
         :aria-label="collapsed ? expandLabel : collapseLabel"
         :data-tooltip="collapsed ? expandLabel : collapseLabel"
-        :aria-expanded="!collapsed" :aria-controls="contentId" @click="emit('toggle')" />
+        :aria-expanded="!collapsed" :aria-controls="contentId" @click="emit('toggle')">
+        <template #icon>
+          <OcIcon class="project-config-section__chevron" name="tree.chevron-right" size="action" />
+        </template>
+      </OcButton>
       <span class="project-config-section__heading">
         <span class="project-config-section__title-row">
           <span class="project-config-section__title">{{ heading }}</span>
@@ -35,6 +39,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import OcButton from '../base/OcButton.vue'
+import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
 
 const props = withDefaults(defineProps<{
@@ -80,12 +85,13 @@ const contentId = computed(() => `${props.sectionId}-content`)
   margin-block-start: calc((var(--oc-text-base) - var(--oc-icon-size-sm)) / 2);
 }
 
-.project-config-section__toggle :deep(.oc-button__icon) {
+/* 折叠箭头是这里自己的内容（走按钮的插槽），旋转也归这里，不必去改按钮的内部结构。 */
+.project-config-section__chevron {
   transform: rotate(0deg);
   transition: transform var(--oc-duration-normal) var(--oc-ease);
 }
 
-.project-config-section__toggle.is-expanded :deep(.oc-button__icon) {
+.project-config-section__toggle.is-expanded .project-config-section__chevron {
   transform: rotate(90deg);
 }
 
@@ -148,7 +154,7 @@ const contentId = computed(() => `${props.sectionId}-content`)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .project-config-section__toggle :deep(.oc-button__icon),
+  .project-config-section__chevron,
   .project-config-section__content {
     transition: none;
   }

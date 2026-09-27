@@ -73,9 +73,10 @@ const { t } = useI18n()
     <OcSwitch
       class="workspace-empty-state__wall-toggle"
       :checked="props.backgroundVisible"
-      :label="t('app.welcome.backgroundToggle')"
       @update:checked="emit('update:backgroundVisible', $event)"
-    />
+    >
+      <span class="workspace-empty-state__wall-toggle-label">{{ t('app.welcome.backgroundToggle') }}</span>
+    </OcSwitch>
   </section>
 </template>
 
@@ -174,8 +175,8 @@ const { t } = useI18n()
   z-index: 2;
 }
 
-/* 开关文字同样落在封面墙上，因此沿用标题那层底色描边。 */
-.workspace-empty-state__wall-toggle :deep(.oc-switch__label) {
+/* 开关文字同样落在封面墙上，因此沿用标题那层底色描边；文字是这里自己的节点，不碰开关内部。 */
+.workspace-empty-state__wall-toggle-label {
   text-shadow: var(--oc-welcome-hero-text-shadow);
 }
 

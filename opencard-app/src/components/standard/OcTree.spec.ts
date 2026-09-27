@@ -125,7 +125,7 @@ describe('OcTree', () => {
     expect(wrapper.get('.oc-tree__label').attributes()).toHaveProperty('data-tooltip-overflow')
   })
 
-  it('opts atlas crop visuals into the shared project-icon renderer', () => {
+  it('opts project-icon visuals into the shared project-icon renderer', () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
