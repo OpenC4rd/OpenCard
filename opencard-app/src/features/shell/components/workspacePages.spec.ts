@@ -95,6 +95,17 @@ describe('workspace pages', () => {
     expect(wrapper.text()).toContain('No editors open')
   })
 
+  it('prompts to open a project when the workbench has no project', async () => {
+    const wrapper = mount(WorkbenchWorkspace, {
+      props: { hasActiveEditor: false, hasProject: false },
+      ...mountOptions(),
+    })
+
+    expect(wrapper.text()).toContain('Open a file or project to get started')
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.emitted('open-project')).toHaveLength(1)
+  })
+
   it('renders editor content only for an active document', () => {
     const wrapper = mount(WorkbenchWorkspace, {
       props: { hasActiveEditor: true },

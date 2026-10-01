@@ -43,7 +43,7 @@
       placement="bottom-end"
       :gap="0"
       :max-height="480"
-      class="oc-action-button__floating"
+      class="oc-action-button__floating oc-floating-layer--surface"
       :data-oc-action-menu-branch="menuBranchId"
       @pointerenter="cancelCloseMenu"
       @pointerleave="scheduleCloseMenu"
@@ -62,11 +62,12 @@
 
 <script lang="ts">
 export type {
-  OcActionDefinition as OcActionButtonAction,
-  OcActionSelectPayload as OcActionButtonSelectPayload,
-} from './OcActionMenu.vue'
-export type ActionButtonSize = 'sm' | 'md' | 'lg'
-export type ActionButtonVariant = 'solid' | 'soft' | 'ghost' | 'outline'
+  ActionButtonSize,
+  ActionButtonVariant,
+  OcActionDefinition,
+  OcActionMenuEntry,
+  OcActionSelectPayload,
+} from '../../shared/ui/action/action.types'
 </script>
 
 <script setup lang="ts">
@@ -75,11 +76,15 @@ import OcButton from '../base/OcButton.vue'
 import type { OcIconSize } from '../base/OcIcon.vue'
 import { inlineMarkupToText } from '../../shared/ui/inline-markup/inlineMarkup'
 import OcActionMenu, {
-  type OcActionDefinition,
-  type OcActionMenuEntry,
-  type OcActionSelectPayload,
   isActionMenuBranchEvent,
 } from './OcActionMenu.vue'
+import type {
+  ActionButtonSize,
+  ActionButtonVariant,
+  OcActionDefinition,
+  OcActionMenuEntry,
+  OcActionSelectPayload,
+} from '../../shared/ui/action/action.types'
 import OcFloatingLayer from './OcFloatingLayer.vue'
 import { actionAccessibleLabel, actionTitleText, formatActionBadge, hasActionBadge } from './actionBadge'
 

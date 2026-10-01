@@ -2,7 +2,7 @@
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcText from '../../../components/base/OcText.vue'
-import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
+import type { OcActionDefinition } from '../../../shared/ui/action/action.types'
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
 import type { ShellAction, ShellWorkspaceAction } from '../shell.types'
 
@@ -24,7 +24,7 @@ const emit = defineEmits<{
   action: [actionKey: string]
 }>()
 
-function toActionDefinition(action: ShellAction): OcActionButtonAction {
+function toActionDefinition(action: ShellAction): OcActionDefinition {
   return {
     key: action.key ?? action.icon,
     title: action.hoverTip ?? action.value,

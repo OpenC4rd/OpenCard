@@ -25,17 +25,23 @@ export default {
     title: 'Packages', description: 'Which packages this project has: the archives in its package folder.',
     installed: 'Installed packages', empty: 'No packages installed yet.',
     unreadable: 'Files that cannot be read', unreadableHint: 'These files cannot say who they are, so they cannot be used as packages.',
-    reveal: 'Show in file manager', copyCoordinate: 'Copy coordinate',
+    reveal: 'Show in file manager',
     remove: 'Remove package', confirmRemove: 'Move {name} to Trash',
   },
   packageManifest: {
     description: 'View package information and the resources it provides.', unavailable: 'This package is no longer available.',
-    information: 'Package information', name: 'Display name', coordinate: 'Coordinate', fingerprint: 'Content fingerprint', copyFingerprint: 'Copy content fingerprint',
+    information: 'Package information', name: 'Display name', coordinate: 'Coordinate', fingerprint: 'Content fingerprint', copyRow: 'Copy {label}: {value}',
     cover: 'Cover', coverAlt: 'Package cover preview',
     fonts: 'Fonts', noFonts: 'No public fonts.', iconSeries: 'Icon sets', noIconSeries: 'No public icon sets.', iconCount: '{count} icons',
   },
   app: {
     shell: {
+      space: {
+        navigation: 'Spaces',
+        welcome: 'Welcome',
+        workbench: 'Workbench',
+        settings: 'Settings',
+      },
       expandSidebar: 'Expand sidebar',
       collapseSidebar: 'Collapse sidebar',
       back: 'Back',
@@ -180,7 +186,10 @@ export default {
       newProject: 'New Project',
       closeAndNewProject: 'Close Project and Create New',
       newOpenCard: 'New OpenCard',
-      closeProjectAndWelcome: 'Close Project and Return to Welcome',
+      closeProjectFolder: 'Close Project Folder',
+      openFile: 'Open File',
+      saveAs: 'Save As',
+      saveAll: 'Save All',
       save: 'Save',
       enableAutoSave: 'Enable Auto Save',
       disableAutoSave: 'Disable Auto Save',
@@ -264,6 +273,10 @@ export default {
       title: 'No editors open',
       subtitle: 'Open a card or image from the file explorer to start editing.',
     },
+    workbenchEmpty: {
+      title: 'Open a file or project to get started',
+      subtitle: 'You can edit a file directly; open a project to use its file tree too.',
+    },
     updater: {
       check: 'Check for Updates',
       checking: 'Checking for updates...',
@@ -301,7 +314,7 @@ export default {
     },
     dialogs: {
       chooseProjectFolder: 'Choose Project Folder',
-      saveFile: 'Save File',
+      saveFile: 'Save File', saveFileAs: 'Save File As',
     },
     about: {
       title: 'About OpenCard',
@@ -412,8 +425,8 @@ export default {
       remove: 'Remove Font',
       noFontSelected: 'No font selected',
       addFont: 'Add Font',
-      projectFonts: 'Project Fonts',
-      compositions: 'Font Compositions',
+      projectFonts: 'Project Fonts', noProjectFonts: 'This project has no fonts yet.',
+      compositions: 'Font Compositions', noCompositions: 'No font compositions yet.',
       defaultSetName: 'Font Set {index}',
       addSet: 'Create Font Set', configureSet: 'Configure Font Set', removeSet: 'Remove Font Set',
       noSetSelected: 'No font composition selected', members: 'Composition Members', noMembers: 'No members', searchMembers: 'Search fonts', addMember: 'Add member', removeMember: 'Remove member', moveMemberToTop: 'Move to top', moveMemberToBottom: 'Move to bottom', memberRequired: 'A font composition needs at least one font.',
@@ -723,7 +736,7 @@ export default {
     workspaceGroup: 'Workspace',
     openedEditors: 'Open Editors',
     closeEditor: 'Close editor',
-    noOpenedEditors: 'Opened project files appear here',
+    noOpenedEditors: 'Opened files appear here',
     editorTitles: {
       external: '[External] {name}',
       draft: '[Draft] {name}',

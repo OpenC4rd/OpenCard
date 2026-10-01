@@ -1,5 +1,5 @@
 import { shallowReadonly, shallowRef } from 'vue'
-import type { OcActionMenuEntry } from '../components/standard/OcActionMenu.vue'
+import type { OcActionMenuEntry } from '../shared/ui/action/action.types'
 
 export type FloatingMenuItem = OcActionMenuEntry
 

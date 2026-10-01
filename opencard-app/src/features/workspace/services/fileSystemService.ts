@@ -57,7 +57,7 @@ export interface FileSystemService {
   pickFile(options: {
     title: string
     fileTypeName: string
-    extensions: string[]
+    extensions?: string[]
     defaultPath?: string
   }): Promise<string | null>
   pickFiles?(options: {
@@ -114,7 +114,7 @@ class FileSystemServiceImpl implements FileSystemService {
   async pickFile(options: {
     title: string
     fileTypeName: string
-    extensions: string[]
+    extensions?: string[]
     defaultPath?: string
   }): Promise<string | null> {
     const selected = await open({
@@ -122,7 +122,7 @@ class FileSystemServiceImpl implements FileSystemService {
       multiple: false,
       title: options.title,
       defaultPath: options.defaultPath,
-      filters: [{ name: options.fileTypeName, extensions: options.extensions }],
+      filters: options.extensions?.length ? [{ name: options.fileTypeName, extensions: options.extensions }] : undefined,
     })
     return selected as string | null
   }

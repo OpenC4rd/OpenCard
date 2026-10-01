@@ -36,6 +36,8 @@
   --button-height: var(--oc-size-md, 28px);
   --workspace-header-height: 32px;
   --scrollbar-size: var(--oc-scrollbar-size, 8px);
+  --shell-space-rail-width: calc(var(--oc-size-lg) + var(--oc-space-4));
+  --shell-workspace-header-background: color-mix(in srgb, var(--oc-bg-surface) 94%, var(--oc-bg-raised));
 
   --radius-shell: var(--oc-radius-lg, 12px);
   --radius-panel: var(--oc-radius-md, 6px);
@@ -441,7 +443,7 @@
 .shell-main {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, var(--shell-sidebar-width, 264px)) minmax(0, 1fr);
+  grid-template-columns: var(--shell-space-rail-width) minmax(0, var(--shell-sidebar-width, 264px)) minmax(0, 1fr);
   gap: 0;
   padding: 0;
   transition: grid-template-columns 220ms ease;
@@ -452,7 +454,58 @@
 }
 
 .shell-main.shell-main-collapsed {
-  grid-template-columns: minmax(0, var(--shell-sidebar-width, 0px)) minmax(0, 1fr);
+  grid-template-columns: var(--shell-space-rail-width) minmax(0, var(--shell-sidebar-width, 0px)) minmax(0, 1fr);
+}
+
+.shell-space-rail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0 var(--radius-shell) var(--radius-shell) 0;
+  background: var(--shell-workspace-header-background);
+  transition: border-radius 220ms ease;
+}
+
+.shell-space-rail__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.shell-space-rail__item {
+  width: 100%;
+  min-height: var(--oc-size-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--oc-fg-default);
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.shell-space-rail__item:hover {
+  background: var(--oc-bg-hover);
+}
+
+.shell-space-rail__item.is-active {
+  background: var(--oc-bg-active);
+}
+
+.shell-space-rail__item:focus-visible {
+  outline: 2px solid var(--oc-border-accent);
+  outline-offset: -2px;
+}
+
+.shell-main.shell-main-collapsed .shell-space-rail {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .workspace-body {
@@ -499,10 +552,10 @@
   position: relative;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   padding: 8px;
   border-radius: 0;
-  background: transparent;
+  background: var(--oc-bg-window, var(--oc-bg-base));
   overflow: hidden;
   transition:
     width 220ms ease,
@@ -520,6 +573,8 @@
 
 .shell-sidebar.collapsed {
   width: var(--sidebar-collapsed-width) !important;
+  min-width: 0;
+  padding: 0;
   opacity: 0;
   pointer-events: none;
 }
@@ -557,9 +612,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-.shell-sidebar-group-bottom {
-  grid-row: 3;
 }
 
 .shell-sidebar-button {
@@ -769,18 +821,18 @@
 }
 
 .shell-main.shell-main-collapsed .workspace-frame {
+  border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
 
 .workspace-header {
-  position: relative;
   min-height: var(--workspace-header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-5);
   padding: 2px var(--oc-space-3, 8px) 2px var(--oc-space-4, 12px);
-  background: color-mix(in srgb, var(--oc-bg-surface) 94%, var(--oc-bg-raised));
+  background: var(--shell-workspace-header-background);
 }
 
 .workspace-heading {
@@ -791,17 +843,6 @@
 }
 
 .workspace-subtitle { min-width: 0; }
-
-.workspace-header::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: var(--oc-space-4, 12px);
-  height: 1px;
-  background: linear-gradient(to right, var(--oc-border-default), var(--oc-border-muted) 45%, transparent 100%);
-  pointer-events: none;
-}
 
 .workspace-title {
   position: relative;
@@ -855,3 +896,122 @@
   scrollbar-gutter: auto;
 }
 
+
+/* OpenCardShell workspace surface */
+
+
+.open-card-shell__workspace-stack {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  overflow: hidden;
+}
+
+.open-card-shell__workspace-stack.is-bottom-panel-expanded {
+  grid-template-rows: minmax(0, 1fr) 1px auto;
+}
+
+.open-card-shell__bottom-panel-resizer {
+  position: relative;
+  z-index: 1;
+  height: 10px;
+  min-height: 0;
+  margin-block: -4.5px;
+  cursor: ns-resize;
+}
+
+.open-card-shell__bottom-panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 4.5px;
+  right: 0;
+  left: 0;
+  height: 1px;
+  color: var(--oc-border-muted);
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    currentColor calc(2 * var(--oc-space-8)),
+    currentColor calc(100% - 2 * var(--oc-space-8)),
+    transparent 100%
+  );
+  transition: color var(--oc-duration-fast, 100ms) var(--oc-ease, ease);
+}
+
+.open-card-shell__bottom-panel-resizer:hover::after {
+  color: var(--oc-border-accent);
+}
+
+.open-card-shell__bottom-panel-resize-preview {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  height: 1px;
+  pointer-events: none;
+  background: var(--oc-border-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--oc-border-accent) 24%, transparent);
+}
+
+.open-card-shell__bottom-panel-resize-preview span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 2px 6px;
+  border: 1px solid var(--oc-border-accent);
+  border-radius: var(--oc-radius-sm, 4px);
+  background: var(--oc-bg-surface);
+  color: var(--oc-fg-accent);
+  font-size: var(--oc-text-xs, 11px);
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.open-card-shell__workbench {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--oc-radius-lg, 8px);
+  background: var(--oc-bg-surface);
+}
+
+.open-card-shell__workbench  > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.open-card-shell__sidebar-tree {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.shell-file-drop-overlay {
+  position: fixed;
+  inset: 8px;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--oc-space-3, 8px);
+  /* 文件拖放的落点判定依赖 elementFromPoint，遮罩必须不参与命中测试，否则会挡住整棵文件树。 */
+  pointer-events: none;
+  border: 2px solid var(--oc-border-accent);
+  border-radius: var(--oc-radius-lg, 8px);
+  background: color-mix(in srgb, var(--oc-bg-base) 88%, transparent);
+  color: var(--oc-fg-default);
+  font-size: var(--oc-text-lg, 15px);
+  font-weight: 600;
+}

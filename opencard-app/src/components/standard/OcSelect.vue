@@ -50,7 +50,7 @@
       :match-anchor-width="true"
       :max-height="maxHeight"
       :z-index="zIndex"
-      class="oc-select__floating"
+      class="oc-select__floating oc-floating-layer--surface"
       :data-oc-select-owner="selectId"
     >
       <div :id="listboxId" class="oc-select__listbox" role="listbox">
@@ -346,10 +346,6 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 <style>
 .oc-select__floating {
   overflow: hidden;
-  border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-md);
-  background: var(--oc-bg-surface);
-  box-shadow: var(--oc-shadow-lg);
 }
 
 .oc-select__listbox {

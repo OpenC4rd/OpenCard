@@ -22,7 +22,8 @@ import {
   VIEWPORT_WHEEL_ZOOM_SENSITIVITY,
   normalizeViewportWheelDelta,
 } from '../../shared/ui/viewport/viewportNavigation'
-import OcOverlayToolbar, { createViewportToolbarItems } from '../standard/OcOverlayToolbar.vue'
+import OcOverlayToolbar from '../standard/OcOverlayToolbar.vue'
+import { createViewportToolbarItems } from '../standard/overlayToolbarItems'
 
 const MIN_SCALE = 0.1
 const MAX_SCALE = 16

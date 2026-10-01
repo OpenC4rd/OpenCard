@@ -150,10 +150,8 @@ import OcIcon from '../../../components/base/OcIcon.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
 import OcSelect from '../../../components/standard/OcSelect.vue'
-import OcActionButton, {
-  type OcActionButtonAction,
-  type OcActionButtonSelectPayload,
-} from '../../../components/standard/OcActionButton.vue'
+import OcActionButton from '../../../components/standard/OcActionButton.vue'
+import type { OcActionDefinition, OcActionSelectPayload } from '../action/action.types'
 import OcFloatingLayer from '../../../components/standard/OcFloatingLayer.vue'
 import { normalizeRichTextHtml, parseRichTextHtml } from '../../rich-text/richTextHtml'
 import type { IconToken } from '../icon/iconRegistry'
@@ -424,7 +422,7 @@ const projectIconActionChildren = computed(() => {
     .filter(group => group.children.length > 0)
   return [...host, ...packages]
 })
-const projectIconAction = computed<OcActionButtonAction>(() => {
+const projectIconAction = computed<OcActionDefinition>(() => {
   toolbarRevision.value
   return {
     key: 'project-icon',
@@ -436,7 +434,7 @@ const projectIconAction = computed<OcActionButtonAction>(() => {
     children: projectIconActionChildren.value,
   }
 })
-const tableAction = computed<OcActionButtonAction>(() => ({
+const tableAction = computed<OcActionDefinition>(() => ({
   key: 'table-actions',
   icon: 'data.table',
   title: tr('propertyEditor.richText.tableActions', '表格操作'),
@@ -480,7 +478,7 @@ const selectedNodeDialogTitle = computed(() => dialogNodeTarget.value?.kind === 
   : dialogNodeTarget.value?.kind === 'projectIcon'
     ? tr('propertyEditor.richText.editProjectIcon', '编辑项目图标')
     : '')
-const dialogProjectIconAction = computed<OcActionButtonAction>(() => ({
+const dialogProjectIconAction = computed<OcActionDefinition>(() => ({
   ...projectIconAction.value,
   title: tr('propertyEditor.richText.chooseProjectIcon', '选择项目图标'),
 }))
@@ -505,7 +503,7 @@ function updateDialogBindingExpression(event: Event): void {
   if (target instanceof HTMLInputElement) dialogBindingExpression.value = target.value
 }
 
-function selectDialogProjectIcon(payload: OcActionButtonSelectPayload): void {
+function selectDialogProjectIcon(payload: OcActionSelectPayload): void {
   const selection = projectIconEntriesByActionKey.value.get(payload.key)
   if (selection) dialogIconPath.value = projectIconPath(selection)
 }
@@ -619,7 +617,7 @@ function insertTable(): void {
   editor.value?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
 }
 
-function handleTableAction(payload: OcActionButtonSelectPayload): void {
+function handleTableAction(payload: OcActionSelectPayload): void {
   const chain = editor.value?.chain().focus()
   if (!chain) return
   if (payload.key === 'table.add-row-before') chain.addRowBefore().run()
@@ -749,7 +747,7 @@ function hasSelectedProjectIcon(): boolean {
     && selection.node.type.name === 'projectIcon')
 }
 
-function handleProjectIconAction(payload: OcActionButtonSelectPayload): void {
+function handleProjectIconAction(payload: OcActionSelectPayload): void {
   const selection = projectIconEntriesByActionKey.value.get(payload.key)
   if (selection) insertProjectIconEntry(selection)
 }

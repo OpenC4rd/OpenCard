@@ -167,8 +167,12 @@ const treeData = computed<OcNodeCollection>(() => {
   const removeCompositionAction: OcNodeAction = {
     key: 'delete-composition', title: t('projectConfig.fonts.removeSet'), icon: 'action.delete', iconTone: 'danger',
   }
-  const familyKeys = props.families.map(entry => treeKey('families', entry.key))
-  const compositionKeys = props.compositions.map(entry => treeKey('compositions', entry.key))
+  const familyKeys = props.families.length
+    ? props.families.map(entry => treeKey('families', entry.key))
+    : [GROUP_EMPTY_KEY.families]
+  const compositionKeys = props.compositions.length
+    ? props.compositions.map(entry => treeKey('compositions', entry.key))
+    : [GROUP_EMPTY_KEY.compositions]
   const items = new Map<string, OcNode>([
     ['families', {
       label: t('projectConfig.fonts.projectFonts'),
@@ -208,6 +212,13 @@ const treeData = computed<OcNodeCollection>(() => {
       ],
     }]),
   ])
+  // 空分组也要有子项：分组标题看着能展开，点开却什么都没有，比一句话更让人以为界面坏了。
+  if (props.families.length === 0) {
+    items.set(GROUP_EMPTY_KEY.families, emptyPlaceholder(t('projectConfig.fonts.noProjectFonts')))
+  }
+  if (props.compositions.length === 0) {
+    items.set(GROUP_EMPTY_KEY.compositions, emptyPlaceholder(t('projectConfig.fonts.noCompositions')))
+  }
   return {
     rootKeys: ['families', 'compositions'],
     items,
@@ -325,6 +336,12 @@ watch(
 )
 
 function treeKey(page: 'families' | 'compositions', key: string): string { return `${page}:${key}` }
+/** 空分组的占位子项键：不参与选中与动作，只说明这一组现在是空的。 */
+const GROUP_EMPTY_KEY = { families: 'families:empty', compositions: 'compositions:empty' } as const
+/** 占位子项禁用它自己：它不是一个能点开的字体条目，只是这一组的空状态（与「预装的包」树同一种做法）。 */
+function emptyPlaceholder(label: string): OcNode {
+  return { label, visual: { type: 'icon', icon: 'file.generic' }, disabled: true }
+}
 /** 字体组合没有自己的字面，按成员回退顺序拼成一套 font-family，标签就用它自己的组合顺序绘制。 */
 function compositionLabelFont(composition: ProjectFontComposition): string | undefined {
   const families = composition.members.map(member => JSON.stringify(createProjectFontCssFamily(member.fontKey)))

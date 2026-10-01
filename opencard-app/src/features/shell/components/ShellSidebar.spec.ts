@@ -18,7 +18,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([{
           key: 'project-files',
           title: 'Files',
@@ -51,7 +50,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup(
           [{ key: 'recent', title: 'Recent Projects', placeholder: 'Empty', actions: [] }],
           [{ key: 'open', title: 'Open Project', icon: 'status.folder-open' }],
@@ -69,28 +67,27 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: [{
           key: 'primary',
-          transitionKey: 'page:welcome',
+          transitionKey: 'space:welcome:none',
           title: '',
           lists: [{ key: 'recent', title: 'Recent Projects', placeholder: 'Empty', actions: [] }],
         }],
       },
     })
 
-    expect(wrapper.get('.shell-sidebar-active-group').attributes('data-transition-key')).toBe('page:welcome')
+    expect(wrapper.get('.shell-sidebar-active-group').attributes('data-transition-key')).toBe('space:welcome:none')
     await wrapper.setProps({
       bodyGroups: [{
         key: 'primary',
-        transitionKey: 'page:settings',
+        transitionKey: 'space:settings:none',
         title: '',
         lists: [{ key: 'settings', title: 'Settings', placeholder: 'Empty', actions: [] }],
       }],
     })
     await flushPromises()
 
-    expect(wrapper.get('.shell-sidebar-active-group').attributes('data-transition-key')).toBe('page:settings')
+    expect(wrapper.get('.shell-sidebar-active-group').attributes('data-transition-key')).toBe('space:settings:none')
     expect(wrapper.get('.shell-sidebar-list-title').text()).toBe('Settings')
   })
 
@@ -99,7 +96,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([
           { key: 'files', title: 'Files', placeholder: 'Empty', actions: [] },
           { key: 'timeline', title: 'Timeline', placeholder: 'Empty', actions: [] },
@@ -121,7 +117,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([
           { key: 'files', title: 'Files', placeholder: 'Empty', actions: [] },
           { key: 'timeline', title: 'Timeline', placeholder: 'Empty', actions: [] },
@@ -149,7 +144,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([
           { key: 'files', title: 'Files', placeholder: 'Empty', actions: [] },
           { key: 'timeline', title: 'Timeline', placeholder: 'Empty', actions: [] },
@@ -169,7 +163,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: [
           {
             key: 'workspace', title: 'Workspace', icon: 'status.folder-open',
@@ -202,7 +195,6 @@ describe('ShellSidebar', () => {
         collapsed: false,
         width: 200,
         compactGroupWidth: 220,
-        tailButtons: [],
         bodyGroups: [
           { key: 'workspace', title: 'Workspace', icon: 'status.folder-open', lists: [] },
           { key: 'history', title: 'History', icon: 'file.git', lists: [] },
@@ -221,7 +213,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([{
           key: 'files',
           title: 'Files',
@@ -256,7 +247,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([{
           key: 'editors',
           title: 'Open Editors',
@@ -283,7 +273,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([{
           key: 'files',
           title: 'Files',
@@ -303,7 +292,6 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [],
         bodyGroups: primaryGroup([{
           key: 'files',
           title: 'Files',
@@ -325,7 +313,6 @@ describe('ShellSidebar', () => {
         collapsed: false,
         width: 260,
         maxResizeWidth: 420,
-        tailButtons: [],
         bodyGroups: primaryGroup([]),
       },
     })
@@ -359,18 +346,17 @@ describe('ShellSidebar', () => {
     expect(wrapper.get('.shell-sidebar').classes()).not.toContain('is-resizing')
   })
 
-  it('uses medium icons for group, group action, and bottom buttons', () => {
+  it('uses medium icons for group actions', () => {
     const wrapper = mount(ShellSidebar, {
       props: {
         collapsed: false,
         width: 260,
-        tailButtons: [{ key: 'settings', title: 'Settings', icon: 'tool.settings' }],
         bodyGroups: primaryGroup([], [{ key: 'open', title: 'Open', icon: 'status.folder-open' }]),
       },
     })
 
     const icons = wrapper.findAll('.shell-sidebar-button .oc-icon')
-    expect(icons).toHaveLength(2)
+    expect(icons).toHaveLength(1)
     expect(icons.every(icon => icon.classes().includes('oc-icon--md'))).toBe(true)
   })
 })

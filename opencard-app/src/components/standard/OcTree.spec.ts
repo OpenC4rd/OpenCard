@@ -357,6 +357,24 @@ describe('OcTree', () => {
     expect(wrapper.get('.oc-tree__child-count').classes()).toContain('oc-number-badge')
   })
 
+  it('does not count a disabled placeholder child, so an empty group shows no badge', () => {
+    const wrapper = mount(OcTree, {
+      props: {
+        data: createData({
+          items: [
+            ['root', { label: 'Root', visual: { type: 'icon', icon: 'data.collection' } }],
+            ['root:empty', { label: 'Nothing yet', visual: { type: 'icon', icon: 'file.generic' }, disabled: true }],
+          ],
+          children: [['root', ['root:empty']]],
+        }),
+      },
+    })
+
+    // 空分组的占位说明不是这一组的内容，所以徽标不出现；分组本身仍然可展开，展开才看得见那行。
+    expect(wrapper.find('.oc-tree__child-count').exists()).toBe(false)
+    expect(wrapper.get('[data-oc-tree-key="root"] .oc-tree__icon-slot').classes()).toContain('is-expandable')
+  })
+
   it('emits expansion changes without mutating controlled state', async () => {
     const wrapper = mount(OcTree, {
       props: {

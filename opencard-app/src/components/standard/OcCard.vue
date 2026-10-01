@@ -30,16 +30,15 @@
 </template>
 
 <script lang="ts">
-import type { OcActionButtonAction } from './OcActionButton.vue'
+import type { OcActionDefinition, OcActionSelectPayload } from '../../shared/ui/action/action.types'
 
-export type OcCardAction = OcActionButtonAction
+export type OcCardAction = OcActionDefinition
 </script>
 
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import { prefersReducedMotion } from '../../shared/ui/foundation'
-import type { OcActionButtonSelectPayload } from './OcActionButton.vue'
 import OcActionRail from './OcActionRail.vue'
 import OcBar from './OcBar.vue'
 
@@ -92,7 +91,7 @@ const cardClasses = computed(() => [
   attrs.class,
 ])
 
-function handleActionSelect(payload: OcActionButtonSelectPayload): void {
+function handleActionSelect(payload: OcActionSelectPayload): void {
   emit('action', { key: payload.key })
 }
 

@@ -106,6 +106,7 @@ function createVersionControl(
     fileChangeRevision,
     getRelativeProjectPath: path => path.slice(`${PROJECT_ROOT}/`.length),
     moveProjectEntryToTrash: vi.fn(),
+    requestConfirmation: vi.fn().mockResolvedValue(true),
     openSetting,
     settings,
   })

@@ -163,6 +163,7 @@ import { notifyAppError } from '../../notifications/titlebarNotices'
 export type WorkspaceBottomTab = 'issues' | 'output'
 
 const props = defineProps<{
+  resizing?: boolean
   expanded: boolean
   activeTab: WorkspaceBottomTab
   issueCount: number
@@ -246,9 +247,10 @@ function togglePinned(): void {
 }
 function scheduleCollapse(): void {
   clearCollapseTimer()
-  if (pinned.value || !props.expanded) return
+  if (props.resizing || pinned.value || !props.expanded) return
   collapseTimer = setTimeout(() => {
     collapseTimer = null
+    if (props.resizing) return
     emit('expanded-change', false)
   }, HOVER_COLLAPSE_DELAY_MS)
 }
@@ -321,6 +323,9 @@ async function scrollOutputToEnd(): Promise<void> {
 watch(() => props.expanded, (expanded) => {
   if (!expanded && contentRef.value?.contains(document.activeElement)) toggleRef.value?.focus()
 }, { flush: 'sync' })
+watch(() => props.resizing, (resizing) => {
+  if (!resizing && props.expanded) scheduleCollapse()
+})
 watch(() => [props.expanded, props.activeTab] as const, scrollOutputToEnd)
 watch(visibleOutputEntries, scrollOutputToEnd)
 
@@ -367,7 +372,8 @@ async function copyIssue(key: string): Promise<void> {
 .workspace-bottom-panel {
   position: relative;
   min-width: 0;
-  border-top: 1px solid var(--oc-border-muted);
+  overflow: hidden;
+  border-radius: var(--oc-radius-lg, 8px);
   background: var(--oc-bg-surface);
 }
 
@@ -433,7 +439,7 @@ async function copyIssue(key: string): Promise<void> {
 }
 
 .workspace-bottom-panel.is-expanded .workspace-bottom-panel__content {
-  height: var(--oc-list-max-height-md, 180px);
+  height: var(--workspace-bottom-panel-height, var(--oc-list-max-height-md, 180px));
 }
 
 .workspace-bottom-panel__tabs {

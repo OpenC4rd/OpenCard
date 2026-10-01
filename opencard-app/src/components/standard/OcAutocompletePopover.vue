@@ -6,7 +6,7 @@
     :max-height="maxHeight"
     :z-index="zIndex"
     :match-anchor-width="matchAnchorWidth"
-    class="oc-autocomplete-popover"
+    class="oc-autocomplete-popover oc-floating-layer--surface"
     role="listbox"
     :id="id"
   >
@@ -113,10 +113,7 @@ watch(
 .oc-autocomplete-popover {
   min-width: var(--oc-autocomplete-popover-min-width);
   padding: var(--oc-space-1);
-  border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-sm);
-  background: var(--oc-bg-surface);
-  box-shadow: var(--oc-shadow-lg);
+  --oc-floating-layer-radius: var(--oc-radius-sm);
 }
 
 .oc-autocomplete-popover__scroll {

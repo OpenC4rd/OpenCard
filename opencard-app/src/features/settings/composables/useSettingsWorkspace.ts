@@ -1,6 +1,6 @@
 /** Projects application settings into node, card and row view models. */
 import { computed, type ComputedRef, type DeepReadonly, type Ref } from 'vue'
-import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
+import type { OcActionDefinition } from '../../../shared/ui/action/action.types'
 import type { IconToken } from '../../../shared/ui/icon/iconRegistry'
 import type { OcNodeCollection } from '../../../shared/ui/node/node.types'
 import { CACHE_GIB_BYTES, formatCacheUsage, type AppCacheUsage } from '../../../shared/storage/appCache'
@@ -45,7 +45,7 @@ export interface SettingsCardViewModel {
   title: string
   icon?: IconToken
   /** 作用于这张 card 整组的操作，例如主题预设的复制、读取与重置。 */
-  actions: OcActionButtonAction[]
+  actions: OcActionDefinition[]
   items: readonly EditorItem[]
 }
 
@@ -96,7 +96,7 @@ function cardAction(
   title: string,
   icon: IconToken,
   disabled = false,
-): OcActionButtonAction {
+): OcActionDefinition {
   return { key, title, icon, disabled }
 }
 
@@ -104,7 +104,7 @@ function card(
   key: string,
   title: string,
   items: readonly EditorItem[],
-  options: { icon?: IconToken; actions?: readonly OcActionButtonAction[] } = {},
+  options: { icon?: IconToken; actions?: readonly OcActionDefinition[] } = {},
 ): SettingsCardViewModel {
   return { key, title, icon: options.icon, actions: [...(options.actions ?? [])], items }
 }

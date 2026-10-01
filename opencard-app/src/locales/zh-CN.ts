@@ -25,17 +25,23 @@ export default {
     title: '包', description: '项目里装了哪些包，就是包文件夹里的那几份归档。',
     installed: '已装的包', empty: '还没有装任何包。',
     unreadable: '读不出来的文件', unreadableHint: '这些文件说不清自己是谁，所以当不了包用。',
-    reveal: '在文件管理器里显示', copyCoordinate: '复制坐标',
+    reveal: '在文件管理器里显示',
     remove: '移除包', confirmRemove: '将 {name} 移到回收站',
   },
   packageManifest: {
     description: '查看包信息和对外提供的资源。', unavailable: '这个包已不可用。',
-    information: '包信息', name: '显示名称', coordinate: '坐标', fingerprint: '内容特征码', copyFingerprint: '复制内容特征码',
+    information: '包信息', name: '显示名称', coordinate: '坐标', fingerprint: '内容特征码', copyRow: '复制{label}：{value}',
     cover: '封面', coverAlt: '包封面预览',
     fonts: '字体', noFonts: '没有公开字体。', iconSeries: '图标集', noIconSeries: '没有公开图标集。', iconCount: '{count} 个图标',
   },
   app: {
     shell: {
+      space: {
+        navigation: '空间',
+        welcome: '首页',
+        workbench: '工作台',
+        settings: '设置',
+      },
       expandSidebar: '展开侧边栏',
       collapseSidebar: '收起侧边栏',
       back: '返回',
@@ -180,7 +186,10 @@ export default {
       newProject: '新建项目',
       closeAndNewProject: '关闭并新建项目',
       newOpenCard: '新建 OpenCard',
-      closeProjectAndWelcome: '关闭项目并返回欢迎页',
+      closeProjectFolder: '关闭项目文件夹',
+      openFile: '打开文件',
+      saveAs: '另存为',
+      saveAll: '全部保存',
       save: '保存',
       enableAutoSave: '开启自动保存',
       disableAutoSave: '关闭自动保存',
@@ -264,6 +273,10 @@ export default {
       title: '没有打开的编辑器',
       subtitle: '从文件浏览器打开卡牌或图片开始编辑。',
     },
+    workbenchEmpty: {
+      title: '打开文件或项目开始工作',
+      subtitle: '可以直接打开文件编辑；打开项目后还能使用项目文件树。',
+    },
     updater: {
       check: '检查更新',
       checking: '正在检查更新…',
@@ -301,7 +314,7 @@ export default {
     },
     dialogs: {
       chooseProjectFolder: '选择项目文件夹',
-      saveFile: '保存文件',
+      saveFile: '保存文件', saveFileAs: '文件另存为',
     },
     about: {
       title: '关于 OpenCard',
@@ -412,8 +425,8 @@ export default {
       remove: '移除字体',
       noFontSelected: '未选择字体',
       addFont: '添加字体',
-      projectFonts: '项目字体',
-      compositions: '字体组合',
+      projectFonts: '项目字体', noProjectFonts: '项目里还没有字体。',
+      compositions: '字体组合', noCompositions: '还没有字体组合。',
       defaultSetName: '字体组合 {index}',
       addSet: '创建字体组合', configureSet: '配置字体组合', removeSet: '移除字体组合',
       noSetSelected: '未选择字体组合', members: '组合成员', noMembers: '没有组合成员', searchMembers: '搜索字体', addMember: '添加成员', removeMember: '移除成员', moveMemberToTop: '置顶', moveMemberToBottom: '置底', memberRequired: '字体组合至少需要一套字体。',
@@ -723,7 +736,7 @@ export default {
     workspaceGroup: '工作区',
     openedEditors: '打开的编辑器',
     closeEditor: '关闭编辑器',
-    noOpenedEditors: '打开的项目文件会显示在这里',
+    noOpenedEditors: '打开的文件会显示在这里',
     editorTitles: {
       external: '[外部] {name}',
       draft: '[草稿] {name}',

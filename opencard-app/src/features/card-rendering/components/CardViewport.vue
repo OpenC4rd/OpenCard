@@ -278,8 +278,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
 import { clamp } from '../../../shared/model/number'
 import OcIcon from '../../../components/base/OcIcon.vue'
-import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
-import type { OcActionMenuEntry } from '../../../components/standard/OcActionMenu.vue'
+import type { OcActionDefinition, OcActionMenuEntry } from '../../../shared/ui/action/action.types'
 import OcOverlayToolbar from '../../../components/standard/OcOverlayToolbar.vue'
 import type { OcShortcutPart } from '../../../components/standard/OcShortcut.vue'
 import { useFloatingMenu } from '../../../composables/useFloatingMenu'
@@ -390,7 +389,7 @@ const props = withDefaults(defineProps<{
   selectedFlowAlign?: 'start' | 'center' | 'end' | 'justify' | null
   selectionInfo?: CardViewportSelectionInfo | null
   selectionActionLabels?: CardViewportSelectionActionLabels
-  selectionCommandActions?: readonly OcActionButtonAction[]
+  selectionCommandActions?: readonly OcActionDefinition[]
   showPositionOnMove?: boolean
   showSizeOnResize?: boolean
   alignmentSnappingEnabled?: boolean
@@ -740,7 +739,7 @@ const activeHandles = computed<ResizeHandle[]>(() => {
   return []
 })
 const showMoveHandle = computed(() => props.selectedLocationType === 'simple-container-location')
-const selectionQuickActions = computed<OcActionButtonAction[]>(() => {
+const selectionQuickActions = computed<OcActionDefinition[]>(() => {
   if (!props.selectedBlockId) return []
   if (resizeMode.value === 'absolute') {
     return [
@@ -749,7 +748,7 @@ const selectionQuickActions = computed<OcActionButtonAction[]>(() => {
         key: 'fill-parent',
         title: props.selectionActionLabels.fillParent,
         icon: 'layout.fill',
-      } as OcActionButtonAction] : []),
+      } as OcActionDefinition] : []),
       {
         key: 'center',
         title: props.selectionActionLabels.centerInParent,
@@ -764,7 +763,7 @@ const selectionQuickActions = computed<OcActionButtonAction[]>(() => {
         key: 'outset',
         title: props.selectionActionLabels.outset,
         icon: 'layout.outset',
-      }] as OcActionButtonAction[] : []),
+      }] as OcActionDefinition[] : []),
     ]
   }
   if (resizeMode.value === 'flow') {
@@ -776,7 +775,7 @@ const selectionQuickActions = computed<OcActionButtonAction[]>(() => {
         key: 'fill-cross-axis',
         title: props.selectionActionLabels.fillCrossAxis,
         icon: horizontalFlow ? 'layout.fill-vertical' : 'layout.fill-horizontal',
-      } as OcActionButtonAction] : []),
+      } as OcActionDefinition] : []),
       {
         key: 'center-cross-axis',
         title: props.selectionActionLabels.centerCrossAxis,
@@ -799,9 +798,9 @@ const selectionContextMenuActions = computed<OcActionMenuEntry[]>(() => {
 })
 
 function findSelectionAction(
-  actions: readonly OcActionButtonAction[],
+  actions: readonly OcActionDefinition[],
   actionKey: string,
-): OcActionButtonAction | null {
+): OcActionDefinition | null {
   for (const action of actions) {
     if (action.key === actionKey) return action
     for (const child of action.children ?? []) {

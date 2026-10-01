@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import type { OcActionDefinition } from '../../../components/standard/OcActionMenu.vue'
+import type { OcActionDefinition } from '../action/action.types'
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
 
 defineOptions({ name: 'PropertyFieldActionRail' })

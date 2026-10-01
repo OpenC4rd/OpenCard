@@ -14,15 +14,16 @@
 
 <script setup lang="ts">
 import type { OcIconSize } from '../base/OcIcon.vue'
-import OcActionButton, {
-  type ActionButtonSize,
-  type ActionButtonVariant,
-  type OcActionButtonAction,
-  type OcActionButtonSelectPayload,
-} from './OcActionButton.vue'
+import type {
+  ActionButtonSize,
+  ActionButtonVariant,
+  OcActionDefinition,
+  OcActionSelectPayload,
+} from '../../shared/ui/action/action.types'
+import OcActionButton from './OcActionButton.vue'
 
 withDefaults(defineProps<{
-  actions: readonly OcActionButtonAction[]
+  actions: readonly OcActionDefinition[]
   size?: ActionButtonSize
   iconSize?: OcIconSize
   variant?: ActionButtonVariant
@@ -33,7 +34,7 @@ withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  select: [payload: OcActionButtonSelectPayload]
+  select: [payload: OcActionSelectPayload]
 }>()
 </script>
 

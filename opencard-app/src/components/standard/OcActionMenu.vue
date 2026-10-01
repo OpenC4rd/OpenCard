@@ -70,7 +70,7 @@
           placement="right-start"
           :gap="0"
           :max-height="480"
-          class="oc-action-menu__floating"
+          class="oc-action-menu__floating oc-floating-layer--surface"
           :data-oc-action-menu-branch="props.branchId"
           @pointerenter="keepMenusOpen"
           @pointerleave="scheduleChildClose"
@@ -91,36 +91,12 @@
 </template>
 
 <script lang="ts">
-import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
-import type { OcShortcutPart } from './OcShortcut.vue'
-
-export interface OcActionDefinition {
-  type?: 'action'
-  key: string
-  icon?: IconToken
-  iconTone?: IconTone
-  thumbnailStyle?: Readonly<Record<string, string>>
-  thumbnailLabel?: string
-  title?: string
-  badge?: number
-  badgeLabel?: string
-  shortcut?: readonly OcShortcutPart[]
-  disabled?: boolean
-  /** Explanation shown with the title while the action is disabled. */
-  disabledReason?: string
-  children?: readonly OcActionMenuEntry[]
-}
-
-export interface OcActionDivider {
-  type: 'divider'
-  key: string
-}
-
-export type OcActionMenuEntry = OcActionDefinition | OcActionDivider
-
-export interface OcActionSelectPayload {
-  key: string
-}
+export type {
+  OcActionDefinition,
+  OcActionDivider,
+  OcActionMenuEntry,
+  OcActionSelectPayload,
+} from '../../shared/ui/action/action.types'
 
 export function isActionMenuBranchEvent(event: Event, branchId: string): boolean {
   return event.composedPath().some(target => (
@@ -132,6 +108,12 @@ export function isActionMenuBranchEvent(event: Event, branchId: string): boolean
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, reactive, ref, type ComponentPublicInstance } from 'vue'
+import type {
+  OcActionDefinition,
+  OcActionDivider,
+  OcActionMenuEntry,
+  OcActionSelectPayload,
+} from '../../shared/ui/action/action.types'
 import OcIcon from '../base/OcIcon.vue'
 import { inlineMarkupToText } from '../../shared/ui/inline-markup/inlineMarkup'
 import { isProjectIconStyle } from '../../shared/ui/visual/projectIconStyle'
@@ -295,10 +277,6 @@ function handleActionKeydown(event: KeyboardEvent, action: OcActionDefinition): 
   max-height: inherit;
   padding: 3px;
   overflow-y: auto;
-  border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-md);
-  background: var(--oc-bg-surface);
-  box-shadow: var(--oc-shadow-lg);
 }
 
 .oc-action-menu__floating {

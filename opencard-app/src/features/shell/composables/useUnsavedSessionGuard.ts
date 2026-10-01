@@ -5,7 +5,7 @@ import {
   type SessionSaveResult,
 } from '../../workspace/store/editorSessionStore'
 import { resolveFileTypeById } from '../../workspace/model/fileTypes'
-import type { ProjectCloseDestination } from '../shellPage'
+import type { ProjectCloseDestination } from '../shellLocation'
 
 export type ApplicationCloseAction = 'close' | 'install-update'
 

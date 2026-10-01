@@ -3,7 +3,7 @@ import type { FilePathDirectoryProvider, FilePathFilter } from '../../model/file
 import type { ProjectIconCatalog } from '../../../features/workspace/services/projectIconCatalog'
 import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
 import type { OcNodeTailDisplayPart } from '../node/node.types'
-import type { OcActionDefinition } from '../../../components/standard/OcActionMenu.vue'
+import type { OcActionDefinition } from '../action/action.types'
 
 export type PropertyEditorSortMode = 'category' | 'alphabetical'
 

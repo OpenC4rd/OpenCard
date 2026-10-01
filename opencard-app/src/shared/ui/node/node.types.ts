@@ -1,8 +1,7 @@
 /** Key-only UI contract for node collections consumed by OcTree and OcAlbum. */
 import type { IconToken, IconTone } from '../icon/iconRegistry'
 import type { OcVisual } from '../visual/visual.types'
-import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
-import type { OcActionDivider } from '../../../components/standard/OcActionMenu.vue'
+import type { OcActionDefinition, OcActionDivider } from '../action/action.types'
 
 export type OcNodeKey = string
 
@@ -25,7 +24,7 @@ export interface OcNodeBadge {
 }
 
 /** Inline action definition; its `key` is reported back through the node action event. */
-export type OcNodeAction = OcActionButtonAction
+export type OcNodeAction = OcActionDefinition
 
 /**
  * One ordered trailing line per node: secondary text, read-only status chips, and commands.

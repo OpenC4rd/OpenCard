@@ -26,45 +26,23 @@
 </template>
 
 <script lang="ts">
-import type { OcIconSize } from '../base/OcIcon.vue'
-import type {
-  ActionButtonSize,
-  ActionButtonVariant,
-} from './OcActionButton.vue'
-import type { OcActionDefinition, OcActionDivider, OcActionSelectPayload } from './OcActionMenu.vue'
-
-export type OcOverlayToolbarAction = OcActionDefinition & {
-  active?: boolean
-  size?: ActionButtonSize
-  iconSize?: OcIconSize
-  variant?: ActionButtonVariant
-  ariaPressed?: boolean
-}
-export type OcOverlayToolbarItem = OcOverlayToolbarAction | OcActionDivider | string
-export type OcOverlayToolbarSelectPayload = OcActionSelectPayload
-
-export type OcViewportToolbarLabels = {
-  zoomOut: string
-  fit: string
-  zoomIn: string
-}
-
-export function createViewportToolbarItems(
-  scaleLabel: string,
-  labels: OcViewportToolbarLabels,
-): OcOverlayToolbarItem[] {
-  return [
-    { key: 'viewport.zoom-out', icon: 'tool.zoom-out', title: labels.zoomOut },
-    scaleLabel,
-    { key: 'viewport.fit', icon: 'tool.fit-screen', title: labels.fit },
-    { key: 'viewport.zoom-in', icon: 'tool.zoom-in', title: labels.zoomIn },
-  ]
-}
+export type {
+  OcOverlayToolbarAction,
+  OcOverlayToolbarItem,
+  OcViewportToolbarLabels,
+} from './overlayToolbarItems'
 </script>
 
 <script setup lang="ts">
 import OcActionButton from './OcActionButton.vue'
 import OcCard from './OcCard.vue'
+import type { OcIconSize } from '../base/OcIcon.vue'
+import type {
+  ActionButtonSize,
+  ActionButtonVariant,
+  OcActionSelectPayload,
+} from '../../shared/ui/action/action.types'
+import type { OcOverlayToolbarItem } from './overlayToolbarItems'
 
 const props = withDefaults(defineProps<{
   orientation?: 'horizontal' | 'vertical'
@@ -83,7 +61,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  select: [payload: OcOverlayToolbarSelectPayload]
+  select: [payload: OcActionSelectPayload]
 }>()
 </script>
 

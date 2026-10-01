@@ -118,7 +118,8 @@ import {
   type PropertyEditorEntry,
 } from './usePropertyEditorView'
 import OcEmpty from '../../../components/base/OcEmpty.vue'
-import OcActionButton, { type OcActionButtonAction } from '../../../components/standard/OcActionButton.vue'
+import OcActionButton from '../../../components/standard/OcActionButton.vue'
+import type { OcActionDefinition } from '../action/action.types'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcText from '../../../components/base/OcText.vue'
 import OcPanel from '../../../components/base/OcPanel.vue'
@@ -218,8 +219,8 @@ function resolveFieldEditorState(inputKey: string, entry: PropertyEditorEntry) {
   })
 }
 
-function resolveFieldActions(inputKey: string, entry: PropertyEditorEntry): OcActionButtonAction[] {
-  const actions: OcActionButtonAction[] = []
+function resolveFieldActions(inputKey: string, entry: PropertyEditorEntry): OcActionDefinition[] {
+  const actions: OcActionDefinition[] = []
   const modeAction = createPropertyFieldEditorModeAction(
     resolveFieldEditorState(inputKey, entry),
     entry.definition,
@@ -259,8 +260,8 @@ function handleFieldValueUpdate(inputKey: string, entry: PropertyEditorEntry, va
 }
 
 // 添加字段与重置交互。
-function resolveCategoryActions(category: PropertyEditorCategoryView): OcActionButtonAction[] {
-  const actions: OcActionButtonAction[] = []
+function resolveCategoryActions(category: PropertyEditorCategoryView): OcActionDefinition[] {
+  const actions: OcActionDefinition[] = []
   if (category.addableFields.length > 0) {
     actions.push({
       key: ADD_PROPERTY_ACTION_KEY,

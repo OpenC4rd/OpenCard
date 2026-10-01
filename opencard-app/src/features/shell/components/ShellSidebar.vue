@@ -4,8 +4,8 @@ import OcIcon from '../../../components/base/OcIcon.vue';
 import OcText from '../../../components/base/OcText.vue';
 import OcActionRail from '../../../components/standard/OcActionRail.vue';
 import OcOptionGroup, { type OcOption } from '../../../components/standard/OcOptionGroup.vue';
-import type { OcActionButtonAction } from '../../../components/standard/OcActionButton.vue';
-import type { ShellButton, ShellList, ShellListGroup } from '../shell.types';
+import type { OcActionDefinition } from '../../../shared/ui/action/action.types';
+import type { ShellList, ShellListGroup } from '../shell.types';
 import type { ProjectWorkspaceSidebarState } from '../../settings/model/appSettings';
 import ShellSidebarContent from './ShellSidebarContent.vue';
 
@@ -13,7 +13,6 @@ const props = defineProps<{
   collapsed: boolean;
   width: number;
   bodyGroups: ShellListGroup[];
-  tailButtons: ShellButton[];
   collapseListTooltip?: string;
   expandListTooltip?: string;
   minResizeWidth?: number;
@@ -27,7 +26,6 @@ const emit = defineEmits<{
   'head-button-clicked': [buttonKey: string];
   'list-button-clicked': [listKey: string, actionKey: string];
   'body-group-changed': [groupKey: string];
-  'tail-button-clicked': [buttonKey: string];
   resize: [width: number];
   'resize-start': [];
   'resize-end': [];
@@ -57,7 +55,7 @@ const groupOptions = computed<readonly OcOption[]>(() => listGroups.value.map(gr
 const groupTitlesHidden = computed(() => props.collapsed || props.width < (props.compactGroupWidth ?? 0));
 const actionDefinitionsByList = computed(() => new Map(activeLists.value.map(list => [
   list.key,
-  list.actions.map<OcActionButtonAction>(action => ({
+  list.actions.map<OcActionDefinition>(action => ({
     key: action.key ?? action.icon,
     title: action.hoverTip,
     icon: action.icon,
@@ -212,7 +210,6 @@ function onResizePointerDown(event: PointerEvent): void {
         </div>
       </div>
     </Transition>
-    <div class="shell-sidebar-group shell-sidebar-group-bottom" data-tooltip-placement="right" data-tooltip-group><button v-for="button in tailButtons" :key="button.key" class="shell-sidebar-button" type="button" :disabled="button.disabled" :data-tooltip="collapsed ? button.hoverTip || button.title : null" @click="emit('tail-button-clicked', button.key)"><OcIcon v-if="button.icon" :name="button.icon" size="md" /><span v-if="!collapsed">{{ button.title }}</span></button></div>
     <div v-if="!collapsed" class="shell-sidebar-resizer" @pointerdown.prevent="onResizePointerDown" />
   </aside>
 </template>

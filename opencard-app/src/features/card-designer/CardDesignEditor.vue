@@ -253,11 +253,9 @@ import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
 import AdditionalFieldCreateDialog from '../../shared/ui/property-editor/AdditionalFieldCreateDialog.vue'
 import OcEmpty from '../../components/base/OcEmpty.vue'
 import OcTree from '../../components/standard/OcTree.vue'
-import type { OcActionButtonAction } from '../../components/standard/OcActionButton.vue'
-import OcOverlayToolbar, {
-  createViewportToolbarItems,
-  type OcOverlayToolbarItem,
-} from '../../components/standard/OcOverlayToolbar.vue'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
+import OcOverlayToolbar, { type OcOverlayToolbarItem } from '../../components/standard/OcOverlayToolbar.vue'
+import { createViewportToolbarItems } from '../../components/standard/overlayToolbarItems'
 import CdeOverlayDock from './CdeOverlayDock.vue'
 import {
   CDE_OVERLAY_BOTTOM_MIN_HEIGHT,
@@ -344,7 +342,7 @@ const FLOW_DIRECTION_ACTIONS = [
 ] as const satisfies readonly {
   key: string
   direction: FlowDirection
-  icon: OcActionButtonAction['icon']
+  icon: OcActionDefinition['icon']
   titleKey: string
 }[]
 
@@ -487,7 +485,7 @@ function commitViewState(): void {
   emit('update-card-designer-view', createViewState())
 }
 
-const clipAction = computed<OcActionButtonAction>(() => ({
+const clipAction = computed<OcActionDefinition>(() => ({
   key: 'toggle-face-clip',
   icon: clipToFace.value ? 'tool.box-cutter' : 'tool.box-cutter-off',
   title: `${clipToFace.value
@@ -495,7 +493,7 @@ const clipAction = computed<OcActionButtonAction>(() => ({
     : t('cardDesigner.view.enableClip')} ${formatCdeShortcutMarkup('view.toggle-clip')}`,
 }))
 
-const alignmentSnappingAction = computed<OcActionButtonAction>(() => ({
+const alignmentSnappingAction = computed<OcActionDefinition>(() => ({
   key: 'toggle-alignment-snapping',
   icon: alignmentSnappingEnabled.value ? 'tool.snap-grid-on' : 'tool.snap-grid',
   title: `${alignmentSnappingEnabled.value
@@ -503,7 +501,7 @@ const alignmentSnappingAction = computed<OcActionButtonAction>(() => ({
     : t('cardDesigner.view.enableAlignmentSnapping')} ${formatCdeShortcutMarkup('view.toggle-snapping')}`,
 }))
 
-const faceSwitchAction = computed<OcActionButtonAction>(() => ({
+const faceSwitchAction = computed<OcActionDefinition>(() => ({
   key: 'switch-face',
   icon: activeFaceKey.value === 'front'
     ? 'tool.flip-to-front'
@@ -1198,17 +1196,17 @@ const selectionActionLabels = computed<CardViewportSelectionActionLabels>(() => 
   fillCrossAxis: t('cardDesigner.selectionActions.fillCrossAxis'),
   centerCrossAxis: t('cardDesigner.selectionActions.centerCrossAxis'),
 }))
-const selectionCommandActions = computed<OcActionButtonAction[]>(() => {
+const selectionCommandActions = computed<OcActionDefinition[]>(() => {
   const block = selectedBlock.value
   if (!block) return []
-  const actions: OcActionButtonAction[] = []
+  const actions: OcActionDefinition[] = []
   if (block.type === 'flow-container-block') {
     actions.push(...FLOW_DIRECTION_ACTIONS.map(action => ({
       key: action.key,
       icon: action.icon,
       iconTone: block.direction === action.direction ? 'primary' : 'default',
       title: t(`cardDesigner.selectionActions.${action.titleKey}`),
-    } satisfies OcActionButtonAction)))
+    } satisfies OcActionDefinition)))
   }
 
   const input = propertyEditorInputs.value.find(candidate => candidate.key === block.id)

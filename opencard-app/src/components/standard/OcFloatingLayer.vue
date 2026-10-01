@@ -123,3 +123,12 @@ const layerStyle = computed<CSSProperties>(() => ({
   }
 }
 </style>
+
+<style>
+.oc-floating-layer--surface {
+  border: 1px solid var(--oc-border-default);
+  border-radius: var(--oc-floating-layer-radius, var(--oc-radius-md));
+  background: var(--oc-bg-surface);
+  box-shadow: var(--oc-shadow-lg);
+}
+</style>

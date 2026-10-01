@@ -20,7 +20,6 @@ const props = defineProps<{
   brandLabel: string;
   brandLogoSrc?: string;
   menuGroups: ShellTitleBarMenuGroup[];
-  primaryPageAction?: ShellTitleBarAppAction;
   appActions?: ShellTitleBarAppAction[];
   tasks?: readonly ShellProgressTask[];
   windowControls?: ShellTitleBarWindowControl[];
@@ -194,17 +193,6 @@ onBeforeUnmount(() => {
         <OcIcon :name="props.collapsed ? 'nav.sidebar-expand' : 'nav.sidebar-collapse'" size="sm" />
       </button>
 
-      <button
-        v-if="props.primaryPageAction"
-        class="titlebar-icon titlebar-primary-page-action"
-        type="button"
-        :disabled="props.primaryPageAction.disabled"
-        :data-tooltip="props.primaryPageAction.hoverTip || null"
-        @click="emit('app-action', props.primaryPageAction.key)"
-      >
-        <OcIcon :name="props.primaryPageAction.icon" size="sm" />
-      </button>
-
       <div
         v-for="menu in props.menuGroups"
         :key="menu.key"
@@ -231,7 +219,7 @@ onBeforeUnmount(() => {
           placement="bottom-start"
           :gap="8"
           :max-height="480"
-          class="titlebar-menu-floating"
+          class="titlebar-menu-floating oc-floating-layer--surface"
           :data-oc-action-menu-branch="menuBranchId"
         >
           <OcActionMenu

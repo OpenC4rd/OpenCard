@@ -5,7 +5,7 @@ import type {
   EditorSession,
   SessionSaveResult,
 } from '../../workspace/store/editorSessionStore'
-import type { ProjectCloseDestination } from '../shellPage'
+import type { ProjectCloseDestination } from '../shellLocation'
 import {
   useUnsavedSessionGuard,
   type ApplicationCloseAction,

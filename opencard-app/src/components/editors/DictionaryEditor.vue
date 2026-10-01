@@ -204,8 +204,8 @@ import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
-import OcActionButton, { type OcActionButtonAction } from '../standard/OcActionButton.vue'
-import type { OcActionMenuEntry } from '../standard/OcActionMenu.vue'
+import OcActionButton from '../standard/OcActionButton.vue'
+import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
 const props = defineProps<EditorProps>()
 const emit = defineEmits<EditorEmits>()
@@ -351,7 +351,7 @@ function resetOverride(language: string, recordKey: string) {
   commit(resetDictionaryOverride(dictionary.value, language, recordKey))
 }
 
-function resetOverrideAction(): OcActionButtonAction {
+function resetOverrideAction(): OcActionDefinition {
   return { key: 'reset-override', icon: 'action.undo', title: t('dictionaryEditor.actions.resetOverride') }
 }
 
@@ -448,7 +448,7 @@ function recordCommands(): OcActionMenuEntry[] {
   ]
 }
 
-function recordAction(): OcActionButtonAction {
+function recordAction(): OcActionDefinition {
   return {
     key: 'more',
     icon: 'nav.more',
@@ -486,7 +486,7 @@ function languageCommands(): OcActionMenuEntry[] {
   ]
 }
 
-function languageAction(): OcActionButtonAction {
+function languageAction(): OcActionDefinition {
   return {
     key: 'more',
     icon: 'nav.more',

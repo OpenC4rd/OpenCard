@@ -64,7 +64,7 @@
       placement="bottom-start"
       :max-height="360"
       :z-index="zIndex"
-      class="oc-color-picker__floating"
+      class="oc-color-picker__floating oc-floating-layer--surface"
       :data-oc-color-owner="pickerId"
     >
       <div class="oc-color-picker__panel" role="dialog" :aria-label="label" @keydown.esc.stop.prevent="closePicker(true, true)">
@@ -694,10 +694,6 @@ function clampUnit(value: number): number {
 .oc-color-picker__floating {
   width: 220px;
   overflow: hidden;
-  border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-md);
-  background: var(--oc-bg-surface);
-  box-shadow: var(--oc-shadow-lg);
 }
 
 .oc-color-picker__panel {

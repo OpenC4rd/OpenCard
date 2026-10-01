@@ -19,7 +19,17 @@ import {
   discardUntrackedPaths,
   ignoreGitPath,
 } from '../../version-control/changeActions'
-import { changedPathsUnder, decorateChangedPathTree } from '../../version-control/changedPathActions'
+import {
+  CHANGE_DISCARD_ACTION_KEY,
+  CHANGE_DESELECT_ACTION_KEY,
+  CHANGE_IGNORE_EXTENSION_ACTION_KEY,
+  CHANGE_IGNORE_FILE_ACTION_KEY,
+  CHANGE_IGNORE_FOLDER_PREFIX,
+  CHANGE_SELECT_ACTION_KEY,
+  changedPathsUnder,
+  decorateChangedPathTree,
+  resolveDiscardTargets,
+} from '../../version-control/changedPathActions'
 import { gitignorePatternForExtension, gitignorePatternForPath } from '../../version-control/gitignorePatterns'
 import { useProjectTimeline } from '../../version-control/useProjectTimeline'
 import { notifyError, notifyWarning } from '../../notifications/titlebarNotices'
@@ -50,6 +60,7 @@ type ShellVersionControlOptions = {
   openSetting: (key: AppSettingKey) => void
   /** 应用设置：初始化仓库时直接取提交者身份与是否创建首次提交。 */
   settings: Readonly<Ref<DeepReadonly<AppSettings>>>
+  requestConfirmation: (options: { title: string; message: string; confirmLabel: string }) => Promise<boolean>
 }
 
 type ShellVersionControl = {
@@ -95,6 +106,7 @@ type ShellVersionControl = {
   handleVersionGraphExpansionSync: (event: OcNodeExpansionSyncEvent) => void
   handleChangesExpansionChange: (event: OcNodeExpansionEvent) => void
   handleChangesExpansionSync: (event: OcNodeExpansionSyncEvent) => void
+  handleChangesAction: (event: { actionKey: string; key: string }) => Promise<void>
   closeCommitVersionDialog: () => void
   commitVersion: (value: { summary: string; description: string }) => Promise<void>
 }
@@ -219,6 +231,38 @@ export function useShellVersionControl(options: ShellVersionControlOptions): She
     const expanded = new Set(event.expandedKeys)
     collapsedChangeGroupKeys.value = [...changesTreeData.value.children.keys()]
       .filter(key => !expanded.has(key))
+  }
+
+  async function handleChangesAction(event: { actionKey: string; key: string }): Promise<void> {
+    if (event.actionKey === CHANGE_SELECT_ACTION_KEY || event.actionKey === CHANGE_DESELECT_ACTION_KEY) {
+      selectChangeNode(event.key, event.actionKey === CHANGE_SELECT_ACTION_KEY)
+      return
+    }
+    if (event.actionKey === CHANGE_DISCARD_ACTION_KEY) {
+      const targets = resolveDiscardTargets(changesTreeData.value, statusEntries.value, event.key)
+      if (targets.tracked.length === 0 && targets.untracked.length === 0) return
+      const name = changesTreeData.value.items.get(event.key)?.label ?? event.key
+      const accepted = await options.requestConfirmation({
+        title: t('sidebar.changesDiscard'),
+        message: targets.untracked.length > 0
+          ? t('sidebar.changesConfirmDiscardWithNew', { name })
+          : t('sidebar.changesConfirmDiscard', { name }),
+        confirmLabel: t('sidebar.changesDiscard'),
+      })
+      if (accepted) await discardChanges(targets)
+      return
+    }
+    if (event.actionKey === CHANGE_IGNORE_FILE_ACTION_KEY) {
+      await ignoreChangePath(event.key, 'file')
+      return
+    }
+    if (event.actionKey === CHANGE_IGNORE_EXTENSION_ACTION_KEY) {
+      await ignoreChangeExtension(event.key)
+      return
+    }
+    if (event.actionKey.startsWith(CHANGE_IGNORE_FOLDER_PREFIX)) {
+      await ignoreChangePath(event.actionKey.slice(CHANGE_IGNORE_FOLDER_PREFIX.length), 'folder')
+    }
   }
 
   const timelinePlaceholder = computed(() => {
@@ -402,6 +446,7 @@ export function useShellVersionControl(options: ShellVersionControlOptions): She
     handleVersionGraphExpansionSync,
     handleChangesExpansionChange,
     handleChangesExpansionSync,
+    handleChangesAction,
     closeCommitVersionDialog,
     initializeProjectRepository,
     commitVersion,

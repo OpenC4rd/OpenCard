@@ -10,12 +10,11 @@
 </template>
 
 <script lang="ts">
-import type { IconToken } from '../../shared/ui/icon/iconRegistry'
-
-export type OcShortcutPart = string | { icon: IconToken } | { separator: string }
+export type { OcShortcutPart } from '../../shared/ui/action/action.types'
 </script>
 
 <script setup lang="ts">
+import type { OcShortcutPart } from '../../shared/ui/action/action.types'
 import OcIcon from '../base/OcIcon.vue'
 import OcKey from './OcKey.vue'
 

@@ -163,8 +163,8 @@ import { useI18n } from 'vue-i18n'
 import OcButton from '../../components/base/OcButton.vue'
 import OcFieldInput from '../../components/base/OcFieldInput.vue'
 import OcIcon from '../../components/base/OcIcon.vue'
-import OcActionButton, { type OcActionButtonAction } from '../../components/standard/OcActionButton.vue'
-import type { OcActionMenuEntry } from '../../components/standard/OcActionMenu.vue'
+import OcActionButton from '../../components/standard/OcActionButton.vue'
+import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 import { useFloatingMenu } from '../../composables/useFloatingMenu'
 import type { PropertyEditorBindingInterpreter, PropertyEditorFieldDefinition } from '../../shared/ui/property-editor/propertyEditor.types'
 import PropertyFieldActionRail from '../../shared/ui/property-editor/PropertyFieldActionRail.vue'
@@ -301,7 +301,7 @@ function resolveCellActions(
   blockId: string,
   field: CdeDataTableFieldRow,
   cell: CdeDataTableCell,
-): OcActionButtonAction[] {
+): OcActionDefinition[] {
   const definition = resolveCellDefinition(blockId, field, cell)
   const modeAction = createPropertyFieldEditorModeAction(
     resolveCellEditorState(blockId, field, cell),
@@ -367,9 +367,9 @@ function columnCommands(column: CdeDataTableColumn): OcActionMenuEntry[] {
   ]
 }
 
-function columnAction(column: CdeDataTableColumn): OcActionButtonAction {
+function columnAction(column: CdeDataTableColumn): OcActionDefinition {
   const commands = columnCommands(column)
-  if (column.kind === 'blueprint') return commands[0] as OcActionButtonAction
+  if (column.kind === 'blueprint') return commands[0] as OcActionDefinition
   return {
     key: 'more',
     icon: 'nav.more',
@@ -386,7 +386,7 @@ function handleColumnAction(column: CdeDataTableColumn, actionKey: string): void
   else if (actionKey === 'delete' && column.kind === 'instance') emit('delete-instance', column.key)
 }
 
-function faceCommands(face: CdeDataTableFaceGroup): OcActionButtonAction[] {
+function faceCommands(face: CdeDataTableFaceGroup): OcActionDefinition[] {
   const catalog = props.catalogFaceGroups.find(candidate => candidate.key === face.key)
   if (!catalog) return []
   const selectedBlockIds = new Set(face.blocks.map(block => block.key))
@@ -398,7 +398,7 @@ function faceCommands(face: CdeDataTableFaceGroup): OcActionButtonAction[] {
   }))
 }
 
-function faceBlockAction(face: CdeDataTableFaceGroup): OcActionButtonAction | null {
+function faceBlockAction(face: CdeDataTableFaceGroup): OcActionDefinition | null {
   const commands = faceCommands(face)
   if (commands.length === 0) return null
   return {
@@ -430,7 +430,7 @@ function blockFieldCommands(block: CdeDataTableBlockCatalogEntry): OcActionMenuE
   ]
 }
 
-function blockFieldAction(block: CdeDataTableBlockCatalogEntry): OcActionButtonAction {
+function blockFieldAction(block: CdeDataTableBlockCatalogEntry): OcActionDefinition {
   return {
     key: 'manage-fields',
     icon: 'action.add',
@@ -439,7 +439,7 @@ function blockFieldAction(block: CdeDataTableBlockCatalogEntry): OcActionButtonA
   }
 }
 
-function removeBlockAction(): OcActionButtonAction {
+function removeBlockAction(): OcActionDefinition {
   return {
     key: 'remove-block',
     icon: 'action.close',
@@ -447,7 +447,7 @@ function removeBlockAction(): OcActionButtonAction {
   }
 }
 
-function deleteFieldAction(): OcActionButtonAction {
+function deleteFieldAction(): OcActionDefinition {
   return {
     key: 'delete-field',
     icon: 'action.delete',
@@ -456,7 +456,7 @@ function deleteFieldAction(): OcActionButtonAction {
   }
 }
 
-function excludeFieldAction(): OcActionButtonAction {
+function excludeFieldAction(): OcActionDefinition {
   return {
     key: 'exclude-field',
     icon: 'action.close',
@@ -464,7 +464,7 @@ function excludeFieldAction(): OcActionButtonAction {
   }
 }
 
-function resetCellAction(): OcActionButtonAction {
+function resetCellAction(): OcActionDefinition {
   return {
     key: 'reset-cell',
     icon: 'action.discard',

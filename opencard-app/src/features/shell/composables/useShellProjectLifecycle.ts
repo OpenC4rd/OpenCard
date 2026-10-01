@@ -4,11 +4,11 @@ import type { CreatedProject } from '../../project-templates/model/projectTempla
 import { reportAppError } from '../../logging/appErrorCatalog'
 import { notifyError } from '../../notifications/titlebarNotices'
 import {
-  getPrimaryShellPage,
-  resolveShellPageAfterProjectClose,
+  openFlow,
+  resolveLocationAfterProjectClose,
   type ProjectCloseDestination,
-  type ShellPage,
-} from '../shellPage'
+  type ShellLocation,
+} from '../shellLocation'
 
 type ProjectLifecycleOptions = {
   project: {
@@ -30,7 +30,7 @@ type ProjectLifecycleOptions = {
   templates: {
     load: () => Promise<void>
   }
-  shellPage: Ref<ShellPage>
+  shellLocation: Ref<ShellLocation>
   translate: (key: string) => string
 }
 
@@ -59,7 +59,7 @@ export function useShellProjectLifecycle(options: ProjectLifecycleOptions) {
       if (entryPath) {
         await options.sessions.open(entryPath)
       }
-      options.shellPage.value = { type: 'workbench' }
+      options.shellLocation.value = { base: { space: 'workbench' } }
       return true
     } catch (error) {
       notifyError(options.translate('projectTemplates.errors.activationFailed'))
@@ -121,17 +121,14 @@ export function useShellProjectLifecycle(options: ProjectLifecycleOptions) {
   }
 
   function enterCreateProject(): void {
-    options.shellPage.value = {
-      type: 'create-project',
-      returnPage: getPrimaryShellPage(options.shellPage.value),
-    }
+    options.shellLocation.value = openFlow(options.shellLocation.value, 'create-project')
     void options.templates.load().catch(() => undefined)
   }
 
   async function completeProjectClose(destination: ProjectCloseDestination = 'current'): Promise<void> {
     options.sessions.closeWorkspaceSessions()
     await options.project.setProjectPath('')
-    options.shellPage.value = resolveShellPageAfterProjectClose(options.shellPage.value, destination)
+    options.shellLocation.value = resolveLocationAfterProjectClose(options.shellLocation.value, destination)
 
     if (destination === 'create-project') {
       void options.templates.load().catch(() => undefined)

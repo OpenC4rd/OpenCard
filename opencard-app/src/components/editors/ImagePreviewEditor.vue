@@ -76,7 +76,8 @@ import {
 } from '../../shared/ui/viewport/viewportNavigation'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
 import OcText from '../base/OcText.vue'
-import OcOverlayToolbar, { createViewportToolbarItems } from '../standard/OcOverlayToolbar.vue'
+import OcOverlayToolbar from '../standard/OcOverlayToolbar.vue'
+import { createViewportToolbarItems } from '../standard/overlayToolbarItems'
 
 type ViewportTransform = { x: number; y: number; scale: number }
 type ImageSideKey = 'single' | 'before' | 'after'

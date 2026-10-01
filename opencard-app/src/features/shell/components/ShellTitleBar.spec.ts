@@ -223,27 +223,21 @@ describe('ShellTitleBar', () => {
     expect(wrapper.get('.titlebar-menu-button').attributes('aria-label')).toBe('Help, 4 unread replies')
   })
 
-  it('places the primary page action beside the sidebar toggle', async () => {
+  it('keeps the sidebar toggle as the only navigation control before menus', async () => {
     const wrapper = mount(ShellTitleBar, {
       props: {
         collapsed: false,
         brandLabel: 'OpenCard',
         menuGroups: [{ key: 'file', label: 'File', actions: [] }],
-        primaryPageAction: {
-          key: 'toggle-primary-page',
-          icon: 'nav.workbench',
-          hoverTip: 'Show Workbench',
-        },
       },
     })
 
     const leftIcons = wrapper.findAll('.titlebar-left > .titlebar-icon')
-    expect(leftIcons).toHaveLength(2)
-    expect(leftIcons[1]!.classes()).toContain('titlebar-primary-page-action')
-    expect(leftIcons[1]!.element.nextElementSibling?.classList).toContain('titlebar-menu')
+    expect(leftIcons).toHaveLength(1)
+    expect(leftIcons[0]!.element.nextElementSibling?.classList).toContain('titlebar-menu')
 
-    await leftIcons[1]!.trigger('click')
-    expect(wrapper.emitted('app-action')).toEqual([['toggle-primary-page']])
+    await leftIcons[0]!.trigger('click')
+    expect(wrapper.emitted('toggle-sidebar')).toEqual([[]])
   })
 
   it('only exposes the native drag region when dragging is enabled', async () => {

@@ -601,6 +601,19 @@ export function useEditorSessionStore() {
     return 'saved'
   }
 
+  async function saveSessionAs(sessionId: string): Promise<SessionSaveResult> {
+    const session = sessions.value.find(candidate => candidate.id === sessionId)
+    if (!session || CONTENTLESS_EDITOR_IDS.has(session.editorId)) return 'skipped'
+    const fileType = resolveSessionFileType(session)
+    const selectedPath = await fileSystemService.pickSavePath({
+      defaultPath: projectPath.value ? `${normalizePath(projectPath.value)}/${session.name}` : session.name,
+      title: i18n.global.t('app.dialogs.saveFileAs'),
+      fileTypeName: fileType.id,
+      extensions: fileType.extensions,
+    })
+    return selectedPath ? saveSession(sessionId, selectedPath) : 'cancelled'
+  }
+
   async function saveDirtySessions(): Promise<string[]> {
     const dirtySessions = sessions.value
       .filter(session => session.isDirty && Boolean(session.path) && session.resourceKind !== 'draft')
@@ -652,6 +665,7 @@ export function useEditorSessionStore() {
     closeWorkspaceSessions,
     closeSessionsByPath,
     saveSession,
+    saveSessionAs,
     saveDirtySessions,
     remapSessionPaths,
   }

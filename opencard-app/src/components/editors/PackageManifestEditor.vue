@@ -11,13 +11,10 @@
         </div>
       </OcCard>
 
-      <OcCard
-        :title="t('packageManifest.information')"
-        icon="file.package"
-        :actions="identityActions"
-        @action="handleIdentityAction"
-      >
-        <OcRow v-for="row in identityRows" :key="row.key">
+      <OcCard :title="t('packageManifest.information')" icon="file.package">
+        <OcRow v-for="row in identityRows" :key="row.key" as="button" type="button"
+          :aria-label="t('packageManifest.copyRow', { label: row.label, value: row.value })"
+          @click="copyRowValue(row)">
           <template #title>
             <OcText tone="muted">{{ row.label }}</OcText>
           </template>
@@ -34,7 +31,7 @@
         <OcRow v-for="font in manifest.public.fonts" :key="font.key">
           <template #title>{{ font.title }}</template>
           <template #append>
-            <OcText tone="muted" size="sm" mono>{{ font.key }}</OcText>
+            <OcText size="sm" mono>{{ font.key }}</OcText>
           </template>
         </OcRow>
       </OcCard>
@@ -47,7 +44,7 @@
           <template #title>{{ series.title }}</template>
           <template #append>
             <OcText tone="muted" size="sm">{{ t('packageManifest.iconCount', { count: series.count }) }}</OcText>
-            <OcText tone="muted" size="sm" mono>{{ series.key }}</OcText>
+            <OcText size="sm" mono>{{ series.key }}</OcText>
           </template>
         </OcRow>
       </OcCard>
@@ -61,6 +58,7 @@ import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { getPathBasename } from '../../shared/model/filePath'
+import { notifyAppError } from '../../features/notifications/titlebarNotices'
 import { coverImageMimeType } from '../../features/workspace/model/projectCover'
 import {
   readResourcePackageArchive,
@@ -69,14 +67,10 @@ import {
 } from '../../features/workspace/services/resourcePackageArchive'
 import OcEmpty from '../base/OcEmpty.vue'
 import OcText from '../base/OcText.vue'
-import type { OcActionButtonAction, OcActionButtonSelectPayload } from '../standard/OcActionButton.vue'
 import OcCard from '../standard/OcCard.vue'
 import OcCover from '../standard/OcCover.vue'
 import OcRow from '../standard/OcRow.vue'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
-
-const COPY_COORDINATE_ACTION_KEY = 'manifest.copy-coordinate'
-const COPY_FINGERPRINT_ACTION_KEY = 'manifest.copy-fingerprint'
 
 const props = defineProps<EditorProps>()
 const emit = defineEmits<EditorEmits>()
@@ -116,15 +110,16 @@ const identityRows = computed(() => [
   { key: 'fingerprint', label: t('packageManifest.fingerprint'), value: fingerprint.value },
 ])
 
-const identityActions = computed<OcActionButtonAction[]>(() => [
-  { key: COPY_COORDINATE_ACTION_KEY, title: t('packageManager.copyCoordinate'), icon: 'action.copy' },
-  { key: COPY_FINGERPRINT_ACTION_KEY, title: t('packageManifest.copyFingerprint'), icon: 'action.copy' },
-])
-
-/** 复制动作跟相册卡片上那两条同款：坐标照抄，特征码也照抄一次好贴给别人比对。 */
-function handleIdentityAction(payload: OcActionButtonSelectPayload): void {
-  if (payload.key === COPY_COORDINATE_ACTION_KEY) void navigator.clipboard.writeText(coordinate.value)
-  else if (payload.key === COPY_FINGERPRINT_ACTION_KEY) void navigator.clipboard.writeText(fingerprint.value)
+/**
+ * 行本身就是复制触点：坐标与内容特征码是拿来贴给别人的，选中再按复制不如点一下。
+ * 成功不提示，和仓库里其余复制动作一样；失败才报，把是哪一行说清楚。
+ */
+async function copyRowValue(row: { label: string; value: string }): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(row.value)
+  } catch (error) {
+    notifyAppError('OC-E1002', { source: 'package-manifest-row', label: row.label, error })
+  }
 }
 
 const presentation = computed<EditorPresentation>(() => ({

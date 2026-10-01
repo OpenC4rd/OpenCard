@@ -91,7 +91,7 @@
               :class="{ 'is-expanded': isExpandable(entry.key) && isExpanded(entry.key) }"
             />
             <span
-              v-if="isExpandable(entry.key)"
+              v-if="isExpandable(entry.key) && childCount(entry.key) > 0"
               class="oc-tree__child-count oc-number-badge oc-number-badge--neutral"
               :class="{ 'is-expanded': isExpanded(entry.key) }"
               aria-hidden="true"
@@ -146,7 +146,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect,
   type ComponentPublicInstance, type CSSProperties } from 'vue'
-import type { OcActionButtonAction } from './OcActionButton.vue'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcNodeTail from './OcNodeTail.vue'
@@ -621,8 +621,15 @@ function isExpandable(key: OcNodeKey): boolean {
   return (props.data.children.get(key)?.length ?? 0) > 0
 }
 
+/** 计子项时只认真正能用的子项：空分组里那行占位（disabled）不是这一组的孩子，不该被数出来。 */
+function childCount(key: OcNodeKey): number {
+  return (props.data.children.get(key) ?? [])
+    .filter(childKey => !props.data.items.get(childKey)?.disabled)
+    .length
+}
+
 function formatChildCount(key: OcNodeKey): string {
-  const count = props.data.children.get(key)?.length ?? 0
+  const count = childCount(key)
   return count > 99 ? '99+' : String(count)
 }
 
@@ -690,7 +697,7 @@ function handleRowDoubleClick(event: MouseEvent, key: OcNodeKey): void {
   if (props.activationMode === 'double-click') emit('node-activate', { key })
 }
 
-function tailActionParts(key: OcNodeKey): OcActionButtonAction[] {
+function tailActionParts(key: OcNodeKey): OcActionDefinition[] {
   return normalizeNodeTail(props.data.items.get(key)?.tail).filter(isNodeTailAction)
 }
 

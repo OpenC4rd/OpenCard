@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ShellPage } from '../shellPage'
+import type { ShellLocation } from '../shellLocation'
 import { useShellProjectLifecycle } from './useShellProjectLifecycle'
 
 const notifications = vi.hoisted(() => ({ notifyError: vi.fn() }))
@@ -10,12 +10,12 @@ vi.mock('../../notifications/titlebarNotices', () => ({ notifyError: notificatio
 function createHarness(options?: {
   currentProject?: string
   selectedProject?: string | null
-  page?: ShellPage
+  location?: ShellLocation
   closeOutcome?: 'completed' | 'prompted'
 }) {
   const events: string[] = []
   const projectPath = ref(options?.currentProject ?? 'D:/old-project')
-  const shellPage = ref<ShellPage>(options?.page ?? { type: 'welcome' })
+  const shellLocation = ref<ShellLocation>(options?.location ?? { base: { space: 'welcome' } })
   const chooseProjectDirectory = vi.fn(async () => (
     options?.selectedProject === undefined ? 'D:/new-project' : options.selectedProject
   ))
@@ -59,7 +59,7 @@ function createHarness(options?: {
       forgetRecentProject,
     },
     templates: { load: loadTemplates },
-    shellPage,
+    shellLocation,
     translate: key => `translated:${key}`,
   })
 
@@ -67,7 +67,7 @@ function createHarness(options?: {
     lifecycle,
     events,
     projectPath,
-    shellPage,
+    shellLocation,
     chooseProjectDirectory,
     setProjectPath,
     readDirectoryEntries,
@@ -104,7 +104,7 @@ describe('useShellProjectLifecycle', () => {
       'remember:D:/new-project',
     ])
     expect(harness.readDirectoryEntries).not.toHaveBeenCalled()
-    expect(harness.shellPage.value).toEqual({ type: 'workbench' })
+    expect(harness.shellLocation.value).toEqual({ base: { space: 'workbench' } })
   })
 
   it('opens only a newly created project entry after the shared activation sequence', async () => {
@@ -139,7 +139,7 @@ describe('useShellProjectLifecycle', () => {
 
     expect(harness.closeCurrentProject).not.toHaveBeenCalled()
     expect(harness.setProjectPath).not.toHaveBeenCalled()
-    expect(harness.shellPage.value).toEqual({ type: 'welcome' })
+    expect(harness.shellLocation.value).toEqual({ base: { space: 'welcome' } })
   })
 
   it('opens an ordinary directory directly without initializing project internals', async () => {
@@ -152,7 +152,7 @@ describe('useShellProjectLifecycle', () => {
       'set:D:/new-project',
       'remember:D:/new-project',
     ])
-    expect(harness.shellPage.value).toEqual({ type: 'workbench' })
+    expect(harness.shellLocation.value).toEqual({ base: { space: 'workbench' } })
   })
 
   it('waits for the unsaved confirmation before switching projects', async () => {
@@ -168,7 +168,7 @@ describe('useShellProjectLifecycle', () => {
     })
     await expect(harness.lifecycle.resumeDeferredActivation()).resolves.toBe(true)
     expect(harness.events).toEqual(['close-current-project', 'set:D:/new-project', 'remember:D:/new-project'])
-    expect(harness.shellPage.value).toEqual({ type: 'workbench' })
+    expect(harness.shellLocation.value).toEqual({ base: { space: 'workbench' } })
   })
 
   it('drops a deferred activation when the user cancels the unsaved confirmation', async () => {
@@ -221,11 +221,11 @@ describe('useShellProjectLifecycle', () => {
     expect(notifications.notifyError).toHaveBeenCalledWith(
       'translated:projectTemplates.errors.activationFailed',
     )
-    expect(harness.shellPage.value).toEqual({ type: 'welcome' })
+    expect(harness.shellLocation.value).toEqual({ base: { space: 'welcome' } })
   })
 
   it('clears busy and reports an immediate notice when opening a created entry fails', async () => {
-    const harness = createHarness({ page: { type: 'create-project', returnPage: 'welcome' } })
+    const harness = createHarness({ location: { base: { space: 'welcome' }, flow: { type: 'create-project' } } })
     harness.open.mockRejectedValueOnce(new Error('entry failed'))
 
     await expect(harness.lifecycle.activateCreatedProject({
@@ -235,7 +235,7 @@ describe('useShellProjectLifecycle', () => {
 
     expect(harness.lifecycle.isActivating.value).toBe(false)
     expect(notifications.notifyError).toHaveBeenCalledOnce()
-    expect(harness.shellPage.value).toEqual({ type: 'create-project', returnPage: 'welcome' })
+    expect(harness.shellLocation.value).toEqual({ base: { space: 'welcome' }, flow: { type: 'create-project' } })
   })
 
   it('relocates a recent project without activating it', async () => {
@@ -251,26 +251,29 @@ describe('useShellProjectLifecycle', () => {
   })
 
   it('enters create-project with the current primary return page and loads templates', async () => {
-    const harness = createHarness({ page: { type: 'settings', categoryKey: 'general', returnPage: 'workbench' } })
+    const harness = createHarness({ location: { base: { space: 'settings', categoryKey: 'general', returnSpace: 'workbench' } } })
 
     harness.lifecycle.enterCreateProject()
     await Promise.resolve()
 
-    expect(harness.shellPage.value).toEqual({ type: 'create-project', returnPage: 'workbench' })
+    expect(harness.shellLocation.value).toEqual({
+      base: { space: 'settings', categoryKey: 'general', returnSpace: 'workbench' },
+      flow: { type: 'create-project' },
+    })
     expect(harness.loadTemplates).toHaveBeenCalledOnce()
   })
 
   it.each([
-    ['current', { type: 'workbench' }],
-    ['welcome', { type: 'welcome' }],
-    ['create-project', { type: 'create-project', returnPage: 'workbench' }],
-  ] as const)('completes project close for the %s destination', async (destination, expectedPage) => {
-    const harness = createHarness({ page: { type: 'workbench' } })
+    ['current', { base: { space: 'workbench' } }],
+    ['welcome', { base: { space: 'welcome' } }],
+    ['create-project', { base: { space: 'workbench' }, flow: { type: 'create-project' } }],
+  ] as const)('completes project close for the %s destination', async (destination, expectedLocation) => {
+    const harness = createHarness({ location: { base: { space: 'workbench' } } })
 
     await harness.lifecycle.completeProjectClose(destination)
 
     expect(harness.events.slice(0, 2)).toEqual(['close-sessions', 'set:'])
-    expect(harness.shellPage.value).toEqual(expectedPage)
+    expect(harness.shellLocation.value).toEqual(expectedLocation)
     expect(harness.loadTemplates).toHaveBeenCalledTimes(destination === 'create-project' ? 1 : 0)
   })
 })

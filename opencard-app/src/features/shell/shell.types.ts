@@ -11,7 +11,7 @@ import type {
   OcNodeSelectionEvent,
 } from '../../shared/ui/node/node.types'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
-import type { OcActionMenuEntry } from '../../components/standard/OcActionMenu.vue'
+import type { OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
 export interface ShellAction {
   type?: 'action' | 'selection';
