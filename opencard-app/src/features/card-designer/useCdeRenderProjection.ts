@@ -70,6 +70,10 @@ function findBlock(
 ): RenderReadyCardBlock | null {
   for (const block of blocks) {
     if (block.id === blockId) return block
+    if (block.type === 'custom-block') {
+      const descendant = findBlock([block.content], blockId)
+      if (descendant) return descendant
+    }
     if (block.type === 'simple-container-block' || block.type === 'flow-container-block') {
       const descendant = findBlock(block.children.map(child => child.block), blockId)
       if (descendant) return descendant

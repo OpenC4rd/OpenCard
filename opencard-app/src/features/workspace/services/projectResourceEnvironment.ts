@@ -14,7 +14,14 @@ import { readResourcePackageArchive, type ResourcePackageArchive } from './resou
 import { resolveProjectCover } from './projectCoverService'
 import type { ProjectCover } from '../model/projectCover'
 import { resolveResourcePath, type PackageScopeRoots } from '../model/scopedResourcePath'
-import { PROJECT_INTERNAL_DIRECTORY_NAME, PROJECT_PACKAGE_DIRECTORY } from '../model/projectStructure'
+import {
+  PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
+  PROJECT_INTERNAL_DIRECTORY_NAME,
+  PROJECT_PACKAGE_DIRECTORY,
+} from '../model/projectStructure'
+import { buildCustomBlockRegistry, parseCustomBlockRegistryText, type CustomBlockRegistry } from '../model/customBlockRegistry'
+import type { OcBlockDocument } from '../../card-rendering/customBlockRuntime'
+import { parseOcBlock } from '../../card-rendering/customBlockRuntime'
 
 export type ProjectResourceScopeKind = 'project' | 'package'
 
@@ -74,6 +81,8 @@ export type ProjectResourceEnvironment = {
   readonly packageFiles?: readonly ProjectResourcePackageFile[]
   readonly unreadablePackages?: readonly UnreadableProjectPackage[]
   readonly packageEnvironments?: ReadonlyMap<string, ProjectResourceEnvironment>
+  readonly customBlockRegistry?: CustomBlockRegistry
+  readonly customBlockSources?: ReadonlyMap<string, OcBlockDocument>
 }
 
 export type ProjectResourcePackageFile = {
@@ -245,11 +254,54 @@ async function readRegistryDocument<T extends object>(
 async function readScopeRegistries(fs: EnvironmentFs, root: string): Promise<{
   fonts: ProjectFontRegistryDocument
   icons: ProjectIconRegistryDocument
+  customBlocks: CustomBlockRegistry
 }> {
   return {
     fonts: await readRegistryDocument(fs, `${root}/${PROJECT_INTERNAL_DIRECTORY_NAME}/fonts/fonts.json`, parseProjectFontRegistryText, {}),
     icons: await readRegistryDocument(fs, `${root}/${PROJECT_INTERNAL_DIRECTORY_NAME}/icons/icons.json`, parseProjectIconRegistryText, {}),
+    customBlocks: buildCustomBlockRegistry(await readRegistryDocument(
+      fs,
+      `${root}/${PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME}`,
+      parseCustomBlockRegistryText,
+      {},
+    )),
   }
+}
+
+async function readCustomBlockSources(
+  fs: EnvironmentFs,
+  root: string,
+  relative = '',
+  result = new Map<string, OcBlockDocument>(),
+): Promise<ReadonlyMap<string, OcBlockDocument>> {
+  let entries: DirEntry[]
+  try {
+    entries = await fs.readDirectory(`${root}/${relative}`)
+  } catch {
+    return result
+  }
+  for (const entry of entries) {
+    if (entry.isSymlink) continue
+    const relativePath = relative ? `${relative}/${entry.name}` : entry.name
+    const absolutePath = `${root}/${relativePath}`
+    if (entry.isDirectory) {
+      const directory = relativePath.toLocaleLowerCase().replace(/\\/g, '/')
+      if (directory === '.git' || directory.startsWith('.git/')
+        || directory === 'node_modules' || directory.startsWith('node_modules/')
+        || directory === 'dist' || directory.startsWith('dist/')
+        || directory === '.opencard/packages' || directory.startsWith('.opencard/packages/')) continue
+      await readCustomBlockSources(fs, root, relativePath, result)
+      continue
+    }
+    if (!entry.isFile || !entry.name.toLocaleLowerCase().endsWith('.ocblock')) continue
+    try {
+      const parsed = parseOcBlock(JSON.parse(await fs.readFile(absolutePath)))
+      if (parsed) result.set(relativePath, parsed)
+    } catch {
+      // A malformed source is reported when a custom block references it.
+    }
+  }
+  return result
 }
 
 function buildScopeIconCatalog(
@@ -300,7 +352,7 @@ export async function loadProjectResourceEnvironment(options: {
 
   const registries = root
     ? await readScopeRegistries(options.fs, root)
-    : { fonts: {}, icons: {} }
+    : { fonts: {}, icons: {}, customBlocks: {} }
 
   const discovered = root && options.kind === 'project'
     ? await discoverProjectResourcePackages({
@@ -319,7 +371,7 @@ export async function loadProjectResourceEnvironment(options: {
     // 包环境按**坐标**索引：引用只认坐标，所以同一坐标有两份时仍然只建一个环境（先出现的那份）。
     const coordinate = formatPackageCoordinate(pkg.coordinate)
     if (packageEnvironments.has(coordinate)) continue
-    packageEnvironments.set(coordinate, await loadProjectResourceEnvironment({
+    const loadedPackageEnvironment = await loadProjectResourceEnvironment({
       fs: options.fs,
       rootPath: pkg.rootPath,
       projectRootPath: projectRoot,
@@ -327,7 +379,20 @@ export async function loadProjectResourceEnvironment(options: {
       kind: 'package',
       identity: coordinate,
       generation: options.generation,
-    }))
+    })
+    const publicBlocks = pkg.manifest.public.blocks ?? []
+    const manifestBlocks = Object.fromEntries(publicBlocks.map((entry) => [entry.key, {
+      key: entry.key,
+      name: entry.title,
+      source: entry.source,
+    }]))
+    packageEnvironments.set(coordinate, {
+      ...loadedPackageEnvironment,
+      customBlockRegistry: {
+        ...(loadedPackageEnvironment.customBlockRegistry ?? {}),
+        ...manifestBlocks,
+      },
+    })
   }
 
   const iconCatalog = options.iconCatalog ?? (root
@@ -346,5 +411,7 @@ export async function loadProjectResourceEnvironment(options: {
     packageFiles: discovered.packageFiles,
     unreadablePackages: discovered.unreadable,
     packageEnvironments,
+    customBlockRegistry: registries.customBlocks,
+    customBlockSources: root ? await readCustomBlockSources(options.fs, root) : new Map(),
   }
 }

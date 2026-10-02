@@ -12,6 +12,7 @@ const nativeInputAllowlist = new Set([
 ])
 const visibleTitleComponents = new Set([
   'AdditionalFieldCreateDialog',
+  'ComingSoonWorkspace',
   'OcBar',
   'OcCard',
   'OcDialog',

@@ -133,7 +133,7 @@ describe('property binding schema policy', () => {
       transform: ['transformAnchor', 'translateX', 'translateY', 'rotation', 'scaleX', 'scaleY'],
       layer: ['visible', 'zIndex', 'opacity'],
       surface: ['background', 'borderColor', 'borderWidth', 'borderStyle', 'borderRadius'],
-      advanced: ['customCss', 'id', 'type'],
+      advanced: ['customCss'],
     }
     const expected = {
       'text-block': {

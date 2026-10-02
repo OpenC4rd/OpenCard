@@ -8,7 +8,7 @@
     read-only
   />
   <section v-else class="unsupported-file-editor" :aria-label="t('unsupportedFile.title')">
-    <OcIcon name="file.generic" tone="muted" size="lg" />
+    <OcIcon :name="fileType.icon" :tone="fileType.iconTone" size="lg" />
     <h1>{{ t('unsupportedFile.title') }}</h1>
     <p>{{ t('unsupportedFile.description', { name: displayName }) }}</p>
     <div class="unsupported-file-editor__actions">
@@ -29,6 +29,7 @@ import { useI18n } from 'vue-i18n'
 import type { EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { fileSystemService } from '../../features/workspace/services/fileSystemService'
+import { resolveFileType } from '../../features/workspace/model/fileTypes'
 import OcButton from '../base/OcButton.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
@@ -45,10 +46,14 @@ let actionPending = false
 
 const displayName = computed(() => props.fileName || props.filePath.split(/[/\\]/).pop() || props.filePath)
 
+/** 没有专门编辑器的文件仍由它自己的文件类型说话，于是文件树与被打开的会话认出同一个形状。 */
+const fileType = computed(() => resolveFileType(props.filePath))
+
 const presentation = computed<EditorPresentation>(() => ({
   title: displayName.value,
   description: t('unsupportedFile.title'),
-  icon: 'file.generic',
+  icon: fileType.value.icon,
+  iconTone: fileType.value.iconTone,
 }))
 
 defineExpose({ presentation })

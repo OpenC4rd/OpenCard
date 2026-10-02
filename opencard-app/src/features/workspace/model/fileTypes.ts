@@ -141,6 +141,14 @@ const fileTypes: FileTypeDefinition[] = [
     previewable: true,
   },
   {
+    id: 'opencard-custom-block',
+    labelKey: 'fileTypes.opencardCustomBlock',
+    extensions: ['ocblock'],
+    icon: 'entity.block-custom',
+    iconTone: 'muted',
+    editorId: 'unsupported-file',
+  },
+  {
     id: 'json',
     labelKey: 'fileTypes.json',
     extensions: ['json'],
@@ -366,7 +374,7 @@ function managedDirectoryPresentation(path: string, isDirectory: boolean): Entry
   const isDirectoryPath = isDirectory || normalized.endsWith('/')
   const segments = normalized.replace(/\/+$/, '').split('/').map(segment => segment.toLocaleLowerCase())
   for (const [marker, presentation] of MANAGED_DIRECTORY_PRESENTATIONS) {
-    if (segments.slice(-2).join('/') === marker) return presentation
+    if (!isDirectoryPath && segments.slice(-2).join('/') === marker) return presentation
     if (isDirectoryPath && segments.slice(-3, -1).join('/') === marker) return presentation
   }
   return null

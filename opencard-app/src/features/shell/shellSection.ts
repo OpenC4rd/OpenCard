@@ -14,6 +14,8 @@ export interface ShellSpaceDefinition {
 export const shellSpaceDefinitions: Record<SpaceKey, ShellSpaceDefinition> = {
   welcome: { key: 'welcome', labelKey: 'app.shell.space.welcome', icon: 'nav.welcome' },
   workbench: { key: 'workbench', labelKey: 'app.shell.space.workbench', icon: 'nav.workbench' },
+  market: { key: 'market', labelKey: 'app.shell.space.market', icon: 'nav.market' },
+  test: { key: 'test', labelKey: 'app.shell.space.test', icon: 'nav.test' },
   settings: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'tool.settings' },
 }
 

@@ -361,8 +361,18 @@ function createBaseBlockPropertyEditorSchema(): Record<string, EditorPropertyDef
         borderStyle: { fieldType: 'string', options: blockBorderStyleOptions, categoryId: 'surface' },
         borderRadius: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'surface' },
         customCss: { fieldType: 'string', multiline: true, categoryId: 'advanced' },
-        id: { fieldType: 'string', required: true, isReadonly: true, minLength: 1, categoryId: 'advanced', acceptsBinding: false },
-        type: { fieldType: 'string', required: true, isReadonly: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
+        id: { fieldType: 'string', required: true, isReadonly: true, isHidden: true, minLength: 1, categoryId: 'advanced', acceptsBinding: false },
+        type: { fieldType: 'string', required: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
+        additionalFieldDefinition: { fieldType: 'object', objectType: 'AdditionalFieldDefinition', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
+    }
+}
+
+function createCustomBlockPropertyEditorSchema(): Record<string, EditorPropertyDefinition> {
+    return {
+        name: { fieldType: 'string', categoryId: 'general' },
+        source: { fieldType: 'string', required: true, categoryId: 'data', acceptsBinding: false },
+        id: { fieldType: 'string', required: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false },
+        type: { fieldType: 'string', required: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         additionalFieldDefinition: { fieldType: 'object', objectType: 'AdditionalFieldDefinition', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     }
 }
@@ -447,6 +457,7 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
         gap: { fieldType: 'string', required: true, autocomplete: cssLengthAutocomplete, categoryId: 'container' },
         children: { fieldType: 'object', objectType: 'CardBlock', required: true, isArray: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     },
+    'custom-block': createCustomBlockPropertyEditorSchema(),
     'simple-container-location': {
         id: { fieldType: 'string', required: true, isReadonly: true, categoryId: 'advanced', acceptsBinding: false },
         type: { fieldType: 'string', required: true, isReadonly: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
@@ -574,6 +585,11 @@ const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
         direction: 'lr',
         gap: '10px',
         children: [],
+    },
+    'custom-block': {
+        ...BASE_BLOCK_DEFAULTS,
+        type: 'custom-block',
+        source: '',
     },
     'simple-container-location': {
         id: '',

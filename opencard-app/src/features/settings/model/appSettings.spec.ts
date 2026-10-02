@@ -46,6 +46,7 @@ describe('appSettings', () => {
       updates: { showReleaseNotesAfterUpdate: true },
       exporting: { openCdeWorkbookAfterExport: true },
       cache: { packageLimitGb: 2, networkLimitGb: 1 },
+      rendering: { customBlockMaxDepth: 32, customBlockMaxNodes: 10000 },
       versionControl: { committerName: '', committerEmail: '', createInitialCommit: true },
       workspace: {
         autoSave: true,

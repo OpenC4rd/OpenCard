@@ -25,7 +25,7 @@ function listKeys(groups: readonly ShellListGroup[]): string[] {
 
 describe('shell section projections', () => {
   it('keeps the static space registry exhaustive', () => {
-    expect(shellSpaceKeys).toEqual(['welcome', 'workbench', 'settings'])
+    expect(shellSpaceKeys).toEqual(['welcome', 'workbench', 'market', 'test', 'settings'])
     expect(Object.keys(shellSpaceDefinitions).sort()).toEqual([...shellSpaceKeys].sort())
   })
 
@@ -33,10 +33,12 @@ describe('shell section projections', () => {
     const welcome = computed(() => [{ key: 'welcome', title: '', lists: [] }])
     const workbench = computed(() => [{ key: 'workbench', title: '', lists: [] }])
     const settings = computed(() => [{ key: 'settings', title: '', lists: [] }])
+    const market = computed(() => [{ key: 'market', title: '', lists: [] }])
+    const test = computed(() => [{ key: 'test', title: '', lists: [] }])
     const createProject = computed(() => [{ key: 'create-project', title: '', lists: [] }])
     const exportTemplate = computed(() => [{ key: 'export-template', title: '', lists: [] }])
     const about = computed(() => [{ key: 'about', title: '', lists: [] }])
-    const spaces: Record<SpaceKey, typeof welcome> = { welcome, workbench, settings }
+    const spaces: Record<SpaceKey, typeof welcome> = { welcome, workbench, market, test, settings }
     const flows: Record<ShellFlowKey, typeof welcome> = { 'create-project': createProject, 'export-template': exportTemplate, about }
 
     expect(resolveShellSection({ base: { space: 'welcome' } }, spaces, flows)).toBe(welcome.value)

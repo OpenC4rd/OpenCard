@@ -17,12 +17,16 @@ import type {
   RenderReadyCardFace,
   RenderReadyFlowContainerLocation,
   RenderReadySimpleContainerLocation,
+  RenderReadyCustomBlock,
+  RenderReadySimpleContainerBlock,
+  RenderReadyFlowContainerBlock,
 } from './render.types'
+import type { CustomBlockRuntimeDescriptor } from './customBlockRuntime'
 import { joinBlockPath } from './renderBlockPath'
 import { isRecord } from '../../shared/model/record'
 
 type SourceRecord = Record<string, unknown>
-type BlockType = CardBlock['type']
+type BlockType = Exclude<CardBlock['type'], 'custom-block'>
 
 type IssueContext = {
   documentId: string
@@ -36,6 +40,7 @@ type IssueContext = {
 
 export type ParseRenderDocumentOptions = {
   instanceId?: string | null
+  customBlocks?: ReadonlyMap<string, CustomBlockRuntimeDescriptor>
 }
 
 type RenderParseFailure =
@@ -96,7 +101,57 @@ export function parseRenderDocument(
     },
   }
 
-  return { document, issues }
+  return {
+    document: options.customBlocks ? decorateCustomBlocks(document, options.customBlocks) : document,
+    issues,
+  }
+}
+
+function decorateCustomBlocks(
+  document: RenderReadyCardDocument,
+  descriptors: ReadonlyMap<string, CustomBlockRuntimeDescriptor>,
+): RenderReadyCardDocument {
+  const decorate = (block: RenderReadyCardBlock): RenderReadyCardBlock => {
+    if (block.type === 'simple-container-block') {
+      const next = {
+        ...block,
+        children: block.children.map(child => ({ ...child, block: decorate(child.block) })),
+      }
+      const descriptor = descriptors.get(next.id)
+      return descriptor ? toRenderReadyCustomBlock(next, descriptor) : next
+    }
+    if (block.type === 'flow-container-block') {
+      const next = {
+        ...block,
+        children: block.children.map(child => ({ ...child, block: decorate(child.block) })),
+      }
+      const descriptor = descriptors.get(next.id)
+      return descriptor ? toRenderReadyCustomBlock(next, descriptor) : next
+    }
+    return block
+  }
+  return {
+    ...document,
+    faces: Object.fromEntries(Object.entries(document.faces).map(([faceKey, face]) => [faceKey, {
+      ...face,
+      children: face.children.map(child => ({ ...child, block: decorate(child.block) })),
+    }])) as RenderReadyCardDocument['faces'],
+  }
+}
+
+function toRenderReadyCustomBlock(
+  content: RenderReadySimpleContainerBlock | RenderReadyFlowContainerBlock,
+  descriptor: CustomBlockRuntimeDescriptor,
+): RenderReadyCustomBlock {
+  const { type: _contentType, ...base } = content
+  return {
+    ...base,
+    type: 'custom-block',
+    id: descriptor.id,
+    source: descriptor.source,
+    state: descriptor.state,
+    content,
+  }
 }
 
 function parseFace(

@@ -19,7 +19,7 @@ import {
   type SettingsPersistence,
 } from '../services/settingsPersistence'
 
-type SettingsSection = keyof Pick<AppSettings, 'appearance' | 'shell' | 'exporting' | 'workspace'>
+type SettingsSection = keyof Pick<AppSettings, 'appearance' | 'shell' | 'exporting' | 'workspace' | 'rendering'>
 
 export interface AppSettingsStore {
   settings: Readonly<Ref<DeepReadonly<AppSettings>>>
@@ -123,6 +123,10 @@ export function createAppSettingsStore(
       candidate.cache.packageLimitGb = value as number
     } else if (key === 'cache.networkLimitGb') {
       candidate.cache.networkLimitGb = value as number
+    } else if (key === 'rendering.customBlockMaxDepth') {
+      candidate.rendering.customBlockMaxDepth = value as number
+    } else if (key === 'rendering.customBlockMaxNodes') {
+      candidate.rendering.customBlockMaxNodes = value as number
     } else if (key === 'workspace.structureTreeSelectionBehavior') {
       candidate.workspace.structureTreeSelectionBehavior = value as AppSettings['workspace']['structureTreeSelectionBehavior']
     } else if (key === 'workspace.structureTreeScrollToSelection') {

@@ -23,6 +23,7 @@
 ## Refactoring Discipline
 
 - Prefer efficient, unified code paths over layered compatibility wrappers, parallel abstractions, and feature-local exceptions.
+- When several resource types share the same invalidation or refresh meaning, route them through one shared entry point; do not add a resource-specific special case in a lower-level file operation.
 - A refactor should normally remove obsolete branches, duplicated types, adapters, and special cases; do not accept a growing implementation merely because it preserves the old shape.
 - Treat sustained line-count growth during a refactor as a warning signal. Stop and reassess the model, ownership boundaries, and single source of truth before adding more code.
 - Every new abstraction must have a concrete complexity payoff. If the result is longer and harder to reason about without reducing behavioral duplication, redesign it.

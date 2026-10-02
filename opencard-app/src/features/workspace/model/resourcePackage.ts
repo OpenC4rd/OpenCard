@@ -18,9 +18,16 @@ export type ResourcePackagePublicIconSeries = {
   count: number
 }
 
+export type ResourcePackagePublicBlock = {
+  key: string
+  title: string
+  source: string
+}
+
 export type ResourcePackagePublicResources = {
   fonts: readonly ResourcePackagePublicFont[]
   iconSeries: readonly ResourcePackagePublicIconSeries[]
+  blocks?: readonly ResourcePackagePublicBlock[]
 }
 
 /**
@@ -121,6 +128,34 @@ function normalizePublicIconSeries(
   return result
 }
 
+function normalizePublicBlocks(
+  value: unknown,
+  issues: ResourcePackageManifestIssue[],
+): ResourcePackagePublicBlock[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    addIssue(issues, 'public.blocks', 'Expected an array; used an empty list')
+    return []
+  }
+  const result: ResourcePackagePublicBlock[] = []
+  const identities = new Set<string>()
+  for (const [index, candidate] of value.entries()) {
+    const path = `public.blocks[${index}]`
+    if (!isRecord(candidate)) continue
+    const key = typeof candidate.key === 'string' ? normalizeKeySlug(candidate.key) : null
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : ''
+    const source = typeof candidate.source === 'string' ? candidate.source.trim() : ''
+    if (!key || !title || !source || !source.toLocaleLowerCase().endsWith('.ocblock')) {
+      addIssue(issues, path, 'Public block key, title, and .ocblock source are required; ignored the entry')
+      continue
+    }
+    if (identities.has(key)) continue
+    identities.add(key)
+    result.push({ key, title, source })
+  }
+  return result
+}
+
 /**
  * 身份的三个字段合用一份实现：把它们拼成坐标再交给 `packageCoordinate` 校验，
  * 小写、slug、精确 semver 的规则因此只有一处。
@@ -163,6 +198,7 @@ export function normalizeResourcePackageManifest(
       public: {
         fonts: normalizePublicFonts(publicSource.fonts, issues),
         iconSeries: normalizePublicIconSeries(publicSource.iconSeries, issues),
+        blocks: normalizePublicBlocks(publicSource.blocks, issues),
       },
     },
     issues,

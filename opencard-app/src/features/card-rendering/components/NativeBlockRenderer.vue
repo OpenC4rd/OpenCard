@@ -6,6 +6,7 @@
   <ShapeBlockRenderer v-else-if="block.type === 'shape-block'" :block="block" :placement="placement" />
   <SimpleContainerBlockRenderer v-else-if="block.type === 'simple-container-block'" :block="block" :placement="placement" />
   <FlowContainerBlockRenderer v-else-if="block.type === 'flow-container-block'" :block="block" :placement="placement" />
+  <CustomBlockRenderer v-else-if="block.type === 'custom-block'" :block="block" :placement="placement" />
 </template>
 
 <script setup lang="ts">
@@ -17,6 +18,7 @@ import QrCodeBlockRenderer from './QrCodeBlockRenderer.vue'
 import ShapeBlockRenderer from './ShapeBlockRenderer.vue'
 import SimpleContainerBlockRenderer from './SimpleContainerBlockRenderer.vue'
 import TextBlockRenderer from './TextBlockRenderer.vue'
+import CustomBlockRenderer from './CustomBlockRenderer.vue'
 import type { BlockRenderPlacement } from './blockRenderPlacement'
 
 defineProps<{

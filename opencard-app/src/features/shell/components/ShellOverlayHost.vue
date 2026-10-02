@@ -1,6 +1,6 @@
 <template>
   <div v-if="showExportRenderer" style="position: fixed; top: -9999px; left: -9999px;">
-    <CardFaceRenderer v-if="exportCardFace && exportResourceContext" ref="exportRendererRef"
+    <CardFaceRenderer v-if="exportCardFace && exportResourceContext" :ref="setExportRendererRef"
       :face="exportCardFace" :clip-to-face="true" :resource-context="exportResourceContext" />
   </div>
 
@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import type { ComponentPublicInstance } from 'vue'
 import FloatingMenuHost from '../../../components/ui/FloatingMenuHost.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcButton from '../../../components/base/OcButton.vue'
@@ -84,6 +85,7 @@ defineProps<{
   showExportRenderer: boolean
   exportCardFace: RenderReadyCardFace | null
   exportResourceContext: CardRenderResourceContext | null
+  setExportRendererRef: (renderer: Element | ComponentPublicInstance | null) => void
   projectExportDialogOpen: boolean
   projectExportDialogTask: ProjectExportTask
   projectExportDocumentCandidates: readonly ExportDocumentCandidate[]

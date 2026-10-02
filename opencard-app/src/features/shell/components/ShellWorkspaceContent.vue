@@ -15,6 +15,8 @@
   <WelcomeWorkspace v-else-if="mode === 'welcome'" :covers="welcomeCovers" :highlight-keys="selectedRecentProjectKeys"
     :background-visible="backgroundVisible" @new-project="emit('new-project')" @open-project="emit('open-project')"
     @update:background-visible="emit('update:background-visible', $event)" />
+  <ComingSoonWorkspace v-else-if="mode === 'market'" :title="t('app.shell.space.market')" icon="nav.market" />
+  <ComingSoonWorkspace v-else-if="mode === 'test'" :title="t('app.shell.space.test')" icon="nav.test" />
   <WorkbenchWorkspace v-else :has-active-editor="Boolean(activeSession)" :has-project="Boolean(projectPath)"
     @open-project="emit('open-project')">
     <Transition name="shell-editor-fade" mode="out-in">
@@ -32,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { Component } from 'vue'
 import type { EditorSession } from '../../workspace/store/editorSessionStore'
 import type { ProjectTemplateKey, CreatedProject, TemplateExportSelection } from '../../project-templates/model/projectTemplate'
@@ -54,9 +57,12 @@ import SettingsWorkspace from '../../settings/components/SettingsWorkspace.vue'
 import AboutWorkspace from './AboutWorkspace.vue'
 import WelcomeWorkspace from './WelcomeWorkspace.vue'
 import WorkbenchWorkspace from './WorkbenchWorkspace.vue'
+import ComingSoonWorkspace from './ComingSoonWorkspace.vue'
+
+const { t } = useI18n()
 
 defineProps<{
-  mode: 'welcome' | 'workbench' | 'settings' | 'create-project' | 'export-template' | 'about'
+  mode: 'welcome' | 'workbench' | 'market' | 'test' | 'settings' | 'create-project' | 'export-template' | 'about'
   isActivatingProject: boolean
   selectedTemplateKey: ProjectTemplateKey | null
   attachedResourcePackages: readonly StoredResourcePackage[]

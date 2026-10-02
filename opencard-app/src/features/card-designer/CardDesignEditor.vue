@@ -220,13 +220,15 @@
       :invalid="Boolean(additionalFieldCreateError)" @update-field-type="updateAdditionalFieldType"
       @update-field-key="updateAdditionalFieldKey" @update-title="updateAdditionalFieldTitle"
       @close="closeAdditionalFieldDialog" @submit="submitAdditionalFieldDialog" />
+    <ExportCustomBlockDialog :open="Boolean(exportCustomBlockTarget)" :fields="exportCustomBlockFields"
+      @close="closeExportCustomBlockDialog" @submit="confirmExportCustomBlock" />
     <DataTableWorkbookImportDialog :result="pendingDataTableWorkbookImport" @cancel="cancelDataTableWorkbookImport"
       @confirm="confirmDataTableWorkbookImport" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, toRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
@@ -251,6 +253,7 @@ import CardViewport, {
 import { buildCardLayerGroups } from '../card-rendering/components/cardLayerModel'
 import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
 import AdditionalFieldCreateDialog from '../../shared/ui/property-editor/AdditionalFieldCreateDialog.vue'
+import ExportCustomBlockDialog from './ExportCustomBlockDialog.vue'
 import OcEmpty from '../../components/base/OcEmpty.vue'
 import OcTree from '../../components/standard/OcTree.vue'
 import type { OcActionDefinition } from '../../shared/ui/action/action.types'
@@ -285,6 +288,11 @@ import { useAppSettingsStore } from '../settings/store/appSettingsStore'
 import { useCdeRenderProjection } from './useCdeRenderProjection'
 import { useCdeViewportCardInfo } from './useCdeViewportCardInfo'
 import type { PreparedCardRender } from '../card-rendering/renderPipeline'
+import {
+  createOcBlockDocument,
+  createOcBlockPublicFields,
+  serializeOcBlock,
+} from '../card-rendering/customBlockRuntime'
 import {
   useCdeViewportController,
   type CdeViewportPort,
@@ -677,6 +685,13 @@ const {
 })
 
 const activeFace = computed(() => cardDoc.value?.faces[activeFaceKey.value] ?? null)
+const exportCustomBlockTarget = shallowRef<CardBlock | null>(null)
+const exportCustomBlockFields = computed(() => {
+  const block = exportCustomBlockTarget.value
+  return block?.type === 'simple-container-block' || block?.type === 'flow-container-block'
+    ? createOcBlockPublicFields(block)
+    : {}
+})
 
 const blockFieldCommands = useCdeBlockFieldCommands({
   cardDoc,
@@ -684,6 +699,32 @@ const blockFieldCommands = useCdeBlockFieldCommands({
   refreshDocumentState,
   markDocumentChanged,
 })
+
+function exportContainerAsCustomBlock(block: CardBlock): void {
+  if (block.type !== 'simple-container-block' && block.type !== 'flow-container-block') return
+  exportCustomBlockTarget.value = block
+}
+
+function closeExportCustomBlockDialog(): void {
+  exportCustomBlockTarget.value = null
+}
+
+async function confirmExportCustomBlock(fieldKeys: readonly string[]): Promise<void> {
+  const block = exportCustomBlockTarget.value
+  if (block?.type !== 'simple-container-block' && block?.type !== 'flow-container-block') return
+  const path = await fileSystemService.pickSavePath({
+    title: t('cardDesigner.treeActions.exportCustomBlock'),
+    defaultPath: `${getBlockProperty<string>(block, 'name')?.trim() || 'custom-block'}.ocblock`,
+    fileTypeName: t('cardDesigner.customBlock.fileTypeName'),
+    extensions: ['ocblock'],
+  })
+  if (!path) return
+  const publicFields = Object.fromEntries(fieldKeys
+    .map(fieldKey => [fieldKey, exportCustomBlockFields.value[fieldKey]])
+    .filter(([, definition]) => definition !== undefined))
+  await fileSystemService.writeFile(path, serializeOcBlock(createOcBlockDocument(block, publicFields)))
+  closeExportCustomBlockDialog()
+}
 
 const {
   createField: createDataTableField,
@@ -954,6 +995,7 @@ const {
   translate: messageKey => t(messageKey),
   refreshDocumentState,
   markDocumentChanged,
+  exportCustomBlock: exportContainerAsCustomBlock,
 })
 
 async function copySelectedBlocks(): Promise<void> {
@@ -1094,6 +1136,7 @@ const {
   markDocumentChanged,
   translate: (messageKey) => t(messageKey),
   hasMessage: (messageKey) => te(messageKey),
+  customBlockCatalog: projectStore.renderEnvironment.value.customBlockCatalog,
 })
 
 const propertyProjectContext = computed(() => ({

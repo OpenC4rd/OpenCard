@@ -10,6 +10,7 @@ import { parseRenderDocument } from './renderParser'
 import type { RenderReadyCardDocument } from './render.types'
 import { resolveReferences } from './resolveCardBindings'
 import { validateRenderResources } from './validateRenderResources'
+import { materializeCustomBlocks, type CustomBlockSourceCatalog } from './customBlockRuntime'
 
 export type RenderPipelineResult = {
   document: RenderReadyCardDocument
@@ -31,6 +32,8 @@ export type CardRenderEnvironment = RenderPipelineContext & {
   /** Reads an icon's size, which is what asks for it and re-renders the consumer that read it. */
   resolveIconDimensions?: ProjectIconDimensionReader
   resolveFontFamily?: (references: string) => string
+  customBlockCatalog?: CustomBlockSourceCatalog
+  customBlockLimits?: { maxDepth: number, maxNodes: number }
 }
 
 export type CardRenderRequest = {
@@ -45,7 +48,12 @@ export type PreparedCardRender = RenderPipelineResult & { resources: CardRenderR
 
 export function prepareCardRender(request: CardRenderRequest): PreparedCardRender {
   const projected = applyInstance(request.document, request.instance)
-  const resolved = resolveReferences(projected, {
+  const materialized = materializeCustomBlocks(projected, {
+    catalog: request.environment.customBlockCatalog ?? { resolve: () => null },
+    maxDepth: request.environment.customBlockLimits?.maxDepth,
+    maxNodes: request.environment.customBlockLimits?.maxNodes,
+  })
+  const resolved = resolveReferences(materialized.document, {
     currentCard: request.instance,
     project: request.environment.project,
     dictionary: request.environment.dictionary,
@@ -59,7 +67,10 @@ export function prepareCardRender(request: CardRenderRequest): PreparedCardRende
     hostEnvironment: request.environment.projectResourceEnvironment,
     resourceScopes,
   })
-  const parsed = parseRenderDocument(resolved.document, { instanceId: request.instance?.id ?? null })
+  const parsed = parseRenderDocument(resolved.document, {
+    instanceId: request.instance?.id ?? null,
+    customBlocks: materialized.descriptors,
+  })
   const resources = createCardRenderResourceContext({
     resourceRootPath: request.resourceRootPath,
     sourceFilePath: request.sourceFilePath,

@@ -14,7 +14,7 @@ import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage, typ
 import { toCssFontFamily, type FontCatalogEntry } from '../model/projectFonts'
 
 export type ResourceReferenceScope = 'current' | 'host' | 'package'
-export type ResourceReferenceKind = 'font' | 'icon'
+export type ResourceReferenceKind = 'font' | 'icon' | 'block'
 
 export type ResourceReference = {
   scope: ResourceReferenceScope

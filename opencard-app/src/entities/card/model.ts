@@ -131,7 +131,12 @@ export type FlowContainerBlock = BlockIdentity & ContainerPackaging & {
     }[]
 }
 
-export type CardBlock = TextBlock | MarkdownTextBlock | ImageBlock | QrCodeBlock | ShapeBlock | SimpleContainerBlock | FlowContainerBlock
+export type CustomBlock = BlockIdentity & {
+    type: "custom-block"
+    source: string
+}
+
+export type CardBlock = TextBlock | MarkdownTextBlock | ImageBlock | QrCodeBlock | ShapeBlock | SimpleContainerBlock | FlowContainerBlock | CustomBlock
 
 export type RootChild = {
     block: CardBlock
@@ -345,6 +350,7 @@ type QrCodeBlockInit = BlockInit & { content?: string; errorCorrection?: 'L' | '
 type ShapeBlockInit = BlockInit & { shape?: ShapeBlock['shape']; fill?: string; stroke?: string; strokeWidth?: string; strokeStyle?: ShapeBlock['strokeStyle']; strokeAlignment?: ShapeBlock['strokeAlignment']; strokeJoin?: ShapeBlock['strokeJoin']; strokeCap?: ShapeBlock['strokeCap']; strokeMiterLimit?: string }
 type SimpleContainerBlockInit = BlockInit & { packaged?: string; clip?: string; children?: SimpleContainerBlock['children'] }
 type FlowContainerBlockInit = BlockInit & { packaged?: string; clip?: string; direction?: FlowDirection; gap?: CssValue; children?: FlowContainerBlock['children'] }
+type CustomBlockInit = BlockInit & { source?: string }
 type CardFaceInit = Partial<Omit<CardFace, 'type'>>
 
 // Shared block creation helpers.
@@ -388,6 +394,8 @@ function getDefaultBlockName(type: CardBlock['type']): string {
             return 'Simple Container'
         case 'flow-container-block':
             return 'Flow Container'
+        case 'custom-block':
+            return 'Custom Block'
     }
 }
 
@@ -403,6 +411,7 @@ const blockSeedFieldKeys: Record<CardBlock['type'], readonly string[]> = {
     'shape-block': ['width', 'height'],
     'simple-container-block': ['width', 'height'],
     'flow-container-block': ['width', 'height'],
+    'custom-block': [],
 }
 
 function createBlockSeed(type: CardBlock['type']): Record<string, unknown> {
@@ -527,6 +536,18 @@ export function createFlowContainerBlock(init: FlowContainerBlockInit = {}): Flo
     return block
 }
 
+export function createCustomBlock(init: CustomBlockInit = {}): CustomBlock {
+    return {
+        ...createBlockIdentity({
+            id: init.id ?? createBlockId('custom-block'),
+            name: init.name ?? getDefaultBlockName('custom-block'),
+            ...init,
+        }),
+        type: 'custom-block',
+        source: init.source ?? '',
+    } as CustomBlock
+}
+
 export function createBlock(type: 'text-block', init?: TextBlockInit): TextBlock
 export function createBlock(type: 'markdown-text-block', init?: MarkdownTextBlockInit): MarkdownTextBlock
 export function createBlock(type: 'image-block', init?: ImageBlockInit): ImageBlock
@@ -534,6 +555,7 @@ export function createBlock(type: 'qrcode-block', init?: QrCodeBlockInit): QrCod
 export function createBlock(type: 'shape-block', init?: ShapeBlockInit): ShapeBlock
 export function createBlock(type: 'simple-container-block', init?: SimpleContainerBlockInit): SimpleContainerBlock
 export function createBlock(type: 'flow-container-block', init?: FlowContainerBlockInit): FlowContainerBlock
+export function createBlock(type: 'custom-block', init?: CustomBlockInit): CustomBlock
 export function createBlock(type: CardBlock['type'], init: unknown = {}): CardBlock {
     switch (type) {
         case 'text-block':
@@ -550,5 +572,7 @@ export function createBlock(type: CardBlock['type'], init: unknown = {}): CardBl
             return createSimpleContainerBlock(init as SimpleContainerBlockInit)
         case 'flow-container-block':
             return createFlowContainerBlock(init as FlowContainerBlockInit)
+        case 'custom-block':
+            return createCustomBlock(init as CustomBlockInit)
     }
 }

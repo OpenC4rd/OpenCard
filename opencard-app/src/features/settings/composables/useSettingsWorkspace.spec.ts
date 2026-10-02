@@ -40,7 +40,7 @@ describe('useSettingsWorkspace', () => {
       { type: 'icon', icon: 'tool.workspace' },
       { type: 'icon', icon: 'nav.collaboration' },
     ])
-    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting', 'cache'])
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting', 'rendering', 'cache'])
     expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([
       'appearance.locale',
       'shell.titleBarNoticeHistoryLimit',
@@ -50,6 +50,9 @@ describe('useSettingsWorkspace', () => {
     ])
     expect(cardOf(activeCategory.value, 'exporting').items.map(item => item.key)).toEqual([
       'exporting.openCdeWorkbookAfterExport',
+    ])
+    expect(cardOf(activeCategory.value, 'rendering').items.map(item => item.key)).toEqual([
+      'rendering.customBlockMaxDepth', 'rendering.customBlockMaxNodes',
     ])
     const cache = cardOf(activeCategory.value, 'cache')
     expect(cache.items.map(item => item.key)).toEqual([

@@ -205,28 +205,24 @@ fn trash_path(path: String) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn create_windows_reveal_command(target: &Path, is_directory: bool) -> Command {
+fn create_windows_reveal_command(target: &Path) -> Command {
     let mut command = Command::new("explorer.exe");
     let windows_path = target.to_string_lossy().replace('/', "\\");
-    if is_directory {
-        command.arg(windows_path);
-    } else {
-        // explorer.exe parses its own command line: when the whole `/select,<path>` argument
-        // arrives wrapped in quotes, it drops the switch and opens the default folder instead.
-        // Only the path may be quoted, so the argument is appended verbatim.
-        command.raw_arg(format!("/select,\"{}\"", windows_path));
-    }
+    // explorer.exe parses its own command line: when the whole `/select,<path>` argument
+    // arrives wrapped in quotes, it drops the switch and opens the default folder instead.
+    // Only the path may be quoted, so the argument is appended verbatim.
+    command.raw_arg(format!("/select,\"{}\"", windows_path));
     command
 }
 
 #[tauri::command]
 fn reveal_path(path: String) -> Result<(), String> {
     let target = Path::new(&path);
-    let metadata = std::fs::symlink_metadata(target)
+    let _metadata = std::fs::symlink_metadata(target)
         .map_err(|error| format!("Cannot reveal '{}': {}", path, error))?;
 
     #[cfg(target_os = "windows")]
-    let mut command = create_windows_reveal_command(target, metadata.is_dir());
+    let mut command = create_windows_reveal_command(target);
 
     #[cfg(target_os = "macos")]
     let mut command = {
@@ -237,7 +233,7 @@ fn reveal_path(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     let mut command = {
-        let directory = if metadata.is_dir() {
+        let directory = if _metadata.is_dir() {
             target
         } else {
             target
@@ -319,7 +315,7 @@ mod tests {
     #[test]
     fn explorer_select_switch_stays_outside_the_quoted_path() {
         let target = Path::new("D:/My Cards/main.ocdocument");
-        let command = create_windows_reveal_command(target, false);
+        let command = create_windows_reveal_command(target);
 
         // explorer.exe keeps `/select,` working only while the quotes wrap the path alone.
         let arguments: Vec<_> = command.get_args().collect();
@@ -332,6 +328,15 @@ mod tests {
             command_line.ends_with(r#"/select,"D:\My Cards\main.ocdocument""#),
             "unexpected command line: {command_line}"
         );
+    }
+
+    #[test]
+    fn explorer_selects_a_directory_from_its_parent() {
+        let target = Path::new("D:/My Cards/assets");
+        let command = create_windows_reveal_command(target);
+
+        let arguments: Vec<_> = command.get_args().collect();
+        assert_eq!(arguments, [r#"/select,"D:\My Cards\assets""#]);
     }
 }
 

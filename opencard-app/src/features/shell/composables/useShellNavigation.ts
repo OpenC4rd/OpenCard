@@ -20,6 +20,8 @@ export interface ShellNavigationModel {
   isAbout: ComputedRef<boolean>
   isWelcome: ComputedRef<boolean>
   isWorkbench: ComputedRef<boolean>
+  isMarket: ComputedRef<boolean>
+  isTest: ComputedRef<boolean>
   isAuxiliary: ComputedRef<boolean>
   getCurrentPrimarySpace: () => PrimarySpaceKey
   showPrimarySpace: (space: PrimarySpaceKey) => void
@@ -37,6 +39,8 @@ export function useShellNavigation(): ShellNavigationModel {
   const isAbout = computed(() => location.value.flow?.type === 'about')
   const isWelcome = computed(() => !location.value.flow && location.value.base.space === 'welcome')
   const isWorkbench = computed(() => !location.value.flow && location.value.base.space === 'workbench')
+  const isMarket = computed(() => !location.value.flow && location.value.base.space === 'market')
+  const isTest = computed(() => !location.value.flow && location.value.base.space === 'test')
   const isAuxiliary = computed(() => (
     isSettings.value || isCreateProject.value || isExportTemplate.value || isAbout.value
   ))
@@ -73,6 +77,8 @@ export function useShellNavigation(): ShellNavigationModel {
     isAbout,
     isWelcome,
     isWorkbench,
+    isMarket,
+    isTest,
     isAuxiliary,
     getCurrentPrimarySpace,
     showPrimarySpace: showPrimarySpacePage,

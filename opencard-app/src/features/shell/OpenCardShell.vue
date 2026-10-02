@@ -83,10 +83,13 @@
         >
           <div class="open-card-shell__workbench">
             <ShellWorkspaceContent
-              :mode="shellLocation.base.space === 'settings' && !shellLocation.flow ? 'settings'
+            :mode="shellLocation.base.space === 'settings' && !shellLocation.flow ? 'settings'
                 : isCreateProjectMode ? 'create-project'
                   : isExportTemplateMode ? 'export-template'
-                    : isAboutMode ? 'about' : isWelcomeMode ? 'welcome' : 'workbench'"
+                    : isAboutMode ? 'about'
+                      : isWelcomeMode ? 'welcome'
+                        : isMarketMode ? 'market'
+                          : isTestMode ? 'test' : 'workbench'"
               :is-activating-project="isActivatingProject"
               :selected-template-key="selectedTemplateKey"
               :attached-resource-packages="attachedResourcePackages"
@@ -191,6 +194,7 @@
       :show-export-renderer="showExportRenderer"
       :export-card-face="exportCardFace"
       :export-resource-context="exportResourceContext"
+      :set-export-renderer-ref="setExportRendererRef"
       :project-export-dialog-open="projectExportDialogOpen"
       :project-export-dialog-task="projectExportDialogTask"
       :project-export-document-candidates="projectExportDocumentCandidates"
@@ -254,6 +258,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
 import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -419,6 +424,8 @@ const {
   isAbout: isAboutMode,
   isWelcome: isWelcomeMode,
   isWorkbench: isWorkbenchMode,
+  isMarket: isMarketMode,
+  isTest: isTestMode,
   showPrimarySpace: showPrimarySpacePage,
   showSettings: showSettingsPage,
   selectSpace: handleSpaceSelect,
@@ -567,6 +574,11 @@ const {
   isCreateProjectMode,
 })
 const exportRendererRef = ref<InstanceType<typeof CardFaceRenderer>>()
+const setExportRendererRef = (renderer: Element | ComponentPublicInstance | null): void => {
+  exportRendererRef.value = renderer && 'getCanvasElement' in renderer
+    ? renderer as InstanceType<typeof CardFaceRenderer>
+    : undefined
+}
 const projectTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
 const projectManagementTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
 
@@ -1199,9 +1211,12 @@ const aboutSection = computed<ShellListGroup[]>(() => [{
   }],
   lists: [],
 }])
+const emptySpaceSection = computed<ShellListGroup[]>(() => [])
 const sidebarBodyGroups = computed(() => resolveShellSection(shellLocation.value, {
   welcome: welcomeSection,
   workbench: workbenchSection,
+  market: emptySpaceSection,
+  test: emptySpaceSection,
   settings: settingsSection,
 }, {
   'create-project': createProjectSection,
@@ -1240,6 +1255,8 @@ const titleBarMenus = computed(() => createShellTitleBarMenus({
 const workspaceTitle = computed(() => {
   if (isCreateProjectMode.value) return t('projectTemplates.title')
   if (isExportTemplateMode.value) return t('templateExport.title')
+  if (isMarketMode.value) return t('app.shell.space.market')
+  if (isTestMode.value) return t('app.shell.space.test')
   if (isSettingsMode.value) return activeSettingsCategory.value.title
   if (isAboutMode.value) return t('app.about.title')
   if (isWelcomeMode.value) return 'OpenCard'
@@ -1248,7 +1265,11 @@ const workspaceTitle = computed(() => {
     : projectName.value || t('app.menu.workbench')
 })
 
-const workspaceIcon = computed(() => activeSession.value?.presentation?.icon ?? undefined)
+const workspaceIcon = computed(() => {
+  if (isMarketMode.value) return 'nav.market'
+  if (isTestMode.value) return 'nav.test'
+  return activeSession.value?.presentation?.icon ?? undefined
+})
 
 const workspaceIconTone = computed(() => activeSession.value?.presentation?.iconTone ?? undefined)
 

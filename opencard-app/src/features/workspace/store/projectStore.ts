@@ -101,13 +101,16 @@ import {
 } from '../services/resourcePackageArchive'
 import {
   createProjectResourceNamespace,
+  type ProjectResourceEnvironment,
   loadProjectResourceEnvironment,
   packageScopeRoots,
-  type ProjectResourceEnvironment,
   type ProjectResourcePackageCatalog,
   type ProjectResourcePackageFile,
   type UnreadableProjectPackage,
 } from '../services/projectResourceEnvironment'
+import { createProjectCustomBlockCatalog } from '../../card-rendering/customBlockRuntime'
+import type { OcBlockDocument } from '../../card-rendering/customBlockRuntime'
+import type { CustomBlockRegistry } from '../model/customBlockRegistry'
 import {
   relativizeResourcePath,
   resolveResourcePath as resolveScopedResourcePath,
@@ -196,6 +199,8 @@ const projectResourcePackageFiles = shallowRef<readonly ProjectResourcePackageFi
 /** 说不出身份的归档：包管理器整页要能让人看到它们，而不是留一个解释不了的空缺。 */
 const unreadableProjectResourcePackages = shallowRef<readonly UnreadableProjectPackage[]>([])
 const projectResourceEnvironments = shallowRef<ReadonlyMap<string, ProjectResourceEnvironment>>(new Map())
+const projectCustomBlockRegistry = shallowRef<CustomBlockRegistry>({})
+const projectCustomBlockSources = shallowRef<ReadonlyMap<string, OcBlockDocument>>(new Map())
 let resourceEnvironmentReloadVersion = 0
 const settingsStore = useAppSettingsStore()
 const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => ({
@@ -212,6 +217,8 @@ const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => ({
   iconCatalog: projectIconCatalog.value,
   packages: projectResourcePackages.value,
   packageEnvironments: projectResourceEnvironments.value,
+  customBlockRegistry: projectCustomBlockRegistry.value ?? {},
+  customBlockSources: projectCustomBlockSources.value ?? new Map(),
 }))
 /**
  * One icon's paint asks for its size here. The catalog entry is the shared record every render path
@@ -234,6 +241,11 @@ const renderEnvironment = computed<CardRenderEnvironment>(() => ({
   projectIconCatalog: projectIconCatalog.value,
   resolveIconDimensions: readProjectIconSize,
   projectResourceEnvironment: projectResourceEnvironment.value,
+  customBlockCatalog: createProjectCustomBlockCatalog(projectResourceEnvironment.value),
+  customBlockLimits: {
+    maxDepth: settingsStore.settings.value.rendering.customBlockMaxDepth,
+    maxNodes: settingsStore.settings.value.rendering.customBlockMaxNodes,
+  },
 }) as CardRenderEnvironment)
 
 let unlistenFn: UnlistenFn | null = null
@@ -489,6 +501,8 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
     projectResourcePackageFiles.value = []
     unreadableProjectResourcePackages.value = []
     projectResourceEnvironments.value = new Map()
+    projectCustomBlockRegistry.value = {}
+    projectCustomBlockSources.value = new Map()
     stampedPackageUsageFor = null
     return false
   }
@@ -510,6 +524,8 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
     projectResourcePackageFiles.value = environment.packageFiles ?? []
     unreadableProjectResourcePackages.value = environment.unreadablePackages ?? []
     projectResourceEnvironments.value = environment.packageEnvironments ?? new Map()
+    projectCustomBlockRegistry.value = environment.customBlockRegistry ?? {}
+    projectCustomBlockSources.value = environment.customBlockSources ?? new Map()
     stampPackageUsage(expectedProjectPath, snapshotsRoot)
     return true
   } catch (error) {
@@ -518,9 +534,21 @@ async function reloadProjectResourceEnvironment(): Promise<boolean> {
     projectResourcePackageFiles.value = []
     unreadableProjectResourcePackages.value = []
     projectResourceEnvironments.value = new Map()
+    projectCustomBlockRegistry.value = {}
+    projectCustomBlockSources.value = new Map()
     reportAppError('OC-E3016', { path: `${expectedProjectPath}/.opencard/packages`, error })
     return false
   }
+}
+
+function scheduleProjectResourceEnvironmentRefresh(): void {
+  taskScheduler.schedule(
+    FILE_CHANGE_RESOURCE_ENVIRONMENT_REFRESH_KEY,
+    FILE_CHANGE_REFRESH_DELAY_MS,
+    async () => {
+      await reloadProjectResourceEnvironment()
+    },
+  )
 }
 
 async function reloadProjectProfile(): Promise<boolean> {
@@ -781,15 +809,8 @@ async function startWatching() {
       if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)))) {
         void reloadProjectIconRegistry()
       }
-      // Both of these scan far more than the changed path, so they wait for a quiet window instead of
-      // running once per written file.
-      taskScheduler.schedule(
-        FILE_CHANGE_RESOURCE_ENVIRONMENT_REFRESH_KEY,
-        FILE_CHANGE_REFRESH_DELAY_MS,
-        async () => {
-          await reloadProjectResourceEnvironment()
-        },
-      )
+      // Resource environments scan more than the changed path, so wait for a quiet window.
+      scheduleProjectResourceEnvironmentRefresh()
       if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_DICTIONARY_FILE_NAME)))) {
         void reloadProjectDictionary()
       }
@@ -1200,6 +1221,7 @@ async function trashFile(relativePath: string) {
   }
   const resolvedPath = resolveProjectPath(relativePath)
   await fileSystemService.trashFile(resolvedPath)
+  scheduleProjectResourceEnvironmentRefresh()
   if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_PROFILE_FILE_NAME))) clearProjectProfile()
   if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_FONT_REGISTRY_FILE_NAME))) clearProjectFontRegistry()
   if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME))) clearProjectIconRegistry()

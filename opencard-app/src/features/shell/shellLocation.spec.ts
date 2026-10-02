@@ -14,7 +14,7 @@ import { shellSpaceDefinitions, shellSpaceKeys } from './shellSection'
 
 describe('shellLocation', () => {
   it('defines every currently available space in one static registry', () => {
-    expect(shellSpaceKeys).toEqual(['welcome', 'workbench', 'settings'])
+    expect(shellSpaceKeys).toEqual(['welcome', 'workbench', 'market', 'test', 'settings'])
     expect(Object.values(shellSpaceDefinitions).map(space => space.key)).toEqual(shellSpaceKeys)
   })
 

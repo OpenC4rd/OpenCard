@@ -1,7 +1,7 @@
 import type { AppSettingKey, SettingsCategoryKey } from '../settings/model/appSettings'
 
 /** 一级空间；流程页不属于空间。 */
-export type SpaceKey = 'welcome' | 'workbench' | 'settings'
+export type SpaceKey = 'welcome' | 'workbench' | 'market' | 'test' | 'settings'
 export type PrimarySpaceKey = Exclude<SpaceKey, 'settings'>
 export type ShellFlowKey = 'create-project' | 'export-template' | 'about'
 export type ProjectCloseDestination = 'current' | 'welcome' | 'create-project'
@@ -9,6 +9,8 @@ export type ProjectCloseDestination = 'current' | 'welcome' | 'create-project'
 export type ShellBaseLocation =
   | { space: 'welcome' }
   | { space: 'workbench' }
+  | { space: 'market' }
+  | { space: 'test' }
   | {
       space: 'settings'
       categoryKey: SettingsCategoryKey

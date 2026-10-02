@@ -25,6 +25,10 @@ export const MAX_AUTO_SAVE_INTERVAL_SECONDS = 300
 /** 缓存上限按 GiB 记：低于 1 装不下一个包，高于 32 还不如自己删缓存。 */
 export const MIN_CACHE_LIMIT_GB = 1
 export const MAX_CACHE_LIMIT_GB = 32
+export const MIN_CUSTOM_BLOCK_DEPTH = 1
+export const MAX_CUSTOM_BLOCK_DEPTH = 128
+export const MIN_CUSTOM_BLOCK_NODES = 1000
+export const MAX_CUSTOM_BLOCK_NODES = 100_000
 
 export type AppLocale = 'system' | 'zh-CN' | 'en-US'
 export type AppThemePreference = OcThemeId | 'system'
@@ -174,6 +178,8 @@ export type AppSettingKey =
   | 'exporting.openCdeWorkbookAfterExport'
   | 'cache.packageLimitGb'
   | 'cache.networkLimitGb'
+  | 'rendering.customBlockMaxDepth'
+  | 'rendering.customBlockMaxNodes'
   | 'workspace.structureTreeSelectionBehavior'
   | 'workspace.structureTreeScrollToSelection'
   | 'workspace.hideDotFiles'
@@ -230,6 +236,10 @@ export interface AppSettings {
     packageLimitGb: number
     /** 从网上取过的图片资源。 */
     networkLimitGb: number
+  }
+  rendering: {
+    customBlockMaxDepth: number
+    customBlockMaxNodes: number
   }
   workspace: {
     autoSave: boolean
@@ -328,6 +338,10 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     packageLimitGb: 2,
     networkLimitGb: 1,
   }),
+  rendering: Object.freeze({
+    customBlockMaxDepth: 32,
+    customBlockMaxNodes: 10_000,
+  }),
   workspace: Object.freeze({
     autoSave: true,
     autoSaveIntervalSeconds: 30,
@@ -350,6 +364,16 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
 function clampCacheLimitGb(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.min(MAX_CACHE_LIMIT_GB, Math.max(MIN_CACHE_LIMIT_GB, Math.round(value)))
+}
+
+function clampCustomBlockDepth(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_APP_SETTINGS.rendering.customBlockMaxDepth
+  return Math.min(MAX_CUSTOM_BLOCK_DEPTH, Math.max(MIN_CUSTOM_BLOCK_DEPTH, Math.round(value)))
+}
+
+function clampCustomBlockNodes(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_APP_SETTINGS.rendering.customBlockMaxNodes
+  return Math.min(MAX_CUSTOM_BLOCK_NODES, Math.max(MIN_CUSTOM_BLOCK_NODES, Math.round(value)))
 }
 
 function clampSidebarWidth(value: unknown): number {
@@ -763,6 +787,7 @@ export function createDefaultAppSettings(): AppSettings {
     updates: { ...DEFAULT_APP_SETTINGS.updates },
     exporting: { ...DEFAULT_APP_SETTINGS.exporting },
     cache: { ...DEFAULT_APP_SETTINGS.cache },
+    rendering: { ...DEFAULT_APP_SETTINGS.rendering },
     workspace: { ...DEFAULT_APP_SETTINGS.workspace },
     projectCreation: {
       ...DEFAULT_APP_SETTINGS.projectCreation,
@@ -785,6 +810,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
   const updates = isRecord(value.updates) ? value.updates : {}
   const exporting = isRecord(value.exporting) ? value.exporting : {}
   const cache = isRecord(value.cache) ? value.cache : {}
+  const rendering = isRecord(value.rendering) ? value.rendering : {}
   const workspace = isRecord(value.workspace) ? value.workspace : {}
   const projectCreation = isRecord(value.projectCreation) ? value.projectCreation : {}
 
@@ -881,6 +907,10 @@ export function normalizeAppSettings(value: unknown): AppSettings {
     cache: {
       packageLimitGb: clampCacheLimitGb(cache.packageLimitGb, DEFAULT_APP_SETTINGS.cache.packageLimitGb),
       networkLimitGb: clampCacheLimitGb(cache.networkLimitGb, DEFAULT_APP_SETTINGS.cache.networkLimitGb),
+    },
+    rendering: {
+      customBlockMaxDepth: clampCustomBlockDepth(rendering.customBlockMaxDepth),
+      customBlockMaxNodes: clampCustomBlockNodes(rendering.customBlockMaxNodes),
     },
     workspace: {
       autoSave: typeof workspace.autoSave === 'boolean'

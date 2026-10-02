@@ -35,6 +35,7 @@ import {
   type CardPropertyEditorInput,
   type CardPropertyFieldDefinition,
 } from '../card-properties/cardPropertyFieldDefinitions'
+import { resolveCustomBlockPublicFields, type CustomBlockSourceCatalog } from '../card-rendering/customBlockRuntime'
 
 export type { CardPropertyEditorInput, CardPropertyFieldDefinition } from '../card-properties/cardPropertyFieldDefinitions'
 
@@ -87,6 +88,7 @@ type UseCdePropertyPanelStateOptions = {
   markDocumentChanged: (mode?: CdeDocumentChangeMode, target?: string, structural?: boolean) => void
   translate: (messageKey: string) => string
   hasMessage: (messageKey: string) => boolean
+  customBlockCatalog?: CustomBlockSourceCatalog
 }
 
 export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOptions) {
@@ -159,7 +161,19 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
       ? {}
       : Object.fromEntries(Object.entries(options.selectedCard.value.data[block.id] ?? {})
         .filter(([fieldKey]) => isInstanceBlockFieldOverridable(fieldKey)))
-    return resolveNulls(block.type, { ...block, ...blockOverrides }) as Record<string, unknown> & { type?: string }
+    const record = { ...block, ...blockOverrides } as Record<string, unknown>
+    if (block.type === 'custom-block') {
+      const publicFields = resolveCustomBlockPublicFields(block, options.customBlockCatalog)
+      const source = options.customBlockCatalog?.resolve(block.source, 'project')
+      const templateRecord = source?.document.block as unknown as Record<string, unknown> | undefined
+      for (const fieldKey of Object.keys(publicFields)) {
+        if (!Object.prototype.hasOwnProperty.call(record, fieldKey)) {
+          const templateValue = templateRecord?.[fieldKey]
+          if (templateValue !== undefined) record[fieldKey] = structuredClone(templateValue)
+        }
+      }
+    }
+    return resolveNulls(block.type, record) as Record<string, unknown> & { type?: string }
   })
   const blockInputOverride = computed<Record<string, Partial<EditorPropertyDefinition>> | undefined>(() => {
     options.documentRevision.value
@@ -219,13 +233,29 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
         blockRecord,
         blockInputOverride.value,
         undefined,
-        options.selectedCardId.value === options.blueprintCardId ? new Set<string>() : new Set(['name']),
+        options.selectedCardId.value === options.blueprintCardId
+          ? new Set(Object.keys(selectedBlock.type === 'custom-block'
+            ? resolveCustomBlockPublicFields(selectedBlock, options.customBlockCatalog)
+            : {}))
+          : new Set(['name']),
       )
+      const customFields = selectedBlock.type === 'custom-block'
+        ? resolveCustomBlockPublicFields(selectedBlock, options.customBlockCatalog)
+        : {}
+      const resolvedWithCustomFields = selectedBlock.type === 'custom-block'
+        ? resolveCardPropertyFields(blockRecord, {
+            allowDelete: options.selectedCardId.value === options.blueprintCardId,
+            translate: options.translate,
+            hasMessage: options.hasMessage,
+            override: { ...customFields, ...blockInputOverride.value },
+            customKeys: new Set(Object.keys(customFields)),
+          })
+        : resolvedBlockFields
       inputs.push({
         key: selectedBlock.id,
         title: getBlockProperty<string>(selectedBlock, 'name')?.trim() || selectedBlock.id,
         record: blockRecord,
-        fields: resolvedBlockFields,
+        fields: resolvedWithCustomFields,
       })
       if (layout) {
         inputs.push({

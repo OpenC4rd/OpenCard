@@ -19,10 +19,14 @@ import {
   APP_THEME_PRESETS,
   MAX_AUTO_SAVE_INTERVAL_SECONDS,
   MAX_CACHE_LIMIT_GB,
+  MAX_CUSTOM_BLOCK_DEPTH,
+  MAX_CUSTOM_BLOCK_NODES,
   MAX_PHASE_IMAGE_SPEED,
   MAX_TITLE_BAR_NOTICE_HISTORY_LIMIT,
   MIN_AUTO_SAVE_INTERVAL_SECONDS,
   MIN_CACHE_LIMIT_GB,
+  MIN_CUSTOM_BLOCK_DEPTH,
+  MIN_CUSTOM_BLOCK_NODES,
   MIN_PHASE_IMAGE_SPEED,
   MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT,
   SETTINGS_CATEGORY_KEYS,
@@ -180,6 +184,21 @@ export function useSettingsWorkspace(
             }, settings.exporting.openCdeWorkbookAfterExport,
             options.translate('settings.descriptions.openCdeWorkbookAfterExport', 'Opens the exported CDE workbook; turn it off to only write the file.')),
           ], { icon: 'action.export' }),
+          card('rendering', options.translate('settings.cards.rendering', 'Rendering'), [
+            fieldItem('rendering.customBlockMaxDepth', {
+              title: options.translate('settings.fields.customBlockMaxDepth', 'Custom block maximum depth'),
+              fieldType: 'number', presentation: 'slider',
+              min: MIN_CUSTOM_BLOCK_DEPTH, max: MAX_CUSTOM_BLOCK_DEPTH, step: 1,
+              ticks: [1, 8, 16, 32, 64, 128],
+            }, settings.rendering.customBlockMaxDepth,
+            options.translate('settings.descriptions.customBlockLimits', 'A branch shows a placeholder when a limit is reached. Recursive references are allowed.')),
+            fieldItem('rendering.customBlockMaxNodes', {
+              title: options.translate('settings.fields.customBlockMaxNodes', 'Custom block maximum nodes'),
+              fieldType: 'number', presentation: 'slider',
+              min: MIN_CUSTOM_BLOCK_NODES, max: MAX_CUSTOM_BLOCK_NODES, step: 1000,
+              ticks: [1000, 10000, 25000, 50000, 100000],
+            }, settings.rendering.customBlockMaxNodes),
+          ], { icon: 'entity.block-custom' }),
           card('cache', options.translate('settings.cards.cache', 'Cache'), [
             fieldItem('cache.snapshots', {
               title: options.translate('settings.fields.cachePackages', 'Unpacked packages'),

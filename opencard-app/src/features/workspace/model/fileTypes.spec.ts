@@ -62,6 +62,17 @@ describe('workspace entry icon tokens', () => {
     })
   })
 
+  it('uses folder glyphs for the managed root directories', () => {
+    expect(resolveEntryIcon('D:/Cards/.opencard/packages', true, false, 'D:/Cards')).toEqual({
+      icon: 'folder.generic',
+      tone: 'folder-open',
+    })
+    expect(resolveEntryIcon('D:/Cards/.opencard/icons', true, true, 'D:/Cards')).toEqual({
+      icon: 'folder.open',
+      tone: 'folder-open',
+    })
+  })
+
   it('uses the project icon glyph for the project icon registry', () => {
     expect(resolveEntryIcon('D:/Cards/.opencard/icons/icons.json', false, false, 'D:/Cards')).toEqual({
       icon: 'file.project-icon',

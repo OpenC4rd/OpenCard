@@ -56,6 +56,7 @@ type BlockActionSet = {
   blockMore: OcNodeAction
   containerMore: OcNodeAction
   packagedContainerMore: OcNodeAction
+  exportCustomBlock: OcNodeAction
 }
 
 const BLOCK_ADD_ACTION_DEFINITIONS: readonly { key: string; type: CardBlock['type'] }[] = [
@@ -66,6 +67,7 @@ const BLOCK_ADD_ACTION_DEFINITIONS: readonly { key: string; type: CardBlock['typ
   { key: 'add-shape-block', type: 'shape-block' },
   { key: 'add-simple-container-block', type: 'simple-container-block' },
   { key: 'add-flow-container-block', type: 'flow-container-block' },
+  { key: 'add-custom-block', type: 'custom-block' },
 ]
 
 export function createBlockAddActions(translate: (messageKey: string) => string): OcNodeAction[] {
@@ -85,6 +87,7 @@ function createBlockActions(translate: (messageKey: string) => string): BlockAct
   const add = cdeNodeAction('add', 'action.add', translate('cardDesigner.treeActions.addChild'), { children: createBlockAddActions(translate) })
   const pack = cdeNodeAction('package', 'entity.block-package', translate('cardDesigner.treeActions.package'))
   const unpack = cdeNodeAction('unpackage', 'entity.block-package', translate('cardDesigner.treeActions.unpackage'))
+  const exportCustomBlock = cdeNodeAction('export-custom-block', 'entity.block-custom', translate('cardDesigner.treeActions.exportCustomBlock'))
   const more = (key: string, children: readonly OcNodeAction[]): OcNodeAction => (
     cdeNodeAction(key, 'nav.more', translate('cardDesigner.treeActions.more'), { children })
   )
@@ -101,8 +104,9 @@ function createBlockActions(translate: (messageKey: string) => string): BlockAct
     package: pack,
     unpackage: unpack,
     blockMore: more('block-more', [copyBlock, pasteBlock, rename, duplicate, remove]),
-    containerMore: more('container-more', [copyBlock, pasteBlock, rename, add, pack, duplicate, remove]),
+    containerMore: more('container-more', [copyBlock, pasteBlock, rename, add, pack, exportCustomBlock, duplicate, remove]),
     packagedContainerMore: more('packaged-container-more', [rename, unpack, duplicate, remove]),
+    exportCustomBlock,
   }
 }
 
@@ -116,6 +120,7 @@ type UseCdeTreeOpsOptions = {
   translate: (messageKey: string) => string
   refreshDocumentState: (structural?: boolean) => void
   markDocumentChanged: (mode?: CdeDocumentChangeMode, target?: string, structural?: boolean) => void
+  exportCustomBlock?: (block: CardBlock) => void
 }
 
 export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
@@ -155,8 +160,11 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
         ? (packaged ? actions.packagedContainerMore : actions.containerMore)
         : actions.blockMore
       const structureEntries: OcNodeContextEntry[] = container
-        ? (packaged ? [actions.unpackage] : [actions.add, actions.package])
+        ? (packaged ? [actions.unpackage] : [actions.add, actions.package, actions.exportCustomBlock])
         : []
+      const tail = block.type === 'custom-block'
+        ? [block.source, visibilityAction, moreAction]
+        : [visibilityAction, moreAction]
       items.set(block.id, {
         label: getBlockProperty<string>(block, 'name')?.trim() || block.id,
         visual: {
@@ -166,7 +174,7 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
         },
         renamable: true,
         draggable: true,
-        tail: [visibilityAction, moreAction],
+        tail,
         contextActions: [
           visibilityAction,
           { type: 'divider', key: 'block-edit-divider' },
@@ -321,6 +329,9 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
       case 'add-flow-container-block':
         if (targetContainer) createBlockAt(targetContainer, 'flow-container-block')
         return
+      case 'add-custom-block':
+        if (targetContainer) createBlockAt(targetContainer, 'custom-block')
+        return
       case 'duplicate':
       case 'duplicate-selected':
         if (target) duplicateBlock(target)
@@ -339,6 +350,11 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
         return
       case 'unpackage':
         if (target && isBlockContainer(target)) setBlockPackaged(target, false)
+        return
+      case 'export-custom-block':
+        if (target && (target.type === 'simple-container-block' || target.type === 'flow-container-block')) {
+          options.exportCustomBlock?.(target)
+        }
         return
     }
   }
@@ -509,6 +525,9 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
         break
       case 'flow-container-block':
         block = createBlock('flow-container-block', { name })
+        break
+      case 'custom-block':
+        block = createBlock('custom-block', { name })
         break
     }
     insertBlockAt(container, block)
