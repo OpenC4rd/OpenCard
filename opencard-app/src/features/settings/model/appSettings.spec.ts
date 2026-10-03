@@ -187,6 +187,8 @@ describe('appSettings', () => {
         fontCompositionKeys: ['body'],
         iconSeriesKeys: [],
         imagePaths: ['images/card.png'],
+        customBlockKeys: [],
+        otherPaths: [],
       },
     })
   })

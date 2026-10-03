@@ -75,6 +75,7 @@ describe('PackageManifestEditor', () => {
       'packageManifest.information',
       'packageManifest.fonts',
       'packageManifest.iconSeries',
+      'packageManifest.blocks',
     ])
     // 行用仓库统一的行控件：标签在左，值在尾部（字体是 key，图标集是计数 + key）。
     expect(wrapper.findAll('.package-manifest-editor .oc-row').map(node => node.text())).toEqual([

@@ -45,12 +45,14 @@ describe('projectStructureService', () => {
     expect(entries.get('D:/Cards/.opencard/packages')).toBe('directory')
     expect(entries.get('D:/Cards/.opencard/project.json')).toBe('file')
     expect([...writes.keys()].sort()).toEqual([
+      'D:/Cards/.opencard-init-test/blocks/blocks.json',
       'D:/Cards/.opencard-init-test/fonts/fonts.json',
       'D:/Cards/.opencard-init-test/icons/icons.json',
       'D:/Cards/.opencard-init-test/locale.json',
       'D:/Cards/.opencard-init-test/project.json',
     ])
     expect(writes.get('D:/Cards/.opencard-init-test/project.json')).toBe('{}\n')
+    expect(writes.get('D:/Cards/.opencard-init-test/blocks/blocks.json')).toBe('{}\n')
   })
 
   it('repairs missing managed entries without overwriting existing files', async () => {

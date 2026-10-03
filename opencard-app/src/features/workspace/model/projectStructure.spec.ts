@@ -25,6 +25,7 @@ describe('projectStructure', () => {
       '.opencard/locale.json',
       '.opencard/fonts',
       '.opencard/icons',
+      '.opencard/blocks',
       '.opencard/packages',
     ])
   })

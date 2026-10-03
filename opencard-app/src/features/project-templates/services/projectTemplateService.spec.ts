@@ -591,6 +591,8 @@ describe('ProjectTemplateService project creation', () => {
     expect(fs.allPaths().filter(path => path.startsWith('/projects/Empty'))).toEqual([
       '/projects/Empty',
       '/projects/Empty/.opencard',
+      '/projects/Empty/.opencard/blocks',
+      '/projects/Empty/.opencard/blocks/blocks.json',
       '/projects/Empty/.opencard/fonts',
       '/projects/Empty/.opencard/fonts/fonts.json',
       '/projects/Empty/.opencard/icons',
