@@ -5,6 +5,9 @@ import OcButton from '../../../components/base/OcButton.vue';
 import OcActionMenu, { isActionMenuBranchEvent } from '../../../components/standard/OcActionMenu.vue';
 import { actionAccessibleLabel, formatActionBadge, hasActionBadge } from '../../../components/standard/actionBadge';
 import OcFloatingLayer from '../../../components/standard/OcFloatingLayer.vue';
+import OcPhaseImage from '../../../components/standard/OcPhaseImage.vue';
+import wordmarkBrightness from '../../../assets/opencard-wordmark-brightness-map.png';
+import wordmarkPhase from '../../../assets/opencard-wordmark-phase-map.png';
 import AppearanceShaderPreview from '../../settings/components/AppearanceShaderPreview.vue';
 import ShellTitleBarNotice from './ShellTitleBarNotice.vue';
 import { titleBarNotices } from '../../notifications/titlebarNotices';
@@ -18,7 +21,6 @@ import type {
 const props = defineProps<{
   collapsed: boolean;
   brandLabel: string;
-  brandLogoSrc?: string;
   menuGroups: ShellTitleBarMenuGroup[];
   appActions?: ShellTitleBarAppAction[];
   tasks?: readonly ShellProgressTask[];
@@ -261,7 +263,17 @@ onBeforeUnmount(() => {
         @focusout="scheduleTaskPanelClose"
         @keydown.esc="closeTaskPanel"
       >
-        <span class="titlebar-brand">{{ props.brandLabel }}</span>
+        <OcPhaseImage
+          v-if="!props.tasks?.length"
+          class="titlebar-brand-wordmark"
+          :src="wordmarkPhase"
+          :brightness-src="wordmarkBrightness"
+          fit="contain"
+          alt="OpenCard"
+          :duration-ms="12_000"
+          direction="reverse"
+        />
+        <span v-else class="titlebar-brand">{{ props.brandLabel }}</span>
       </div>
     </div>
 

@@ -123,7 +123,7 @@ const treeData = computed<OcNodeCollection>(() => {
       tail: [{
         key: TOGGLE_FAMILY_ACTION_KEY,
         icon: selected ? 'action.checkbox-marked' : 'action.checkbox-blank',
-        iconTone: selected ? 'primary' : 'muted',
+        iconTone: selected ? 'accent' : 'muted',
         title: selected ? t('projectConfig.fonts.systemFontDeselect') : t('projectConfig.fonts.systemFontSelect'),
       }],
     })

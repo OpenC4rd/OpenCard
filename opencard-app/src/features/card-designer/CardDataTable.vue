@@ -41,7 +41,7 @@
                   size="sm"
                   variant="ghost"
                   :icon="column.exported ? 'status.eye' : 'status.eye-off'"
-                  :icon-tone="column.exported ? 'primary' : 'muted'"
+                  :icon-tone="column.exported ? 'accent' : 'muted'"
                   :data-tooltip="column.exported
                     ? t('cardDesigner.dataTable.excludeInstanceFromExport')
                     : t('cardDesigner.dataTable.includeInstanceInExport')"

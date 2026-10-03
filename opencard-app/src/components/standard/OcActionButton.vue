@@ -1,4 +1,4 @@
-<!-- Base action button: icon action with optional hover/focus cascading children. -->
+<!-- Base action button: top-level children open on click/focus; nested menu items own hover behavior. -->
 <template>
   <div
     ref="rootRef"
@@ -9,7 +9,6 @@
       'has-children': hasActionChildren(action),
     }"
     v-bind="$attrs"
-    @pointerenter="openMenu"
     @pointerleave="scheduleCloseMenu"
     @focusin="openMenu"
     @focusout="scheduleCloseMenu"
@@ -224,5 +223,14 @@ function hasActionChildren(
   z-index: 1;
   top: calc(-1 * var(--oc-space-1));
   right: calc(-1 * var(--oc-space-1));
+}
+
+.oc-action-button .oc-button__icon {
+  transform-origin: center;
+  transition: transform var(--oc-duration-fast) var(--oc-ease);
+}
+
+.oc-action-button.is-menu-open .oc-button__icon {
+  transform: rotate(45deg);
 }
 </style>

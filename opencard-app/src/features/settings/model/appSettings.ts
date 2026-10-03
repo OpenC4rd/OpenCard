@@ -1,7 +1,10 @@
 /** Versioned application settings contract and normalization boundary. */
+import { isValidAppLocaleId, type AppLocale } from '../../../i18n/appLocale'
 import { normalizeKeySlug, toKeySlug } from '../../../shared/model/keySlug'
 import { isRecord } from '../../../shared/model/record'
 import {
+  clampBaseFontSize,
+  DEFAULT_BASE_FONT_SIZE,
   OC_EDITABLE_THEME_COLOR_KEYS,
   OC_THEME_REGISTRY,
   type OcEditableThemeColorKey,
@@ -14,8 +17,6 @@ export const MIN_SIDEBAR_WIDTH = 220
 export const MAX_SIDEBAR_WIDTH = 420
 export const MAX_RECENT_PROJECTS = 8
 export const DEFAULT_ACCENT_NEIGHBOR_ANGLE = -50
-export const MIN_BASE_FONT_SIZE = 10
-export const MAX_BASE_FONT_SIZE = 16
 export const MIN_PHASE_IMAGE_SPEED = 25
 export const MAX_PHASE_IMAGE_SPEED = 400
 export const MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT = 1
@@ -30,7 +31,8 @@ export const MAX_CUSTOM_BLOCK_DEPTH = 128
 export const MIN_CUSTOM_BLOCK_NODES = 1000
 export const MAX_CUSTOM_BLOCK_NODES = 100_000
 
-export type AppLocale = 'system' | 'zh-CN' | 'en-US'
+/** `system`、内置语言 id，或用户语言文件名（`<名字>.json`）；规则见 `i18n/appLocale.ts`。 */
+export type { AppLocale }
 export type AppThemePreference = OcThemeId | 'system'
 export type StructureTreeSelectionBehavior = 'none' | 'expand' | 'expand-exclusive'
 export type SettingsCategoryKey = 'general' | 'appearance' | 'workspace' | 'versionControl'
@@ -78,7 +80,9 @@ export type ProjectPackageBuilderState = {
   fontFamilyKeys: string[]
   fontCompositionKeys: string[]
   iconSeriesKeys: string[]
+  customBlockKeys?: string[]
   imagePaths: string[]
+  otherPaths?: string[]
 }
 
 export type ProjectWorkspaceState = {
@@ -293,6 +297,8 @@ export type SettingsIntent =
   | { type: 'theme.copy' | 'theme.read'; themeId: OcThemeId }
   | { type: 'theme-name.change'; themeId: OcThemeId; name: string }
   | { type: 'identity.regenerate' }
+  | { type: 'locale.refresh' }
+  | { type: 'locale-folder.open' }
   | {
       type: 'project-workspace.reset'
     }
@@ -311,7 +317,7 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     theme: 'system',
     locale: 'system',
     glassIntensity: 60,
-    baseFontSize: 12,
+    baseFontSize: DEFAULT_BASE_FONT_SIZE,
     phaseImageSpeed: 100,
     micaBackground: false,
     themeOverrides: Object.freeze({ dark: Object.freeze({}), light: Object.freeze({}) }),
@@ -455,13 +461,6 @@ function normalizeRecentProjects(value: unknown): string[] {
     if (result.length >= MAX_RECENT_PROJECTS) break
   }
   return result
-}
-
-function clampBaseFontSize(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return DEFAULT_APP_SETTINGS.appearance.baseFontSize
-  }
-  return Math.min(MAX_BASE_FONT_SIZE, Math.max(MIN_BASE_FONT_SIZE, Math.round(value)))
 }
 
 function clampPhaseImageSpeed(value: unknown): number {
@@ -722,7 +721,9 @@ function normalizePackageBuilderState(value: unknown): ProjectPackageBuilderStat
     fontFamilyKeys: normalizeTextList(value.fontFamilyKeys),
     fontCompositionKeys: normalizeTextList(value.fontCompositionKeys),
     iconSeriesKeys: normalizeTextList(value.iconSeriesKeys),
+    customBlockKeys: normalizeTextList(value.customBlockKeys),
     imagePaths: normalizeTextList(value.imagePaths),
+    otherPaths: normalizeTextList(value.otherPaths),
   }
 }
 
@@ -863,9 +864,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       theme: appearance.theme === 'system' || appearance.theme === 'light' || appearance.theme === 'dark'
         ? appearance.theme
         : DEFAULT_APP_SETTINGS.appearance.theme,
-      locale: appearance.locale === 'system'
-        || appearance.locale === 'zh-CN'
-        || appearance.locale === 'en-US'
+      locale: appearance.locale === 'system' || isValidAppLocaleId(appearance.locale)
         ? appearance.locale
         : DEFAULT_APP_SETTINGS.appearance.locale,
       glassIntensity: clampPercentage(

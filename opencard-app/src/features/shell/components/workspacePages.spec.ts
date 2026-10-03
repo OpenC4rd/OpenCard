@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest'
 import enUS from '../../../locales/en-US'
 import OcPhaseImage from '../../../components/standard/OcPhaseImage.vue'
 import WorkbenchWorkspace from './WorkbenchWorkspace.vue'
-import OcSwitch from '../../../components/base/OcSwitch.vue'
 import WelcomeCoverWall from './WelcomeCoverWall.vue'
 import WelcomeGravityField from './WelcomeGravityField.vue'
 import WelcomeWorkspace from './WelcomeWorkspace.vue'
@@ -36,28 +35,30 @@ describe('workspace pages', () => {
     expect(wrapper.text()).not.toContain('No editors open')
 
     const buttons = wrapper.findAll('button')
-    expect(buttons).toHaveLength(2)
+    // 两个入口按钮，外加左下角控制背景显隐的图标按钮。
+    expect(buttons).toHaveLength(3)
     await buttons[0]?.trigger('click')
     await buttons[1]?.trigger('click')
     expect(wrapper.emitted('new-project')).toHaveLength(1)
     expect(wrapper.emitted('open-project')).toHaveLength(1)
   })
 
-  it('gates the cover wall and the gravity background from the bottom-left switch', async () => {
+  it('gates the cover wall and the gravity background from the bottom-left toggle', async () => {
     const wrapper = mount(WelcomeWorkspace, {
       props: { backgroundVisible: true },
       ...mountOptions(),
     })
 
-    const toggle = wrapper.getComponent(OcSwitch)
-    expect(toggle.props('checked')).toBe(true)
-    // The caller renders the label itself (so it can carry the cover-wall text shadow), not via prop.
-    expect(toggle.text()).toContain('Background effects')
+    const toggle = wrapper.get('.workspace-empty-state__wall-toggle')
+    expect(toggle.element.tagName).toBe('BUTTON')
+    // 图标按钮没有可见文字，可访问名字与提示都由调用方给出。
+    expect(toggle.attributes('aria-label')).toBe('Background effects')
+    expect(toggle.attributes('data-tooltip')).toBe('Background effects')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
     expect(wrapper.findComponent(WelcomeCoverWall).exists()).toBe(true)
     expect(wrapper.findComponent(WelcomeGravityField).exists()).toBe(true)
 
-    toggle.vm.$emit('update:checked', false)
-    await wrapper.vm.$nextTick()
+    await toggle.trigger('click')
     expect(wrapper.emitted('update:backgroundVisible')).toEqual([[false]])
   })
 
@@ -69,7 +70,7 @@ describe('workspace pages', () => {
 
     expect(wrapper.findComponent(WelcomeCoverWall).exists()).toBe(false)
     expect(wrapper.findComponent(WelcomeGravityField).exists()).toBe(false)
-    expect(wrapper.getComponent(OcSwitch).props('checked')).toBe(false)
+    expect(wrapper.get('.workspace-empty-state__wall-toggle').attributes('aria-pressed')).toBe('false')
     expect(wrapper.findAll('.workspace-empty-state__actions button')).toHaveLength(2)
   })
 

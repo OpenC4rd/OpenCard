@@ -1,3 +1,4 @@
+import { clampBaseFontSize } from './baseFontSize'
 import { DEFAULT_OC_THEME, OC_THEME_REGISTRY } from './themes'
 import { prefersReducedMotion } from './prefersReducedMotion'
 import {
@@ -181,7 +182,7 @@ export function resolveOcThemeTokens(
     if (value && parseHex(value)) tokens[token] = value
   }
 
-  const baseFontSize = Math.min(16, Math.max(10, Math.round(typography.baseFontSize ?? 12)))
+  const baseFontSize = clampBaseFontSize(typography.baseFontSize)
   tokens['--oc-font-sans'] = resolveFontStack(typography.fontFamily, tokens['--oc-font-sans'])
   tokens['--oc-text-xs'] = `${baseFontSize - 2}px`
   tokens['--oc-text-sm'] = `${baseFontSize - 1}px`

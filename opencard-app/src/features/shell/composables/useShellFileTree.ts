@@ -12,6 +12,8 @@ import {
   PROJECT_FONT_REGISTRY_FILE_NAME,
   PROJECT_ICON_DIRECTORY,
   PROJECT_ICON_REGISTRY_FILE_NAME,
+  PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
+  PROJECT_CUSTOM_BLOCK_DIRECTORY,
   PROJECT_INTERNAL_DIRECTORY_NAME,
   PROJECT_PROFILE_FILE_NAME,
   PROJECT_PACKAGE_DIRECTORY,
@@ -39,6 +41,7 @@ const PROJECT_MANAGEMENT_ENTRIES: readonly ProjectManagementEntry[] = [
   { path: PROJECT_DICTIONARY_FILE_NAME, labelKey: 'fileTypes.opencardDictionary' },
   { path: PROJECT_FONT_REGISTRY_FILE_NAME, labelKey: 'fileTypes.opencardFontRegistry', assetDirectory: PROJECT_FONT_DIRECTORY },
   { path: PROJECT_ICON_REGISTRY_FILE_NAME, labelKey: 'fileTypes.opencardIconRegistry', assetDirectory: PROJECT_ICON_DIRECTORY },
+  { path: PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, labelKey: 'fileTypes.opencardCustomBlockRegistry', assetDirectory: PROJECT_CUSTOM_BLOCK_DIRECTORY },
   {
     path: `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`,
     labelKey: 'fileTypes.opencardResourcePackage',
@@ -240,7 +243,7 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
     const rootKeys = PROJECT_MANAGEMENT_ENTRIES.map((entry) => {
       const key = normalizeShellPath(`${options.projectPath.value}/${entry.path}`)
       const presentation = entry.packageDirectory
-        ? { icon: 'file.package' as IconToken, tone: 'config' as const }
+        ? { icon: 'file.package' as IconToken, tone: 'file-config' as const }
         : resolveEntryIcon(key, false, false, options.projectPath.value)
       items.set(key, {
         label: options.translate(entry.labelKey),
@@ -358,6 +361,7 @@ export function useShellFileTree(options: UseShellFileTreeOptions) {
       const visual = resolveSessionVisual(session)
       items.set(session.id, {
         label: options.formatSessionTitle(session),
+        loading: session.presentation === undefined,
         visual: { type: 'icon', icon: visual.icon, iconTone: visual.tone },
         tail: [closeAction],
         contextActions: [closeAction],

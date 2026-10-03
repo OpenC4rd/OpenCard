@@ -54,6 +54,14 @@ pub struct ResourcePackageBuildPublicIconSeries {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ResourcePackageBuildPublicBlock {
+    pub key: String,
+    pub title: String,
+    pub source: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResourcePackageBuildRequest {
     pub output_path: String,
     /// 身份：作者与包名都是小写 slug，版本是精确 semver。它由打包界面填，
@@ -74,6 +82,8 @@ pub struct ResourcePackageBuildRequest {
     pub public_fonts: Vec<ResourcePackageBuildPublicFont>,
     #[serde(default)]
     pub public_icon_series: Vec<ResourcePackageBuildPublicIconSeries>,
+    #[serde(default)]
+    pub public_blocks: Vec<ResourcePackageBuildPublicBlock>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -131,6 +141,10 @@ fn build_manifest(request: &ResourcePackageBuildRequest) -> serde_json::Value {
             "iconSeries": request.public_icon_series
                 .iter()
                 .map(|series| serde_json::json!({ "key": series.key, "title": series.title, "count": series.count }))
+                .collect::<Vec<_>>(),
+            "blocks": request.public_blocks
+                .iter()
+                .map(|block| serde_json::json!({ "key": block.key, "title": block.title, "source": block.source }))
                 .collect::<Vec<_>>(),
         },
     });

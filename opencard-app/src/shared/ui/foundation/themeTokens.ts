@@ -118,7 +118,6 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-icon-file-image',
   '--oc-icon-file-config',
   '--oc-icon-folder',
-  '--oc-icon-folder-open',
 
   // 块类型图标色
   '--oc-icon-block-text',

@@ -21,6 +21,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { resolveFileType } from '../model/fileTypes'
 import { resolveResourcePath, type PackageScopeRoots } from '../model/scopedResourcePath'
 import type { ProjectIcon } from '../model/projectIcons'
+import { PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME } from '../model/projectStructure'
+import { parseCustomBlockRegistryText, serializeCustomBlockRegistry, type CustomBlockRegistryEntry } from '../model/customBlockRegistry'
+import type { ResourcePackagePublicBlock } from '../model/resourcePackage'
 
 export type ResourcePackageProjectBuildOptions = {
   fs: Pick<FileSystemService, 'readFile' | 'fileExists'>
@@ -42,6 +45,8 @@ export type ResourcePackageProjectBuildOptions = {
   iconSelection?: {
     seriesKeys: readonly string[]
   }
+  blockSelection?: { keys: readonly string[] }
+  otherSelection?: { paths: readonly string[] }
   outputPath: string
 }
 
@@ -81,6 +86,37 @@ export type ResourcePackageProjectBuildResult = {
   fingerprint: string
 }
 
+type ResourcePackageBlockProjection = {
+  document: { blocks: readonly CustomBlockRegistryEntry[] } | null
+  files: readonly ResourcePackagePlannedFile[]
+  publicBlocks: readonly ResourcePackagePublicBlock[]
+}
+
+async function buildBlockProjection(options: ResourcePackageProjectBuildOptions, root: string): Promise<ResourcePackageBlockProjection> {
+  const selected = selectedIdentities(options.blockSelection?.keys ?? [])
+  if (!selected.size) return { document: null, files: [], publicBlocks: [] }
+  const registryPath = `${root}/${PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME}`
+  if (!await options.fs.fileExists(registryPath)) throw new Error('Project custom block registry is missing')
+  const source = parseCustomBlockRegistryText(await options.fs.readFile(registryPath))
+  if (!source) throw new Error('Project custom block registry is invalid')
+  const entries = (source.blocks ?? []).filter(entry => selected.has(entry.key.toLocaleLowerCase()))
+  if (entries.length !== selected.size) throw new Error('Selected project custom block is unavailable')
+  const files = new Map<string, ResourcePackagePlannedFile>()
+  const projected: CustomBlockRegistryEntry[] = []
+  for (const entry of entries) {
+    const resolved = resolveBundledResource(options, root, entry.source)
+    if (!resolved.ok) throw new Error(`Project custom block path is invalid: ${entry.source}`)
+    if (!await options.fs.fileExists(resolved.value)) throw new Error(`Project custom block file is missing: ${entry.source}`)
+    const archivePath = archivedReferencePath(entry.source)
+    projected.push({ ...entry, source: archivePath })
+    if (!files.has(archivePath.toLocaleLowerCase())) files.set(archivePath.toLocaleLowerCase(), plannedFile(resolved.value, archivePath))
+  }
+  return {
+    document: { blocks: projected }, files: [...files.values()],
+    publicBlocks: projected.map(entry => ({ key: entry.key, title: entry.name, source: entry.source })),
+  }
+}
+
 export type ResourcePackageBuildRequest = {
   outputPath: string
   author: string
@@ -92,6 +128,7 @@ export type ResourcePackageBuildRequest = {
   texts: readonly { archivePath: string, text: string }[]
   publicFonts: readonly ResourcePackagePublicFont[]
   publicIconSeries: readonly ResourcePackagePublicIconSeries[]
+  publicBlocks: readonly ResourcePackagePublicBlock[]
 }
 
 /**
@@ -150,6 +187,22 @@ function selectedImages(root: string, paths: readonly string[]): { absolutePath:
     const image = resolveSelectedImage(root, path)
     const identity = image.relativePath.toLocaleLowerCase()
     if (!result.has(identity)) result.set(identity, image)
+  }
+  return [...result.values()]
+}
+
+function selectedOtherFiles(root: string, paths: readonly string[]): { absolutePath: string, relativePath: string }[] {
+  const result = new Map<string, { absolutePath: string, relativePath: string }>()
+  for (const value of paths) {
+    const relativePath = value.trim().replace(/\\/g, '/')
+    const lower = relativePath.toLocaleLowerCase()
+    const segments = relativePath.split('/')
+    if (!relativePath || lower.startsWith('.opencard/') || lower === '.opencard' || lower.startsWith('.git/') || lower === '.git'
+      || segments.some(segment => !segment || segment === '.' || segment === '..')) {
+      throw new Error(`Selected project file is internal or unsafe: ${value}`)
+    }
+    const absolutePath = `${root}/${relativePath}`
+    if (!result.has(lower)) result.set(lower, { absolutePath, relativePath })
   }
   return [...result.values()]
 }
@@ -312,17 +365,24 @@ export async function buildResourcePackageFromProject(
   const root = options.projectRootPath.replace(/\\/g, '/').replace(/[\\/]+$/, '')
   if (!root) throw new Error('Project root path is required')
   const images = selectedImages(root, options.imageSelection?.paths ?? [])
+  const otherFiles = selectedOtherFiles(root, options.otherSelection?.paths ?? [])
   const fontProjection = await buildFontProjection(options, root)
   const iconProjection = await buildIconProjection(options, root)
-  if (images.length === 0 && !fontProjection.document && !iconProjection.document) {
+  const blockProjection = await buildBlockProjection(options, root)
+  if (images.length === 0 && otherFiles.length === 0 && !fontProjection.document && !iconProjection.document && !blockProjection.document) {
     throw new Error('Select at least one resource')
   }
   const files: ResourcePackagePlannedFile[] = [...fontProjection.files, ...iconProjection.files]
+  files.push(...blockProjection.files)
   for (const image of images) {
     if (!await options.fs.fileExists(image.absolutePath)) {
       throw new Error(`Selected project image is missing: ${image.relativePath}`)
     }
     files.push(plannedFile(image.absolutePath, image.relativePath))
+  }
+  for (const file of otherFiles) {
+    if (!await options.fs.fileExists(file.absolutePath)) throw new Error(`Selected project file is missing: ${file.relativePath}`)
+    files.push(plannedFile(file.absolutePath, file.relativePath))
   }
   const cover = await buildCoverProjection(options, root)
   if (cover && !files.some(file => file.archivePath.toLocaleLowerCase() === cover.toLocaleLowerCase())) {
@@ -334,6 +394,9 @@ export async function buildResourcePackageFromProject(
   }
   if (iconProjection.document) {
     texts.push({ archivePath: PROJECT_ICON_REGISTRY_FILE_NAME, text: serializeProjectIconRegistry(iconProjection.document) })
+  }
+  if (blockProjection.document) {
+    texts.push({ archivePath: PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, text: serializeCustomBlockRegistry(blockProjection.document) })
   }
   const localePath = `${root}/.opencard/locale.json`
   if (await options.fs.fileExists(localePath)) {
@@ -351,6 +414,7 @@ export async function buildResourcePackageFromProject(
     texts,
     publicFonts: fontProjection.publicFonts,
     publicIconSeries: iconProjection.publicIconSeries,
+    publicBlocks: blockProjection.publicBlocks,
   }
   return await invoke<ResourcePackageProjectBuildResult>('build_resource_package', { request })
 }

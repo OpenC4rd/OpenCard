@@ -1,7 +1,7 @@
 /**
  * 安全内联标记协议：只解析应用文案允许的扁平标记，其他输入保持原文。
  */
-import { iconGlyphs, type IconToken } from '../icon/iconRegistry'
+import { isIconToken, type IconToken } from '../icon/iconRegistry'
 
 export type InlineMarkupNode =
   | { type: 'text'; value: string }
@@ -13,10 +13,6 @@ export type InlineMarkupNode =
   | { type: 'icon'; reference: IconToken }
 
 const INLINE_MARKUP_PATTERN = /\[icon:([^\]\r\n]+)\]|\[(b|i|code|key)\]([^\[\]\r\n]+)\[\/\2\]|\[br\]/gi
-
-function isIconToken(value: string): value is IconToken {
-  return Object.prototype.hasOwnProperty.call(iconGlyphs, value)
-}
 
 export function parseInlineMarkup(source: string): readonly InlineMarkupNode[] {
   const nodes: InlineMarkupNode[] = []

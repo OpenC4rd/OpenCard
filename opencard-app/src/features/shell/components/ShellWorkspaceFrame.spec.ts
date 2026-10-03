@@ -20,6 +20,16 @@ describe('ShellWorkspaceFrame', () => {
     expect(wrapper.find('.workspace-bottom-panel').exists()).toBe(false)
   })
 
+  it('keeps the workspace title space while the title is loading', () => {
+    const wrapper = mount(ShellWorkspaceFrame, {
+      props: { title: '', titleLoading: true, actions: [] },
+    })
+
+    expect(wrapper.get('[aria-busy="true"]')).toBeTruthy()
+    expect(wrapper.find('.oc-skeleton').exists()).toBe(true)
+    expect(wrapper.get('.workspace-title').text()).toBe('')
+  })
+
   it('renders workspace actions and emits their key to the Shell owner', async () => {
     const wrapper = mount(ShellWorkspaceFrame, {
       props: {

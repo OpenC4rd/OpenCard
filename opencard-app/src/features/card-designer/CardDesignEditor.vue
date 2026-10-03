@@ -1247,7 +1247,7 @@ const selectionCommandActions = computed<OcActionDefinition[]>(() => {
     actions.push(...FLOW_DIRECTION_ACTIONS.map(action => ({
       key: action.key,
       icon: action.icon,
-      iconTone: block.direction === action.direction ? 'primary' : 'default',
+      iconTone: block.direction === action.direction ? 'accent' : 'default',
       title: t(`cardDesigner.selectionActions.${action.titleKey}`),
     } satisfies OcActionDefinition)))
   }

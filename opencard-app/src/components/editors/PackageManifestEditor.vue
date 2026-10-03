@@ -48,6 +48,19 @@
           </template>
         </OcRow>
       </OcCard>
+
+      <OcCard :title="t('packageManifest.blocks')" icon="entity.block-custom">
+        <OcEmpty v-if="!(manifest.public.blocks?.length)" tone="muted" inset="compact">
+          {{ t('packageManifest.noBlocks') }}
+        </OcEmpty>
+        <OcRow v-for="block in manifest.public.blocks ?? []" :key="block.key">
+          <template #title>{{ block.title }}</template>
+          <template #append>
+            <OcText tone="muted" size="sm">{{ block.source }}</OcText>
+            <OcText size="sm" mono>{{ block.key }}</OcText>
+          </template>
+        </OcRow>
+      </OcCard>
     </div>
   </ProjectRegistryEditorShell>
 </template>

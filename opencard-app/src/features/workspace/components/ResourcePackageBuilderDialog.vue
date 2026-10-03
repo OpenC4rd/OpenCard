@@ -27,7 +27,7 @@
               <OcText id="resource-package-summary-title" as="h3" size="sm">{{ t('resourcePackage.packagePreview') }}</OcText>
               <OcText size="xs" tone="muted">{{ t('resourcePackage.packagePreviewDescription') }}</OcText>
             </div>
-            <OcIcon name="file.package" size="lg" tone="opencard" />
+            <OcIcon name="file.package" size="lg" tone="file-opencard" />
           </div>
           <div class="resource-package-builder__fields">
             <label>
@@ -89,7 +89,7 @@ import OcPanel from '../../../components/base/OcPanel.vue'
 import OcText from '../../../components/base/OcText.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcTree from '../../../components/standard/OcTree.vue'
-import { resolveFileType } from '../model/fileTypes'
+import { resolveEntryIcon } from '../model/fileTypes'
 import { formatPackageCoordinate, parsePackageCoordinate } from '../model/packageCoordinate'
 import { toKeySlug } from '../../../shared/model/keySlug'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
@@ -127,7 +127,7 @@ const version = ref('1.0.0')
 const selectedFamilyKeys = ref<Set<string>>(new Set())
 const selectedCompositionKeys = ref<Set<string>>(new Set())
 const selectedIconSeriesKeys = ref<Set<string>>(new Set())
-const selectedImageIds = ref<Set<string>>(new Set())
+const selectedCustomBlockKeys = ref<Set<string>>(new Set())
 const busy = ref(false)
 const errorText = ref('')
 const projectCover = ref<ProjectCover | null>(null)
@@ -147,10 +147,11 @@ type PackageBuildRequest = {
   name: string
   title: string
   version: string
-  imagePaths: readonly string[]
   familyKeys: readonly string[]
   compositionKeys: readonly string[]
   iconSeriesKeys: readonly string[]
+  customBlockKeys: readonly string[]
+  otherPaths: readonly string[]
 }
 
 type PackageCandidate = {
@@ -186,25 +187,19 @@ function restoreSelection(available: readonly string[], cached: readonly string[
   return next
 }
 
-/** Image selection ids are the project-relative paths the package stores, so the cache can be reused directly. */
-const IMAGE_SELECTION_PREFIX = 'image:'
-const imageSelectionId = (imagePath: string): string => `${IMAGE_SELECTION_PREFIX}${imagePath}`
-
-const imageCandidates = computed<readonly PackageCandidate[]>(() => [
+const otherCandidates = computed<readonly PackageCandidate[]>(() => [
   ...props.entries.map(projectRelativePath)
     .filter((relative): relative is string => Boolean(relative))
     .filter(relative => {
       const lower = relative.toLocaleLowerCase()
-      return resolveFileType(relative, props.projectRootPath).id === 'image'
-        && !lower.startsWith('.git/') && lower !== '.git'
+      const hasHiddenPart = relative.split('/').some(part => part.startsWith('.') && part.length > 1)
+      return !lower.startsWith('.git/') && lower !== '.git'
         && !lower.startsWith('.opencard/')
+        && (!(appSettingsStore.settings.value.workspace?.hideDotFiles ?? true) || !hasHiddenPart)
     })
-    .map(relative => ({
-      id: imageSelectionId(relative),
-      label: relative.split('/').pop() ?? relative,
-      detail: relative,
-    })),
+    .map(relative => ({ id: `file:${relative}`, label: relative.split('/').pop() ?? relative, detail: relative })),
 ])
+const selectedOtherPaths = ref<Set<string>>(new Set())
 const expandedKeys = computed(() => [...expandedKeySet.value])
 const expandedKeySet = ref<Set<string>>(new Set())
 const packageCoordinate = computed(() => {
@@ -213,7 +208,8 @@ const packageCoordinate = computed(() => {
 })
 const selectedCount = computed(() => selectedFamilyKeys.value.size
   + selectedCompositionKeys.value.size + selectedIconSeriesKeys.value.size
-  + selectedImageIds.value.size)
+  + selectedCustomBlockKeys.value.size
+  + selectedOtherPaths.value.size)
 const canBuild = computed(() => Boolean(packageCoordinate.value && selectedCount.value > 0))
 
 /** 包摘要只列数量：具体带了哪些在左边那棵树里看得见。 */
@@ -221,7 +217,8 @@ const contentSummary = computed<readonly { label: string, value: string }[]>(() 
   { label: t('resourcePackage.projectFonts'), count: selectedFamilyKeys.value.size },
   { label: t('resourcePackage.fontCompositions'), count: selectedCompositionKeys.value.size },
   { label: t('resourcePackage.icons'), count: selectedIconSeriesKeys.value.size },
-  { label: t('resourcePackage.images'), count: selectedImageIds.value.size },
+  { label: t('resourcePackage.customBlocks'), count: selectedCustomBlockKeys.value.size },
+  { label: t('resourcePackage.otherFiles'), count: selectedOtherPaths.value.size },
 ].filter(row => row.count > 0).map(row => ({ label: row.label, value: String(row.count) })))
 
 const treeData = computed<OcNodeCollection>(() => {
@@ -237,13 +234,13 @@ const treeData = computed<OcNodeCollection>(() => {
   }
   const families = projectStore.projectFontFamilies.value
   const compositions = projectStore.projectFontCompositions.value
-  if (families.length > 0 || compositions.length > 0) {
+  {
     const categoryKey = 'category:fonts'
     const familyGroupKey = 'font-group:families'
     const compositionGroupKey = 'font-group:compositions'
     rootKeys.push(categoryKey)
     items.set(categoryKey, {
-      label: t('resourcePackage.fonts'), visual: { type: 'icon', icon: 'file.font', iconTone: 'config' },
+      label: t('resourcePackage.fonts'), visual: { type: 'icon', icon: 'file.font', iconTone: 'file-config' },
     })
     items.set(familyGroupKey, {
       label: t('resourcePackage.projectFonts'), visual: { type: 'icon', icon: 'file.font' },
@@ -278,7 +275,7 @@ const treeData = computed<OcNodeCollection>(() => {
     const categoryKey = 'category:icons'
     rootKeys.push(categoryKey)
     items.set(categoryKey, {
-      label: t('resourcePackage.icons'), visual: { type: 'icon', icon: 'file.project-icon', iconTone: 'config' },
+      label: t('resourcePackage.icons'), visual: { type: 'icon', icon: 'file.project-icon', iconTone: 'file-config' },
     })
     children.set(categoryKey, iconSeries.map(series => {
       const key = `icon-series:${series.key}`
@@ -291,29 +288,42 @@ const treeData = computed<OcNodeCollection>(() => {
       return key
     }))
   }
-  if (imageCandidates.value.length > 0) {
-    const categoryKey = 'category:images'
+  const customBlocks = Object.values(projectStore.projectCustomBlockRegistry?.value ?? {})
+  {
+    const categoryKey = 'category:custom-blocks'
     rootKeys.push(categoryKey)
-    items.set(categoryKey, {
-      label: t('resourcePackage.images'), visual: { type: 'icon', icon: 'file.image', iconTone: 'config' },
-    })
-    for (const entry of imageCandidates.value) {
+    items.set(categoryKey, { label: t('resourcePackage.customBlocks'), visual: { type: 'icon', icon: 'entity.block-custom', iconTone: 'file-config' } })
+    children.set(categoryKey, customBlocks.map(block => {
+      const key = `custom-block:${block.key}`
+      const selected = selectedCustomBlockKeys.value.has(block.key)
+      items.set(key, {
+        label: block.name, tail: [block.key, ...toggleSelection(selected)],
+        visual: { type: 'icon', icon: 'entity.block-custom', iconTone: selected ? 'active' : 'muted' },
+        contextActions: toggleSelection(selected),
+      })
+      return key
+    }))
+  }
+  {
+    const categoryKey = 'category:other-files'
+    rootKeys.push(categoryKey)
+    items.set(categoryKey, { label: t('resourcePackage.otherFiles'), visual: { type: 'icon', icon: 'file.generic', iconTone: 'file-config' } })
+    for (const entry of otherCandidates.value) {
       const segments = (entry.detail ?? entry.label).split('/')
       let parentKey = categoryKey
       let folderPath = ''
       for (const segment of segments.slice(0, -1)) {
         folderPath = folderPath ? `${folderPath}/${segment}` : segment
-        const folderKey = `folder:images:${folderPath}`
-        if (!items.has(folderKey)) {
-          items.set(folderKey, { label: segment, visual: { type: 'icon', icon: 'folder.generic', iconTone: 'muted' } })
-        }
+        const folderKey = `folder:other-files:${folderPath}`
+        if (!items.has(folderKey)) items.set(folderKey, { label: segment, visual: { type: 'icon', icon: 'folder.generic', iconTone: 'muted' } })
         addChild(parentKey, folderKey)
         parentKey = folderKey
       }
-      const selected = selectedImageIds.value.has(entry.id)
+      const selected = selectedOtherPaths.value.has(entry.detail ?? '')
+      const fileType = resolveEntryIcon(entry.detail ?? entry.label, false, false, props.projectRootPath)
       items.set(entry.id, {
         label: segments[segments.length - 1] ?? entry.label,
-        visual: { type: 'icon', icon: 'file.image', iconTone: selected ? 'active' : 'muted' },
+        visual: { type: 'icon', icon: fileType.icon, iconTone: selected ? 'active' : fileType.tone },
         tail: toggleSelection(selected), contextActions: toggleSelection(selected),
       })
       addChild(parentKey, entry.id)
@@ -342,12 +352,20 @@ watch(() => props.open, open => {
     projectStore.projectIconSeries.value.map(series => series.key),
     cached?.iconSeriesKeys,
   )
-  selectedImageIds.value = restoreSelection(
-    imageCandidates.value.map(candidate => candidate.id),
-    cached?.imagePaths.map(imageSelectionId),
+  selectedCustomBlockKeys.value = restoreSelection(
+    Object.keys(projectStore.projectCustomBlockRegistry?.value ?? {}),
+    cached?.customBlockKeys,
+  )
+  selectedOtherPaths.value = restoreSelection(
+    otherCandidates.value.map(candidate => candidate.detail ?? candidate.label),
+    cached?.otherPaths ?? cached?.imagePaths,
   )
   expandedKeySet.value = new Set([
-    'category:fonts', 'font-group:families', 'font-group:compositions', 'category:icons', 'category:images',
+    'category:fonts', 'font-group:families', 'font-group:compositions', 'category:icons', 'category:custom-blocks', 'category:other-files',
+    ...otherCandidates.value.flatMap(candidate => {
+      const segments = (candidate.detail ?? candidate.label).split('/')
+      return segments.slice(0, -1).map((_, index) => `folder:other-files:${segments.slice(0, index + 1).join('/')}`)
+    }),
   ])
   errorText.value = ''
   void refreshProjectCover()
@@ -403,10 +421,22 @@ function handleTreeAction(event: OcNodeActionEvent): void {
     selectedIconSeriesKeys.value = nextSeries
     return
   }
-  const nextImages = new Set(selectedImageIds.value)
-  if (selected) nextImages.add(event.key)
-  else nextImages.delete(event.key)
-  selectedImageIds.value = nextImages
+  if (event.key.startsWith('custom-block:')) {
+    const blockKey = event.key.slice('custom-block:'.length)
+    const nextBlocks = new Set(selectedCustomBlockKeys.value)
+    if (selected) nextBlocks.add(blockKey)
+    else nextBlocks.delete(blockKey)
+    selectedCustomBlockKeys.value = nextBlocks
+    return
+  }
+  if (event.key.startsWith('file:')) {
+    const path = event.key.slice('file:'.length)
+    const next = new Set(selectedOtherPaths.value)
+    if (selected) next.add(path)
+    else next.delete(path)
+    selectedOtherPaths.value = next
+    return
+  }
 }
 
 /**
@@ -420,13 +450,11 @@ async function build(): Promise<void> {
   errorText.value = ''
   let request: PackageBuildRequest | null = null
   try {
-    const selected = imageCandidates.value.filter(candidate => selectedImageIds.value.has(candidate.id))
-    const imagePaths = selected.map(candidate => candidate.detail ?? candidate.label)
     const outputPath = await fileSystemService.pickSavePath({
       defaultPath: `${toKeySlug(name.value.trim(), 'package')}.ocpack`, fileTypeName: t('resourcePackage.fileType'),
       extensions: ['ocpack'], title: t('resourcePackage.buildTitle'),
     })
-    rememberBuildInputs(imagePaths)
+    rememberBuildInputs()
     if (!outputPath) return
     request = {
       outputPath,
@@ -434,10 +462,11 @@ async function build(): Promise<void> {
       name: name.value.trim(),
       title: displayName.value.trim() || name.value.trim(),
       version: version.value.trim(),
-      imagePaths,
       familyKeys: [...selectedFamilyKeys.value],
       compositionKeys: [...selectedCompositionKeys.value],
       iconSeriesKeys: [...selectedIconSeriesKeys.value],
+      customBlockKeys: [...selectedCustomBlockKeys.value],
+      otherPaths: [...selectedOtherPaths.value],
     }
   } catch (cause) {
     errorText.value = cause instanceof Error ? cause.message : String(cause)
@@ -480,12 +509,13 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
       version: request.version,
       title: request.title,
       packageRoots: packageScopeRoots(projectStore.projectResourceEnvironment.value.packages),
-      imageSelection: { paths: request.imagePaths },
       fontSelection: {
         familyKeys: request.familyKeys,
         compositionKeys: request.compositionKeys,
       },
       iconSelection: { seriesKeys: request.iconSeriesKeys },
+      blockSelection: { keys: request.customBlockKeys },
+      otherSelection: { paths: request.otherPaths },
       outputPath: request.outputPath,
     })
     const builtPath = result.outputPath ?? request.outputPath
@@ -498,7 +528,7 @@ async function runPackageBuild(request: PackageBuildRequest): Promise<void> {
   }
 }
 
-function rememberBuildInputs(imagePaths: readonly string[]): void {
+function rememberBuildInputs(): void {
   const cache: ProjectPackageBuilderState = {
     name: name.value.trim(),
     title: displayName.value.trim(),
@@ -507,7 +537,9 @@ function rememberBuildInputs(imagePaths: readonly string[]): void {
     fontFamilyKeys: [...selectedFamilyKeys.value],
     fontCompositionKeys: [...selectedCompositionKeys.value],
     iconSeriesKeys: [...selectedIconSeriesKeys.value],
-    imagePaths: [...imagePaths],
+    customBlockKeys: [...selectedCustomBlockKeys.value],
+    otherPaths: [...selectedOtherPaths.value],
+    imagePaths: [],
   }
   appSettingsStore.updateProjectCreation({
     workspaceStates: updateProjectWorkspaceState(

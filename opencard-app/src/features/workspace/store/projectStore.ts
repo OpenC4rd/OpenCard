@@ -1540,6 +1540,7 @@ export function useProjectStore() {
     fontRegistryReady: readonly(fontRegistryReady),
     projectFontLoadErrors: readonly(projectFontLoadErrors),
     projectIconSeries: readonly(projectIconSeries),
+    projectCustomBlockRegistry: readonly(projectCustomBlockRegistry),
     iconRegistryError: readonly(iconRegistryError),
     projectIconCatalog: readonly(projectIconCatalog),
     renderEnvironment,

@@ -340,27 +340,27 @@ mod tests {
     }
 }
 
-/// `.ocpack` 图标文件的路径：安装后取资源目录，开发构建回退到源码树，
+/// 专用文件类型图标的路径：安装后取资源目录，开发构建回退到源码树，
 /// 因为 dev 不会把 resources 复制到目标目录。
-fn resource_package_icon_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+fn file_type_icon_path(app: &tauri::AppHandle, file_name: &str) -> Option<PathBuf> {
     use tauri::Manager;
 
     let installed = app
         .path()
         .resource_dir()
         .ok()
-        .map(|directory| directory.join("icons").join("ocpack.ico"))
+        .map(|directory| directory.join("icons").join(file_name))
         .filter(|path| path.is_file());
-    installed.or_else(source_icon_path)
+    installed.or_else(|| source_icon_path(file_name))
 }
 
 #[cfg(debug_assertions)]
-fn source_icon_path() -> Option<PathBuf> {
-    Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("icons").join("ocpack.ico"))
+fn source_icon_path(file_name: &str) -> Option<PathBuf> {
+    Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("icons").join(file_name))
 }
 
 #[cfg(not(debug_assertions))]
-fn source_icon_path() -> Option<PathBuf> {
+fn source_icon_path(_file_name: &str) -> Option<PathBuf> {
     None
 }
 
@@ -388,13 +388,18 @@ pub fn run() {
         })
         .setup(|app| {
             // 文件类型图标是尽力而为的一步：注册失败只影响资源管理器里的图标，不应拦住启动。
-            match resource_package_icon_path(app.handle()) {
-                Some(path) => match file_type_icons::register_resource_package_icon(&path) {
-                    Ok(true) => println!("Registered the resource package file icon: {}", path.display()),
-                    Ok(false) => {}
-                    Err(error) => eprintln!("Could not register the resource package file icon: {error}"),
-                },
-                None => eprintln!("The resource package icon asset is missing"),
+            for (file_name, register, label) in [
+                ("ocblock.ico", file_type_icons::register_custom_block_icon as fn(&Path) -> Result<bool, String>, "custom block"),
+                ("ocpack.ico", file_type_icons::register_resource_package_icon as fn(&Path) -> Result<bool, String>, "resource package"),
+            ] {
+                match file_type_icon_path(app.handle(), file_name) {
+                    Some(path) => match register(&path) {
+                        Ok(true) => println!("Registered the {label} file icon: {}", path.display()),
+                        Ok(false) => {}
+                        Err(error) => eprintln!("Could not register the {label} file icon: {error}"),
+                    },
+                    None => eprintln!("The {label} icon asset is missing"),
+                }
             }
             Ok(())
         })

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MAX_BASE_FONT_SIZE, MIN_BASE_FONT_SIZE } from './baseFontSize'
 import { DEFAULT_OC_THEME, OC_THEME_REGISTRY } from './themes'
 import {
   deriveAccentNeighborColor,
@@ -24,7 +25,6 @@ const fileIconColorTokens = [
   '--oc-icon-file-image',
   '--oc-icon-file-config',
   '--oc-icon-folder',
-  '--oc-icon-folder-open',
 ] as const
 const blockIconColorTokens = [
   '--oc-icon-block-text',
@@ -188,6 +188,20 @@ describe('OC theme runtime', () => {
     expect(document.documentElement.style.getPropertyValue('--oc-text-lg')).toBe('15px')
     expect(document.documentElement.style.getPropertyValue('--oc-text-xl')).toBe('19px')
     expect(document.documentElement.style.getPropertyValue('--oc-font-preview-size')).toBe('56px')
+  })
+
+  /**
+   * 字号范围只有一处定义（`baseFontSize.ts`）：设置滑块能拉到 19，这里就必须真的按 19 出 token。
+   * 以前这里自带一份 10–16 的钳制，只改设置就会出现"滑块能拉、界面不变"。
+   */
+  it('honours the configured base font size range', () => {
+    setOcTheme('dark', {}, -50, { baseFontSize: MAX_BASE_FONT_SIZE })
+    expect(document.documentElement.style.getPropertyValue('--oc-text-base'))
+      .toBe(`${MAX_BASE_FONT_SIZE}px`)
+
+    setOcTheme('dark', {}, -50, { baseFontSize: 1 })
+    expect(document.documentElement.style.getPropertyValue('--oc-text-base'))
+      .toBe(`${MIN_BASE_FONT_SIZE}px`)
   })
 
   it('only starts a transition after the resolved theme colors actually change', async () => {

@@ -18,6 +18,8 @@ export const APP_FEEDBACK_RECEIPTS_FILE_NAME = 'feedback-receipts.json'
 export const APP_PACKAGE_DIRECTORY_NAME = 'packages'
 /** 用户保存的项目模板。 */
 export const APP_TEMPLATE_DIRECTORY_NAME = 'templates'
+/** 用户自己写的界面语言文件：一个 `<名字>.json` 就是列表里的一种语言。 */
+export const APP_LOCALE_DIRECTORY_NAME = 'locales'
 
 /** 一切可以随手删的派生数据与暂存数据。删掉不会丢东西：派生数据下次用到会重新做一遍。 */
 export const APP_CACHE_DIRECTORY_NAME = 'cache'

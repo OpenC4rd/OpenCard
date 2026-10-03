@@ -21,7 +21,7 @@ import {
   type ResourceReferenceDiagnostic,
   type ResourceReferenceResolutionOptions,
 } from '../workspace/services/resourceReference'
-import type { ProjectFontRegistryEntry } from '../workspace/model/projectFontRegistry'
+import { projectFontSources, type ProjectFontRegistryEntry } from '../workspace/model/projectFontRegistry'
 import { toCssFontFamily } from '../workspace/model/projectFonts'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { parsePackageQualifier, resolvePackageQualifier } from '../workspace/model/packageCoordinate'
@@ -173,7 +173,16 @@ function resolveFontResource(
   }
   const cssFamily = parseResourceReferenceList(request.value, 'font').map(token => {
     if (token.diagnostics.length > 0) return ''
-    if (!token.reference) return token.source
+    if (!token.reference) {
+      const direct = Object.values(environment.fonts).find(entry => (
+        entry.kind === 'family' && projectFontSources(entry.family).some(source => (
+          source.toLocaleLowerCase() === token.source.toLocaleLowerCase()
+        ))
+      ))
+      return direct?.kind === 'family'
+        ? JSON.stringify(createScopedProjectFontFamily(environment.namespace, direct.family.key))
+        : token.source
+    }
     const resolved = resolveResourceReferenceText<ProjectFontRegistryEntry>(token.source, options)
     if (!resolved.value || !resolved.reference) return ''
     const key = resolved.value.kind === 'family'

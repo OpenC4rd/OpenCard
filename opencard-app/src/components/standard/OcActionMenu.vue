@@ -63,6 +63,11 @@
           />
         </button>
 
+        <!--
+          子菜单的存活要跟着指针和焦点一起判：只跟指针的话，先点过分支（焦点留在分支项里）、
+          再按子菜单里的命令时，焦点离开分支项排出的延迟关闭没人取消，子菜单会在按下的那一瞬间
+          被卸载，click 也就落空了。
+        -->
         <OcFloatingLayer
           v-if="hasActionChildren(entry)"
           :open="openChildKey === entry.key"
@@ -74,6 +79,8 @@
           :data-oc-action-menu-branch="props.branchId"
           @pointerenter="keepMenusOpen"
           @pointerleave="scheduleChildClose"
+          @focusin="keepMenusOpen"
+          @focusout="scheduleChildClose"
         >
           <OcActionMenu
             :ref="(element) => setChildMenu(entry.key, element)"

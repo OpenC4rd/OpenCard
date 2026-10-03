@@ -1,52 +1,420 @@
 /**
  * 模块说明：
- * - 作为图标系统统一导出入口
+ * - 维护内置语义 token、MDI SVG path 与图标 tone 的唯一注册表
  * 职责边界：
- * - 只聚合 token/type/resolver，不承载具体库映射实现
+ * - 对外提供 token 类型、解析、回退和运行时 token 检查
  */
-import type { IconToken } from './iconPacks'
-import type { IconGlyph } from './icon.types'
-import { iconGlyphs } from './iconPacks'
 import {
-  DEFAULT_ICON_TOKEN,
-  UNKNOWN_ICON_TOKEN,
-  resolveIcon,
-  type IconResolvable,
-} from './iconResolver'
+  mdiAppleKeyboardShift,
+  mdiAccountGroupOutline,
+  mdiAlertCircleOutline,
+  mdiAlertOutline,
+  mdiArrowBottomLeftThin,
+  mdiArrowBottomRightThin,
+  mdiArrowDownThin,
+  mdiArrowCollapse,
+  mdiArrowCollapseLeft,
+  mdiArrowExpand,
+  mdiArrowExpandAll,
+  mdiArrowExpandHorizontal,
+  mdiArrowExpandRight,
+  mdiArrowExpandVertical,
+  mdiArrowLeft,
+  mdiArrowLeftThin,
+  mdiArrowDown,
+  mdiArrowRight,
+  mdiArrowRightThin,
+  mdiArrowTopLeftThin,
+  mdiArrowTopRightThin,
+  mdiArrowUp,
+  mdiArrowUpThin,
+  mdiArtboard,
+  mdiBoxCutter,
+  mdiBoxCutterOff,
+  mdiBroom,
+  mdiCardTextOutline,
+  mdiCardsOutline,
+  mdiCheckerboard,
+  mdiCheck,
+  mdiCheckboxBlankOutline,
+  mdiCheckboxMarkedOutline,
+  mdiCircleMedium,
+  mdiChevronDown,
+  mdiChevronRight,
+  mdiChevronUp,
+  mdiClose,
+  mdiCodeBraces,
+  mdiCodeJson,
+  mdiCogOutline,
+  mdiCompassOutline,
+  mdiContentCopy,
+  mdiContentSaveOutline,
+  mdiContentSaveOffOutline,
+  mdiCubeUnfolded,
+  mdiCursorText,
+  mdiDatabaseOutline,
+  mdiDownload,
+  mdiDragVariant,
+  mdiDotsHorizontal,
+  mdiEyeOffOutline,
+  mdiEyeOutline,
+  mdiFileArrowUpDownOutline,
+  mdiFileCompare,
+  mdiFileCodeOutline,
+  mdiFileCogOutline,
+  mdiExport,
+  mdiFileImageOutline,
+  mdiImport,
+  mdiFileKeyOutline,
+  mdiFileMultipleOutline,
+  mdiFileMinusOutline,
+  mdiFileOutline,
+  mdiFilePlusOutline,
+  mdiFileTreeOutline,
+  mdiFitToScreenOutline,
+  mdiFlipToBack,
+  mdiFlipToFront,
+  mdiFolderImage,
+  mdiFolderAlertOutline,
+  mdiFolder,
+  mdiFolderOpen,
+  mdiFolderOpenOutline,
+  mdiFolderOutline,
+  mdiFolderPlusOutline,
+  mdiFolderStarOutline,
+  mdiFolderWrenchOutline,
+  mdiFormatListBulleted,
+  mdiFormatListBulletedSquare,
+  mdiFormatListNumbered,
+  mdiFormatListGroup,
+  mdiFormatAlignCenter,
+  mdiFormatAlignJustify,
+  mdiFormatAlignLeft,
+  mdiFormatAlignRight,
+  mdiFormatBold,
+  mdiFormatClear,
+  mdiFormatColorFill,
+  mdiFormatColorHighlight,
+  mdiFormatFont,
+  mdiFormatFontSizeDecrease,
+  mdiFormatFontSizeIncrease,
+  mdiFormatItalic,
+  mdiFormatStrikethrough,
+  mdiFormatUnderline,
+  mdiFormatVerticalAlignBottom,
+  mdiFormatVerticalAlignCenter,
+  mdiFormatVerticalAlignTop,
+  mdiFullscreen,
+  mdiFullscreenExit,
+  mdiGrid,
+  mdiGridOff,
+  mdiFormatText,
+  mdiFormatTextVariantOutline,
+  mdiHelpCircleOutline,
+  mdiHistory,
+  mdiHumanGreeting,
+  mdiImageFilterCenterFocus,
+  mdiImageFilterCenterFocusWeak,
+  mdiImageOutline,
+  mdiKeyboardSpace,
+  mdiLandRowsHorizontal,
+  mdiLandRowsVertical,
+  mdiImageMinusOutline,
+  mdiImagePlusOutline,
+  mdiQrcode,
+  mdiShapeOutline,
+  mdiKeyOutline,
+  mdiLanguageCss3,
+  mdiLanguageHtml5,
+  mdiLanguageJavascript,
+  mdiLanguageMarkdownOutline,
+  mdiLanguageTypescript,
+  mdiLayersOutline,
+  mdiLockOutline,
+  mdiMagnify,
+  mdiMagnifyMinusOutline,
+  mdiMagnifyPlusOutline,
+  mdiMagnet,
+  mdiMagnetOn,
+  mdiMouseScrollWheel,
+  mdiNumeric,
+  mdiPackageVariantClosed,
+  mdiPanoramaVariantOutline,
+  mdiPaperCutVertical,
+  mdiPaletteOutline,
+  mdiPencilOutline,
+  mdiPencilRulerOutline,
+  mdiPinOffOutline,
+  mdiPinOutline,
+  mdiPlayOutline,
+  mdiPlus,
+  mdiMinus,
+  mdiRefresh,
+  mdiRedoVariant,
+  mdiRestart,
+  mdiRocketLaunchOutline,
+  mdiToyBrickOutline,
+  mdiRulerSquare,
+  mdiSortAlphabeticalAscending,
+  mdiSourceBranch,
+  mdiStorefrontOutline,
+  mdiStickerEmoji,
+  mdiSwapHorizontal,
+  mdiTableLarge,
+  mdiToggleSwitchOutline,
+  mdiTranslate,
+  mdiTextBoxOutline,
+  mdiTrashCanOutline,
+  mdiUndoVariant,
+  mdiViewDashboard,
+  mdiViewDashboardEditOutline,
+  mdiViewDashboardOutline,
+  mdiViewGridOutline,
+  mdiViewSequentialOutline,
+  mdiVariable,
+  mdiVuejs,
+  mdiWindowMaximize,
+  mdiWindowMinimize,
+  mdiWindowRestore,
+  mdiXml,
+} from '@mdi/js'
+import type { OcThemeTokenKey } from '../foundation/themeTokens'
+type IconGlyph = {
+  path: string
+  viewBox?: string
+}
 
-export type { IconToken, IconGlyph, IconResolvable }
+function glyph(path: string, viewBox?: string): IconGlyph {
+  return { path, viewBox }
+}
 
-export type IconTone =
-  | 'default'
-  | 'muted'
-  | 'primary'
-  | 'success'
-  | 'active'
-  | 'warning'
-  | 'danger'
-  | 'opencard'
-  | 'json'
-  | 'markdown'
-  | 'typescript'
-  | 'javascript'
-  | 'vue'
-  | 'html'
-  | 'css'
-  | 'image'
-  | 'config'
-  | 'folder-default'
-  | 'folder-open'
-  | 'block-text'
-  | 'block-markdown'
-  | 'block-image'
-  | 'block-qrcode'
-  | 'block-shape'
-  | 'block-simple-container'
-  | 'block-flow-container'
+export const iconGlyphs = {
+  'action.add': glyph(mdiPlus),
+  'action.check': glyph(mdiCheck),
+  'action.checkbox-blank': glyph(mdiCheckboxBlankOutline),
+  'action.checkbox-marked': glyph(mdiCheckboxMarkedOutline),
+  'action.clean': glyph(mdiBroom),
+  'action.close': glyph(mdiClose),
+  'action.copy': glyph(mdiContentCopy, '-1 -1 26 26'),
+  'action.delete': glyph(mdiTrashCanOutline),
+  'action.discard': glyph(mdiUndoVariant),
+  'action.download': glyph(mdiDownload),
+  'action.drag': glyph(mdiDragVariant),
+  'action.edit': glyph(mdiPencilOutline),
+  'action.export': glyph(mdiExport),
+  'action.folder-plus': glyph(mdiFolderPlusOutline),
+  'action.minus': glyph(mdiMinus),
+  'action.file-minus': glyph(mdiFileMinusOutline),
+  'action.file-plus': glyph(mdiFilePlusOutline),
+  'action.file-arrow-up-down': glyph(mdiFileArrowUpDownOutline),
+  'action.file-compare': glyph(mdiFileCompare),
+  'action.history': glyph(mdiHistory),
+  'action.image-minus': glyph(mdiImageMinusOutline),
+  'action.image-plus': glyph(mdiImagePlusOutline),
+  'action.import': glyph(mdiImport),
+  'action.play': glyph(mdiPlayOutline),
+  'action.project-icon-plus': glyph(mdiStickerEmoji),
+  'action.search': glyph(mdiMagnify),
+  'action.publish': glyph(mdiRocketLaunchOutline),
+  'action.refresh': glyph(mdiRefresh),
+  'action.restart': glyph(mdiRestart),
+  'action.redo': glyph(mdiRedoVariant),
+  'action.save': glyph(mdiContentSaveOutline),
+  'action.save-off': glyph(mdiContentSaveOffOutline),
+  'action.sort-alphabetical-ascending': glyph(mdiSortAlphabeticalAscending),
+  'action.sort-category': glyph(mdiFormatListGroup),
+  'action.undo': glyph(mdiUndoVariant),
 
-export {
-  iconGlyphs,
-  DEFAULT_ICON_TOKEN,
-  UNKNOWN_ICON_TOKEN,
-  resolveIcon,
+  'nav.arrow-left': glyph(mdiArrowLeft),
+  'nav.arrow-down': glyph(mdiArrowDown),
+  'nav.arrow-right': glyph(mdiArrowRight),
+  'nav.arrow-swap': glyph(mdiSwapHorizontal),
+  'nav.arrow-up': glyph(mdiArrowUp),
+  'nav.chevron-down': glyph(mdiChevronDown),
+  'nav.chevron-up': glyph(mdiChevronUp),
+  'nav.compass': glyph(mdiCompassOutline),
+  'nav.collaboration': glyph(mdiAccountGroupOutline),
+  'nav.files': glyph(mdiFileMultipleOutline),
+  'nav.more': glyph(mdiDotsHorizontal),
+  'nav.sidebar-collapse': glyph(mdiArrowCollapseLeft),
+  'nav.sidebar-expand': glyph(mdiArrowExpandRight),
+  'nav.welcome': glyph(mdiHumanGreeting),
+  'nav.workbench': glyph(mdiPencilRulerOutline),
+  'nav.market': glyph(mdiStorefrontOutline),
+  'nav.test': glyph(mdiCheckerboard),
+
+  'window.fullscreen': glyph(mdiFullscreen),
+  'window.fullscreen-exit': glyph(mdiFullscreenExit),
+  'window.maximize': glyph(mdiWindowMaximize),
+  'window.minimize': glyph(mdiWindowMinimize),
+  'window.restore': glyph(mdiWindowRestore),
+
+  'tree.chevron-down': glyph(mdiChevronDown),
+  'tree.chevron-right': glyph(mdiChevronRight),
+
+  'tool.background': glyph(mdiPanoramaVariantOutline),
+  'tool.clip': glyph(mdiPaperCutVertical),
+  'tool.box-cutter': glyph(mdiBoxCutter),
+  'tool.box-cutter-off': glyph(mdiBoxCutterOff),
+  'tool.fit-screen': glyph(mdiFitToScreenOutline),
+  'tool.focus-selection': glyph(mdiImageFilterCenterFocusWeak),
+  'tool.flip-to-back': glyph(mdiFlipToBack),
+  'tool.flip-to-front': glyph(mdiFlipToFront),
+  'tool.grid': glyph(mdiGrid),
+  'tool.grid-off': glyph(mdiGridOff),
+  'tool.snap-grid': glyph(mdiMagnet),
+  'tool.snap-grid-on': glyph(mdiMagnetOn),
+  'tool.pin': glyph(mdiPinOutline),
+  'tool.pin-off': glyph(mdiPinOffOutline),
+  'tool.pixelated': glyph(mdiCubeUnfolded),
+  'tool.interface': glyph(mdiRulerSquare),
+  'tool.workspace': glyph(mdiPencilRulerOutline),
+  'tool.settings': glyph(mdiCogOutline),
+  'tool.zoom-in': glyph(mdiMagnifyPlusOutline),
+  'tool.zoom-out': glyph(mdiMagnifyMinusOutline),
+
+  'input.mouse-scroll-wheel': glyph(mdiMouseScrollWheel),
+  'input.keyboard-space': glyph(mdiKeyboardSpace),
+  'input.keyboard-shift': glyph(mdiAppleKeyboardShift),
+
+  'layout.fill': glyph(mdiArrowExpandAll),
+  'layout.fill-horizontal': glyph(mdiArrowExpandHorizontal),
+  'layout.fill-vertical': glyph(mdiArrowExpandVertical),
+  'layout.center': glyph(mdiImageFilterCenterFocus),
+  'layout.inset': glyph(mdiArrowCollapse),
+  'layout.outset': glyph(mdiArrowExpand),
+  'layout.columns': glyph(mdiLandRowsVertical),
+  'layout.rows': glyph(mdiLandRowsHorizontal),
+  'layout.artboard': glyph(mdiArtboard),
+
+  'data.collection': glyph(mdiDatabaseOutline),
+  'data.code-string': glyph(mdiCursorText),
+  'data.layers': glyph(mdiLayersOutline),
+  'data.list-bulleted': glyph(mdiFormatListBulleted),
+  'data.list-numbered': glyph(mdiFormatListNumbered),
+  'data.list-selection': glyph(mdiFormatListBulletedSquare),
+  'data.list-tree': glyph(mdiFileTreeOutline),
+  'data.table': glyph(mdiTableLarge),
+  'data.symbol-boolean': glyph(mdiToggleSwitchOutline),
+  'data.symbol-class': glyph(mdiCodeBraces),
+  'data.symbol-color': glyph(mdiPaletteOutline),
+  'data.symbol-key': glyph(mdiKeyOutline),
+  'data.symbol-number': glyph(mdiNumeric),
+  'data.symbol-string': glyph(mdiFormatText),
+  'data.variable': glyph(mdiVariable),
+
+  'format.align-start': glyph(mdiFormatAlignLeft),
+  'format.align-center': glyph(mdiFormatAlignCenter),
+  'format.align-end': glyph(mdiFormatAlignRight),
+  'format.align-justify': glyph(mdiFormatAlignJustify),
+  'format.bold': glyph(mdiFormatBold),
+  'format.clear': glyph(mdiFormatClear),
+  'format.code-braces': glyph(mdiCodeBraces),
+  'format.color-fill': glyph(mdiFormatColorFill),
+  'format.color-highlight': glyph(mdiFormatColorHighlight),
+  'format.font-size-decrease': glyph(mdiFormatFontSizeDecrease),
+  'format.font-size-increase': glyph(mdiFormatFontSizeIncrease),
+  'format.italic': glyph(mdiFormatItalic),
+  'format.strikethrough': glyph(mdiFormatStrikethrough),
+  'format.underline': glyph(mdiFormatUnderline),
+  'format.text-variant-outline': glyph(mdiFormatTextVariantOutline),
+  'format.xml': glyph(mdiXml),
+  'format.vertical-top': glyph(mdiFormatVerticalAlignTop),
+  'format.vertical-center': glyph(mdiFormatVerticalAlignCenter),
+  'format.vertical-bottom': glyph(mdiFormatVerticalAlignBottom),
+  'format.anchor-top-left': glyph(mdiArrowTopLeftThin),
+  'format.anchor-top': glyph(mdiArrowUpThin),
+  'format.anchor-top-right': glyph(mdiArrowTopRightThin),
+  'format.anchor-left': glyph(mdiArrowLeftThin),
+  'format.anchor-center': glyph(mdiCircleMedium),
+  'format.anchor-right': glyph(mdiArrowRightThin),
+  'format.anchor-bottom-left': glyph(mdiArrowBottomLeftThin),
+  'format.anchor-bottom': glyph(mdiArrowDownThin),
+  'format.anchor-bottom-right': glyph(mdiArrowBottomRightThin),
+
+  'entity.block-flow-container': glyph(mdiViewSequentialOutline),
+  'entity.block-custom': glyph(mdiToyBrickOutline),
+  'entity.block-image': glyph(mdiImageOutline),
+  'entity.block-markdown': glyph(mdiLanguageMarkdownOutline),
+  'entity.block-package': glyph(mdiPackageVariantClosed),
+  'entity.block-qrcode': glyph(mdiQrcode),
+  'entity.block-shape': glyph(mdiShapeOutline),
+  'entity.block-simple-container': glyph(mdiViewGridOutline),
+  'entity.block-text': glyph(mdiTextBoxOutline),
+  'entity.card-blueprint': glyph(mdiViewDashboard),
+  'entity.card-instance': glyph(mdiViewDashboardEditOutline),
+
+  'status.error': glyph(mdiAlertCircleOutline),
+  'status.eye': glyph(mdiEyeOutline),
+  'status.eye-off': glyph(mdiEyeOffOutline),
+  'status.folder-open': glyph(mdiFolderOpenOutline),
+  'status.folder-alert': glyph(mdiFolderAlertOutline),
+  'status.unknown': glyph(mdiHelpCircleOutline),
+  'status.warning': glyph(mdiAlertOutline),
+  'status.circle-medium': glyph(mdiCircleMedium),
+
+  'file.css': glyph(mdiLanguageCss3),
+  'file.dictionary': glyph(mdiTranslate),
+  'file.env': glyph(mdiFileKeyOutline),
+  'file.font': glyph(mdiFormatFont),
+  'file.generic': glyph(mdiFileOutline),
+  'file.git': glyph(mdiSourceBranch),
+  'file.html': glyph(mdiLanguageHtml5),
+  'file.image': glyph(mdiFileImageOutline),
+  'file.javascript': glyph(mdiLanguageJavascript),
+  'file.json': glyph(mdiCodeJson),
+  'file.lock': glyph(mdiLockOutline),
+  'file.markdown': glyph(mdiLanguageMarkdownOutline),
+  'file.media': glyph(mdiFileImageOutline),
+  'file.opencard': glyph(mdiCardsOutline),
+  'file.opencard-project': glyph(mdiFileCogOutline),
+  'file.package': glyph(mdiPackageVariantClosed),
+  'file.project-icon': glyph(mdiStickerEmoji),
+  'file.settings': glyph(mdiCogOutline),
+  'file.text': glyph(mdiCardTextOutline),
+  'file.typescript': glyph(mdiLanguageTypescript),
+  'file.vue': glyph(mdiVuejs),
+
+  'folder.assets': glyph(mdiFolderImage),
+  'folder.components': glyph(mdiFolderStarOutline),
+  'folder.core': glyph(mdiFolderWrenchOutline),
+  'folder.generic': glyph(mdiFolder),
+  'folder.locales': glyph(mdiFolderOutline),
+  'folder.open': glyph(mdiFolderOpen),
+  'folder.src': glyph(mdiFileCodeOutline),
+  'folder.views': glyph(mdiViewDashboardOutline),
+}
+
+/** 语义 token 就是字形表的键：一处声明，`glyph()` 的返回类型保证每个键都有字形。 */
+export type IconToken = keyof typeof iconGlyphs
+
+type IconColorCssToken = Exclude<
+  Extract<OcThemeTokenKey, `--oc-icon-${string}`>,
+  `--oc-icon-size-${string}`
+>
+
+export type IconTone = IconColorCssToken extends `--oc-icon-${infer Tone}` ? Tone : never
+
+export const DEFAULT_ICON_TOKEN: IconToken = 'file.generic'
+export const UNKNOWN_ICON_TOKEN: IconToken = 'status.unknown'
+
+const warnedMissingTokens = new Set<string>()
+
+export function isIconToken(value: string): value is IconToken {
+  return Object.prototype.hasOwnProperty.call(iconGlyphs, value)
+}
+
+function warnMissingToken(token: string, source: string): void {
+  if (!import.meta.env.DEV || warnedMissingTokens.has(token)) return
+  warnedMissingTokens.add(token)
+  console.warn(`[icon] unresolved token: "${token}" at ${source}, fallback to "${UNKNOWN_ICON_TOKEN}"`)
+}
+
+export function resolveIcon(input?: IconToken, source = 'unknown'): IconGlyph {
+  const token = input ?? DEFAULT_ICON_TOKEN
+  const resolved = iconGlyphs[token]
+  if (resolved) return resolved
+
+  warnMissingToken(token, source)
+  return iconGlyphs[UNKNOWN_ICON_TOKEN]
 }

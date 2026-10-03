@@ -41,6 +41,8 @@ tone?: string
 
 唯一例外：`icon` prop 接受 `IconToken` 类型（本身也是有限注册集）。
 
+`IconToken` 是稳定的语义名称，glyph 是图标注册模块的内置实现细节；`IconTone` 独立描述颜色语义。相同 glyph 不表示语义 token 必须合并。
+
 ### 铁律 3 — 组件签名稳定，新增 prop 只追加不修改
 
 - 已有 prop 的名字和可选值 **永不改名**。
@@ -116,6 +118,7 @@ emit('selection-change', selectionEvent)
 | `variant`（按钮） | `OcButton.variant` | `ButtonVariant` |
 | `size`（控件） | `OcButton.size`、`OcFieldInput.size`、`OcIcon.size` | `ButtonSize`、`OcIconSize` |
 | `tone`（文本） | `OcText.tone` | `OcTextTone` |
+| `icon` / `icon-tone` | `OcIcon.name` / `OcIcon.tone` | `shared/ui/icon/iconRegistry.ts` → `IconToken`、`IconTone` |
 | 主题色值 | — | `shared/ui/foundation/themes.ts` → `OC_THEME_REGISTRY`、`OC_SHARED_THEME_TOKENS` |
 
 Agent 新增 token 时，必须在该组件的枚举常量中定义，并同步更新上表的「定义位置」列；**不得在本文档里另抄一份取值清单**。

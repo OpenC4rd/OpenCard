@@ -4,7 +4,6 @@ import phaseLogo from '../../../assets/opencard-logo-phase-map.png'
 import wordmarkBrightness from '../../../assets/opencard-wordmark-brightness-map.png'
 import wordmarkPhase from '../../../assets/opencard-wordmark-phase-map.png'
 import OcButton from '../../../components/base/OcButton.vue'
-import OcSwitch from '../../../components/base/OcSwitch.vue'
 import OcPhaseImage from '../../../components/standard/OcPhaseImage.vue'
 import WelcomeCoverWall, { type WelcomeCoverWallCover } from './WelcomeCoverWall.vue'
 import WelcomeGravityField from './WelcomeGravityField.vue'
@@ -70,13 +69,18 @@ const { t } = useI18n()
         </OcButton>
       </div>
     </div>
-    <OcSwitch
+    <!-- 左下角的小按钮：控制背景封面墙显隐；开关状态由按下态与 aria-pressed 表达。 -->
+    <OcButton
       class="workspace-empty-state__wall-toggle"
-      :checked="props.backgroundVisible"
-      @update:checked="emit('update:backgroundVisible', $event)"
-    >
-      <span class="workspace-empty-state__wall-toggle-label">{{ t('app.welcome.backgroundToggle') }}</span>
-    </OcSwitch>
+      icon="tool.background"
+      icon-only
+      variant="ghost"
+      :active="props.backgroundVisible"
+      :aria-pressed="props.backgroundVisible"
+      :aria-label="t('app.welcome.backgroundToggle')"
+      :data-tooltip="t('app.welcome.backgroundToggle')"
+      @click="emit('update:backgroundVisible', !props.backgroundVisible)"
+    />
   </section>
 </template>
 
@@ -167,17 +171,12 @@ const { t } = useI18n()
   margin-top: var(--oc-space-3);
 }
 
-/* 左下角的小开关：控制背景封面墙显隐。 */
+/* 左下角的小按钮：控制背景封面墙显隐。 */
 .workspace-empty-state__wall-toggle {
   position: absolute;
   left: var(--oc-space-4);
   bottom: var(--oc-space-4);
   z-index: 2;
-}
-
-/* 开关文字同样落在封面墙上，因此沿用标题那层底色描边；文字是这里自己的节点，不碰开关内部。 */
-.workspace-empty-state__wall-toggle-label {
-  text-shadow: var(--oc-welcome-hero-text-shadow);
 }
 
 /* 切换显隐时整面墙淡入淡出。 */

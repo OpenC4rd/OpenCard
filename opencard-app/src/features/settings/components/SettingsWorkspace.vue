@@ -377,6 +377,8 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
     emit('intent', { type: 'identity.regenerate' })
     return
   }
+  if (actionKey === 'locale.refresh') emit('intent', { type: 'locale.refresh' })
+  if (actionKey === 'locale-folder.open') emit('intent', { type: 'locale-folder.open' })
   if (actionKey === 'project-workspace.reset') emit('intent', { type: 'project-workspace.reset' })
   if (actionKey === 'cache.clear') emit('intent', { type: 'cache.clear' })
 }

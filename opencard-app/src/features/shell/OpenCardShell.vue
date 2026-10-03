@@ -15,7 +15,6 @@
     <ShellTitleBar
       :collapsed="effectiveSidebarCollapsed"
       :brand-label="titleBarBrandLabel"
-      brand-logo-src="/opencard-logo.png"
       :menu-groups="titleBarMenus"
       :app-actions="titleBarAppActions"
       :tasks="titleBarTasks"
@@ -68,6 +67,7 @@
 
       <ShellWorkspaceFrame
         :title="workspaceTitle"
+        :title-loading="workspaceTitleLoading"
         :icon="workspaceIcon"
         :icon-tone="workspaceIconTone"
         :subtitle="workspaceSubtitle"
@@ -260,6 +260,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { appLocaleLanguageTag } from '../../i18n/appLocale'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { useProjectStore } from '../workspace/store/projectStore'
@@ -959,7 +960,7 @@ const visibleIssueSeverity = computed(() => isWorkbenchMode.value ? highestIssue
 
 watch(locale, clearAllSessionIssues, { flush: 'sync' })
 watch(locale, value => {
-  document.documentElement.lang = value
+  document.documentElement.lang = appLocaleLanguageTag(value)
 }, { immediate: true })
 watch(projectPath, (nextPath, previousPath) => {
   if (nextPath !== previousPath) clearAllSessionIssues()
@@ -1264,6 +1265,10 @@ const workspaceTitle = computed(() => {
     ? formatSessionTitle(activeSession.value)
     : projectName.value || t('app.menu.workbench')
 })
+
+const workspaceTitleLoading = computed(() => (
+  isWorkbenchMode.value && activeSession.value?.presentation === undefined
+))
 
 const workspaceIcon = computed(() => {
   if (isMarketMode.value) return 'nav.market'
@@ -1671,5 +1676,7 @@ onUnmounted(() => {
 async function openResourcePackageBuilder(): Promise<void> {
   if (!projectPath.value) return
   await ensureProjectTreeLoaded()
+  // The package picker needs files below collapsed folders; the normal file tree stays lazy.
+  await readDirectoryEntries('', Number.POSITIVE_INFINITY)
   resourcePackageBuilderOpen.value = true
 }</script>

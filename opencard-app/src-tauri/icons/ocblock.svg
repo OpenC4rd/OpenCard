@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  .ocblock 的文件类型图标：积木轮廓来自 toy-brick-remove-outline，
+  右下角的叉号替换为 OpenCard 的 4o 标志。图标保持和 .ocpack 一样的
+  单色灰阶，方便在资源管理器的浅色和深色背景上保持一致。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1024" height="1024">
+  <defs>
+    <!-- 先从积木底图挖出 logo 的圆形占位区，避免底图从 4o 的孔洞和边缘穿出来。 -->
+    <mask id="ocblock-brick-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+      <rect width="24" height="24" fill="#fff" />
+      <circle cx="19" cy="19" r="7" fill="#000" />
+    </mask>
+    <!-- 环4（右上）避开环1（左上），保留 OpenCard 标志的原始缺口。 -->
+    <mask id="ocblock-logo-gap" maskUnits="userSpaceOnUse" x="-100" y="-100" width="1600" height="1600">
+      <rect x="-100" y="-100" width="1600" height="1600" fill="#fff" />
+      <circle cx="400" cy="400" r="425" fill="#000" />
+    </mask>
+  </defs>
+
+  <!-- toy-brick-outline 原始积木轮廓。 -->
+  <path fill="#808080" mask="url(#ocblock-brick-cutout)" d="M19 6V5A2 2 0 0 0 17 3H15A2 2 0 0 0 13 5V6H11V5A2 2 0 0 0 9 3H7A2 2 0 0 0 5 5V6H3V20H21V6M19 18H5V8H19Z" />
+
+  <!-- 4o 标志：单条合并路径，和 .ocpack 共用同一形状、尺寸与锚点。 -->
+  <g transform="translate(14.1 14.1) scale(0.007)" fill="none" stroke="#808080" stroke-width="200">
+    <path d="M400 100A300 300 0 1 0 400 700A300 300 0 1 0 400 100M400 700A300 300 0 1 0 700 1000M1000 700A300 300 0 1 1 1000 1300A300 300 0 1 1 1000 700M1000 700A300 300 0 0 0 1000 100" />
+    <path d="M1000 700A300 300 0 1 0 700 400" mask="url(#ocblock-logo-gap)" />
+  </g>
+</svg>

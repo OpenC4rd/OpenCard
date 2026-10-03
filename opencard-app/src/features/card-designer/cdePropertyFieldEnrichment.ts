@@ -26,6 +26,7 @@ import {
   createProjectIconCompletionProvider,
   type ProjectIconSource,
 } from '../workspace/services/projectIconCompletion'
+import { createCustomBlockCompletionProvider } from '../workspace/services/customBlockCompletion'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 import { resolveProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
 import { buildResourceFontCatalog } from '../workspace/services/resourceReference'
@@ -151,8 +152,13 @@ export function enrichCardPropertyFieldDefinition(options: {
       mode: options.fieldKey === 'content' ? 'rich-text' : 'reference',
     })
     : undefined
-  const provider = bindingProvider || fontProvider || iconProvider
-    ? chainPropertyCompletionProviders([bindingProvider, fontProvider, iconProvider])
+  const customBlockProvider = options.fieldKey === 'source'
+    && options.record.type === 'custom-block'
+    && options.resourceEnvironment
+    ? createCustomBlockCompletionProvider(options.resourceEnvironment)
+    : undefined
+  const provider = bindingProvider || fontProvider || iconProvider || customBlockProvider
+    ? chainPropertyCompletionProviders([bindingProvider, fontProvider, iconProvider, customBlockProvider])
     : undefined
   const fontOptions = options.definition.fieldType === 'string' && options.definition.richText
     ? fontCatalog.map(font => ({
@@ -219,7 +225,7 @@ function createFontCompletionProvider(
 ): PropertyCompletionProvider {
   const scopes = new Map<string, string>()
   for (const font of fontCatalog) {
-    if (font.source === 'system') continue
+    if (font.source !== 'project') continue
     const prefix = font.value.slice(0, font.value.indexOf('font:') + 5)
     // 引用里写的是**完整坐标**，而资源环境也按坐标索引：解析出来那个包，才拿得到显示名。
     const qualifier = prefix.includes('#') ? parsePackageQualifier(prefix.slice(0, prefix.indexOf('#'))) : null
@@ -246,7 +252,7 @@ function createFontCompletionProvider(
             insertText: `${insertionPrefix}${prefix}`, keepOpen: true,
           })) : []),
         ...fontCatalog
-        .filter(font => scope ? font.value.startsWith(scope) : font.source === 'system')
+        .filter(font => scope ? font.value.startsWith(scope) : font.source === 'system' || font.source === 'project-file')
         .filter(font => !query
           || font.label.toLocaleLowerCase().includes(query)
           || (scope ? font.value.slice(scope.length) : font.value).toLocaleLowerCase().includes(query))

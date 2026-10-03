@@ -127,6 +127,7 @@
       }
     ],
     "resources": {
+      "icons/ocblock.ico": "icons/ocblock.ico",
       "icons/ocpack.ico": "icons/ocpack.ico",
       "resources/packages/": "packages/",
       "resources/templates/": "templates/"

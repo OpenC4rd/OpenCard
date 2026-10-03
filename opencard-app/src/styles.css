@@ -74,7 +74,6 @@
 @property --oc-icon-file-image { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-file-config { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-folder { syntax: '<color>'; inherits: true; initial-value: transparent; }
-@property --oc-icon-folder-open { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-block-text { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-block-markdown { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-block-image { syntax: '<color>'; inherits: true; initial-value: transparent; }
@@ -146,7 +145,6 @@ html.oc-theme-transitioning {
     --oc-icon-file-image 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-file-config 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-folder 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
-    --oc-icon-folder-open 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-block-text 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-block-markdown 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-block-image 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),

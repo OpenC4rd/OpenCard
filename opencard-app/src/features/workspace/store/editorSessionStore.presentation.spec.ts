@@ -33,7 +33,7 @@ const PACKAGE_PRESENTATION = {
   title: '包',
   description: '查看包信息和对外提供的资源。',
   icon: 'file.package' as const,
-  iconTone: 'config' as const,
+  iconTone: 'file-config' as const,
 }
 
 describe('editorSessionStore presentation', () => {

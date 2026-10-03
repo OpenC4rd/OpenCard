@@ -10,7 +10,10 @@ import type {
   PropertyCompletionProvider,
   PropertyEditorFieldDefinition,
 } from '../../../shared/ui/property-editor/propertyEditor.types'
+import type { AppLocaleOption } from '../../../i18n/appLocale'
 import {
+  MAX_BASE_FONT_SIZE,
+  MIN_BASE_FONT_SIZE,
   OC_THEME_REGISTRY,
   type OcEditableThemeColorKey,
   type OcThemeId,
@@ -67,6 +70,8 @@ interface UseSettingsWorkspaceOptions {
   categoryKey: Readonly<Ref<SettingsCategoryKey>>
   projectOpen: Readonly<Ref<boolean>>
   systemFontFamilies?: Readonly<Ref<readonly string[]>>
+  /** 当前可用的语言：内置两种 + 用户语言文件（见 `i18n/appLocale.ts`）。 */
+  appLocales: Readonly<Ref<readonly AppLocaleOption[]>>
   /** `cache/` 的现量占用；进设置页时由 shell 量一次。 */
   cacheUsage: Readonly<Ref<AppCacheUsage>>
   translate: (key: string, fallback: string) => string
@@ -141,6 +146,32 @@ export function useSettingsWorkspace(
     children: new Map(),
   }))
 
+  /**
+   * 语言行的候选：跟随系统 + 内置语言 + 用户语言文件。
+   * 选中的文件已经被删掉时也要把它列出来，否则下拉会显示成空占位。
+   */
+  function languageRow(settings: DeepReadonly<AppSettings>): EditorItem {
+    const preference = settings.appearance.locale
+    const locales = options.appLocales.value
+    const known = ['system', ...locales.map(locale => locale.id)]
+    const optionIds = known.includes(preference) ? known : [...known, preference]
+    const labelOf = (id: string): string => {
+      if (id === 'system') return options.translate('settings.values.systemLanguage', 'System')
+      return locales.find(locale => locale.id === id)?.label
+        ?? `${id}${options.translate('settings.values.localeFileMissing', ' (file missing)')}`
+    }
+    return fieldItem('appearance.locale', {
+      title: options.translate('settings.fields.language', 'Language'),
+      fieldType: 'string',
+      presentation: 'select',
+      options: optionIds,
+      optionLabels: Object.fromEntries(optionIds.map(id => [id, labelOf(id)])),
+    }, preference, options.translate(
+      'settings.descriptions.userLocales',
+      'Put it in the locales folder under the app storage root; keys you leave out keep the base language value.',
+    ))
+  }
+
   function buildCategory(
     categoryKey: SettingsCategoryKey,
     settings: DeepReadonly<AppSettings>,
@@ -151,17 +182,7 @@ export function useSettingsWorkspace(
         title: categoryLabels.value.general,
         cards: [
           card('interface', options.translate('settings.cards.interface', 'Interface'), [
-            fieldItem('appearance.locale', {
-              title: options.translate('settings.fields.language', 'Language'),
-              fieldType: 'string',
-              presentation: 'select',
-              options: ['system', 'zh-CN', 'en-US'],
-              optionLabels: {
-                system: options.translate('settings.values.systemLanguage', 'System'),
-                'zh-CN': '简体中文',
-                'en-US': 'English',
-              },
-            }, settings.appearance.locale),
+            languageRow(settings),
             fieldItem('shell.titleBarNoticeHistoryLimit', {
               title: options.translate('settings.fields.titleBarNoticeHistoryLimit', 'Instant messages'),
               fieldType: 'number', presentation: 'slider',
@@ -170,7 +191,21 @@ export function useSettingsWorkspace(
               suffix: options.translate('settings.values.messages', ' messages'),
             }, settings.shell.titleBarNoticeHistoryLimit,
             options.translate('settings.descriptions.titleBarNoticeHistoryLimit', 'How many the title bar keeps.')),
-          ], { icon: 'tool.interface' }),
+          ], {
+            icon: 'tool.interface',
+            actions: [
+              cardAction(
+                'locale.refresh',
+                options.translate('settings.actions.refreshLocales', 'Reload language files'),
+                'action.refresh',
+              ),
+              cardAction(
+                'locale-folder.open',
+                options.translate('settings.actions.openLocaleFolder', 'Open language folder'),
+                'folder.open',
+              ),
+            ],
+          }),
           card('updates', options.translate('settings.cards.updates', 'Updates'), [
             fieldItem('updates.showReleaseNotesAfterUpdate', {
               title: options.translate('settings.fields.showReleaseNotesAfterUpdate', 'Show release notes'),
@@ -377,8 +412,9 @@ export function useSettingsWorkspace(
             }, settings.appearance.theme),
             fieldItem('appearance.baseFontSize', {
               title: options.translate('settings.fields.baseFontSize', 'Base font size'),
-              fieldType: 'number', presentation: 'slider', min: 10, max: 16, step: 1,
-              ticks: [10, 11, 12, 13, 14, 15, 16], suffix: 'px',
+              fieldType: 'number', presentation: 'slider',
+              min: MIN_BASE_FONT_SIZE, max: MAX_BASE_FONT_SIZE, step: 1,
+              ticks: [13, 14, 15, 16, 17, 18, 19], suffix: 'px',
             }, settings.appearance.baseFontSize),
             fieldItem('appearance.phaseImageSpeed', {
               title: options.translate('settings.fields.phaseImageSpeed', 'Phase animation speed'),

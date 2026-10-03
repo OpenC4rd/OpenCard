@@ -542,6 +542,8 @@ describe('OcTree', () => {
     await (wrapper.vm as unknown as { beginRename: (key: string) => Promise<void> })
       .beginRename('root')
     const input = wrapper.get('input')
+    // 输入框出现时原来的标题必须让位：三者是一条 v-if / v-else-if / v-else 链，两个都画就是链断了。
+    expect(wrapper.find('.oc-tree__label').exists()).toBe(false)
     await input.setValue('Renamed')
     await input.trigger('keydown', { key: 'Enter' })
 
@@ -587,6 +589,8 @@ describe('OcTree', () => {
     await wrapper.get('input').setValue('Cancelled')
     await wrapper.get('input').trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('input').exists()).toBe(false)
+    // 取消之后标题要回来，不能被占位状态挡住。
+    expect(wrapper.find('.oc-tree__label').exists()).toBe(true)
     expect(wrapper.emitted('rename-commit')).toHaveLength(1)
     wrapper.unmount()
   })
@@ -746,9 +750,16 @@ describe('OcTree', () => {
       },
     })
 
-    await wrapper.get('button[aria-label="Duplicate"]').trigger('click')
+    await wrapper.get('button[aria-label="More actions"]').trigger('click')
+    const duplicate = document.body.querySelector<HTMLButtonElement>('button[aria-label="Duplicate"]')
+    expect(duplicate).not.toBeNull()
+    duplicate?.click()
+    await wrapper.vm.$nextTick()
     expect(wrapper.get('.oc-tree__row .oc-row__append').text()).toBe('Metadata')
-    expect(wrapper.get('button[aria-label="Delete: Protected"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('button[aria-label="More actions"]').trigger('click')
+    await wrapper.vm.$nextTick()
+    const deleteButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')
+    expect(deleteButton?.disabled).toBe(true)
     expect(wrapper.emitted('action')).toEqual([[
       { key: 'root', actionKey: 'duplicate', source: 'inline' },
     ]])
@@ -810,7 +821,7 @@ describe('OcTree', () => {
     resize([], {} as ResizeObserver)
     await wrapper.vm.$nextTick()
     expect(wrapper.findAllComponents(OcActionButton).map(button => button.props('action').key))
-      .toEqual(['top', 'up', 'delete'])
+      .toEqual(['__oc-tree-action-overflow__:root'])
   })
 
   it('trades the trailing text before trading the commands', async () => {
@@ -851,7 +862,7 @@ describe('OcTree', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.findAllComponents(OcActionButton).map(button => button.props('action').key))
-      .toEqual(['top', 'up'])
+      .toEqual(['__oc-tree-action-overflow__:root'])
   })
 
   it('renders no action container when a node declares no commands', () => {
@@ -906,7 +917,7 @@ describe('OcTree', () => {
     const actionPart = wrapper.get('.oc-node-tail__action')
     const actionButton = wrapper.getComponent(OcActionButton)
 
-    await actionButton.trigger('pointerenter')
+    await actionButton.get('button').trigger('click')
 
     expect(actionButton.classes()).toContain('is-menu-open')
     expect(actionPart.element.matches(':has(.oc-action-button.is-menu-open)')).toBe(true)

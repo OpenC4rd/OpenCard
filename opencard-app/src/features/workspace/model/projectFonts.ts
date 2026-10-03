@@ -14,7 +14,7 @@ export const projectFontIdPattern = /^[a-z0-9][a-z0-9._-]*$/
 export type FontCatalogEntry = {
   value: string
   label: string
-  source: 'system' | 'project'
+  source: 'system' | 'project' | 'project-file'
   detail?: string
   cssFamily?: string
 }

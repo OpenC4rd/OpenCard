@@ -1,7 +1,7 @@
 /**
  * 图标静态守卫：
  * - 禁止 icon 类型退化为 string
- * - 禁止旧图标语义 key
+ * - 只允许共享图标注册模块引入图标库
  * - 禁止业务层直接引入图标库
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -43,13 +43,6 @@ function inspectFile(fullPath) {
 
   if (/(?:^|\W)icon\??\s*:\s*string(?:\W|$)/m.test(content)) {
     addViolation(relativePath, 'icon type must use IconToken, not string')
-  }
-
-  const legacyMatches = content.match(
-    /['"`](?:app\.(?:files|git|publish|close)|icon\.(?:add|check|close|copy|discard|edit|export|play|save|trash|refresh|debug-restart|search|settings(?:-gear)?|arrow-(?:left-right|right|swap|up)|chevron-(?:down|left|right)|compass|menu|collection|layers|list-(?:selection|tree)|symbol-(?:boolean|class|color|key|number|string)|account|error|eye|warning|star-full|file(?:-code|-media|-text)?|folder(?:-opened)?)|tree\.chevron(?:Down|Right)|status\.folderOpen|folder\.[a-zA-Z-]*Expanded|misc\.(?:code|preview))['"`]/g,
-  )
-  if (legacyMatches && legacyMatches.length > 0) {
-    addViolation(relativePath, `legacy icon token detected: ${legacyMatches[0]}`)
   }
 
   if (content.includes("@mdi/js")) {

@@ -36,6 +36,7 @@ describe('useShellFileTree opened editors', () => {
     })
 
     expect(openedEditorTreeData.value.items.get('session-1')?.label).toBe('card.ocdocument')
+    expect(openedEditorTreeData.value.items.get('session-1')?.loading).toBe(true)
     expect(normalizeNodeTail(openedEditorTreeData.value.items.get('session-1')?.tail)).toEqual([{
       key: OPENED_EDITOR_CLOSE_ACTION_KEY,
       title: 'sidebar.closeEditor',
@@ -146,6 +147,7 @@ describe('useShellFileTree opened editors', () => {
       `${projectPath}/.opencard/locale.json`,
       `${projectPath}/.opencard/fonts/fonts.json`,
       `${projectPath}/.opencard/icons/icons.json`,
+      `${projectPath}/.opencard/blocks/blocks.json`,
       `${projectPath}/.opencard/packages`,
     ])
     expect(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`)?.label)
@@ -159,7 +161,7 @@ describe('useShellFileTree opened editors', () => {
       '.opencard/icons/icons.json',
     ])
     expect(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`))
-      .toMatchObject({ visual: { type: 'icon', icon: 'file.font', iconTone: 'config' } })
+      .toMatchObject({ visual: { type: 'icon', icon: 'file.font', iconTone: 'file-config' } })
     expect(result.projectManagementTreeData.value.children.has(`${projectPath}/.opencard/fonts/fonts.json`)).toBe(false)
     expect(result.projectManagementTreeData.value.children.has(`${projectPath}/.opencard/icons/icons.json`)).toBe(false)
     expect(normalizeNodeTail(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`)?.tail))

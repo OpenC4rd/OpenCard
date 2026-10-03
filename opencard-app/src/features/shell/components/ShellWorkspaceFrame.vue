@@ -2,12 +2,15 @@
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcText from '../../../components/base/OcText.vue'
+import OcSkeleton from '../../../components/base/OcSkeleton.vue'
 import type { OcActionDefinition } from '../../../shared/ui/action/action.types'
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
 import type { ShellAction, ShellWorkspaceAction } from '../shell.types'
 
 const props = defineProps<{
   title: string
+  /** 标题尚未准备好时显示骨架，并保留标题栏的布局空间。 */
+  titleLoading?: boolean
   icon?: IconToken
   iconTone?: IconTone
   subtitle?: string
@@ -38,11 +41,14 @@ function toActionDefinition(action: ShellAction): OcActionDefinition {
 </script>
 
 <template>
-  <section class="workspace-frame">
+  <section class="workspace-frame" :aria-busy="props.titleLoading || undefined">
     <header class="workspace-header">
       <div class="workspace-heading">
         <OcIcon v-if="props.icon" :name="props.icon" :tone="props.iconTone" size="md" />
-        <h1 class="workspace-title">{{ title }}</h1>
+        <h1 class="workspace-title">
+          <OcSkeleton v-if="props.titleLoading" width="md" height="md" />
+          <template v-else>{{ title }}</template>
+        </h1>
         <OcText v-if="props.subtitle" class="workspace-subtitle" size="xs" tone="muted" :truncate="true">
           {{ props.subtitle }}
         </OcText>

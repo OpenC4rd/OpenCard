@@ -1,5 +1,5 @@
 import { readonly, ref } from 'vue'
-import type { IconResolvable, IconTone } from '../../shared/ui/icon/iconRegistry'
+import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
 import { getAppErrorMeaning, reportAppError, type AppErrorCode } from '../logging/appErrorCatalog'
 import {
   DEFAULT_APP_SETTINGS,
@@ -10,7 +10,7 @@ import {
 export type ShellTitleBarNotice = {
   id: number
   tone?: IconTone
-  icon?: IconResolvable
+  icon?: IconToken
   message: string
 }
 
@@ -27,15 +27,15 @@ export function addTitleBarNotice(input: Omit<ShellTitleBarNotice, 'id'>): numbe
   return notice.id
 }
 
-export function notifySuccess(message: string, icon: IconResolvable = 'action.check'): number {
+export function notifySuccess(message: string, icon: IconToken = 'action.check'): number {
   return addTitleBarNotice({ message, tone: 'success', icon })
 }
 
-export function notifyWarning(message: string, icon: IconResolvable = 'status.warning'): number {
+export function notifyWarning(message: string, icon: IconToken = 'status.warning'): number {
   return addTitleBarNotice({ message, tone: 'warning', icon })
 }
 
-export function notifyError(message: string, icon: IconResolvable = 'status.error'): number {
+export function notifyError(message: string, icon: IconToken = 'status.error'): number {
   return addTitleBarNotice({ message, tone: 'danger', icon })
 }
 

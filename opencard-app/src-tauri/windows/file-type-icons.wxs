@@ -1,12 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   MSI 的文件关联只声明了 ProgId 与 Verb，没有写任何 DefaultIcon（见 Tauri 的 main.wxs 模板），
-  所以 .ocpack 在 MSI 安装后是空白图标。这个片段把资源包的图标指向随应用分发的
-  icons\ocpack.ico；片段通过 tauri.conf.json 的 bundle.windows.wix.componentGroupRefs 挂到安装器的功能组里。
+  所以 .ocblock 和 .ocpack 在 MSI 安装后是空白图标。这个片段把两种文件的图标指向随应用分发的
+  icons\ 下的文件；片段通过 tauri.conf.json 的 bundle.windows.wix.componentGroupRefs 挂到安装器的功能组里。
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <ComponentGroup Id="OpenCardFileTypeIcons">
+      <Component Id="OpenCardCustomBlockIcon" Directory="INSTALLDIR"
+        Guid="2D29A19A-1E18-4C45-9B94-0A4E54A6D78F">
+        <RegistryValue Root="HKCR" Key="OpenCard.ocblock\DefaultIcon" Type="string"
+          Value="&quot;[INSTALLDIR]icons\ocblock.ico&quot;,0" KeyPath="yes" />
+        <RegistryValue Root="HKCR" Key=".ocblock\DefaultIcon" Type="string"
+          Value="&quot;[INSTALLDIR]icons\ocblock.ico&quot;,0" />
+      </Component>
       <Component Id="OpenCardResourcePackageIcon" Directory="INSTALLDIR"
         Guid="C497109C-A77B-4DB5-B487-5D5005E021D8">
         <RegistryValue Root="HKCR" Key="OpenCard.ocpack\DefaultIcon" Type="string"

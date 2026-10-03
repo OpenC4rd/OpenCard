@@ -78,7 +78,7 @@ type UseShellEditorHostOptions = {
   translate: (key: string, params?: Record<string, unknown>) => string
 }
 
-const AUTO_SAVE_REGISTRY_EDITOR_IDS = new Set(['font-registry', 'icon-registry'])
+const AUTO_SAVE_REGISTRY_EDITOR_IDS = new Set(['font-registry', 'icon-registry', 'custom-block-registry'])
 
 type PendingViewportTransform = {
   sessionId: string
@@ -249,22 +249,20 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
     return Boolean(editorId && editorRegistry.getEditor(editorId)?.id === 'dictionary')
   })
 
-  const hasDataTableWorkbook = computed(() => isCardDesigner.value || isDictionaryEditor.value)
-
   const cardDesignerMode = computed<CardDesignerMode>(() => (
     options.activeSession.value?.uiState?.cardDesigner?.mode ?? 'design'
   ))
 
   const dataTableWorkbookBusy = computed(() => (
-    hasDataTableWorkbook.value && editorRef.value?.dataTableWorkbookBusy === true
+    editorRef.value?.dataTableWorkbookBusy === true
   ))
 
   const canExportDataTableWorkbook = computed(() => (
-    hasDataTableWorkbook.value && editorRef.value?.canExportDataTableWorkbook === true
+    editorRef.value?.canExportDataTableWorkbook === true
   ))
 
   const canRenderCardImage = computed(() => (
-    isCardDesigner.value && editorRef.value?.getImageRenderSource?.() != null
+    editorRef.value?.getImageRenderSource?.() != null
   ))
 
   function persistPendingViewportTransform(): void {
@@ -388,17 +386,17 @@ export function useShellEditorHost(options: UseShellEditorHostOptions) {
   }
 
   async function importDataTableWorkbook(): Promise<void> {
-    if (!hasDataTableWorkbook.value || dataTableWorkbookBusy.value) return
+    if (dataTableWorkbookBusy.value) return
     await editorRef.value?.importDataTableWorkbook?.()
   }
 
   async function exportDataTableWorkbook(): Promise<void> {
-    if (!hasDataTableWorkbook.value || dataTableWorkbookBusy.value || !canExportDataTableWorkbook.value) return
+    if (dataTableWorkbookBusy.value || !canExportDataTableWorkbook.value) return
     await editorRef.value?.exportDataTableWorkbook?.()
   }
 
   function getCardImageRenderSource() {
-    return isCardDesigner.value ? editorRef.value?.getImageRenderSource?.() ?? null : null
+    return editorRef.value?.getImageRenderSource?.() ?? null
   }
 
   async function flushAffectedSessions(sessionIds: readonly string[]): Promise<void> {

@@ -84,7 +84,7 @@ const treeData = computed<OcNodeCollection>(() => {
     const coordinate = pkg ? formatPackageCoordinate(pkg.coordinate) : ''
     items.set(file.archivePath, {
       label: title,
-      visual: { type: 'icon', icon: 'file.package', iconTone: 'opencard' },
+      visual: { type: 'icon', icon: 'file.package', iconTone: 'file-opencard' },
       // 封面是包解开之后的资源：没解开的包没有封面，媒体区留空。
       ...(pkg?.cover ? { cover: { type: 'image' as const, src: pkg.cover.src, label: `${coordinate || title} ${t('packageManifest.coverAlt')}` } } : {}),
       tail: [...(coordinate ? [coordinate] : []), REVEAL_ACTION, removeAction(title)],

@@ -1,16 +1,21 @@
 //! Windows 文件类型图标注册。
 //!
 //! 安装器给 OpenCard 各扩展名写下的 `DefaultIcon` 都指向应用本体（NSIS）或者根本没有写（MSI），
-//! 而 Tauri 的 `fileAssociations` 没有按扩展名指定图标的字段，所以 `.ocpack` 的专用图标必须在
+//! 而 Tauri 的 `fileAssociations` 没有按扩展名指定图标的字段，所以 `.ocblock` 和 `.ocpack` 的专用图标必须在
 //! 安装器里补写、或者在应用启动时按当前用户补写。两条路写的是同一个值：这里只写 HKCU，
 //! 既不需要管理员权限，也能盖住两种安装器写下的机器级关联。
 //!
 //! 值已经正确、图标文件也没换过时不做任何写入。只换图标文件（路径不变）时外壳会继续用缓存里的
 //! 旧图，所以这里另外记一份图标文件的指纹，指纹变了就通知外壳刷新。
 
-/// 把 `.ocpack` 的图标指向随应用分发的图标文件；返回值表示这次是否真的动了注册表或通知了外壳。
+/// 把 `.ocpack` 的图标指向随应用分发的图标文件。
 pub fn register_resource_package_icon(icon_path: &std::path::Path) -> Result<bool, String> {
-    platform::register(icon_path)
+    platform::register(icon_path, ".ocpack", "resourcePackage")
+}
+
+/// 把 `.ocblock` 的图标指向随应用分发的图标文件。
+pub fn register_custom_block_icon(icon_path: &std::path::Path) -> Result<bool, String> {
+    platform::register(icon_path, ".ocblock", "customBlock")
 }
 
 #[cfg(target_os = "windows")]
@@ -25,21 +30,18 @@ mod platform {
         SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_FLUSH, SHCNF_IDLIST,
     };
 
-    /// 资源包扩展名在注册表里的位置，以及它当前指向的关联类。
-    const EXTENSION_KEY: &str = r"Software\Classes\.ocpack";
     /// 记录图标文件指纹的位置：外壳按路径缓存图标，只换文件不会让它重新取图。
     const STAMP_KEY: &str = r"Software\OpenCard\FileTypeIcons";
-    const STAMP_VALUE: &str = "resourcePackage";
 
-    pub fn register(icon_path: &Path) -> Result<bool, String> {
+    pub fn register(icon_path: &Path, extension: &str, stamp_value: &str) -> Result<bool, String> {
         let value = format!("\"{}\",0", icon_path.display());
         let mut changed = false;
-        for key in icon_keys() {
+        for key in icon_keys(extension) {
             changed |= set_string(&key, None, &value)?;
         }
         let stamp = icon_stamp(icon_path)?;
-        if read_string(HKEY_CURRENT_USER, STAMP_KEY, Some(STAMP_VALUE)).as_deref() != Some(&stamp) {
-            set_string(STAMP_KEY, Some(STAMP_VALUE), &stamp)?;
+        if read_string(HKEY_CURRENT_USER, STAMP_KEY, Some(stamp_value)).as_deref() != Some(&stamp) {
+            set_string(STAMP_KEY, Some(stamp_value), &stamp)?;
             changed = true;
         }
         if changed {
@@ -74,10 +76,11 @@ mod platform {
 
     /// 需要写入的 `DefaultIcon` 键：扩展名自身兜底，再加上当前关联类——安装器各自用的是不同的类名
     /// （NSIS 用关联的 name，MSI 用 `product_name.ext`），所以从注册表读当时真正的那一个。
-    fn icon_keys() -> Vec<String> {
-        let mut keys = vec![format!(r"{EXTENSION_KEY}\DefaultIcon")];
-        let prog_id = read_string(HKEY_CURRENT_USER, EXTENSION_KEY, None)
-            .or_else(|| read_string(HKEY_LOCAL_MACHINE, EXTENSION_KEY, None));
+    fn icon_keys(extension: &str) -> Vec<String> {
+        let extension_key = format!(r"Software\Classes\{extension}");
+        let mut keys = vec![format!(r"{extension_key}\DefaultIcon")];
+        let prog_id = read_string(HKEY_CURRENT_USER, &extension_key, None)
+            .or_else(|| read_string(HKEY_LOCAL_MACHINE, &extension_key, None));
         let Some(prog_id) = prog_id.filter(|value| !value.is_empty()) else {
             return keys;
         };
@@ -180,7 +183,7 @@ mod platform {
 
 #[cfg(not(target_os = "windows"))]
 mod platform {
-    pub fn register(_icon_path: &std::path::Path) -> Result<bool, String> {
+    pub fn register(_icon_path: &std::path::Path, _extension: &str, _stamp_value: &str) -> Result<bool, String> {
         Ok(false)
     }
 }

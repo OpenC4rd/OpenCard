@@ -33,7 +33,7 @@ describe('appSettings', () => {
         theme: 'light',
         locale: 'zh-CN',
         glassIntensity: 100,
-        baseFontSize: 12,
+        baseFontSize: 13,
         phaseImageSpeed: 400,
         micaBackground: false,
         themeOverrides: { dark: {}, light: {} },
@@ -364,11 +364,25 @@ describe('appSettings', () => {
       },
     })
 
-    expect(settings.appearance.baseFontSize).toBe(16)
+    expect(settings.appearance.baseFontSize).toBe(19)
     expect(settings.appearance.fontFamilies).toEqual({
       dark: 'Inter; Microsoft YaHei UI',
       light: 'system',
     })
+  })
+
+  it('keeps a user language file id and falls back for anything else', () => {
+    const localeOf = (locale: unknown) => normalizeAppSettings({
+      version: APP_SETTINGS_VERSION,
+      appearance: { locale },
+    }).appearance.locale
+
+    expect(localeOf('fr-FR.json')).toBe('fr-FR.json')
+    expect(localeOf('zh-CN')).toBe('zh-CN')
+    expect(localeOf('system')).toBe('system')
+    expect(localeOf('fr-FR')).toBe('system')
+    expect(localeOf('fr/FR.json')).toBe('system')
+    expect(localeOf(12)).toBe('system')
   })
 
   it('falls back field-by-field for malformed current-version data', () => {

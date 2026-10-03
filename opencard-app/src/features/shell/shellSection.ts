@@ -5,6 +5,7 @@ export interface ShellSpaceDefinition {
   key: SpaceKey
   labelKey: string
   icon: IconToken
+  railGroup?: 'primary' | 'secondary'
 }
 
 /**
@@ -16,7 +17,7 @@ export const shellSpaceDefinitions: Record<SpaceKey, ShellSpaceDefinition> = {
   workbench: { key: 'workbench', labelKey: 'app.shell.space.workbench', icon: 'nav.workbench' },
   market: { key: 'market', labelKey: 'app.shell.space.market', icon: 'nav.market' },
   test: { key: 'test', labelKey: 'app.shell.space.test', icon: 'nav.test' },
-  settings: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'tool.settings' },
+  settings: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'tool.settings', railGroup: 'secondary' },
 }
 
 export const shellSpaceKeys = Object.keys(shellSpaceDefinitions) as SpaceKey[]

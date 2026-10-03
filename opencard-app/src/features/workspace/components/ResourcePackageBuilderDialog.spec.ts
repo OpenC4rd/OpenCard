@@ -152,38 +152,39 @@ describe('ResourcePackageBuilderDialog selection', () => {
     expect(actionsOf(tree.props('data') as OcNodeCollection, 'icon-series:status')).toEqual(['deselect'])
   })
 
-  it('shows project images by directory without paths or counts and builds from the selection', async () => {
+  it('shows project files by directory and builds from the selection', async () => {
     const wrapper = mountBuilder(imageEntries)
     const tree = wrapper.findComponent(OcTree)
     let data = tree.props('data') as OcNodeCollection
 
-    expect(data.children.get('category:images')).toEqual(['folder:images:images'])
-    expect(data.children.get('folder:images:images')).toEqual([
-      'image:images/card.png', 'folder:images:images/nested',
+    expect(data.children.get('category:other-files')).toEqual(['folder:other-files:images'])
+    expect(data.children.get('folder:other-files:images')).toEqual([
+      'file:images/card.png', 'folder:other-files:images/nested', 'file:images/notes.txt',
     ])
-    expect(data.items.has('image:images/nested/banner.svg')).toBe(true)
-    expect([...data.items.keys()].some(key => key.includes('notes.txt') || key.includes('.opencard')
+    expect(data.items.has('file:images/nested/banner.svg')).toBe(true)
+    expect(data.items.has('file:images/notes.txt')).toBe(true)
+    expect([...data.items.keys()].some(key => key.includes('.opencard')
       || key.includes('.git') || key.includes('outside'))).toBe(false)
-    expect(data.items.get('category:images')?.tail).toBeUndefined()
+    expect(data.items.get('category:other-files')?.tail).toBeUndefined()
     // An image row carries only its selection command, with no descriptive text part.
-    expect(normalizeNodeTail(data.items.get('image:images/card.png')?.tail).filter(part => typeof part === 'string'))
+    expect(normalizeNodeTail(data.items.get('file:images/card.png')?.tail).filter(part => typeof part === 'string'))
       .toEqual([])
-    expect(actionsOf(data, 'image:images/card.png')).toEqual(['deselect'])
+    expect(actionsOf(data, 'file:images/card.png')).toEqual(['deselect'])
 
-    tree.vm.$emit('action', { key: 'image:images/card.png', actionKey: 'deselect', source: 'inline' })
+    tree.vm.$emit('action', { key: 'file:images/card.png', actionKey: 'deselect', source: 'inline' })
     await nextTick()
-    tree.vm.$emit('action', { key: 'image:images/nested/banner.svg', actionKey: 'deselect', source: 'inline' })
+    tree.vm.$emit('action', { key: 'file:images/nested/banner.svg', actionKey: 'deselect', source: 'inline' })
     await nextTick()
     data = tree.props('data') as OcNodeCollection
-    expect(actionsOf(data, 'image:images/card.png')).toEqual(['select'])
+    expect(actionsOf(data, 'file:images/card.png')).toEqual(['select'])
 
-    tree.vm.$emit('action', { key: 'image:images/card.png', actionKey: 'select', source: 'inline' })
+    tree.vm.$emit('action', { key: 'file:images/card.png', actionKey: 'select', source: 'inline' })
     await nextTick()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Project',
-      imageSelection: { paths: ['images/card.png'] },
+      otherSelection: { paths: ['images/notes.txt', 'images/card.png'] },
     }))
   })
 
@@ -265,8 +266,8 @@ describe('ResourcePackageBuilderDialog selection', () => {
     expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
     expect(actionsOf(data, 'font-composition:body')).toEqual(['select'])
     expect(actionsOf(data, 'icon-series:status')).toEqual(['select'])
-    expect(actionsOf(data, 'image:images/nested/banner.svg')).toEqual(['deselect'])
-    expect(actionsOf(data, 'image:images/card.png')).toEqual(['select'])
+    expect(actionsOf(data, 'file:images/nested/banner.svg')).toEqual(['deselect'])
+    expect(actionsOf(data, 'file:images/card.png')).toEqual(['select'])
     // The remembered package name and version come back; the version would otherwise default to 1.0.0.
     const fields = wrapper.findAll('.resource-package-builder__fields input')
     expect((fields[0]!.element as HTMLInputElement).value).toBe('Theme')
@@ -277,7 +278,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
     await flushPromises()
     expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Theme',
-      imageSelection: { paths: ['images/nested/banner.svg'] },
+      otherSelection: { paths: ['images/nested/banner.svg'] },
       fontSelection: { familyKeys: ['cjk'], compositionKeys: [] },
       iconSelection: { seriesKeys: [] },
     }))
@@ -286,7 +287,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
   it('remembers the build inputs for the project and restores them on reopen', async () => {
     const wrapper = mountBuilder(imageEntries)
     const tree = wrapper.findComponent(OcTree)
-    tree.vm.$emit('action', { key: 'image:images/card.png', actionKey: 'deselect', source: 'inline' })
+    tree.vm.$emit('action', { key: 'file:images/card.png', actionKey: 'deselect', source: 'inline' })
     await nextTick()
     tree.vm.$emit('action', { key: 'font-family:latin', actionKey: 'deselect', source: 'inline' })
     await nextTick()
@@ -307,7 +308,9 @@ describe('ResourcePackageBuilderDialog selection', () => {
       fontFamilyKeys: ['cjk'],
       fontCompositionKeys: [],
       iconSeriesKeys: [],
-      imagePaths: ['images/nested/banner.svg'],
+      customBlockKeys: [],
+      imagePaths: [],
+      otherPaths: ['images/nested/banner.svg', 'images/notes.txt'],
     })
 
     const reopened = mountBuilder(imageEntries)
@@ -315,7 +318,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
     const data = reopenedTree.props('data') as OcNodeCollection
     expect(actionsOf(data, 'font-family:latin')).toEqual(['select'])
     expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
-    expect(actionsOf(data, 'image:images/card.png')).toEqual(['select'])
-    expect(actionsOf(data, 'image:images/nested/banner.svg')).toEqual(['deselect'])
+    expect(actionsOf(data, 'file:images/card.png')).toEqual(['select'])
+    expect(actionsOf(data, 'file:images/nested/banner.svg')).toEqual(['deselect'])
   })
 })

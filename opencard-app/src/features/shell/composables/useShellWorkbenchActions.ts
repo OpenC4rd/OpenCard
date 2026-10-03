@@ -112,7 +112,8 @@ export function useShellWorkbenchActions(options: {
   async function handleProjectRenameCommit(event: OcNodeRenameCommitEvent): Promise<void> {
     const result = await options.project.renameEntry(event.key, event.name)
     if (result.ok) options.editor.remapSessionPaths(result.fromPath, result.toPath)
-    else notifyWarning(t('app.notifications.renameRejected'))
+    // 名字没改（输入框里原样确认）不是失败：什么都没发生，也就不必报。
+    else if (result.reason !== 'same-path') notifyWarning(t('app.notifications.renameRejected'))
   }
   async function handleProjectMove(event: OcNodeMoveEvent): Promise<void> {
     const result = await options.project.moveEntryByDrop(event)

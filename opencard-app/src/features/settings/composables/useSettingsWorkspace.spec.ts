@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
+import type { AppLocaleOption } from '../../../i18n/appLocale'
 import type { EditorItem, EditorItemEditorPart } from '../../../shared/ui/property-editor/propertyEditor.types'
 import { createDefaultAppSettings, type SettingsCategoryKey } from '../model/appSettings'
 import { useSettingsWorkspace, type SettingsCategoryViewModel } from './useSettingsWorkspace'
@@ -21,6 +22,13 @@ function rowOf(category: SettingsCategoryViewModel, key: string): EditorItem {
 /** 缓存面板读的现量占用；这些用例只关心它怎么投影成行。 */
 const cacheUsage = ref({ snapshots: 1.5 * 1024 ** 3, network: 2048, staged: 0 })
 
+/** 语言行读的可选语言：内置两种，外加一份用户语言文件（id 就是文件名）。 */
+const availableLocales = ref<readonly AppLocaleOption[]>([
+  { id: 'zh-CN', label: '简体中文' },
+  { id: 'en-US', label: 'English' },
+  { id: 'ja.json', label: 'ja' },
+])
+
 describe('useSettingsWorkspace', () => {
   it('projects general settings as cards of single-value rows', () => {
     const categoryKey = ref<SettingsCategoryKey>('general')
@@ -28,6 +36,7 @@ describe('useSettingsWorkspace', () => {
     const { categoryTreeData, activeCategory } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen,
       cacheUsage,
+      appLocales: availableLocales,
       translate: (_key, fallback) => fallback,
     })
 
@@ -70,9 +79,15 @@ describe('useSettingsWorkspace', () => {
     expect(cache.actions).toMatchObject([{ key: 'cache.clear', disabled: false }])
     projectOpen.value = true
     expect(cardOf(activeCategory.value, 'cache').actions).toMatchObject([{ key: 'cache.clear', disabled: true }])
-    expect(editor(rowOf(activeCategory.value, 'appearance.locale'))).toMatchObject({
+    const language = editor(rowOf(activeCategory.value, 'appearance.locale'))
+    expect(language).toMatchObject({
       value: 'system',
       definition: { fieldType: 'string', presentation: 'select' },
+    })
+    // 用户语言文件按文件名进候选；内置语言的标签是语言自称，不是翻译。
+    expect(language.definition).toMatchObject({
+      options: ['system', 'zh-CN', 'en-US', 'ja.json'],
+      optionLabels: { system: 'System', 'zh-CN': '简体中文', 'en-US': 'English', 'ja.json': 'ja' },
     })
     expect(editor(rowOf(activeCategory.value, 'shell.titleBarNoticeHistoryLimit'))).toMatchObject({
       value: 128,
@@ -80,6 +95,29 @@ describe('useSettingsWorkspace', () => {
         fieldType: 'number', presentation: 'slider', min: 1, max: 512,
         ticks: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
       },
+    })
+  })
+
+  it('keeps the selected language visible after its file is gone', () => {
+    const settings = createDefaultAppSettings()
+    settings.appearance.locale = 'ja.json'
+    const categoryKey = ref<SettingsCategoryKey>('general')
+    const { activeCategory } = useSettingsWorkspace({
+      settings: ref(settings), categoryKey, projectOpen: ref(false),
+      appLocales: ref<readonly AppLocaleOption[]>([
+        { id: 'zh-CN', label: '简体中文' },
+        { id: 'en-US', label: 'English' },
+      ]),
+      cacheUsage,
+      translate: (_key, fallback) => fallback,
+    })
+
+    // 设置里的值不改写，行里也仍然看得见它，只是标出文件已经不在。
+    const language = editor(rowOf(activeCategory.value, 'appearance.locale'))
+    expect(language.value).toBe('ja.json')
+    expect(language.definition).toMatchObject({
+      options: ['system', 'zh-CN', 'en-US', 'ja.json'],
+      optionLabels: { 'ja.json': 'ja.json (file missing)' },
     })
   })
 
@@ -102,13 +140,21 @@ describe('useSettingsWorkspace', () => {
       settings: ref(settings), categoryKey, projectOpen: ref(false),
       systemFontFamilies: ref(['Inter', 'Microsoft YaHei UI']),
       cacheUsage,
+      appLocales: availableLocales,
       translate: (_key, fallback) => fallback,
     })
 
     expect(activeCategory.value.preview).toEqual({ glassIntensity: 60 })
     expect(activeCategory.value.cards.map(card => card.key)).toEqual(['theme:dark', 'theme:light', 'interface'])
     expect(editor(rowOf(activeCategory.value, 'appearance.baseFontSize')))
-      .toMatchObject({ definition: { presentation: 'slider', ticks: [10, 11, 12, 13, 14, 15, 16] } })
+      .toMatchObject({
+        definition: {
+          presentation: 'slider',
+          min: 13,
+          max: 19,
+          ticks: [13, 14, 15, 16, 17, 18, 19],
+        },
+      })
 
     const darkTheme = cardOf(activeCategory.value, 'theme:dark')
     const lightTheme = cardOf(activeCategory.value, 'theme:light')
@@ -141,6 +187,7 @@ describe('useSettingsWorkspace', () => {
     const { activeCategory } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen,
       cacheUsage,
+      appLocales: availableLocales,
       translate: (_key, fallback) => fallback,
     })
 
@@ -160,6 +207,7 @@ describe('useSettingsWorkspace', () => {
     const { activeCategory } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
       cacheUsage,
+      appLocales: availableLocales,
       translate: (_key, fallback) => fallback,
     })
 
@@ -185,6 +233,7 @@ describe('useSettingsWorkspace', () => {
     const { activeCategory } = useSettingsWorkspace({
       settings: settingsRef, categoryKey, projectOpen: ref(false),
       cacheUsage,
+      appLocales: availableLocales,
       translate: (_key, fallback) => fallback,
     })
 
@@ -222,6 +271,7 @@ describe('useSettingsWorkspace', () => {
     const { settingsAnchorFor } = useSettingsWorkspace({
       settings: ref(createDefaultAppSettings()), categoryKey, projectOpen: ref(false),
       cacheUsage,
+      appLocales: availableLocales,
       translate: (_key, fallback) => fallback,
     })
 

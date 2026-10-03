@@ -9,7 +9,7 @@ import {
   findProjectIcon,
   type ProjectIconCatalogEntry,
 } from './projectIconCatalog'
-import type { ProjectFontRegistryEntry } from '../model/projectFontRegistry'
+import { projectFontSources, type ProjectFontRegistryEntry } from '../model/projectFontRegistry'
 import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
 import { toCssFontFamily, type FontCatalogEntry } from '../model/projectFonts'
 
@@ -279,6 +279,12 @@ export function buildResourceFontCatalog(
   for (const [key, entry] of Object.entries(environment.fonts)) {
     entries.push({ value: `font:${key}`, label: entry.name, source: 'project', detail: `font:${key}`,
       cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, environment, toCssFontFamily) })
+  }
+  for (const entry of Object.values(environment.fonts)) {
+    if (entry.kind !== 'family') continue
+    for (const source of projectFontSources(entry.family)) {
+      entries.push({ value: source, label: source.split('/').pop() ?? source, source: 'project-file', detail: source })
+    }
   }
   // 环境按坐标索引，引用值就写完整坐标：`作者/包名@版本#font:key`。
   // 挑中的东西写死版本 —— 用户挑的就是这个长相。坐标里的 `@` 与引用分段符 `#` 不同，

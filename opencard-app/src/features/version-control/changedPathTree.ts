@@ -18,7 +18,7 @@ export type ChangedPathEntry = {
 }
 
 function fileName(path: string): string {
-  return path.split('/').pop() ?? path
+  return path.replace(/\/+$/, '').split('/').pop() ?? path
 }
 
 /**
@@ -34,7 +34,7 @@ function nodeKey(keyPrefix: string, path: string): string {
  * 返回 null 表示这个文件不属于任何点目录，直接挂在根上。
  */
 function dotFolderOf(path: string): string | null {
-  const segments = path.split('/')
+  const segments = path.replace(/\/+$/, '').split('/')
   return segments.slice(0, -1).find(segment => segment.startsWith('.')) ?? null
 }
 

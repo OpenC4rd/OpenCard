@@ -122,6 +122,7 @@ import ImagePreviewEditor from '../../../components/editors/ImagePreviewEditor.v
 import ProjectConfigEditor from '../../../components/editors/ProjectConfigEditor.vue'
 import ProjectFontRegistryFileEditor from '../../../components/editors/ProjectFontRegistryFileEditor.vue'
 import ProjectIconRegistryFileEditor from '../../../components/editors/ProjectIconRegistryFileEditor.vue'
+import ProjectCustomBlockRegistryFileEditor from '../../../components/editors/ProjectCustomBlockRegistryFileEditor.vue'
 import PackageManifestEditor from '../../../components/editors/PackageManifestEditor.vue'
 import PackageManagerEditor from '../../../components/editors/PackageManagerEditor.vue'
 import DictionaryEditor from '../../../components/editors/DictionaryEditor.vue'
@@ -175,6 +176,14 @@ editorRegistry.register({
   id: 'icon-registry',
   name: 'Project Icon Registry',
   component: ProjectIconRegistryFileEditor,
+  hasPreview: false,
+  supportsDiff: true,
+})
+
+editorRegistry.register({
+  id: 'custom-block-registry',
+  name: 'Project Custom Block Registry',
+  component: ProjectCustomBlockRegistryFileEditor,
   hasPreview: false,
   supportsDiff: true,
 })

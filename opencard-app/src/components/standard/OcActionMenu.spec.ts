@@ -119,6 +119,40 @@ describe('OcActionMenu', () => {
     wrapper.unmount()
   })
 
+  it('keeps the child menu alive while a command inside it is being pressed', async () => {
+    const wrapper = mount(OcActionMenu, {
+      attachTo: document.body,
+      props: {
+        actions: [{
+          key: 'trash',
+          title: 'Trash',
+          children: [{ key: 'confirm', title: 'Confirm' }],
+        }],
+      },
+    })
+    const branch = wrapper.get<HTMLButtonElement>('[role="menuitem"]')
+    branch.element.closest('.oc-action-menu__item')!.dispatchEvent(new Event('pointerenter'))
+    await wrapper.vm.$nextTick()
+    const confirm = document.body.querySelector<HTMLButtonElement>(
+      '.oc-action-menu__button[aria-label="Confirm"]',
+    )!
+    expect(confirm).not.toBeNull()
+
+    // 先点一下分支：焦点落在分支项里（点它本身没有动作，但焦点留在了那儿）。
+    branch.element.focus()
+    await wrapper.vm.$nextTick()
+
+    // 再按子菜单里的命令：焦点离开分支项会排一个延迟关闭，命令必须在那个延迟之后依然接得住。
+    confirm.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }))
+    confirm.focus()
+    await new Promise((resolve) => window.setTimeout(resolve, 150))
+    expect(confirm.isConnected).toBe(true)
+
+    confirm.click()
+    expect(wrapper.emitted('select')).toEqual([[{ key: 'confirm' }]])
+    wrapper.unmount()
+  })
+
   it('requests dismissal on Escape', async () => {
     const wrapper = mount(OcActionMenu, {
       props: { actions: [{ key: 'rename', title: 'Rename' }] },

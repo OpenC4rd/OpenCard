@@ -56,6 +56,7 @@
         :role="rowRole"
         :tabindex="props.tabNavigation === 'roving' && activeKey === entry.key && !entry.item.disabled ? 0 : -1"
         :aria-disabled="entry.item.disabled || undefined"
+        :aria-busy="entry.item.loading || undefined"
         :aria-selected="props.role !== 'menu' && props.selectionMode !== 'none' ? isSelected(entry.key) : undefined"
         :aria-expanded="isExpandable(entry.key) ? isExpanded(entry.key) : undefined"
         :aria-posinset="props.virtualized ? entry.index + 1 : undefined"
@@ -117,6 +118,11 @@
             @keydown.stop="handleRenameKeydown($event, entry.key)"
             @blur="commitRename(entry.key)"
           />
+          <OcSkeleton
+            v-else-if="entry.item.loading"
+            width="sm"
+            height="sm"
+          />
           <OcText
             v-else
             class="oc-tree__label"
@@ -152,6 +158,7 @@ import OcIcon from '../base/OcIcon.vue'
 import OcNodeTail from './OcNodeTail.vue'
 import OcRow from './OcRow.vue'
 import OcText from '../base/OcText.vue'
+import OcSkeleton from '../base/OcSkeleton.vue'
 import OcVisual from '../base/OcVisual.vue'
 import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
 import { resolveNodeSelection, type OcNodeSelectionMode } from '../../shared/ui/node/nodeSelection'
@@ -451,9 +458,7 @@ function withCommandsRevealed<T>(measure: () => T): T {
 }
 
 /**
- * A row yields space in one order: the trailing text first, then the commands (all of them replaced
- * by one overflow menu), and only then the title. This pass decides the middle step — a row collapses
- * its commands exactly while the title cannot be shown in full without that trade.
+ * A row yields space in one order: the trailing text first, then one action menu, and only then the title.
  */
 function syncActionOverflow(): void {
   const nextCollapsed = new Set(collapsedActionKeys.value)
@@ -702,13 +707,13 @@ function tailActionParts(key: OcNodeKey): OcActionDefinition[] {
 }
 
 /**
- * The node's trailing line in order. When the row runs out of label space, its commands are
- * replaced by one overflow menu placed at the first command's position.
+ * The node's trailing line in order. Multiple commands always use one menu so the first click
+ * opens the menu and pointer movement can select the next action.
  */
 function resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNodeTailPart[] {
   const parts = normalizeNodeTail(tail)
   const actions = parts.filter(isNodeTailAction)
-  if (actions.length <= 1 || !collapsedActionKeys.value.has(key)) return parts
+  if (actions.length <= 1) return parts
   let overflowPlaced = false
   return parts.flatMap((part): OcNodeTailPart[] => {
     if (!isNodeTailAction(part)) return [part]
@@ -1076,6 +1081,10 @@ onBeforeUnmount(() => {
   font-size: var(--oc-size-sm);
   transform-origin: center;
   transition: transform var(--oc-duration-fast) var(--oc-ease);
+}
+
+.oc-tree__node-visual.is-expanded {
+  transform: rotate(45deg);
 }
 
 .oc-tree.is-fill {

@@ -137,6 +137,7 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
   box-sizing: border-box;
   display: grid;
   min-height: var(--oc-page-editor-row-min-height);
+  padding-block: var(--oc-space-3);
   grid-template-columns: minmax(var(--oc-page-editor-title-min-width), 1fr)
     minmax(var(--oc-page-editor-content-min-width), 1fr);
   align-items: center;
@@ -198,7 +199,6 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
     gap: var(--oc-space-2);
-    padding-block: var(--oc-space-3);
   }
 
   .page-property-editor-item__content {

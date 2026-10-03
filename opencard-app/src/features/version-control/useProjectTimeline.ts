@@ -83,7 +83,7 @@ export function useProjectTimeline(
       const changedFiles = Array.isArray(commit.changedFiles) ? commit.changedFiles : []
       if (!includeChangedPaths || changedFiles.length === 0) continue
       const fileTree = createChangedPathTree(changedFiles.map(file => {
-        const presentation = resolveEntryIcon(file.path, false)
+        const presentation = resolveEntryIcon(file.path, file.path.endsWith('/'))
         return {
           path: file.path,
           node: {
@@ -130,7 +130,7 @@ export function useProjectTimeline(
   /** 更改列表的节点 key 就是项目相对路径。 */
   const changesTreeData = computed<OcNodeCollection>(() => createChangedPathTree(
     changeEntries.value.map(entry => {
-      const presentation = resolveEntryIcon(entry.path, false)
+      const presentation = resolveEntryIcon(entry.path, entry.path.endsWith('/'))
       return {
         path: entry.path,
         node: {

@@ -102,13 +102,10 @@ describe('OcActionButton', () => {
     expect(document.body.querySelector('.oc-floating-layer')).toBeNull()
     expect(addListener.mock.calls.some(([type]) => type === 'pointerdown')).toBe(false)
 
-    await wrapper.trigger('pointerenter')
+    await wrapper.get('button').trigger('click')
     await flushPromises()
     expect(document.body.querySelector('.oc-floating-layer')).not.toBeNull()
     expect(wrapper.classes()).toContain('is-menu-open')
-    expect(addListener.mock.calls.some(([type]) => type === 'pointerdown')).toBe(false)
-
-    await wrapper.get('button').trigger('click')
     expect(addListener.mock.calls.some(([type]) => type === 'pointerdown')).toBe(true)
     wrapper.unmount()
   })
@@ -133,7 +130,7 @@ describe('OcActionButton', () => {
       },
     })
 
-    await wrapper.trigger('pointerenter')
+    await wrapper.get('button').trigger('click')
     await flushPromises()
 
     const layer = document.body.querySelector<HTMLElement>('.oc-action-button__floating')
@@ -146,7 +143,7 @@ describe('OcActionButton', () => {
     wrapper.unmount()
   })
 
-  it('keeps a hover-opened menu open when the action button is clicked', async () => {
+  it('keeps a clicked menu open when the pointer leaves the action button', async () => {
     const wrapper = mount(OcActionButton, {
       attachTo: document.body,
       props: {
@@ -158,11 +155,10 @@ describe('OcActionButton', () => {
       },
     })
 
-    await wrapper.trigger('pointerenter')
+    await wrapper.get('button[aria-label="More"]').trigger('click')
     await flushPromises()
     expect(document.body.querySelector('.oc-action-menu')).not.toBeNull()
 
-    await wrapper.get('button[aria-label="More"]').trigger('click')
     await wrapper.trigger('pointerleave')
     await new Promise((resolve) => window.setTimeout(resolve, 120))
     await flushPromises()

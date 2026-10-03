@@ -40,6 +40,20 @@ describe('useProjectTimeline', () => {
     mocks.readStatus.mockResolvedValue(ok({ entries: [] }))
   })
 
+  it('keeps untracked directory paths while displaying their names and folder icons', async () => {
+    mocks.readStatus.mockResolvedValueOnce(ok({ entries: [
+      statusEntry('.opencard/', { worktreeNew: true }),
+      statusEntry('assets/', { worktreeNew: true }),
+    ] }))
+    const state = useTimeline(ref('D:/Cards/demo'))
+    await vi.waitFor(() => expect(state.changesTreeData.value.rootKeys).toEqual(['.opencard/', 'assets/']))
+    const tree = state.changesTreeData.value
+    expect(tree.children.size).toBe(0)
+    expect(tree.items.get('.opencard/')?.label).toBe('.opencard')
+    expect(tree.items.get('assets/')?.label).toBe('assets')
+    expect(tree.items.get('.opencard/')?.visual).toMatchObject({ icon: 'folder.generic' })
+  })
+
   it('stays empty without a current project', async () => {
     const state = useTimeline(ref<string | null>(null))
     await nextTick()

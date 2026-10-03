@@ -8,6 +8,7 @@ export { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from './resourceP
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
 import {
   PROJECT_ICON_DIRECTORY,
+  PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
   PROJECT_INTERNAL_DIRECTORY_NAME,
   PROJECT_PACKAGE_DIRECTORY,
 } from './projectStructure'
@@ -36,18 +37,16 @@ export interface EntryIconPresentation {
 type EntryIconTone = IconTone
 
 const iconTone = {
-  opencard: 'opencard',
-  json: 'json',
-  markdown: 'markdown',
-  typescript: 'typescript',
-  javascript: 'javascript',
-  vue: 'vue',
-  html: 'html',
-  css: 'css',
-  image: 'image',
-  config: 'config',
-  folderDefault: 'folder-default',
-  folderOpen: 'folder-open',
+  opencard: 'file-opencard',
+  json: 'file-json',
+  markdown: 'file-markdown',
+  typescript: 'file-typescript',
+  javascript: 'file-javascript',
+  vue: 'file-vue',
+  html: 'file-html',
+  css: 'file-css',
+  image: 'file-image',
+  config: 'file-config',
 } as const satisfies Record<string, EntryIconTone>
 
 const defaultFileType: FileTypeDefinition = {
@@ -99,6 +98,16 @@ const fileTypes: FileTypeDefinition[] = [
     previewable: true,
   },
   {
+    id: 'opencard-custom-block-registry',
+    labelKey: 'fileTypes.opencardCustomBlockRegistry',
+    patterns: [PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME],
+    icon: 'entity.block-custom',
+    iconTone: iconTone.config,
+    language: 'json',
+    editorId: 'custom-block-registry',
+    previewable: true,
+  },
+  {
     id: 'opencard-dictionary',
     labelKey: 'fileTypes.opencardDictionary',
     patterns: ['.opencard/locale.json'],
@@ -145,7 +154,7 @@ const fileTypes: FileTypeDefinition[] = [
     labelKey: 'fileTypes.opencardCustomBlock',
     extensions: ['ocblock'],
     icon: 'entity.block-custom',
-    iconTone: 'muted',
+    iconTone: 'block-simple-container',
     editorId: 'unsupported-file',
   },
   {
@@ -350,7 +359,7 @@ export function resolveFileTypeById(fileTypeId: string | null | undefined): File
 export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryIconPresentation {
   return {
     icon: isExpanded ? 'folder.open' : 'folder.generic',
-    tone: iconTone.folderOpen,
+    tone: 'folder',
   }
 }
 

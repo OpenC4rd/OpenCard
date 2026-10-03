@@ -635,7 +635,7 @@ describe('CardDesignEditor issue navigation', () => {
       { key: 'flow.direction.left', icon: 'nav.arrow-left', iconTone: 'default', title: 'Flow left' },
       { key: 'flow.direction.up', icon: 'nav.arrow-up', iconTone: 'default', title: 'Flow up' },
       { key: 'flow.direction.down', icon: 'nav.arrow-down', iconTone: 'default', title: 'Flow down' },
-      { key: 'flow.direction.right', icon: 'nav.arrow-right', iconTone: 'primary', title: 'Flow right' },
+      { key: 'flow.direction.right', icon: 'nav.arrow-right', iconTone: 'accent', title: 'Flow right' },
     ])
 
     const directions = [

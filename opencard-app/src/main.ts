@@ -1,6 +1,6 @@
 import { createApp, watch } from "vue";
 import App from "./App.vue";
-import { i18n, setAppLocale } from "./i18n";
+import { i18n, applyAppLocalePreference, reloadUserLocales } from "./i18n";
 import { setupGlobalTooltip } from "./shared/ui/tooltip/globalTooltip";
 import {
   setOcGlassIntensity,
@@ -74,6 +74,9 @@ async function bootstrap(): Promise<void> {
   recordStartupTiming("settings load started");
   await settingsStore.initialize();
   recordStartupTiming("settings ready");
+  // 用户语言文件要在首帧之前读完，否则界面会先用内置语言画一遍再切过去。
+  await reloadUserLocales(settingsStore.settings.value.appearance.locale);
+  recordStartupTiming("locales ready");
   const micaBackdropAvailable = await isMicaBackdropAvailable();
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
   let lastAppliedTheme: "dark" | "light" | null = null;
@@ -184,7 +187,7 @@ async function bootstrap(): Promise<void> {
   });
   watch(
     () => settingsStore.settings.value.appearance.locale,
-    (locale) => setAppLocale(locale),
+    (locale) => applyAppLocalePreference(locale),
     { immediate: true },
   );
 

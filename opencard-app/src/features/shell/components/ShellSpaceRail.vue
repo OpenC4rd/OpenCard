@@ -1,5 +1,6 @@
 <!-- Feature 空间栏：提供一级空间切换，并把当前空间暴露给辅助技术。 -->
 <script setup lang="ts">
+import { computed } from 'vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import type { ShellSpaceDefinition } from '../shellSection'
 import type { SpaceKey } from '../shellLocation'
@@ -17,6 +18,11 @@ interface ShellSpaceRailProps {
 
 const props = defineProps<ShellSpaceRailProps>()
 
+const spaceGroups = computed(() => (['primary', 'secondary'] as const).map(key => ({
+  key,
+  spaces: props.spaces.filter(space => (space.railGroup ?? 'primary') === key),
+})).filter(group => group.spaces.length > 0))
+
 const emit = defineEmits<{
   select: [space: SpaceKey]
 }>()
@@ -24,9 +30,14 @@ const emit = defineEmits<{
 
 <template>
   <nav class="shell-space-rail" :aria-label="props.label" data-tooltip-placement="right" data-tooltip-group>
-    <div class="shell-space-rail__items">
+    <div
+      v-for="group in spaceGroups"
+      :key="group.key"
+      class="shell-space-rail__items"
+      :class="{ 'shell-space-rail__items--secondary': group.key === 'secondary' }"
+    >
       <button
-        v-for="space in props.spaces"
+        v-for="space in group.spaces"
         :key="space.key"
         class="shell-space-rail__item"
         :class="{ 'is-active': space.key === props.activeSpace }"
@@ -36,7 +47,7 @@ const emit = defineEmits<{
         :data-tooltip="props.translate(space.labelKey)"
         @click="emit('select', space.key)"
       >
-        <OcIcon :name="space.icon" :tone="space.key === props.activeSpace ? 'primary' : 'muted'" size="md" />
+        <OcIcon :name="space.icon" :tone="space.key === props.activeSpace ? 'accent' : 'muted'" size="md" />
       </button>
     </div>
   </nav>

@@ -19,20 +19,18 @@ export type OcIconSize = 'sm' | 'md' | 'lg' | 'action' | 'display'
 
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue'
-import { resolveIcon, type IconResolvable, type IconTone } from '../../shared/ui/icon/iconRegistry'
+import { resolveIcon, type IconToken, type IconTone } from '../../shared/ui/icon/iconRegistry'
 
 /**
  * Icon tone/color semantic tokens.
- * Base tones: default, muted, accent, success, warning, danger
- * File-type tones: file-opencard, file-json, file-markdown, file-typescript, file-javascript, file-vue, file-html, file-css, file-image, file-config
- * Folder tones: folder, folder-open
+ * 通用、文件、文件夹和 Block tone 均由图标注册表统一定义。
  */
 /**
  * OcIcon component props.
  */
 interface OcIconProps {
   /** 图标注册键 */
-  name?: IconResolvable
+  name?: IconToken
   /** 图标色调 */
   tone?: IconTone
   /** 图标尺寸 */
@@ -58,39 +56,10 @@ const forwardedAttrs = computed(() => {
   return restAttrs
 })
 
-const iconColorMap: Record<IconTone, string> = {
-  default: 'var(--oc-icon-default)',
-  muted: 'var(--oc-icon-muted)',
-  primary: 'var(--oc-icon-accent)',
-  success: 'var(--oc-icon-success)',
-  active: 'var(--oc-icon-active)',
-  warning: 'var(--oc-icon-warning)',
-  danger: 'var(--oc-icon-danger)',
-  opencard: 'var(--oc-icon-file-opencard)',
-  json: 'var(--oc-icon-file-json)',
-  markdown: 'var(--oc-icon-file-markdown)',
-  typescript: 'var(--oc-icon-file-typescript)',
-  javascript: 'var(--oc-icon-file-javascript)',
-  vue: 'var(--oc-icon-file-vue)',
-  html: 'var(--oc-icon-file-html)',
-  css: 'var(--oc-icon-file-css)',
-  image: 'var(--oc-icon-file-image)',
-  config: 'var(--oc-icon-file-config)',
-  'folder-default': 'var(--oc-icon-folder)',
-  'folder-open': 'var(--oc-icon-folder-open)',
-  'block-text': 'var(--oc-icon-block-text)',
-  'block-markdown': 'var(--oc-icon-block-markdown)',
-  'block-image': 'var(--oc-icon-block-image)',
-  'block-qrcode': 'var(--oc-icon-block-qrcode)',
-  'block-shape': 'var(--oc-icon-block-shape)',
-  'block-simple-container': 'var(--oc-icon-block-simple-container)',
-  'block-flow-container': 'var(--oc-icon-block-flow-container)',
-}
-
 const sizeClass = computed(() => `oc-icon--${props.size}`)
 
 const iconStyle = computed(() => ({
-  color: iconColorMap[props.tone] ?? iconColorMap.default,
+  color: `var(--oc-icon-${props.tone})`,
 }))
 </script>
 
