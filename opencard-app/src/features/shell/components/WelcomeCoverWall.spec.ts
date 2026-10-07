@@ -89,13 +89,13 @@ describe('WelcomeCoverWall', () => {
 
   it('keeps the artwork in place when project covers arrive', async () => {
     const wrapper = mountWall()
-    const before = rowSources(wrapper)
+    const before = wrapper.findAll('.welcome-cover-wall__row').flatMap((_, index) => rowSources(wrapper, index))
     expect(before).not.toContain(cover(0).src)
 
     await wrapper.setProps({ covers: [cover(0), cover(1)] })
 
     // 封面只占用固定的封面格：其余格子的内置封面一个都不动。
-    const after = rowSources(wrapper)
+    const after = wrapper.findAll('.welcome-cover-wall__row').flatMap((_, index) => rowSources(wrapper, index))
     expect(after).toHaveLength(before.length)
     const changed = after.filter((source, index) => source !== before[index])
     expect(changed.length).toBeGreaterThan(0)

@@ -2,12 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ProjectDictionary } from './projectDictionary'
 import {
   DICTIONARY_BASE_COLUMN_KEY,
-  applyDictionaryCellMatrix,
   addDictionaryLanguage,
   addDictionaryRecord,
   canUseDictionaryLanguageKey,
   canUseDictionaryRecordKey,
-  clearDictionaryCells,
   deleteDictionaryLanguages,
   deleteDictionaryRecords,
   projectDictionaryGrid,
@@ -103,24 +101,4 @@ describe('projectDictionaryGrid', () => {
     expect(setDictionaryActiveLanguage(dictionary, 'fr_FR')).toBe(dictionary)
   })
 
-  it('applies, fills, clips, and clears cell matrices as one result', () => {
-    const pasted = applyDictionaryCellMatrix(dictionary, {
-      rowKey: 'title', columnKey: DICTIONARY_BASE_COLUMN_KEY,
-    }, [['Base', 'English'], ['Body', 'English body']])
-    expect(pasted.clipped).toBe(false)
-    expect(pasted.dictionary.base).toEqual({ title: 'Base', body: 'Body' })
-    expect(pasted.dictionary.languages?.en_US).toEqual({ title: 'English', body: 'English body' })
-
-    const filled = applyDictionaryCellMatrix(dictionary, {
-      rowKey: 'title', columnKey: 'ja_JP',
-    }, [['同じ']], { rowKeys: ['title', 'body'], columnKeys: ['ja_JP'] })
-    expect(filled.dictionary.languages?.ja_JP).toEqual({ title: '同じ', body: '同じ' })
-    expect(applyDictionaryCellMatrix(dictionary, {
-      rowKey: 'body', columnKey: 'ja_JP',
-    }, [['one', 'two']]).clipped).toBe(true)
-
-    const cleared = clearDictionaryCells(pasted.dictionary, ['title'], [DICTIONARY_BASE_COLUMN_KEY, 'en_US'])
-    expect(cleared.base?.title).toBe('')
-    expect(cleared.languages?.en_US).not.toHaveProperty('title')
-  })
 })

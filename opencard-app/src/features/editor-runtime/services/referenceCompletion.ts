@@ -45,10 +45,6 @@ export type ReferenceCompletionState = {
   suggestions: ReferenceCompletionSuggestion[]
 }
 
-export type ReferenceCompletionEdit = {
-  value: string
-  cursor: number
-}
 
 export function resolveReferenceCompletion(
   value: string,
@@ -221,17 +217,5 @@ function scopeSuggestion(insertText: string, detail: string): ReferenceCompletio
     detail,
     insertText,
     kind: 'scope',
-  }
-}
-
-export function applyReferenceCompletion(
-  value: string,
-  state: ReferenceCompletionState,
-  suggestion: ReferenceCompletionSuggestion,
-): ReferenceCompletionEdit {
-  const nextValue = `${value.slice(0, state.replaceStart)}${suggestion.insertText}${value.slice(state.replaceEnd)}`
-  return {
-    value: nextValue,
-    cursor: state.replaceStart + suggestion.insertText.length,
   }
 }

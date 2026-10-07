@@ -34,6 +34,11 @@ type UseShellCloseCoordinatorOptions = {
 
 export function useShellCloseCoordinator(options: UseShellCloseCoordinatorOptions) {
   async function completeClose(intent: UnsavedCloseIntent): Promise<void> {
+    if (intent.type === 'discard') {
+      await intent.perform!()
+      await options.completions.sessions(intent.sessionIds)
+      return
+    }
     if (intent.type === 'project') {
       await options.completions.project(intent.projectDestination ?? 'current')
       return
@@ -89,6 +94,15 @@ export function useShellCloseCoordinator(options: UseShellCloseCoordinatorOption
     })
   }
 
+  async function requestPathChanges(paths: readonly string[], perform: () => Promise<void>): Promise<CloseOutcome> {
+    return request({
+      type: 'discard', perform,
+      sessionIds: options.sessions.value
+        .filter(session => session.path && paths.some(path => isSameOrDescendantPath(session.path!, path)))
+        .map(session => session.id),
+    })
+  }
+
   async function requestApplicationClose(action: ApplicationCloseAction = 'close'): Promise<CloseOutcome> {
     return await request({
       type: 'app',
@@ -137,6 +151,7 @@ export function useShellCloseCoordinator(options: UseShellCloseCoordinatorOption
     requestSessionClose,
     requestProjectClose,
     requestPathTrash,
+    requestPathChanges,
     requestApplicationClose,
     discardSingle,
     saveSingle,

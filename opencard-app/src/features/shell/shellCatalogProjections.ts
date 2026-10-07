@@ -24,29 +24,6 @@ export const TEMPLATE_COVER_TREE_PREFIX = 'template-cover:'
 
 export type ShellCatalogLabels = (key: string, params?: Record<string, unknown>) => string
 
-export function createTemplateItems(
-  templates: readonly ProjectTemplate[],
-  removable: boolean,
-  locale: string,
-  translate: ShellCatalogLabels,
-): Map<string, OcNode> {
-  const removeAction: OcNodeAction = {
-    key: TEMPLATE_REMOVE_ACTION_KEY,
-    title: translate('projectTemplates.actions.delete'),
-    icon: 'action.delete',
-    iconTone: 'danger',
-  }
-  return new Map(templates.map(template => [template.key, {
-    label: resolveProjectTemplateName(template, locale),
-    visual: { type: 'icon' as const, icon: 'file.opencard' as const },
-    ...(removable ? { tail: [removeAction] } : {}),
-  }]))
-}
-
-export function createEmptyCatalogItem(key: string, label: string): [string, OcNode] {
-  return [key, { label, visual: { type: 'icon', icon: 'file.generic' }, disabled: true }]
-}
-
 export function createTemplateTreeData(
   builtinTemplates: readonly ProjectTemplate[],
   userTemplates: readonly ProjectTemplate[],
@@ -62,13 +39,17 @@ export function createTemplateTreeData(
   ] as const) {
     items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.user'), visual: { type: 'icon', icon: 'file.package' }, ...(actions.length ? { tail: actions } : {}) })
     if (!templates.length) {
-      const [emptyKey, emptyNode] = createEmptyCatalogItem(`${groupKey}:empty`, translate(emptyLabel))
-      items.set(emptyKey, emptyNode)
+      const emptyKey = `${groupKey}:empty`
+      items.set(emptyKey, { label: translate(emptyLabel), visual: { type: 'icon', icon: 'file.generic' }, disabled: true })
       children.set(groupKey, [emptyKey])
       continue
     }
     children.set(groupKey, templates.map(template => template.key))
-    for (const [key, node] of createTemplateItems(templates, removable, locale, translate)) items.set(key, node)
+    for (const template of templates) items.set(template.key, {
+      label: resolveProjectTemplateName(template, locale),
+      visual: { type: 'icon', icon: 'file.opencard' },
+      ...(removable ? { tail: [{ key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'action.delete', iconTone: 'danger' } satisfies OcNodeAction] } : {}),
+    })
   }
   return { rootKeys: [groups.builtin, groups.user], items, children }
 }

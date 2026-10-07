@@ -13,7 +13,7 @@ import type { OcNode, OcNodeAction, OcNodeCollection } from '../../../shared/ui/
 const SESSION_KEY_PREFIX = 'workspace-issue-session:'
 const ISSUE_KEY_PREFIX = 'workspace-issue:'
 
-export const COPY_ISSUE_ACTION_KEY = 'copy-issue'
+import { COPY_ISSUE_ACTION_KEY } from '../spacePage'
 
 type SessionIssueScopes = ReadonlyMap<string, readonly EditorIssue[]>
 

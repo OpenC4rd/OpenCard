@@ -7,7 +7,6 @@ import {
   duplicateProjectIcon,
   findProjectIconKeyConflicts,
   isRasterProjectIconSource,
-  moveProjectIcon,
   normalizeProjectIconDirectory,
   normalizeProjectIconSource,
   parseProjectIconSeries,
@@ -146,10 +145,4 @@ describe('projectIcons', () => {
     expect(duplicateProjectIcon(series, 99)).toBe(series)
   })
 
-  it('moves an icon without changing its identity', () => {
-    expect(moveProjectIcon(series, 0, 1).icons.map(icon => icon.iconKey)).toEqual(['logo', 'warn'])
-    expect(series.icons.map(icon => icon.iconKey)).toEqual(['warn', 'logo'])
-    expect(moveProjectIcon(series, 0, 0)).toBe(series)
-    expect(moveProjectIcon(series, 0, 9)).toBe(series)
-  })
 })

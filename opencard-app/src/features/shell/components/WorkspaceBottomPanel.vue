@@ -147,11 +147,8 @@ import type {
   OcNodeCollection,
   OcNodeExpansionEvent,
 } from '../../../shared/ui/node/node.types'
-import { COPY_ISSUE_ACTION_KEY } from '../composables/useWorkspaceIssues'
-import type {
-  EditorIssueSeverity,
-  SessionIssueNavigationRequest,
-} from '../../editor-runtime/model/editorIssue'
+import { COPY_ISSUE_ACTION_KEY } from '../spacePage'
+import type { SpacePageProblems } from '../spacePage'
 import {
   APP_OUTPUT_SEVERITIES,
   type AppOutputEntry,
@@ -167,10 +164,8 @@ const props = defineProps<{
   expanded: boolean
   activeTab: WorkspaceBottomTab
   issueCount: number
-  issueSeverity: EditorIssueSeverity | null
+  issueSeverity: SpacePageProblems['severity']
   issueTreeData: OcNodeCollection
-  issueNavigationTargets: ReadonlyMap<string, SessionIssueNavigationRequest>
-  issueDetails?: ReadonlyMap<string, import('../../editor-runtime/model/editorIssue').EditorIssue>
   expandedIssueKeys: readonly string[]
   outputEntries: readonly AppOutputEntry[]
   issuesLabel: string
@@ -194,7 +189,8 @@ const emit = defineEmits<{
   'expanded-change': [expanded: boolean]
   'tab-change': [tab: WorkspaceBottomTab]
   'issue-expansion-change': [key: string, expanded: boolean]
-  'issue-navigate': [request: SessionIssueNavigationRequest]
+  'issue-navigate': [key: string]
+  'issue-copy': [key: string]
   'output-clear': []
 }>()
 
@@ -349,22 +345,11 @@ function handleIssueExpansionChange(event: OcNodeExpansionEvent): void {
 }
 
 function handleIssueAction(event: OcNodeActionEvent): void {
-  if (event.actionKey === COPY_ISSUE_ACTION_KEY) void copyIssue(event.key)
+  if (event.actionKey === COPY_ISSUE_ACTION_KEY) emit('issue-copy', event.key)
 }
 
 function handleIssueActivate(event: OcNodeActivateEvent): void {
-  const target = props.issueNavigationTargets.get(event.key)
-  if (target) emit('issue-navigate', target)
-}
-
-async function copyIssue(key: string): Promise<void> {
-  const issue = props.issueDetails?.get(key)
-  if (!issue) return
-  try {
-    await navigator.clipboard.writeText(JSON.stringify(issue, null, 2))
-  } catch (error) {
-    notifyAppError('OC-E1002', { source: 'issue-entry', issueId: issue.id, error }, props.outputLocale)
-  }
+  emit('issue-navigate', event.key)
 }
 </script>
 

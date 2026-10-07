@@ -1,0 +1,93 @@
+import { defineComponent, h, nextTick } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createI18n } from 'vue-i18n'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import enUS from '../../../locales/en-US'
+import { useEditorSessionStore } from '../../workspace/store/editorSessionStore'
+import { appOutputEntries, clearAppOutputEntries, publishAppOutput } from '../../logging/appOutput'
+import { initializeAppPages, useAppPages } from './useAppPages'
+import { useAppProjectActions } from '../services/appProjectActions'
+import { useShellNavigation } from './useShellNavigation'
+import { useShellProgressTasks } from './useShellProgressTasks'
+import { networkResourceCacheService } from '../../network-resources/services/networkResourceCacheService'
+import type { EditorIssueSnapshot } from '../../editor-runtime/model/editorIssue'
+
+// Monaco loads browser workers; these tests exercise page runtimes, not its DOM.
+vi.mock('../../../components/editors/MonacoEditor.vue', () => ({ default: {} }))
+vi.mock('../../../shared/storage/appCache', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../shared/storage/appCache')>(),
+  measureAppCacheDirectories: async () => ({ snapshots: 0, staged: 0 }),
+}))
+
+afterEach(() => {
+  const sessions = useEditorSessionStore()
+  sessions.sessions.value.forEach(session => sessions.closeSession(session.id))
+  useShellNavigation().selectSpace('welcome')
+  useShellProgressTasks().removeTask('page-test')
+  clearAppOutputEntries()
+  vi.restoreAllMocks()
+})
+
+describe('application page ownership', () => {
+  it('switches all page projections while retaining workbench state and global channels', async () => {
+    vi.spyOn(networkResourceCacheService, 'usage').mockResolvedValue(0)
+    expect(() => useAppPages()).toThrow('Application pages have not been initialized')
+    const listeners = vi.spyOn(window, 'addEventListener')
+    let app!: ReturnType<typeof useAppPages>
+    const wrapper = mount(defineComponent({ setup() {
+      app = initializeAppPages(async () => undefined)
+      return () => h('div')
+    } }), { global: { plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })] } })
+    try {
+      await flushPromises()
+      const listenerCount = listeners.mock.calls.length
+      expect(useAppPages()).toBe(app)
+      expect(initializeAppPages(async () => undefined)).toBe(app)
+      expect(useAppPages().pages.welcome).toBe(app.pages.welcome)
+      expect(listeners.mock.calls.length).toBe(listenerCount)
+      const navigation = useShellNavigation()
+      const store = useEditorSessionStore()
+      const session = store.createDraftSession({ fileTypeId: 'opencard-dictionary', name: 'locale.json', content: '{}' })
+      store.updateDraftContent(session.id, '{"base":{"title":"edited"}}')
+      store.updateSessionUiState(session.id, { imagePreview: { pixelated: true } })
+      store.setSessionMode(session.id, 'diff', { beforeRevisionId: 'before', afterRevisionId: 'after' })
+      navigation.selectSpace('workbench')
+      await nextTick()
+      const workbench = app.currentPage.value
+      const oldEditor = workbench.contentProps.value.editor as { props: Record<string, unknown> }
+      const snapshot: EditorIssueSnapshot = { scopeKey: 'test', scopeOrder: ['test'], issues: [{
+        id: 'invalid', type: 'test.invalid', severity: 'warning', locationText: 'notes', description: 'Invalid',
+      }] }
+      ;(oldEditor.props.onIssueSnapshot as (value: EditorIssueSnapshot) => void)(snapshot)
+      expect(workbench.bottomPanel?.value.count).toBe(1)
+      publishAppOutput({ severity: 'info', message: 'background output' })
+      useShellProgressTasks().setTask({ key: 'page-test', title: 'Background task', progress: 0.5 })
+
+      for (const space of ['welcome', 'settings', 'market', 'test'] as const) {
+        navigation.selectSpace(space)
+        await nextTick()
+        expect(app.currentPage.value).toBe(app.pages[space])
+        expect(app.currentPage.value.header.value.title).toBeTruthy()
+        expect(app.currentPage.value.bottomPanel).toBeUndefined()
+        expect(app.pages.workbench.menuContribution?.value.edit?.actions[0]).toMatchObject({ disabled: true })
+      }
+      navigation.selectSpace('workbench')
+      await nextTick()
+      expect(app.currentPage.value).toBe(workbench)
+      expect(store.activeSession.value).toMatchObject({ id: session.id, draftContent: '{"base":{"title":"edited"}}', mode: 'diff',
+        diff: { beforeRevisionId: 'before', afterRevisionId: 'after' }, uiState: { imagePreview: { pixelated: true } } })
+      expect(workbench.bottomPanel?.value.count).toBe(1)
+      expect(appOutputEntries.value.some(entry => entry.message === 'background output')).toBe(true)
+      expect(useShellProgressTasks().tasks.value.some(task => task.key === 'page-test')).toBe(true)
+
+      const second = store.createDraftSession({ fileTypeId: 'plaintext', name: 'other.txt' })
+      ;(oldEditor.props.onIssueSnapshot as (value: EditorIssueSnapshot) => void)(snapshot)
+      await nextTick()
+      await workbench.bottomPanel!.value.activate(`workspace-issue-session:${session.id}`)
+      expect(store.activeSession.value?.id).toBe(second.id)
+      expect(workbench.bottomPanel!.value.count).toBe(1)
+    } finally { wrapper.unmount() }
+    expect(() => useAppPages()).toThrow('Application pages have not been initialized')
+    expect(() => useAppProjectActions()).toThrow('Application project actions have not been initialized')
+  })
+})

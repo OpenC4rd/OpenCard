@@ -86,212 +86,31 @@
 </template>
 
 <script setup lang="ts">
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
-import {
-  TemplateServiceError,
-  PROJECT_TEMPLATE_PACKAGE_SUFFIX,
-  validateTemplateDescription,
-  validateTemplateName,
-  type TemplateExportSelection,
-  type TemplateProjectInspection,
-} from '../model/projectTemplate'
-import { useProjectTemplateStore } from '../store/projectTemplateStore'
-import { notifyError } from '../../notifications/titlebarNotices'
-import { publishAppOutput } from '../../logging/appOutput'
-
-const props = defineProps<{ projectPath: string }>()
-const emit = defineEmits<{
-  'update:busy': [busy: boolean]
-  'selection-change': [selection: TemplateExportSelection]
-  'exported': [path: string]
-}>()
+import type { createTemplateExportForm } from '../composables/createTemplateExportForm'
+const props = defineProps<{ model: ReturnType<typeof createTemplateExportForm> }>()
 const { t } = useI18n()
-const store = useProjectTemplateStore()
-const inspection = ref<TemplateProjectInspection | null>(null)
-const name = ref('')
-const description = ref('')
-const entries = ref<string[]>([])
-const covers = ref<string[]>([])
-const excludedPaths = ref<string[]>([])
+const { name, description, entries, covers, excludedPaths, isInspecting, isExporting, isBusy, nameError, canExport, coverSource, exportTemplate } = props.model
 const activeCoverIndex = ref(0)
-const isInspecting = ref(true)
-const isExporting = ref(false)
-let coverTimer: ReturnType<typeof setInterval> | null = null
-
-const isBusy = computed(() => isInspecting.value || isExporting.value)
-const nameError = computed(() => name.value.length > 0 && validateTemplateName(name.value) !== null)
 const activeCoverSrc = computed(() => {
   const cover = covers.value[activeCoverIndex.value]
   return cover ? coverSource(cover) : ''
 })
-const canExport = computed(() => Boolean(
-  inspection.value
-  && entries.value.length > 0
-  && !validateTemplateName(name.value)
-  && !validateTemplateDescription(description.value)
-  && !isBusy.value,
-))
-
-function normalizeRelativePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
-}
-
-function pathContains(parent: string, child: string): boolean {
-  return child === parent || child.startsWith(`${parent}/`)
-}
-
-function coverSource(cover: string): string {
-  const separator = props.projectPath.includes('\\') ? '\\' : '/'
-  return convertFileSrc(`${props.projectPath.replace(/[\\/]+$/, '')}${separator}${cover.replace(/\//g, separator)}`)
-}
-
-function emitSelection(): void {
-  emit('selection-change', {
-    excludedPaths: [...excludedPaths.value],
-    entries: [...entries.value],
-    entryNames: { ...(inspection.value?.entryNames ?? {}) },
-    covers: [...covers.value],
-  })
-}
-
+let coverTimer: ReturnType<typeof setInterval> | null = null
 function restartCoverTimer(): void {
   if (coverTimer) clearInterval(coverTimer)
   coverTimer = null
   activeCoverIndex.value = 0
-  if (covers.value.length < 2) return
-  coverTimer = setInterval(() => {
+  if (covers.value.length > 1) coverTimer = setInterval(() => {
     activeCoverIndex.value = (activeCoverIndex.value + 1) % covers.value.length
   }, 4500)
 }
-
-onMounted(async () => {
-  emit('update:busy', true)
-  try {
-    const result = await store.inspectProjectSource(props.projectPath)
-    inspection.value = result
-    name.value = result.suggestedName
-    entries.value = result.entries.slice(0, 1)
-    emitSelection()
-  } catch (cause) {
-    reportFailure(cause)
-  } finally {
-    isInspecting.value = false
-    emit('update:busy', false)
-  }
-})
-
-onUnmounted(() => {
-  if (coverTimer) clearInterval(coverTimer)
-})
-
-watch(covers, restartCoverTimer, { deep: true })
-
-function togglePathIncluded(path: string): void {
-  const normalized = normalizeRelativePath(path)
-  if (!normalized || normalized === 'project.json' || normalized === 'fonts.json' || normalized === 'icons.json' || normalized === 'locale.json') return
-  const coveringExclusion = excludedPaths.value.find((excluded) => pathContains(excluded, normalized))
-  if (coveringExclusion) {
-    excludedPaths.value = excludedPaths.value.filter((excluded) => excluded !== coveringExclusion)
-  } else {
-    excludedPaths.value = excludedPaths.value
-      .filter((excluded) => !pathContains(normalized, excluded))
-      .concat(normalized)
-    entries.value = entries.value.filter((entry) => !pathContains(normalized, entry))
-    covers.value = covers.value.filter((cover) => !pathContains(normalized, cover))
-  }
-  emitSelection()
-}
-
-function toggleEntry(path: string): void {
-  const normalized = normalizeRelativePath(path)
-  if (!inspection.value?.entries.includes(normalized) || isPathExcluded(normalized)) return
-  entries.value = entries.value.includes(normalized)
-    ? entries.value.filter((entry) => entry !== normalized)
-    : [...entries.value, normalized]
-  emitSelection()
-}
-
-function toggleCover(path: string): void {
-  const normalized = normalizeRelativePath(path)
-  if (!inspection.value?.coverCandidates.includes(normalized) || isPathExcluded(normalized)) return
-  covers.value = covers.value.includes(normalized)
-    ? covers.value.filter((cover) => cover !== normalized)
-    : [...covers.value, normalized]
-  emitSelection()
-}
-
-function isPathExcluded(path: string): boolean {
-  const normalized = normalizeRelativePath(path)
-  return normalized === '.opencard-cache'
-    || normalized.startsWith('.opencard-cache/')
-    || excludedPaths.value.some((excluded) => pathContains(excluded, normalized))
-}
-
-defineExpose({ togglePathIncluded, toggleEntry, toggleCover })
-
-function safeFileName(value: string): string {
-  return value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'template'
-}
-
-async function exportTemplate(): Promise<void> {
-  if (!canExport.value || !inspection.value) return
-  try {
-    const outputPath = await store.pickTemplateExportPath(
-      `${safeFileName(name.value)}${PROJECT_TEMPLATE_PACKAGE_SUFFIX}`,
-      t('templateExport.dialogs.chooseOutput'),
-    )
-    if (!outputPath) return
-    isExporting.value = true
-    emit('update:busy', true)
-    const exportedPath = await store.exportProjectTemplate({
-      sourcePath: props.projectPath,
-      outputPath,
-      name: name.value,
-      description: description.value,
-      entry: entries.value[0],
-      entries: entries.value,
-      covers: covers.value,
-      excludedPaths: excludedPaths.value,
-    })
-    emit('exported', exportedPath)
-  } catch (cause) {
-    reportFailure(cause)
-  } finally {
-    isExporting.value = false
-    emit('update:busy', false)
-  }
-}
-
-/** 一次性失败交给即时信息，具体原因留在输出里，页面不再长期挂着过期报错。 */
-function reportFailure(cause: unknown): void {
-  const message = resolveError(cause)
-  notifyError(message)
-  publishAppOutput({ severity: 'error', message, detail: describeFailure(cause) })
-}
-
-function describeFailure(cause: unknown): string {
-  if (cause instanceof TemplateServiceError) return `${cause.code}: ${cause.message}`
-  return cause instanceof Error ? cause.message : String(cause)
-}
-
-function resolveError(cause: unknown): string {
-  if (!(cause instanceof TemplateServiceError)) return t('projectTemplates.errors.unknown')
-  const keys: Partial<Record<TemplateServiceError['code'], string>> = {
-    'invalid-template-name': 'invalidTemplateName',
-    'description-too-long': 'descriptionTooLong',
-    'source-not-project': 'sourceNotProject',
-    'source-has-symlink': 'sourceHasSymlink',
-    'entry-not-found': 'entryNotFound',
-    'cover-not-found': 'coverNotFound',
-    'archive-failed': 'archiveFailed',
-  }
-  return t(`projectTemplates.errors.${keys[cause.code] ?? 'unknown'}`)
-}
+watch(covers, restartCoverTimer, { deep: true, immediate: true })
+onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 </script>
 
 <style scoped>

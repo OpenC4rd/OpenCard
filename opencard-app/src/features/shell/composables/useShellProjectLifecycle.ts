@@ -139,6 +139,7 @@ export function useShellProjectLifecycle(options: ProjectLifecycleOptions) {
     isActivating: readonly(isActivating),
     openProject,
     openRecentProject,
+    activateProject,
     relocateRecentProject,
     activateCreatedProject,
     resumeDeferredActivation,

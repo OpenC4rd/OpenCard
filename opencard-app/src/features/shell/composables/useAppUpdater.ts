@@ -47,6 +47,7 @@ export function useAppUpdater(options: AppUpdaterOptions = {}) {
   let pendingProgress: number | null = null
   let lastProgressUpdate = 0
   let initializePromise: Promise<void> | null = null
+  let disposed = false
 
   const updateVersion = computed(() => availableUpdate.value?.version ?? '')
   const availableReleaseNotes = computed<ReleaseNotesSnapshot | null>(() => {
@@ -177,14 +178,17 @@ export function useAppUpdater(options: AppUpdaterOptions = {}) {
   }
 
   async function checkForUpdate(): Promise<AppUpdateCheckResult> {
-    if (!isTauri() || isChecking.value || isDownloading.value || isDownloaded.value || isInstalling.value) {
+    if (disposed || !isTauri() || isChecking.value || isDownloading.value || isDownloaded.value || isInstalling.value) {
       return 'skipped'
     }
 
     isChecking.value = true
     try {
       await initialize()
-      availableUpdate.value = await check()
+      if (disposed) return 'skipped'
+      const update = await check()
+      if (disposed) { await update?.close(); return 'skipped' }
+      availableUpdate.value = update
       await savePendingReleaseNotes(availableReleaseNotes.value)
       return availableUpdate.value ? 'available' : 'up-to-date'
     } catch (error) {
@@ -267,6 +271,7 @@ export function useAppUpdater(options: AppUpdaterOptions = {}) {
   }
 
   function dispose(): void {
+    disposed = true
     clearProgressTimer()
     stopDeveloperPreview()
     if (!isDownloading.value && !isInstalling.value) {

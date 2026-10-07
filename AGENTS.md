@@ -40,28 +40,16 @@
 - Progress reports must distinguish observed facts, hypotheses, production-code changes, automated verification, and pending manual verification. Never describe unverified UI behavior as complete.
 - During implementation, proactively report at each meaningful phase boundary (diagnosis complete, production edit complete, verification complete) and whenever a command stalls or work takes unexpectedly long. Do not remain silent through extended tool use; keep the user informed about current findings, changes, blockers, and next steps.
 
-## Test Guards
+## Test Selection
 
-- Tests have two roles and only one of them is permanent. A test written while building records **current behaviour**, incidental implementation detail included; that is scaffolding. A test that freezes a **confirmed contract** is a guard.
-- Scaffolding may be dismantled and rewritten wholesale to serve a design change. Never refuse a correct design change because scaffolding would go red, and never keep an accidental assertion merely because it currently passes.
-- Promote a module's tests to a guard only when the module is confirmed clean. That judgement is the agent's, and it is offered to the user as a by-product of ordinary work — not sought out, and not raised repeatedly.
-- Surface it as a question, never as a report: one line naming the module and asking whether the user wants to hear the reasoning. Deliver the analysis and the structure list only after the user says yes. The insight belongs to the agent; whether to spend the user's attention on it belongs to the user.
-- A guard is named `<Source>.guard.spec.ts`. `scripts/lint-naming.mjs` strips `.spec.ts` and then takes the segment before the first `.`, so `OcCard.guard.spec.ts` still resolves to `OcCard.vue` and passes `lint:naming` unchanged. Do not invent a prefix such as `[A]`: it breaks that check.
-- Promotion criteria — all six must hold:
-  1. The responsibility fits one sentence containing no "and".
-  2. Every input and output is an explicit parameter or return value; no globals, no captured outer state.
-  3. One implementation of each meaning across the repository.
-  4. Every export has a caller outside its own file.
-  5. Failure is a value carrying a code, not a throw and not a silent fallback.
-  6. Behaviour is testable as a pure function: no mock framework, no mount, no fake timers.
-- When the user says yes, answer in this shape: `发现 <module> 满足完美无缺要求，理由：【三句以内】, 模块结构：【方法：输入 arg 名|类型|含义，输出 名|类型|含义；数据结构字段：名|类型|含义与用途】`. That structure list is the guard's table of contents: each entry becomes an assertion.
-- Promotion requires a **stable contract**. Early-Stage Compatibility allows persisted formats to be rewritten outright, so a guard freezes the module's inputs and outputs, never a file format.
-- When dismantling scaffolding, re-derive the module's intended contract and confirm that any **cross-module** contract it carried is still guarded at the seam. Otherwise a refactor can change behaviour with nothing left to detect it.
-- This section governs deliberate design changes. Production-First Debugging still governs bug reports: there, identify the production root cause before touching a spec. Weakening an assertion so that something passes is forbidden under both.
-- Do not write a test for something a reader can see at a glance (a rename, a constant, a one-line mapping, a label's wording). If a behaviour needs no explanation to be understood, it needs no test either.
-- Do not create a new spec file for a small helper. Cover it inside the spec that already owns the feature, and only when the behaviour is not obvious.
-- Verification is spent, not performed. Run only the specs your change actually touches; a full-suite run is for a change whose blast radius is unknown, not a habit.
-- Every change is expected to pay for itself in diff size. Adding a feature is not a licence to add scaffolding, helpers, or assertions around it; prefer folding logic into the existing path and deleting what it replaces. A run of net-growing diffs is a signal to stop and cut, not to continue.
+- Read production code and its complete call chain before changing it. Running tests never substitutes for investigation.
+- File size does not determine whether a test is needed. Keep a test only when it detects a meaningful failure.
+- Do not test trivial configuration, constants, mappings, forwarding, names, or wording separately.
+- Prefer existing feature tests. Do not create a test suite for a small helper or add speculative guards.
+- Delete obsolete, duplicate, and implementation-detail tests. Keep minimal checks for data loss, cancellation, async ownership, parsing, and trust boundaries.
+- Mocks must not replace the integration path being verified. Passing mocked tests is not runtime evidence.
+- Run affected tests during development. Run the remaining full suite once after a repository-wide cleanup; do not repeat it without a new reason.
+- A test must justify its setup and assertions. Reduce redundant fixtures and assertions instead of preserving scaffolding for its own sake.
 
 ## Release Notes
 

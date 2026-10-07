@@ -188,17 +188,3 @@ export function duplicateProjectIcon(
   icons.splice(index + 1, 0, duplicate)
   return { ...series, icons }
 }
-
-export function moveProjectIcon(
-  series: ProjectIconSeries,
-  fromIndex: number,
-  toIndex: number,
-): ProjectIconSeries {
-  if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)
-    || fromIndex < 0 || fromIndex >= series.icons.length
-    || toIndex < 0 || toIndex >= series.icons.length || fromIndex === toIndex) return series
-  const icons = [...series.icons]
-  const [moved] = icons.splice(fromIndex, 1)
-  icons.splice(toIndex, 0, moved!)
-  return { ...series, icons }
-}

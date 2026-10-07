@@ -17,12 +17,12 @@ import { SHELL_SIDEBAR_COLLAPSE_THRESHOLD } from '../shellSidebarConfig'
 type ShellSidebarLayoutOptions = {
   /** 侧栏宽度、折叠状态与项目侧栏缓存的真相仓储。 */
   settings: AppSettingsStore
-  /** 当前项目根路径；空字符串表示未打开项目。 */
-  projectPath: Readonly<Ref<string>>
+  /** 当前页提供的布局缓存 key；空字符串表示不缓存列表布局。 */
+  persistenceKey: Readonly<Ref<string>>
   /** 窗口视口宽度；窄视口下侧栏默认收起。 */
   viewportWidth: Readonly<Ref<number>>
-  /** 是否处于新建项目页；该页面优先占用横向空间，不随窄视口收起侧栏。 */
-  isCreateProjectMode: Readonly<Ref<boolean>>
+  /** 当前页是否希望窄视口保留侧栏。 */
+  expandOnNarrowViewport: Readonly<Ref<boolean>>
 }
 
 type ShellSidebarLayout = {
@@ -43,9 +43,9 @@ type ShellSidebarLayout = {
 export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): ShellSidebarLayout {
   const {
     settings: settingsStore,
-    projectPath,
+    persistenceKey,
     viewportWidth,
-    isCreateProjectMode,
+    expandOnNarrowViewport,
   } = options
 
   const sidebarCollapsed = computed(() => settingsStore.settings.value.shell.sidebarCollapsed)
@@ -57,14 +57,13 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
   let sidebarResizeRevision = 0
   const effectiveSidebarCollapsed = computed(() => (
     (sidebarResizeCollapsed.value ?? sidebarCollapsed.value)
-    || (viewportWidth.value < 960 && !isCreateProjectMode.value)
+    || (viewportWidth.value < 960 && !expandOnNarrowViewport.value)
   ))
   watch(() => settingsStore.settings.value.shell.sidebarWidth, width => {
     if (!sidebarResizeActive.value) sidebarWidth.value = width
   })
-  const sidebarWorkspaceStateKey = computed(() => projectPath.value.replace(/\\/g, '/').replace(/\/+$/, ''))
   const sidebarPersistedLayout = computed<ProjectWorkspaceSidebarState | undefined>(() => {
-    const key = sidebarWorkspaceStateKey.value
+    const key = persistenceKey.value
     const sidebar = key ? settingsStore.settings.value.projectCreation.workspaceStates[key]?.sidebar : undefined
     return sidebar ? {
       collapsedLists: [...sidebar.collapsedLists],
@@ -72,7 +71,7 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
     } : undefined
   })
   function handleSidebarLayoutChange(layout: ProjectWorkspaceSidebarState): void {
-    const key = sidebarWorkspaceStateKey.value
+    const key = persistenceKey.value
     if (!key) return
     settingsStore.updateProjectCreation({
       workspaceStates: updateProjectWorkspaceState(

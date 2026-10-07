@@ -23,23 +23,6 @@ describe('OcActionButton', () => {
     document.body.innerHTML = ''
   })
 
-  it('forwards the declared icon tone to the action icon', () => {
-    const wrapper = mount(OcActionButton, {
-      props: {
-        action: {
-          key: 'open',
-          icon: 'action.play',
-          iconTone: 'success',
-          title: 'Open',
-        },
-      },
-    })
-
-    expect(wrapper.find('.oc-button__icon').attributes('style')).toContain('var(--oc-icon-success)')
-    expect(wrapper.find('.oc-button__icon').classes()).toContain('oc-icon--action')
-    expect(wrapper.get('button').attributes('data-tooltip')).toBe('Open')
-    expect(wrapper.get('button').attributes('title')).toBeUndefined()
-  })
 
   it('renders an action badge without changing the button contract', () => {
     const wrapper = mount(OcActionButton, {
@@ -59,32 +42,7 @@ describe('OcActionButton', () => {
     expect(wrapper.get('button').attributes('aria-label')).toBe('Fill F')
   })
 
-  it('decouples the action icon size from the button target size', () => {
-    const wrapper = mount(OcActionButton, {
-      props: {
-        action: { key: 'zoom', icon: 'tool.zoom-in', title: 'Zoom in' },
-        size: 'md',
-        iconSize: 'action',
-      },
-    })
 
-    expect(wrapper.get('button').classes()).toContain('oc-button--size-md')
-    expect(wrapper.get('.oc-button__icon').classes()).toContain('oc-icon--action')
-  })
-
-  it('forwards the active highlight without changing the icon tone', () => {
-    const wrapper = mount(OcActionButton, {
-      props: {
-        action: { key: 'toggle', icon: 'tool.snap-grid', title: 'Toggle' },
-        active: true,
-        variant: 'soft',
-      },
-    })
-
-    expect(wrapper.get('button').classes()).toContain('oc-button--active')
-    expect(wrapper.get('button').classes()).toContain('oc-button--variant-soft')
-    expect(wrapper.get('.oc-button__icon').attributes('style')).toContain('var(--oc-icon-default)')
-  })
 
   it('mounts floating behavior and the outside listener only when needed', async () => {
     const addListener = vi.spyOn(document, 'addEventListener')

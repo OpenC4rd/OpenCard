@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ShellTitleBar from './ShellTitleBar.vue'
 
 describe('ShellTitleBar', () => {
@@ -68,14 +68,16 @@ describe('ShellTitleBar', () => {
     wrapper.unmount()
   })
 
-  it('does not emit disabled menu actions', async () => {
+  it('keeps the displayed contributor after a page change and blocks disabled actions', async () => {
+    const onAction = vi.fn()
+    const nextOwner = vi.fn()
     const wrapper = mount(ShellTitleBar, {
       attachTo: document.body,
       props: {
         collapsed: false,
         brandLabel: 'OpenCard',
         menuGroups: [{
-          key: 'file',
+          key: 'file', onAction,
           label: 'File',
           actions: [
             { key: 'open-project', title: 'Open Project' },
@@ -89,22 +91,25 @@ describe('ShellTitleBar', () => {
     const items = document.body.querySelectorAll<HTMLButtonElement>('.oc-action-menu__button')
     expect(items[1]?.disabled).toBe(true)
 
+    await wrapper.setProps({ menuGroups: [{ key: 'file', label: 'Other page', actions: [{ key: 'open-project', title: 'Other' }], onAction: nextOwner }] })
     items[1]!.click()
-    expect(wrapper.emitted('menu-action')).toBeUndefined()
+    expect(onAction).not.toHaveBeenCalled()
 
     items[0]!.click()
-    expect(wrapper.emitted('menu-action')).toEqual([['file', 'open-project']])
+    expect(onAction).toHaveBeenCalledWith('open-project')
+    expect(nextOwner).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
   it('keeps an arbitrarily deep title menu branch mounted through pointerdown', async () => {
+    const onAction = vi.fn()
     const wrapper = mount(ShellTitleBar, {
       attachTo: document.body,
       props: {
         collapsed: false,
         brandLabel: 'OpenCard',
         menuGroups: [{
-          key: 'file',
+          key: 'file', onAction,
           label: 'File',
           actions: [{
             key: 'level-1',
@@ -140,7 +145,7 @@ describe('ShellTitleBar', () => {
     expect(leafButton?.isConnected).toBe(true)
 
     leafButton?.click()
-    expect(wrapper.emitted('menu-action')).toEqual([['file', 'leaf']])
+    expect(onAction).toHaveBeenCalledWith('leaf')
     wrapper.unmount()
   })
 

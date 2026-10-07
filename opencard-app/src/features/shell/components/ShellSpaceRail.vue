@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
-import type { ShellSpaceDefinition } from '../shellSection'
+import type { ShellSpaceDefinition } from '../shell.types'
 import type { SpaceKey } from '../shellLocation'
 
 interface ShellSpaceRailProps {

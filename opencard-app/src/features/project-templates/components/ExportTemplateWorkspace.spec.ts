@@ -1,3 +1,5 @@
+import { defineComponent, h, ref } from 'vue'
+import { createTemplateExportForm } from '../composables/createTemplateExportForm'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,20 +46,21 @@ describe('ExportTemplateWorkspace', () => {
 
   it('inspects the open project and exports configured metadata', async () => {
     const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: messages } })
-    const wrapper = mount(ExportTemplateWorkspace, {
-      props: { projectPath: '/project' },
-      global: { plugins: [i18n] },
-    })
+    let model!: ReturnType<typeof createTemplateExportForm>
+    const onExported = vi.fn()
+    const visible = ref(true)
+    const wrapper = mount(defineComponent({ setup() {
+      model = createTemplateExportForm({ projectPath: ref('/project'), onExported })
+      return () => visible.value ? h(ExportTemplateWorkspace, { model }) : null
+    } }), { global: { plugins: [i18n] } })
+    await model.reset()
+    model.toggleCover('cover.png')
+    model.toggleEntry('alternate.ocdocument')
+    model.togglePathIncluded('notes')
+    visible.value = false
     await flushPromises()
-
-    const workspace = wrapper.vm as unknown as {
-      toggleCover(path: string): void
-      toggleEntry(path: string): void
-      togglePathIncluded(path: string): void
-    }
-    workspace.toggleCover('cover.png')
-    workspace.toggleEntry('alternate.ocdocument')
-    workspace.togglePathIncluded('notes')
+    visible.value = true
+    await flushPromises()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
@@ -72,13 +75,41 @@ describe('ExportTemplateWorkspace', () => {
       covers: ['cover.png'],
       excludedPaths: ['notes'],
     })
-    const selectionEvents = wrapper.emitted('selection-change') ?? []
-    expect(selectionEvents[selectionEvents.length - 1]).toEqual([{
+    expect(model.selection.value).toEqual({
       entries: ['main.ocdocument', 'alternate.ocdocument'],
       entryNames: { 'main.ocdocument': 'Main Blueprint', 'alternate.ocdocument': 'Alternate Blueprint' },
-      covers: ['cover.png'],
-      excludedPaths: ['notes'],
-    }])
-    expect(wrapper.emitted('exported')).toEqual([['/exports/Portable.octemplate']])
+      covers: ['cover.png'], excludedPaths: ['notes'],
+    })
+    expect(onExported).toHaveBeenCalledWith('/exports/Portable.octemplate')
+    wrapper.unmount()
   })
+
+  it('ignores an obsolete inspection and stops export when its project changes during the picker', async () => {
+    const projectPath = ref('/first')
+    let resolveInspection!: (value: Awaited<ReturnType<ProjectTemplateStore['inspectProjectSource']>>) => void
+    vi.mocked(store.inspectProjectSource).mockImplementationOnce(() => new Promise(resolve => { resolveInspection = resolve }))
+    let model!: ReturnType<typeof createTemplateExportForm>
+    const wrapper = mount(defineComponent({ setup() {
+      model = createTemplateExportForm({ projectPath, onExported: vi.fn() })
+      return () => null
+    } }), { global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: messages } })] } })
+    const obsolete = model.reset()
+    projectPath.value = '/second'
+    await model.reset()
+    resolveInspection({ sourcePath: '/first', suggestedName: 'Obsolete', entries: ['old.ocdocument'], entryNames: {}, coverCandidates: [] })
+    await obsolete
+    expect(model.name.value).toBe('Portable')
+    let finishPicker!: (path: string) => void
+    vi.mocked(store.pickTemplateExportPath).mockImplementationOnce(() => new Promise(resolve => { finishPicker = resolve }))
+    const exporting = model.exportTemplate()
+    expect(model.isBusy.value).toBe(true)
+    projectPath.value = '/third'
+    await model.reset(false)
+    finishPicker('/exports/old.octemplate')
+    await exporting
+    expect(store.exportProjectTemplate).not.toHaveBeenCalled()
+    expect(model.isBusy.value).toBe(false)
+    wrapper.unmount()
+  })
+
 })

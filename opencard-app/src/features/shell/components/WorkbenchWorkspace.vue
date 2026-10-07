@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import type { Component } from 'vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcButton from '../../../components/base/OcButton.vue'
 
@@ -8,6 +9,7 @@ defineOptions({ name: 'WorkbenchWorkspace' })
 const props = withDefaults(defineProps<{
   hasActiveEditor: boolean
   hasProject?: boolean
+  editor?: { component: Component | null; key: string; props: Record<string, unknown>; capture: (value: unknown) => void }
 }>(), { hasProject: true })
 
 const emit = defineEmits<{ 'open-project': [] }>()
@@ -17,7 +19,10 @@ const { t } = useI18n()
 
 <template>
   <div v-if="props.hasActiveEditor" class="workbench-workspace__editor-stage">
-    <slot />
+    <Transition name="shell-editor-fade" mode="out-in">
+      <component v-if="props.editor" :is="props.editor.component" :key="props.editor.key"
+        :ref="props.editor.capture" v-bind="props.editor.props" />
+    </Transition>
   </div>
   <section v-else-if="props.hasProject" class="workspace-empty-state" :aria-label="t('app.editorEmpty.title')">
     <OcIcon class="workspace-empty-state__icon" name="file.generic" size="lg" />

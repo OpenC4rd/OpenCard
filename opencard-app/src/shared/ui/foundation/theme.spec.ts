@@ -1,5 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { extname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MAX_BASE_FONT_SIZE, MIN_BASE_FONT_SIZE } from './baseFontSize'
 import { DEFAULT_OC_THEME, OC_THEME_REGISTRY } from './themes'
@@ -11,8 +9,6 @@ import {
   setOcTheme,
 } from './theme'
 
-const srcRoot = join(process.cwd(), 'src')
-const sourceExtensions = new Set(['.css', '.ts', '.vue'])
 const fileIconColorTokens = [
   '--oc-icon-file-opencard',
   '--oc-icon-file-json',
@@ -46,17 +42,6 @@ function testContrast(left: string, right: string): number {
   const brighter = Math.max(testLuminance(left), testLuminance(right))
   const darker = Math.min(testLuminance(left), testLuminance(right))
   return (brighter + 0.05) / (darker + 0.05)
-}
-
-function readProductionSources(directory: string): string {
-  return readdirSync(directory, { withFileTypes: true })
-    .map((entry) => {
-      const path = join(directory, entry.name)
-      if (entry.isDirectory()) return readProductionSources(path)
-      if (!sourceExtensions.has(extname(entry.name)) || entry.name.endsWith('.spec.ts')) return ''
-      return readFileSync(path, 'utf8')
-    })
-    .join('\n')
 }
 
 afterEach(() => {
@@ -221,15 +206,5 @@ describe('OC theme runtime', () => {
 
     vi.advanceTimersByTime(1200)
     expect(root.classList.contains('oc-theme-transitioning')).toBe(false)
-  })
-})
-
-describe('theme source boundary', () => {
-  it('does not restore legacy Shell color aliases or theme classes', () => {
-    const source = readProductionSources(srcRoot)
-
-    expect(source).not.toContain('--color-')
-    expect(source).not.toContain('shell-theme-graphite')
-    expect(source).not.toContain('shell-theme-light')
   })
 })

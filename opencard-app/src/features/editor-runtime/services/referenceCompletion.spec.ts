@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applyReferenceCompletion,
   resolveReferenceCompletion,
   type ReferenceCompletionContext,
 } from './referenceCompletion'
@@ -93,12 +92,4 @@ describe('referenceCompletion', () => {
       .toEqual(['opposite:background'])
   })
 
-  it('replaces only the token body and preserves closing braces', () => {
-    const value = 'Name: {{card:n}}'
-    const state = resolveReferenceCompletion(value, value.indexOf('}}'), context)!
-    expect(applyReferenceCompletion('Name: {{card:n}}', state, state.suggestions[0]!)).toEqual({
-      value: 'Name: {{card:name}}',
-      cursor: 17,
-    })
-  })
 })

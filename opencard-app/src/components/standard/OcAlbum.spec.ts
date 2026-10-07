@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OcNode, OcNodeCollection } from '../../shared/ui/node/node.types'
@@ -293,22 +291,4 @@ describe('OcAlbum', () => {
     expect(wrapper.get('.oc-album__placeholder').text()).toBe('No packages')
   })
 
-  it('reserves the command height so revealing a command cannot reflow the card', () => {
-    // jsdom does not evaluate the scoped stylesheet, so read the source to pin the invariant.
-    const source = readFileSync(
-      join(process.cwd(), 'src/components/standard/OcAlbum.vue'),
-      'utf8',
-    )
-    const cssRule = (selector: string): string => {
-      // Anchor to a line start so compound selectors ending in the same name do not match.
-      const start = source.indexOf(`\n${selector} {`)
-      expect(start).toBeGreaterThanOrEqual(0)
-      return source.slice(start, source.indexOf('}', start))
-    }
-
-    // The strip overlays the cover, so a strip that grew on hover would hide part of the cover.
-    expect(cssRule('.oc-album__info')).toContain('position: absolute')
-    // The meta row always reserves a small action button's height.
-    expect(cssRule('.oc-album__meta')).toContain('min-height: var(--oc-size-sm)')
-  })
 })

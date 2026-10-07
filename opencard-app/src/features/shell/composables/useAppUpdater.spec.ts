@@ -111,6 +111,21 @@ describe('useAppUpdater', () => {
     expect(mocks.relaunch).toHaveBeenCalledOnce()
   })
 
+  it('closes a late update result after the service is disposed', async () => {
+    let finish!: (update: unknown) => void
+    mocks.check.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const updater = createUpdater()
+    await updater.initialize()
+    const pending = updater.checkForUpdate()
+    await vi.waitFor(() => expect(mocks.check).toHaveBeenCalled())
+    updater.dispose()
+    const close = vi.fn(async () => undefined)
+    finish({ version: '0.2.1', close })
+    await expect(pending).resolves.toBe('skipped')
+    expect(close).toHaveBeenCalledOnce()
+    expect(updater.availableUpdate.value).toBeNull()
+  })
+
   it('owns and disposes the developer update preview timer', () => {
     vi.useFakeTimers()
     const updater = createUpdater()

@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { FeedbackKind, FeedbackPage } from '../../feedback/model/feedback'
 import { useFeedbackDiagnostics } from '../../feedback/composables/useFeedbackDiagnostics'
@@ -9,13 +9,11 @@ import type { ShellTitleBarAppAction } from '../shell.types'
 import { useAppUpdater } from './useAppUpdater'
 import { useShellProgressTasks } from './useShellProgressTasks'
 
-export function useShellAboutFeature(options: {
-  isAboutMode: Readonly<Ref<boolean>>
+export function useApplicationServices(options: {
   requestInstall: () => Promise<void>
 }) {
   const { t, locale } = useI18n()
   const settingsStore = useAppSettingsStore()
-  const isAboutMode = options.isAboutMode
   const developerMode = ref(false)
   const { setTask: setShellProgressTask, removeTask: removeShellProgressTask } = useShellProgressTasks()
   const UPDATE_PROGRESS_TASK_KEY = 'app-update'
@@ -71,10 +69,6 @@ export function useShellAboutFeature(options: {
       }
     },
   )
-
-  watch([isAboutMode, currentReleaseNotes], ([aboutMode, release]) => {
-    if (aboutMode && release?.seenAt === null) void markCurrentReleaseNotesSeen()
-  })
 
   const updateOperationTask = computed<{
     phase: 'downloading' | 'waiting-install' | 'installing'
@@ -183,5 +177,5 @@ export function useShellAboutFeature(options: {
 
   onMounted(() => { void startAppUpdater(); void startFeedbackInbox() })
   onUnmounted(() => { removeShellProgressTask(UPDATE_PROGRESS_TASK_KEY); disposeAppUpdater(); disposeFeedbackInbox() })
-  return { availableUpdate, updateVersion, currentReleaseNotes, isCheckingForUpdate, isDownloadingUpdate, isUpdateDownloaded, isInstallingUpdate, checkForUpdate, installDownloadedUpdate, stopDeveloperUpdatePreview, isDeveloperPreviewDownloaded, developerMode, releaseNotesDialogMode, feedbackDialogKind, feedbackCenterPage, latestFeedbackDiagnostics, unreadFeedbackReplyCount, openFeedbackCenter, displayedReleaseNotes, closeReleaseNotesDialog, handleAvailableReleaseAction, handleTitleBarAppAction, titleBarAppActions }
+  return { markCurrentReleaseNotesSeen, availableUpdate, updateVersion, currentReleaseNotes, isCheckingForUpdate, isDownloadingUpdate, isUpdateDownloaded, isInstallingUpdate, checkForUpdate, installDownloadedUpdate, stopDeveloperUpdatePreview, isDeveloperPreviewDownloaded, developerMode, releaseNotesDialogMode, feedbackDialogKind, feedbackCenterPage, latestFeedbackDiagnostics, unreadFeedbackReplyCount, openFeedbackCenter, displayedReleaseNotes, closeReleaseNotesDialog, handleAvailableReleaseAction, handleTitleBarAppAction, titleBarAppActions }
 }

@@ -31,11 +31,6 @@ export type DictionaryGridProjection = {
   rows: DictionaryGridRow[]
 }
 
-export type DictionaryGridMatrixResult = {
-  dictionary: ProjectDictionary
-  clipped: boolean
-}
-
 function identity(value: string): string {
   return value.toLocaleLowerCase()
 }
@@ -243,58 +238,5 @@ export function deleteDictionaryLanguages(
   ))
   if (Object.keys(next.languages).length === 0) delete next.languages
   if (selectedIdentities.has(identity(next.active ?? ''))) delete next.active
-  return next
-}
-
-export function applyDictionaryCellMatrix(
-  dictionary: ProjectDictionary,
-  start: { rowKey: string; columnKey: string },
-  matrix: readonly (readonly string[])[],
-  fillRange?: { rowKeys: readonly string[]; columnKeys: readonly string[] },
-): DictionaryGridMatrixResult {
-  const projection = projectDictionaryGrid(dictionary)
-  const rowKeys = projection.rows.map(row => row.key)
-  const columnKeys = projection.columns.map(column => column.key)
-  const startRow = rowKeys.indexOf(start.rowKey)
-  const startColumn = columnKeys.indexOf(start.columnKey)
-  if (startRow < 0 || startColumn < 0 || matrix.length === 0) {
-    return { dictionary, clipped: false }
-  }
-  const sourceColumnCount = Math.max(0, ...matrix.map(row => row.length))
-  const targetRows = matrix.length === 1 && sourceColumnCount === 1 && fillRange
-    ? [...fillRange.rowKeys]
-    : rowKeys.slice(startRow, startRow + matrix.length)
-  const targetColumns = matrix.length === 1 && sourceColumnCount === 1 && fillRange
-    ? [...fillRange.columnKeys]
-    : columnKeys.slice(startColumn, startColumn + sourceColumnCount)
-  let next = dictionary
-  for (let rowIndex = 0; rowIndex < targetRows.length; rowIndex += 1) {
-    for (let columnIndex = 0; columnIndex < targetColumns.length; columnIndex += 1) {
-      const value = matrix.length === 1 && sourceColumnCount === 1
-        ? matrix[0]?.[0] ?? ''
-        : matrix[rowIndex]?.[columnIndex]
-      if (value === undefined) continue
-      next = setDictionaryCellValue(next, targetColumns[columnIndex]!, targetRows[rowIndex]!, value)
-    }
-  }
-  return {
-    dictionary: next,
-    clipped: matrix.length > rowKeys.length - startRow || sourceColumnCount > columnKeys.length - startColumn,
-  }
-}
-
-export function clearDictionaryCells(
-  dictionary: ProjectDictionary,
-  rowKeys: readonly string[],
-  columnKeys: readonly string[],
-): ProjectDictionary {
-  let next = dictionary
-  for (const rowKey of rowKeys) {
-    for (const columnKey of columnKeys) {
-      next = columnKey === DICTIONARY_BASE_COLUMN_KEY
-        ? setDictionaryCellValue(next, columnKey, rowKey, '')
-        : resetDictionaryOverride(next, columnKey, rowKey)
-    }
-  }
   return next
 }

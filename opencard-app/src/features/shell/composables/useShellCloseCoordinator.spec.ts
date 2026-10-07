@@ -47,6 +47,27 @@ function createCoordinator(initialSessions: EditorSession[]) {
 }
 
 describe('useShellCloseCoordinator', () => {
+  it('guards a whole path batch before any disk operation, including cancellation and save failure', async () => {
+    const result = createCoordinator([
+      createSession('a', { isDirty: true }), createSession('b', { isDirty: true }), createSession('keep'),
+    ])
+    const perform = vi.fn(async () => undefined)
+    const paths = ['D:/project/a.ocdocument', 'D:/project/b.ocdocument']
+    await result.coordinator.requestPathChanges(paths, perform)
+    expect(result.coordinator.decisions.value.map(row => row.sessionId)).toEqual(['a', 'b'])
+    result.coordinator.cancel()
+    expect(perform).not.toHaveBeenCalled()
+    await result.coordinator.requestPathChanges(paths, perform)
+    await result.coordinator.markSelectedSave()
+    result.saveSession.mockResolvedValueOnce('cancelled')
+    expect(await result.coordinator.confirm()).toBe(false)
+    expect(perform).not.toHaveBeenCalled()
+    result.saveSession.mockResolvedValue('saved')
+    expect(await result.coordinator.confirm()).toBe(true)
+    expect(perform).toHaveBeenCalledOnce()
+    expect(result.completions.sessions).toHaveBeenCalledWith(['a', 'b'])
+  })
+
   it('flushes before immediately completing a clean session close', async () => {
     const session = createSession('clean')
     const { coordinator, flushAffectedSessions, completions } = createCoordinator([session])

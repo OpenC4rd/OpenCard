@@ -20,7 +20,6 @@ export interface ExportTemplateSectionOptions {
   coverTreeData: Readonly<Ref<OcNodeCollection>>
   onProjectAction: (event: OcNodeActionEvent) => void
   onSelectionAction: (event: OcNodeActionEvent) => void
-  captureProjectTree: (instance: unknown) => void
 }
 
 export function createExportTemplateSection(options: ExportTemplateSectionOptions): ComputedRef<ShellListGroup[]> {
@@ -34,7 +33,6 @@ export function createExportTemplateSection(options: ExportTemplateSectionOption
       selectionMode: 'single' as const,
       activationMode: 'none' as const,
       onAction: options.onProjectAction,
-      captureInstance: options.captureProjectTree,
     }
     return [{
       key: 'primary',

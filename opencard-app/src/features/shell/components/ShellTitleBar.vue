@@ -34,13 +34,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'toggle-sidebar': [];
-  'menu-action': [menuKey: string, actionKey: string];
   'app-action': [actionKey: string];
   'window-control': [actionKey: string];
   'cancel-task': [taskKey: string];
 }>();
 
 const openMenu = ref<string | null>(null);
+const displayedMenus = ref<ShellTitleBarMenuGroup[] | null>(null);
 const menuBranchId = useId();
 const titlebarRef = ref<HTMLElement | null>(null);
 const taskPanelAnchor = ref<HTMLElement | null>(null);
@@ -125,6 +125,7 @@ function setMenuAnchor(menuKey: string, element: Element | ComponentPublicInstan
 }
 
 function toggleMenu(menuKey: string): void {
+  if (!openMenu.value) displayedMenus.value = props.menuGroups;
   openMenu.value = openMenu.value === menuKey ? null : menuKey;
 }
 
@@ -134,7 +135,7 @@ function switchOpenMenu(menuKey: string): void {
 
 function runMenuCommand(menuKey: string, actionKey: string): void {
   openMenu.value = null;
-  emit('menu-action', menuKey, actionKey);
+  void displayedMenus.value?.find(menu => menu.key === menuKey)?.onAction?.(actionKey);
 }
 
 function closeMenu(): void {
@@ -196,7 +197,7 @@ onBeforeUnmount(() => {
       </button>
 
       <div
-        v-for="menu in props.menuGroups"
+        v-for="menu in openMenu ? displayedMenus : props.menuGroups"
         :key="menu.key"
         class="titlebar-menu"
         @pointerenter="switchOpenMenu(menu.key)"

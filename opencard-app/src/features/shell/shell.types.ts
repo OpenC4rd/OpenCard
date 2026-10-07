@@ -1,3 +1,4 @@
+import type { SpaceKey } from './shellLocation'
 import type {
   OcNodeActionEvent,
   OcNodeActivateEvent,
@@ -10,7 +11,7 @@ import type {
   OcNodeRenameCommitEvent,
   OcNodeSelectionEvent,
 } from '../../shared/ui/node/node.types'
-import type { IconToken } from '../../shared/ui/icon/iconRegistry'
+import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
 import type { OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
 export interface ShellAction {
@@ -75,7 +76,15 @@ export interface ShellNoneContent {
 
 export type ShellListContent = ShellTreeContent | ShellEmptyContent | ShellNoneContent
 
+export type ShellActionHandler = (key: string) => void | Promise<void>
+
+export interface ShellMenuContribution {
+  actions: readonly OcActionMenuEntry[]
+  onAction: ShellActionHandler
+}
+
 export interface ShellList {
+  onAction?: ShellActionHandler;
   title: string;
   placeholder: string;
   key: string;
@@ -84,6 +93,7 @@ export interface ShellList {
 }
 
 export interface ShellListGroup {
+  onAction?: ShellActionHandler;
   key: string;
   transitionKey?: string;
   title: string;
@@ -92,6 +102,7 @@ export interface ShellListGroup {
   lists: ShellList[];
 }
 export interface ShellTitleBarMenuGroup {
+  onAction?: ShellActionHandler;
   key: string;
   label: string;
   badge?: number;
@@ -119,4 +130,20 @@ export interface ShellProgressTask {
 export interface ShellTitleBarWindowControl extends ShellTitleBarAppAction {
   group?: 'app' | 'window';
   danger?: boolean;
+}
+export interface ShellSpaceDefinition {
+  key: SpaceKey
+  labelKey: string
+  icon: IconToken
+  railGroup?: 'primary' | 'secondary'
+}
+
+export type ShellHeaderModel = {
+  title: string
+  titleLoading: boolean
+  icon?: IconToken
+  iconTone?: IconTone
+  subtitle?: string
+  actions: ShellWorkspaceAction[]
+  onAction?: ShellActionHandler
 }

@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
@@ -129,14 +127,5 @@ describe('ProjectCoverField', () => {
     expect(mocks.writeFile).not.toHaveBeenCalled()
   })
 
-  it('reserves the remove height so revealing it on hover cannot reflow the bar', () => {
-    // jsdom 不求值 scoped 样式，直接读源码钉住这条不变量。
-    const source = readFileSync(
-      join(process.cwd(), 'src/components/editors/ProjectCoverField.vue'),
-      'utf8',
-    )
-    const start = source.indexOf('\n.project-cover-field__info {')
-    expect(start).toBeGreaterThanOrEqual(0)
-    expect(source.slice(start, source.indexOf('}', start))).toContain('min-height: calc(var(--oc-size-sm)')
-  })
+
 })

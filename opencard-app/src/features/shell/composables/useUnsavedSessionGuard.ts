@@ -10,8 +10,9 @@ import type { ProjectCloseDestination } from '../shellLocation'
 export type ApplicationCloseAction = 'close' | 'install-update'
 
 export type UnsavedCloseIntent = {
-  type: 'project' | 'app' | 'sessions' | 'trash'
+  type: 'project' | 'app' | 'sessions' | 'trash' | 'discard'
   sessionIds: readonly string[]
+  perform?: () => Promise<void>
   path?: string
   projectDestination?: ProjectCloseDestination
   applicationAction?: ApplicationCloseAction

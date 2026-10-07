@@ -4,6 +4,7 @@ import type { AppSettingKey, SettingsCategoryKey } from '../settings/model/appSe
 export type SpaceKey = 'welcome' | 'workbench' | 'market' | 'test' | 'settings'
 export type PrimarySpaceKey = Exclude<SpaceKey, 'settings'>
 export type ShellFlowKey = 'create-project' | 'export-template' | 'about'
+export type ShellPage = SpaceKey | ShellFlowKey
 export type ProjectCloseDestination = 'current' | 'welcome' | 'create-project'
 
 export type ShellBaseLocation =
@@ -24,6 +25,11 @@ export interface ShellLocation {
   flow?: { type: ShellFlowKey }
 }
 
+/** Returns the one page currently visible in the shell. Flows take precedence over their base space. */
+export function resolveShellPage(location: ShellLocation): ShellPage {
+  return location.flow?.type ?? location.base.space
+}
+
 export function createSpaceLocation(space: SpaceKey, returnSpace: PrimarySpaceKey = 'welcome'): ShellLocation {
   if (space === 'settings') {
     return { base: { space, categoryKey: 'general', returnSpace } }
@@ -37,10 +43,6 @@ export function getPrimarySpace(location: ShellLocation): PrimarySpaceKey {
 
 export function getActiveSpace(location: ShellLocation): SpaceKey {
   return location.base.space
-}
-
-export function getOtherPrimarySpace(location: ShellLocation): PrimarySpaceKey {
-  return getPrimarySpace(location) === 'welcome' ? 'workbench' : 'welcome'
 }
 
 export function openSettings(

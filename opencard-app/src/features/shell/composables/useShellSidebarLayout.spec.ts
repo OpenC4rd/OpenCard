@@ -15,25 +15,25 @@ const PROJECT_PATH = 'D:/projects/demo'
 function createSidebarLayout(options: {
   sidebarWidth?: number
   sidebarCollapsed?: boolean
-  projectPath?: string
+  persistenceKey?: string
   viewportWidth?: number
-  isCreateProjectMode?: boolean
+  expandOnNarrowViewport?: boolean
 } = {}) {
   const settingsStore = createAppSettingsStore(new MemorySettingsPersistence())
   settingsStore.updateShell({
     sidebarWidth: options.sidebarWidth ?? DEFAULT_APP_SETTINGS.shell.sidebarWidth,
     sidebarCollapsed: options.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.shell.sidebarCollapsed,
   })
-  const projectPath = ref(options.projectPath ?? '')
+  const persistenceKey = ref(options.persistenceKey ?? '')
   const viewportWidth = ref(options.viewportWidth ?? 1440)
-  const isCreateProjectMode = ref(options.isCreateProjectMode ?? false)
+  const expandOnNarrowViewport = ref(options.expandOnNarrowViewport ?? false)
   const layout = useShellSidebarLayout({
     settings: settingsStore,
-    projectPath,
+    persistenceKey,
     viewportWidth,
-    isCreateProjectMode,
+    expandOnNarrowViewport,
   })
-  return { layout, settingsStore, projectPath, viewportWidth, isCreateProjectMode }
+  return { layout, settingsStore, persistenceKey, viewportWidth, expandOnNarrowViewport }
 }
 
 describe('useShellSidebarLayout', () => {
@@ -81,18 +81,18 @@ describe('useShellSidebarLayout', () => {
   })
 
   it('computes the effective collapse from settings, resize preview, and viewport', async () => {
-    const { layout, isCreateProjectMode, viewportWidth } = createSidebarLayout({ sidebarWidth: 300 })
+    const { layout, expandOnNarrowViewport, viewportWidth } = createSidebarLayout({ sidebarWidth: 300 })
     expect(layout.effectiveSidebarCollapsed.value).toBe(false)
 
     viewportWidth.value = 900
     await nextTick()
     expect(layout.effectiveSidebarCollapsed.value).toBe(true)
 
-    isCreateProjectMode.value = true
+    expandOnNarrowViewport.value = true
     await nextTick()
     expect(layout.effectiveSidebarCollapsed.value).toBe(false)
 
-    isCreateProjectMode.value = false
+    expandOnNarrowViewport.value = false
     viewportWidth.value = 1440
     layout.handleSidebarResize(SHELL_SIDEBAR_COLLAPSE_THRESHOLD)
     expect(layout.effectiveSidebarCollapsed.value).toBe(true)
@@ -152,7 +152,7 @@ describe('useShellSidebarLayout', () => {
   })
 
   it('stores the reported sidebar layout for the open project', () => {
-    const { layout, settingsStore } = createSidebarLayout({ projectPath: PROJECT_PATH })
+    const { layout, settingsStore } = createSidebarLayout({ persistenceKey: PROJECT_PATH })
     expect(layout.sidebarPersistedLayout.value).toBeUndefined()
 
     const reported = { collapsedLists: ['project-files'], listWeights: { 'project-files': 2 } }

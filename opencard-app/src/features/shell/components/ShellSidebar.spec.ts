@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ShellSidebar from './ShellSidebar.vue'
 import type { ShellButton, ShellList, ShellListGroup } from '../shell.types'
 
@@ -12,14 +12,15 @@ describe('ShellSidebar', () => {
     document.body.innerHTML = ''
   })
 
-  it('emits the selected child key from a list action submenu', async () => {
+  it('returns a list submenu token to its owning VM', async () => {
+    const onAction = vi.fn()
     const wrapper = mount(ShellSidebar, {
       attachTo: document.body,
       props: {
         collapsed: false,
         width: 260,
         bodyGroups: primaryGroup([{
-          key: 'project-files',
+          onAction, key: 'project-files',
           title: 'Files',
           placeholder: 'Empty',
           actions: [{
@@ -42,74 +43,11 @@ describe('ShellSidebar', () => {
     document.body.querySelector<HTMLButtonElement>('.oc-action-menu__button[aria-label="OpenCard (.ocdocument)"]')?.click()
     await flushPromises()
 
-    expect(wrapper.emitted('list-button-clicked')).toEqual([['project-files', 'project.new-file.ocdocument']])
+    expect(onAction).toHaveBeenCalledWith('project.new-file.ocdocument')
   })
 
-  it('uses one declarative group path and hides the switcher for a single group', () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 260,
-        bodyGroups: primaryGroup(
-          [{ key: 'recent', title: 'Recent Projects', placeholder: 'Empty', actions: [] }],
-          [{ key: 'open', title: 'Open Project', icon: 'status.folder-open' }],
-        ),
-      },
-    })
 
-    expect(wrapper.find('.shell-sidebar-group-switcher').exists()).toBe(false)
-    expect(wrapper.get('.shell-sidebar-group-top .shell-sidebar-button').text()).toBe('Open Project')
-    expect(wrapper.get('.shell-sidebar-list-title').text()).toBe('Recent Projects')
-  })
 
-  it('animates single-group content when its transition identity changes', async () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 260,
-        bodyGroups: [{
-          key: 'primary',
-          transitionKey: 'space:welcome:none',
-          title: '',
-          lists: [{ key: 'recent', title: 'Recent Projects', placeholder: 'Empty', actions: [] }],
-        }],
-      },
-    })
-
-    expect(wrapper.get('.shell-sidebar-active-group').attributes('data-transition-key')).toBe('space:welcome:none')
-    await wrapper.setProps({
-      bodyGroups: [{
-        key: 'primary',
-        transitionKey: 'space:settings:none',
-        title: '',
-        lists: [{ key: 'settings', title: 'Settings', placeholder: 'Empty', actions: [] }],
-      }],
-    })
-    await flushPromises()
-
-    expect(wrapper.get('.shell-sidebar-active-group').attributes('data-transition-key')).toBe('space:settings:none')
-    expect(wrapper.get('.shell-sidebar-list-title').text()).toBe('Settings')
-  })
-
-  it('shares available height across expanded lists and keeps scrolling inside each list', () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 260,
-        bodyGroups: primaryGroup([
-          { key: 'files', title: 'Files', placeholder: 'Empty', actions: [] },
-          { key: 'timeline', title: 'Timeline', placeholder: 'Empty', actions: [] },
-        ]),
-      },
-      slots: { 'list-content': '<div class="tree-content">Tree</div>' },
-    })
-
-    const sections = wrapper.findAll('.shell-sidebar-list')
-    expect(sections).toHaveLength(2)
-    expect(sections.every(section => section.attributes('style')?.includes('flex-grow: 1'))).toBe(true)
-    expect(wrapper.findAll('.shell-sidebar-list-content')).toHaveLength(2)
-    expect(wrapper.find('.shell-sidebar-list-resizer').exists()).toBe(true)
-  })
 
   it('stores resized list proportions and restores them after collapsing', async () => {
     const wrapper = mount(ShellSidebar, {

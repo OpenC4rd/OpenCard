@@ -21,11 +21,6 @@ const issueTreeData: OcNodeCollection = {
   children: new Map([['session:a', ['issue:a']]]),
 }
 
-const navigationToken = { protocol: 'card-designer', version: 1 } as const
-const issueNavigationTargets = new Map([
-  ['issue:a', { sessionId: 'a', token: navigationToken }],
-])
-
 const outputEntries: AppOutputEntry[] = [
   { id: 1, severity: 'info', timestamp: 1_000, message: 'info message' },
   { id: 2, severity: 'warning', timestamp: 2_000, message: 'warning message' },
@@ -44,7 +39,6 @@ function mountPanel(
       issueCount: 1,
       issueSeverity: 'warning',
       issueTreeData,
-      issueNavigationTargets,
       expandedIssueKeys: ['session:a'],
       outputEntries: output,
       issuesLabel: 'Problems',
@@ -69,7 +63,7 @@ function mountPanel(
 }
 
 describe('WorkspaceBottomPanel', () => {
-  it('projects controlled tree data and emits navigation only for an issue leaf', () => {
+  it('projects controlled tree data and sends the selected key to its page', () => {
     const wrapper = mountPanel()
     const tree = wrapper.getComponent(OcTree)
     const event: OcNodeActivateEvent = { key: 'issue:a' }
@@ -78,9 +72,7 @@ describe('WorkspaceBottomPanel', () => {
     expect(tree.props('expandedKeys')).toEqual(['session:a'])
     tree.vm.$emit('node-activate', event)
 
-    expect(wrapper.emitted('issue-navigate')).toEqual([[
-      { sessionId: 'a', token: navigationToken },
-    ]])
+    expect(wrapper.emitted('issue-navigate')).toEqual([['issue:a']])
   })
 
   it('filters diagnostics by their instance, Block, or field label text', async () => {
@@ -106,7 +98,7 @@ describe('WorkspaceBottomPanel', () => {
     expect(wrapper.emitted('issue-expansion-change')).toEqual([['session:a', false]])
   })
 
-  it('does not navigate for a grouping node without a supplied target', () => {
+  it('leaves grouping-node interpretation to the supplying page', () => {
     const wrapper = mountPanel()
     const tree = wrapper.getComponent(OcTree)
 
@@ -114,7 +106,7 @@ describe('WorkspaceBottomPanel', () => {
       key: 'session:a',
     } satisfies OcNodeActivateEvent)
 
-    expect(wrapper.emitted('issue-navigate')).toBeUndefined()
+    expect(wrapper.emitted('issue-navigate')).toEqual([['session:a']])
   })
 
   it('requests expansion on hover and collapse after leaving the whole panel', async () => {

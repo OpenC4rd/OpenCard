@@ -2,20 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   createSpaceLocation,
   getActiveSpace,
-  getOtherPrimarySpace,
   getPrimarySpace,
   leaveFlow,
   openFlow,
   openSettings,
   resolveLocationAfterProjectClose,
+  resolveShellPage,
   showSpace,
 } from './shellLocation'
-import { shellSpaceDefinitions, shellSpaceKeys } from './shellSection'
 
 describe('shellLocation', () => {
-  it('defines every currently available space in one static registry', () => {
-    expect(shellSpaceKeys).toEqual(['welcome', 'workbench', 'market', 'test', 'settings'])
-    expect(Object.values(shellSpaceDefinitions).map(space => space.key)).toEqual(shellSpaceKeys)
+  it('resolves one visible page and gives flows precedence over their base space', () => {
+    expect(resolveShellPage(createSpaceLocation('welcome'))).toBe('welcome')
+    expect(resolveShellPage(createSpaceLocation('workbench'))).toBe('workbench')
+    expect(resolveShellPage(openSettings(createSpaceLocation('welcome'), 'general'))).toBe('settings')
+    expect(resolveShellPage(openFlow(createSpaceLocation('workbench'), 'create-project'))).toBe('create-project')
+    expect(resolveShellPage(openFlow(createSpaceLocation('settings'), 'about'))).toBe('about')
   })
 
   it('keeps the primary space when entering a flow', () => {
@@ -36,11 +38,6 @@ describe('shellLocation', () => {
       categoryKey: 'general',
       returnSpace: 'workbench',
     })
-  })
-
-  it('switches to the other primary space from settings', () => {
-    expect(getOtherPrimarySpace(openSettings(createSpaceLocation('welcome'), 'general')))
-      .toBe('workbench')
   })
 
   it('leaves a flow without losing its originating base space', () => {

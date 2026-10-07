@@ -15,7 +15,7 @@ export const DICTIONARY_EXPORT_ACTION_KEY = 'dictionary.workbook.export'
 
 type Translate = (key: string, paramsOrFallback?: Record<string, unknown> | string) => string
 
-export interface ShellWorkspaceActionsOptions {
+export interface WorkbenchHeaderActionsOptions {
   translate: Translate
   isWorkbench: boolean
   isDiff: boolean
@@ -52,8 +52,8 @@ function createRevisionMenu(
   }))
 }
 
-export function createShellWorkspaceActions(
-  options: ShellWorkspaceActionsOptions,
+export function createWorkbenchHeaderActions(
+  options: WorkbenchHeaderActionsOptions,
 ): ShellWorkspaceAction[] {
   const { translate: t } = options
   if (!options.isWorkbench) return []

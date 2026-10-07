@@ -98,6 +98,8 @@ function createVersionControl(
     ...createDefaultAppSettings(),
     versionControl: { ...createDefaultAppSettings().versionControl, ...committer },
   })
+  const requestPathChanges = vi.fn(async (_paths: readonly string[], perform: () => Promise<void>) => { await perform() })
+  const moveProjectEntryToTrash = vi.fn()
   const versionControl = useShellVersionControl({
     projectPath,
     activeSession,
@@ -105,12 +107,12 @@ function createVersionControl(
     translate: key => key,
     fileChangeRevision,
     getRelativeProjectPath: path => path.slice(`${PROJECT_ROOT}/`.length),
-    moveProjectEntryToTrash: vi.fn(),
+    moveProjectEntryToTrash, requestPathChanges,
     requestConfirmation: vi.fn().mockResolvedValue(true),
     openSetting,
     settings,
   })
-  return { versionControl, projectPath, activeSession, fileChangeRevision, settings }
+  return { versionControl, projectPath, activeSession, fileChangeRevision, settings, requestPathChanges, moveProjectEntryToTrash }
 }
 
 /** 未提交状态条目：默认按"工作区已修改"造，够用来驱动更改列表。 */
@@ -144,6 +146,20 @@ describe('useShellVersionControl', () => {
     mocks.unstagePaths.mockResolvedValue(ok(true))
     mocks.discardPaths.mockResolvedValue(ok(true))
     mocks.createCommit.mockResolvedValue(ok({ id: 'commit-1' }))
+  })
+
+  it('defers tracked restore and untracked deletion together until the close guard allows them', async () => {
+    const { versionControl, projectPath, requestPathChanges, moveProjectEntryToTrash } = createVersionControl()
+    projectPath.value = PROJECT_ROOT
+    let proceed!: () => Promise<void>
+    requestPathChanges.mockImplementationOnce(async (_paths, perform) => { proceed = perform })
+    await versionControl.discardChanges({ tracked: [DOCUMENT_PATH], untracked: ['notes.txt'] })
+    expect(requestPathChanges.mock.calls[0][0]).toEqual([DOCUMENT_PATH, 'notes.txt'])
+    expect(mocks.discardPaths).not.toHaveBeenCalled()
+    expect(moveProjectEntryToTrash).not.toHaveBeenCalled()
+    await proceed()
+    expect(mocks.discardPaths).toHaveBeenCalledWith(PROJECT_ROOT, { paths: [DOCUMENT_PATH] })
+    expect(moveProjectEntryToTrash).toHaveBeenCalledWith('notes.txt')
   })
 
   it('derives repository readiness and the timeline placeholder from the repository inspection', async () => {

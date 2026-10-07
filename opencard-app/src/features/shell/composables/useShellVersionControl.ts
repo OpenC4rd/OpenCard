@@ -56,6 +56,7 @@ type ShellVersionControlOptions = {
   getRelativeProjectPath: (path: string) => string
   /** 把项目相对路径移入回收站：放弃新增内容时用它，磁盘上的文件还留得下来。 */
   moveProjectEntryToTrash: (relativePath: string) => Promise<void>
+  requestPathChanges: (paths: readonly string[], perform: () => Promise<void>) => Promise<unknown>
   /** 跳到某个设置项：提交者身份不合法时用它把用户带到该行。 */
   openSetting: (key: AppSettingKey) => void
   /** 应用设置：初始化仓库时直接取提交者身份与是否创建首次提交。 */
@@ -361,13 +362,14 @@ export function useShellVersionControl(options: ShellVersionControlOptions): She
     const root = projectPath.value
     if (!root) return
     try {
-      await discardTrackedPaths(root, targets.tracked)
-      await discardUntrackedPaths({
-        projectRoot: root,
-        paths: targets.untracked,
-        moveToTrash: moveProjectEntryToTrash,
+      await options.requestPathChanges([...targets.tracked, ...targets.untracked], async () => {
+        if (projectPath.value !== root) throw new Error(t('sidebar.changesDiscardFailed'))
+        await discardTrackedPaths(root, targets.tracked)
+        await discardUntrackedPaths({
+          projectRoot: root, paths: targets.untracked, moveToTrash: moveProjectEntryToTrash,
+        })
+        await refreshTimelineStatus()
       })
-      await refreshTimelineStatus()
     } catch (error) {
       notifyError(error instanceof Error && error.message ? error.message : t('sidebar.changesDiscardFailed'))
     }

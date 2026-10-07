@@ -6,6 +6,8 @@ import {
   openSettings,
   showPrimarySpace,
   showSpace,
+  resolveShellPage,
+  type ShellPage,
   type PrimarySpaceKey,
   type ShellLocation,
   type SpaceKey,
@@ -14,6 +16,7 @@ import {
 export interface ShellNavigationModel {
   location: Ref<ShellLocation>
   activeSpace: ComputedRef<SpaceKey>
+  page: ComputedRef<ShellPage>
   isSettings: ComputedRef<boolean>
   isCreateProject: ComputedRef<boolean>
   isExportTemplate: ComputedRef<boolean>
@@ -30,17 +33,19 @@ export interface ShellNavigationModel {
   returnFromFlow: () => void
 }
 
+const location = ref<ShellLocation>({ base: { space: 'welcome' } })
+
 export function useShellNavigation(): ShellNavigationModel {
-  const location = ref<ShellLocation>({ base: { space: 'welcome' } })
   const activeSpace = computed(() => getActiveSpace(location.value))
-  const isSettings = computed(() => !location.value.flow && location.value.base.space === 'settings')
-  const isCreateProject = computed(() => location.value.flow?.type === 'create-project')
-  const isExportTemplate = computed(() => location.value.flow?.type === 'export-template')
-  const isAbout = computed(() => location.value.flow?.type === 'about')
-  const isWelcome = computed(() => !location.value.flow && location.value.base.space === 'welcome')
-  const isWorkbench = computed(() => !location.value.flow && location.value.base.space === 'workbench')
-  const isMarket = computed(() => !location.value.flow && location.value.base.space === 'market')
-  const isTest = computed(() => !location.value.flow && location.value.base.space === 'test')
+  const page = computed(() => resolveShellPage(location.value))
+  const isSettings = computed(() => page.value === 'settings')
+  const isCreateProject = computed(() => page.value === 'create-project')
+  const isExportTemplate = computed(() => page.value === 'export-template')
+  const isAbout = computed(() => page.value === 'about')
+  const isWelcome = computed(() => page.value === 'welcome')
+  const isWorkbench = computed(() => page.value === 'workbench')
+  const isMarket = computed(() => page.value === 'market')
+  const isTest = computed(() => page.value === 'test')
   const isAuxiliary = computed(() => (
     isSettings.value || isCreateProject.value || isExportTemplate.value || isAbout.value
   ))
@@ -71,6 +76,7 @@ export function useShellNavigation(): ShellNavigationModel {
   return {
     location,
     activeSpace,
+    page,
     isSettings,
     isCreateProject,
     isExportTemplate,
