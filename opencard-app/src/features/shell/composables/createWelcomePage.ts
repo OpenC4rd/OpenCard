@@ -1,25 +1,25 @@
 import { computed } from 'vue'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
-import WelcomeWorkspace from '../components/WelcomeWorkspace.vue'
+import WelcomePageContent from '../components/WelcomePageContent.vue'
 import type { SpacePage } from '../spacePage'
 import { useAppProjectActions } from '../services/appProjectActions'
 import { useShellNavigation } from './useShellNavigation'
-import { useShellWelcomeFeature } from './useShellWelcomeFeature'
+import { useWelcomePageState } from './useWelcomePageState'
 
 export function createWelcomePage(): SpacePage {
   const settings = useAppSettingsStore()
   const app = useAppProjectActions()
   const { projectPath } = useProjectStore()
   const { isWelcome } = useShellNavigation()
-  const feature = useShellWelcomeFeature({
+  const feature = useWelcomePageState({
     projectPath, isWelcomeMode: isWelcome,
     openRecentProject: app.openRecentProject, relocateRecentProject: app.relocateRecentProject,
   })
   return {
     key: 'welcome',
     navigation: { key: 'welcome', icon: 'nav.welcome', labelKey: 'app.shell.space.welcome' },
-    content: WelcomeWorkspace,
+    content: WelcomePageContent,
     contentProps: computed(() => ({
       covers: feature.welcomeCoverWallCovers.value,
       highlightKeys: feature.selectedRecentProjectKeys.value,
@@ -31,6 +31,6 @@ export function createWelcomePage(): SpacePage {
       if (key === 'new-project') await app.newProject()
       else if (key === 'open-project') await app.openProject()
     } }))),
-    header: computed(() => ({ title: 'OpenCard', titleLoading: false, actions: [] })),
+    header: computed(() => null),
   }
 }

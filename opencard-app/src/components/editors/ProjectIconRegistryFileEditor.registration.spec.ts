@@ -263,7 +263,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     await flushPromises()
 
     // Related commands are disabled for the duration of the task.
-    const actions = wrapper.vm.workspaceActions as { disabled?: boolean }[]
+    const actions = wrapper.vm.headerActions as { disabled?: boolean }[]
     expect(actions.every(action => action.disabled)).toBe(true)
     expect(progress.tasks.value.some(task => task.key === TASK_KEY)).toBe(true)
 

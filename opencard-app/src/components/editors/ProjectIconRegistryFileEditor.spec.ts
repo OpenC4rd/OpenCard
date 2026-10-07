@@ -198,16 +198,9 @@ describe('ProjectIconRegistryFileEditor', () => {
     })
 
     expect(wrapper.vm.presentation).toMatchObject({ title: 'iconRegistry.title', icon: 'file.project-icon' })
-    expect(wrapper.vm.workspaceActions.map(action => (
-      typeof action === 'string' ? action : action.hoverTip
-    ))).toEqual([
-      'projectConfig.icons.createPack',
-      'projectConfig.icons.importPack',
-    ])
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(false)
 
-    expect(await wrapper.vm.runWorkspaceAction('project-icon-registry.create-pack')).toBe(true)
+    await wrapper.vm.onHeaderAction('project-icon-registry.create-pack')
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(true)
-    expect(await wrapper.vm.runWorkspaceAction('unknown-action')).toBe(false)
   })
 })

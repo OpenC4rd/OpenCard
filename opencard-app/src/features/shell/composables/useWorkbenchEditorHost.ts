@@ -1,0 +1,440 @@
+/** Adapts the active editor session to a registered editor without owning session truth. */
+import { computed, ref, watch, type Component, type DeepReadonly, type Ref } from 'vue'
+import UnsupportedFileEditor from '../../../components/editors/UnsupportedFileEditor.vue'
+import MonacoEditor from '../../../components/editors/MonacoEditor.vue'
+import { getPathDirectory } from '../../../shared/model/filePath'
+import { getOcTheme } from '../../../shared/ui/foundation'
+import type { AppSettings } from '../../settings/model/appSettings'
+import type {
+  CardDesignerLayoutState,
+  CardDesignerMode,
+  CardDesignerViewState,
+  EditorDiffUiState,
+  EditorViewportTransform,
+} from '../../editor-runtime/model/editorUiState'
+import type {
+  EditorNavigationResult,
+  SessionNavigationToken,
+} from '../../editor-runtime/model/editorIssue'
+import { editorRegistry } from '../../editor-runtime/registry/editorRegistry'
+import { resolveFileType, resolveFileTypeById } from '../../workspace/model/fileTypes'
+import type {
+  EditorSession,
+  EditorSessionUiState,
+  SessionSaveResult,
+} from '../../workspace/store/editorSessionStore'
+import type { ProjectProfile } from '../../workspace/model/projectMetadata'
+import { notifyAppError, notifySuccess, notifyWarning } from '../../notifications/titlebarNotices'
+import { editorHistoryManager } from '../../editor-runtime/history/editorHistoryManager'
+import type { HistoryOperationMeta } from '../../editor-runtime/history/history.types'
+import type { EditorComparisonInput, EditorProps } from '../../editor-runtime/registry/editorRegistry'
+import type { PageHeaderAction } from '../shell.types'
+import type { EditorPresentation } from '../../../shared/ui/editorPresentation.types'
+
+const VIEWPORT_TRANSFORM_PERSIST_DELAY_MS = 200
+
+export type WorkbenchEditorRef = {
+  save?: () => Promise<void> | void
+  flush?: () => Promise<void> | void
+  undo?: () => Promise<void> | void
+  redo?: () => Promise<void> | void
+  canUndo?: boolean
+  canRedo?: boolean
+  /** Actions the active editor contributes to the workspace header. */
+  headerActions?: readonly PageHeaderAction[]
+  /** Returns a header action to the editor that contributed it. */
+  onHeaderAction?: (actionKey: string) => Promise<void> | void
+  /** The editor's own identity, shown in the workspace header. */
+  presentation?: EditorPresentation
+  navigate?: (token: SessionNavigationToken) => Promise<EditorNavigationResult> | EditorNavigationResult
+
+}
+
+type SessionActions = {
+  updateDraftContent: (sessionId: string, content: string) => void
+  setSessionDirtyState: (sessionId: string, isDirty: boolean) => void
+  setSessionPresentation: (sessionId: string, presentation: EditorPresentation | null) => void
+  updateSessionUiState: (sessionId: string, patch: EditorSessionUiState) => void
+  updateSessionDiffUiState?: (sessionId: string, value: EditorDiffUiState) => void
+  saveSession: (sessionId: string) => Promise<SessionSaveResult>
+}
+
+type UseWorkbenchEditorHostOptions = {
+  activeSession: Readonly<Ref<EditorSession | null>>
+  projectPath: Readonly<Ref<string>>
+  projectProfile: Readonly<Ref<ProjectProfile | null>>
+  settings: Readonly<Ref<DeepReadonly<AppSettings>>>
+  sessionActions: SessionActions
+  comparison?: Readonly<Ref<EditorComparisonInput | null>>
+  renderCardImages?: EditorProps['renderCardImages']
+  imageExportBusy?: Readonly<Ref<boolean>>
+  debugHideCdeOverlays?: Readonly<Ref<boolean>>
+  debugTransparentCdeViewport?: Readonly<Ref<boolean>>
+  debugPassiveCdeViewport?: Readonly<Ref<boolean>>
+  translate: (key: string, params?: Record<string, unknown>) => string
+}
+
+const AUTO_SAVE_REGISTRY_EDITOR_IDS = new Set(['font-registry', 'icon-registry', 'custom-block-registry'])
+
+type PendingViewportTransform = {
+  sessionId: string
+  editorId: 'card-designer' | 'image-preview'
+  value: EditorViewportTransform
+}
+
+function resolveSessionFileType(session: Pick<EditorSession, 'fileTypeId' | 'path'>) {
+  const fileTypeFromId = resolveFileTypeById(session.fileTypeId)
+  if (!session.path) return fileTypeFromId
+  const fileTypeFromPath = resolveFileType(session.path)
+  return fileTypeFromPath.id === session.fileTypeId ? fileTypeFromPath : fileTypeFromId
+}
+
+export function useWorkbenchEditorHost(options: UseWorkbenchEditorHostOptions) {
+  const editorRef = ref<WorkbenchEditorRef | null>(null)
+  let viewportTransformPersistTimer: number | null = null
+  let pendingViewportTransform: PendingViewportTransform | null = null
+  let disposed = false
+
+  function recordDraftContent(sessionId: string, value: string, history?: HistoryOperationMeta): void {
+    const session = options.activeSession.value
+    if (session?.mode === 'diff') return
+    editorHistoryManager.recordContent(sessionId, value, history)
+    if (session?.id === sessionId && AUTO_SAVE_REGISTRY_EDITOR_IDS.has(session.editorId)) {
+      void options.sessionActions.saveSession(sessionId)
+    }
+  }
+
+  const resourceRootPath = computed<string | null>(() => {
+    const session = options.activeSession.value
+    if (!session) return null
+    if (session.resourceKind === 'workspace') return options.projectPath.value || null
+    if (session.resourceKind === 'external' && session.path) return getPathDirectory(session.path) || null
+    return null
+  })
+
+  const themeId = computed(() => (
+    options.settings.value.appearance.theme === 'system'
+      ? getOcTheme()
+      : options.settings.value.appearance.theme
+  ))
+  const themeOverrides = computed(() => options.settings.value.appearance.themeOverrides[themeId.value])
+
+  const component = computed<Component | null>(() => {
+    const session = options.activeSession.value
+    if (!session) return null
+    const editor = editorRegistry.getEditor(session.editorId)
+    const fileType = resolveSessionFileType(session)
+    if (session.mode === 'diff' && editor && !editor.supportsDiff && fileType.language) return MonacoEditor
+    return editor?.component ?? UnsupportedFileEditor
+  })
+
+  const historyState = computed(() => editorHistoryManager.state(options.activeSession.value?.id))
+  const canUndo = computed(() => historyState.value.canUndo)
+  const canRedo = computed(() => historyState.value.canRedo)
+
+  const key = computed(() => {
+    const session = options.activeSession.value
+    if (!session) return 'none'
+    const base = [session.id, session.path ?? `draft://${session.id}`, session.editorId]
+    if (session.mode !== 'diff') return base.join('|')
+    return [...base, 'diff', session.diff?.beforeRevisionId ?? '', session.diff?.afterRevisionId ?? ''].join('|')
+  })
+
+  const props = computed<Record<string, unknown>>(() => {
+    const session = options.activeSession.value
+    if (!session) return {}
+
+    const sessionId = session.id
+    const fileType = resolveSessionFileType(session)
+    const filePath = session.path ?? `draft://${session.id}`
+    const editor = editorRegistry.getEditor(session.editorId) ?? editorRegistry.getEditor('unsupported-file')
+    if (session.mode === 'diff' && editor && !editor.supportsDiff && fileType.language) {
+      return {
+        sessionId,
+        mode: 'diff',
+        comparison: options.comparison?.value ?? undefined,
+        modelValue: session.draftContent,
+        language: fileType.language,
+        themeId: themeId.value,
+        themeOverrides: themeOverrides.value,
+      }
+    }
+    if (editor && editor.id !== 'monaco') {
+      const baseProps = {
+        sessionId,
+        mode: session.mode,
+        comparison: options.comparison?.value ?? undefined,
+        filePath,
+        fileName: session.name,
+        resourceRootPath: resourceRootPath.value,
+        modelValue: session.draftContent,
+        savedContent: session.savedContent,
+        diffUiState: session.diff?.uiState,
+        themeId: themeId.value,
+        themeOverrides: themeOverrides.value,
+        ...(session.mode === 'diff' ? {} : {
+          'onUpdate:modelValue': (value: string, history?: HistoryOperationMeta) => {
+            recordDraftContent(sessionId, value, history)
+          },
+        }),
+      }
+
+      if (editor.id === 'card-designer') {
+        return {
+          renderCardImages: options.renderCardImages,
+          imageExportBusy: options.imageExportBusy?.value ?? false,
+          ...baseProps,
+          fileName: session.name,
+          resourceRootPath: resourceRootPath.value,
+          remoteResourcePolicy: session.resourceKind === 'workspace'
+            ? options.projectProfile.value?.remoteResources
+            : undefined,
+          cardDesignerMode: session.uiState?.cardDesigner?.mode ?? 'design',
+          viewportTransform: session.uiState?.cardDesigner?.viewportTransform,
+          cardDesignerLayout: session.uiState?.cardDesigner?.layout,
+          cardDesignerView: session.uiState?.cardDesigner?.view,
+          structureTreeSelectionBehavior:
+            options.settings.value.workspace.structureTreeSelectionBehavior,
+          structureTreeScrollToSelection:
+            options.settings.value.workspace.structureTreeScrollToSelection,
+          showSelectionPositionOnMove:
+            options.settings.value.workspace.showSelectionPositionOnMove,
+          showSelectionSizeOnResize:
+            options.settings.value.workspace.showSelectionSizeOnResize,
+          alignmentSnappingEnabledByDefault:
+            options.settings.value.workspace.alignmentSnappingEnabledByDefault,
+          debugHideCdeOverlays: options.debugHideCdeOverlays?.value ?? false,
+          debugTransparentCdeViewport: options.debugTransparentCdeViewport?.value ?? false,
+          debugPassiveCdeViewport: options.debugPassiveCdeViewport?.value ?? false,
+        }
+      }
+
+      if (editor.id === 'image-preview') {
+        return {
+          ...baseProps,
+          viewportTransform: session.uiState?.imagePreview?.viewportTransform,
+          pixelated: session.uiState?.imagePreview?.pixelated ?? false,
+        }
+      }
+
+      return baseProps
+    }
+
+    return {
+      sessionId,
+      mode: session.mode,
+      comparison: options.comparison?.value ?? undefined,
+      modelValue: session.draftContent,
+      savedContent: session.savedContent,
+      ...(session.mode === 'diff' ? {} : {
+        'onUpdate:modelValue': (value: string, history?: HistoryOperationMeta) => {
+          recordDraftContent(sessionId, value, history)
+        },
+      }),
+      language: fileType.language ?? 'plaintext',
+      themeId: themeId.value,
+      themeOverrides: themeOverrides.value,
+    }
+  })
+
+  function persistPendingViewportTransform(): void {
+    if (viewportTransformPersistTimer !== null) {
+      window.clearTimeout(viewportTransformPersistTimer)
+      viewportTransformPersistTimer = null
+    }
+
+    const pending = pendingViewportTransform
+    pendingViewportTransform = null
+    if (!pending) return
+
+    options.sessionActions.updateSessionUiState(
+      pending.sessionId,
+      pending.editorId === 'card-designer'
+        ? { cardDesigner: { viewportTransform: pending.value } }
+        : { imagePreview: { viewportTransform: pending.value } },
+    )
+  }
+
+  function handleViewportTransform(value: EditorViewportTransform): void {
+    const session = options.activeSession.value
+    if (!session || (session.editorId !== 'card-designer' && session.editorId !== 'image-preview')) return
+
+    if (pendingViewportTransform && pendingViewportTransform.sessionId !== session.id) {
+      persistPendingViewportTransform()
+    }
+    pendingViewportTransform = { sessionId: session.id, editorId: session.editorId, value }
+    if (viewportTransformPersistTimer !== null) window.clearTimeout(viewportTransformPersistTimer)
+    viewportTransformPersistTimer = window.setTimeout(
+      persistPendingViewportTransform,
+      VIEWPORT_TRANSFORM_PERSIST_DELAY_MS,
+    )
+  }
+
+  function handleCardDesignerLayout(value: CardDesignerLayoutState): void {
+    const session = options.activeSession.value
+    if (!session || session.editorId !== 'card-designer') return
+    options.sessionActions.updateSessionUiState(session.id, { cardDesigner: { layout: value } })
+  }
+
+  function handleCardDesignerMode(value: CardDesignerMode): void {
+    const session = options.activeSession.value
+    if (!session || session.editorId !== 'card-designer') return
+    options.sessionActions.updateSessionUiState(session.id, { cardDesigner: { mode: value } })
+  }
+
+  function handleCardDesignerView(value: CardDesignerViewState): void {
+    const session = options.activeSession.value
+    if (!session || session.editorId !== 'card-designer') return
+    options.sessionActions.updateSessionUiState(session.id, { cardDesigner: { view: value } })
+  }
+
+  function handleDiffUiState(value: EditorDiffUiState): void {
+    const session = options.activeSession.value
+    if (!session || session.mode !== 'diff') return
+    options.sessionActions.updateSessionDiffUiState?.(session.id, value)
+  }
+
+  function handleImagePreviewPixelated(value: boolean): void {
+    const session = options.activeSession.value
+    if (!session || session.editorId !== 'image-preview') return
+    options.sessionActions.updateSessionUiState(session.id, { imagePreview: { pixelated: value } })
+  }
+
+  function handleModified(modified: boolean): void {
+    const session = options.activeSession.value
+    if (session) options.sessionActions.setSessionDirtyState(session.id, modified)
+  }
+
+  function notifySaveResult(result: SessionSaveResult, name: string): void {
+    if (result === 'saved') {
+      notifySuccess(options.translate('app.notifications.saved', { name }), 'action.save')
+      return
+    }
+    notifyWarning(options.translate(
+      result === 'cancelled' ? 'app.notifications.saveCancelled' : 'app.notifications.saveSkipped',
+      { name },
+    ))
+  }
+
+  async function handleSaveEvent(): Promise<void> {
+    const session = options.activeSession.value
+    if (!session) return
+    try {
+      await editorHistoryManager.flush(session.id)
+      notifySaveResult(await options.sessionActions.saveSession(session.id), session.name)
+    } catch (error) {
+      notifyAppError('OC-E4002', error)
+    }
+  }
+
+  async function save(): Promise<void> {
+    const session = options.activeSession.value
+    if (!session) return
+    try {
+      await editorHistoryManager.flush(session.id)
+      if (editorRegistry.getEditor(session.editorId)?.id !== 'monaco'
+        && editorRef.value?.save) {
+        await editorRef.value.save()
+        return
+      }
+      notifySaveResult(await options.sessionActions.saveSession(session.id), session.name)
+    } catch (error) {
+      notifyAppError('OC-E4002', error)
+    }
+  }
+
+  async function undo(): Promise<void> {
+    const sessionId = options.activeSession.value?.id
+    if (!sessionId || !canUndo.value) return
+    await editorRef.value?.flush?.()
+    await editorHistoryManager.undo(sessionId)
+  }
+
+  async function redo(): Promise<void> {
+    const sessionId = options.activeSession.value?.id
+    if (!sessionId || !canRedo.value) return
+    await editorRef.value?.flush?.()
+    await editorHistoryManager.redo(sessionId)
+  }
+
+  async function flushAffectedSessions(sessionIds: readonly string[]): Promise<void> {
+    const activeId = options.activeSession.value?.id
+    if (activeId && sessionIds.includes(activeId)) await editorRef.value?.flush?.()
+    await editorHistoryManager.flushMany(sessionIds)
+  }
+
+  const stopSessionWatch = watch(
+    () => options.activeSession.value?.id ?? null,
+    () => persistPendingViewportTransform(),
+  )
+
+  /**
+   * 当前编辑器实例是为哪个会话挂载的。用它而不是 `activeSession`：切换会话时旧编辑器还会短暂存在，
+   * 若此刻读它就会把旧呈现写给新会话。
+   */
+  const mountedSessionId = ref<string | null>(null)
+  watch(editorRef, (instance) => {
+    mountedSessionId.value = instance ? options.activeSession.value?.id ?? null : null
+  }, { immediate: true, flush: 'post' })
+
+  /**
+   * 活动编辑器声明它要求自己在外部看起来是什么样，host 把它写回 session —— 这是呈现的唯一写入口，
+   * 于是列表与头部读的是同一份，后台会话也留着最后一次声明。值没变时 store 自己会跳过写入。
+   *
+   * 已挂载却不带 `presentation` 的编辑器（纯文本这类）声明 `null`，即"我没有呈现"；在那之前什么都不声明，
+   * 壳层据此留空 —— 先显示身份名再被替换，等于让用户看一次改名。会话身份也是这份声明的输入：
+   * 另存为或重命名之后要按新身份重新声明一次。
+   */
+  const editorDeclaration = computed(() => {
+    const sessionId = mountedSessionId.value
+    const instance = editorRef.value
+    const session = options.activeSession.value
+    if (!sessionId || !instance || !session || session.id !== sessionId) return null
+    return {
+      sessionId,
+      identity: `${session.path ?? ''}\0${session.name}`,
+      presentation: instance.presentation ?? null,
+    }
+  })
+
+  const stopPresentationWatch = watch(
+    editorDeclaration,
+    (declaration) => {
+      if (declaration) {
+        options.sessionActions.setSessionPresentation(declaration.sessionId, declaration.presentation)
+      }
+    },
+    { immediate: true, flush: 'post' },
+  )
+
+  function dispose(): void {
+    if (disposed) return
+    disposed = true
+    stopSessionWatch()
+    stopPresentationWatch()
+    persistPendingViewportTransform()
+  }
+
+  return {
+    editorRef,
+    component,
+    key,
+    props,
+    resourceRootPath,
+    canUndo,
+    canRedo,
+    handleViewportTransform,
+    handleCardDesignerMode,
+    handleCardDesignerLayout,
+    handleCardDesignerView,
+    handleDiffUiState,
+    handleImagePreviewPixelated,
+    handleModified,
+    handleSaveEvent,
+    save,
+    undo,
+    redo,
+    flushAffectedSessions,
+    dispose,
+  }
+}

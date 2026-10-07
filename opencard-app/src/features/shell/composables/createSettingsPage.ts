@@ -3,17 +3,17 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import type { AppSettingKey, SettingsCategoryKey } from '../../settings/model/appSettings'
-import SettingsWorkspace from '../../settings/components/SettingsWorkspace.vue'
+import SettingsPageContent from '../../settings/components/SettingsPageContent.vue'
 import type { SpacePage } from '../spacePage'
 import { useShellNavigation } from './useShellNavigation'
-import { useShellSettingsFeature } from './useShellSettingsFeature'
+import { useSettingsPageState } from './useSettingsPageState'
 
 export function createSettingsPage() {
   const navigation = useShellNavigation()
   const project = useProjectStore()
   const category = computed<SettingsCategoryKey>(() => navigation.location.value.base.space === 'settings'
     ? navigation.location.value.base.categoryKey : 'general')
-  const feature = useShellSettingsFeature({
+  const feature = useSettingsPageState({
     settingsStore: useAppSettingsStore(), categoryKey: category,
     projectOpen: computed(() => Boolean(project.projectPath.value)), isSettingsMode: navigation.isSettings,
     resetWorkspace: project.resetProjectWorkspaceState, selectCategory: navigation.showSettings,
@@ -26,7 +26,7 @@ export function createSettingsPage() {
   const page: SpacePage = {
     key: 'settings',
     navigation: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'tool.settings', railGroup: 'secondary' },
-    content: SettingsWorkspace,
+    content: SettingsPageContent,
     contentProps: computed(() => ({
       viewModel: feature.activeCategory.value,
       focusKey: navigation.location.value.base.space === 'settings' ? navigation.location.value.base.focusKey : undefined,

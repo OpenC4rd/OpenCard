@@ -4,7 +4,7 @@ import type { SpacePage } from '../spacePage'
 import type { ShellPage } from '../shellLocation'
 import type { ShellSpaceDefinition } from '../shell.types'
 import type { ApplicationCloseAction } from './useUnsavedSessionGuard'
-import ComingSoonWorkspace from '../components/ComingSoonWorkspace.vue'
+import ComingSoonPageContent from '../components/ComingSoonPageContent.vue'
 import { useShellNavigation } from './useShellNavigation'
 import { useApplicationServices } from './useApplicationServices'
 import { useApplicationActions } from './useApplicationActions'
@@ -45,7 +45,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   templateExport = createExportTemplatePage(workbench.templateTree)
   function placeholder(key: 'market' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
     return {
-      key, navigation: { key, icon, labelKey: `app.shell.space.${key}` }, content: ComingSoonWorkspace,
+      key, navigation: { key, icon, labelKey: `app.shell.space.${key}` }, content: ComingSoonPageContent,
       contentProps: computed(() => ({ title: t(`app.shell.space.${key}`), icon })), sidebar: computed(() => []),
       header: computed(() => ({ title: t(`app.shell.space.${key}`), titleLoading: false, icon, actions: [] })),
     }

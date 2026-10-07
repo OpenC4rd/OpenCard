@@ -12,7 +12,7 @@ import type {
   OcNodeSelectionEvent,
 } from '../../shared/ui/node/node.types'
 import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
-import type { OcActionMenuEntry } from '../../shared/ui/action/action.types'
+import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
 export interface ShellAction {
   type?: 'action' | 'selection';
@@ -37,7 +37,7 @@ export interface ShellButton {
   badge?: number;
 }
 
-export type ShellWorkspaceAction = ShellAction | string
+export type PageHeaderAction = OcActionDefinition | string
 
 export interface ShellTreeContent {
   type: 'tree';
@@ -144,6 +144,6 @@ export type ShellHeaderModel = {
   icon?: IconToken
   iconTone?: IconTone
   subtitle?: string
-  actions: ShellWorkspaceAction[]
+  actions: readonly PageHeaderAction[]
   onAction?: ShellActionHandler
 }

@@ -3,7 +3,7 @@ import type { OcNodeCollection } from '../../shared/ui/node/node.types'
 import type { ShellHeaderModel, ShellListGroup, ShellMenuContribution, ShellSpaceDefinition } from './shell.types'
 import type { ShellPage } from './shellLocation'
 
-/** A page contributes data and callbacks; only its content controls the workspace DOM. */
+/** A page contributes data and callbacks; only its content controls the page content DOM. */
 export interface SpacePage {
   key: ShellPage
   navigation?: ShellSpaceDefinition
@@ -11,7 +11,7 @@ export interface SpacePage {
   contentProps: Readonly<Ref<Record<string, unknown>>>
   sidebar: Readonly<Ref<ShellListGroup[]>>
   sidebarLayout?: { persistenceKey: Readonly<Ref<string>>; expandOnNarrowViewport?: boolean }
-  header: Readonly<Ref<ShellHeaderModel>>
+  header: Readonly<Ref<ShellHeaderModel | null>>
   bottomPanel?: Readonly<Ref<SpacePageProblems>>
   menuContribution?: Readonly<Ref<Partial<Record<'file' | 'edit' | 'view' | 'help', ShellMenuContribution>>>>
   selectSidebarGroup?: (key: string) => void

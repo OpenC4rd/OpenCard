@@ -1,4 +1,4 @@
-<!-- Fixed application frame. Pages supply view models and own their workspace content. -->
+<!-- Fixed application frame. Pages supply view models and own their page content. -->
 <template>
   <main class="shell-root open-card-shell">
     <ShellTitleBar
@@ -51,17 +51,17 @@
         @layout-change="handleSidebarLayoutChange"
       />
 
-      <ShellWorkspaceFrame
+      <ShellPageFrame
         :header="currentPage.header.value"
         lock-body-scroll
         flush-body
       >
         <div
-          ref="workspaceStackRef"
-          class="open-card-shell__workspace-stack"
+          ref="pageStackRef"
+          class="open-card-shell__page-stack"
           :class="{ 'is-bottom-panel-expanded': isBottomPanelExpanded }"
         >
-          <div class="open-card-shell__workbench">
+          <div class="open-card-shell__page-content">
             <component :is="currentPage.content" :key="currentPage.key" v-bind="currentPage.contentProps.value" />
           </div>
           <div
@@ -76,8 +76,8 @@
           >
             <span>{{ bottomPanelPreviewPercentage }}%</span>
           </div>
-          <WorkspaceBottomPanel
-            :style="{ '--workspace-bottom-panel-height': `${bottomPanelHeight}px` }"
+          <ShellBottomPanel
+            :style="{ '--shell-bottom-panel-height': `${bottomPanelHeight}px` }"
             :resizing="isBottomPanelResizing"
             :expanded="isBottomPanelExpanded"
             :active-tab="activeBottomTab"
@@ -114,7 +114,7 @@
             @output-clear="clearAppOutputEntries"
           />
         </div>
-      </ShellWorkspaceFrame>
+      </ShellPageFrame>
     </div>
 
     <component v-for="page in overlayPages" :key="page.key" :is="page.overlays" v-bind="page.overlayProps?.value" />
@@ -133,12 +133,12 @@ import { useProjectStore } from '../workspace/store/projectStore'
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from '../settings/model/appSettings'
 import { registerUnhandledExternalDrop, useExternalFileDrop } from '../../shared/ui/drop/externalFileDrop'
 import { appOutputEntries, clearAppOutputEntries } from '../logging/appOutput'
-import WorkspaceBottomPanel, { type WorkspaceBottomTab } from './components/WorkspaceBottomPanel.vue'
+import ShellBottomPanel, { type ShellBottomPanelTab } from './components/ShellBottomPanel.vue'
 import ShellOverlayHost from './components/ShellOverlayHost.vue'
 import ShellSidebar from './components/ShellSidebar.vue'
 import ShellTitleBar from './components/ShellTitleBar.vue'
 import ShellSpaceRail from './components/ShellSpaceRail.vue'
-import ShellWorkspaceFrame from './components/ShellWorkspaceFrame.vue'
+import ShellPageFrame from './components/ShellPageFrame.vue'
 import { useShellWindow } from './composables/useShellWindow'
 import { useShellNavigation } from './composables/useShellNavigation'
 import { useShellSidebarLayout } from './composables/useShellSidebarLayout'
@@ -178,11 +178,11 @@ const titleBarBrandLabel = computed(() => {
 })
 watch(() => settingsStore.settings.value.shell.titleBarNoticeHistoryLimit, setTitleBarNoticeHistoryLimit, { immediate: true })
 watch(locale, value => { document.documentElement.lang = appLocaleLanguageTag(value) }, { immediate: true })
-const workspaceStackRef = ref<HTMLElement | null>(null)
+const pageStackRef = ref<HTMLElement | null>(null)
 const { isExpanded: isBottomPanelExpanded, height: bottomPanelHeight, previewHeight: bottomPanelPreviewHeight,
   isResizing: isBottomPanelResizing, previewPercentage: bottomPanelPreviewPercentage, startResize: handleBottomPanelResizeStart,
-} = useShellBottomPanelLayout(workspaceStackRef)
-const activeBottomTab = ref<WorkspaceBottomTab>('issues')
+} = useShellBottomPanelLayout(pageStackRef)
+const activeBottomTab = ref<ShellBottomPanelTab>('issues')
 const {
   sidebarCollapsed,
   sidebarWidth,

@@ -1,13 +1,13 @@
 import { computed, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ExportTemplateWorkspace from '../../project-templates/components/ExportTemplateWorkspace.vue'
+import ExportTemplatePageContent from '../../project-templates/components/ExportTemplatePageContent.vue'
 import { createTemplateExportForm } from '../../project-templates/composables/createTemplateExportForm'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { notifySuccess } from '../../notifications/titlebarNotices'
 import type { SpacePage } from '../spacePage'
 import type { createWorkbenchPage } from './createWorkbenchPage'
 import { useShellNavigation } from './useShellNavigation'
-import { useShellExportTemplateFeature } from './useShellExportTemplateFeature'
+import { useExportTemplatePageState } from './useExportTemplatePageState'
 import { useShellProgressTasks } from './useShellProgressTasks'
 
 export function createExportTemplatePage(tree: ReturnType<typeof createWorkbenchPage>['templateTree']) {
@@ -24,13 +24,13 @@ export function createExportTemplatePage(tree: ReturnType<typeof createWorkbench
     else removeTask('export-template')
   })
   onUnmounted(() => removeTask('export-template'))
-  const feature = useShellExportTemplateFeature({
+  const feature = useExportTemplatePageState({
     projectPath: project.projectPath,
     projectFolderName: computed(() => project.projectPath.value.split(/[/\\]/).filter(Boolean).pop() ?? ''),
     busy, ...tree, translate: t, form,
   })
   const page: SpacePage = {
-    key: 'export-template', content: ExportTemplateWorkspace,
+    key: 'export-template', content: ExportTemplatePageContent,
     contentProps: computed(() => ({ model: form })),
     sidebar: computed(() => feature.section.value.map(group => ({ ...group, onAction: navigation.returnFromFlow }))),
     header: computed(() => ({ title: t('templateExport.title'), titleLoading: false, actions: [] })),

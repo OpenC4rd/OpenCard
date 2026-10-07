@@ -548,15 +548,15 @@ function handleGridKeydown(event: KeyboardEvent): void {
 
 async function exportDictionaryWorkbook(): Promise<void> {
   if (!dictionary.value || !canExportDictionaryWorkbook.value || dictionaryWorkbookBusy.value) return
-  const path = await fileSystemService.pickSavePath({
-    defaultPath: `${dictionaryWorkbookFileName()}.xlsx`,
-    fileTypeName: 'Excel Workbook',
-    extensions: ['xlsx'],
-    title: t('dictionaryEditor.workbook.export'),
-  })
-  if (!path) return
   dictionaryWorkbookBusy.value = true
   try {
+    const path = await fileSystemService.pickSavePath({
+      defaultPath: `${dictionaryWorkbookFileName()}.xlsx`,
+      fileTypeName: 'Excel Workbook',
+      extensions: ['xlsx'],
+      title: t('dictionaryEditor.workbook.export'),
+    })
+    if (!path) return
     const bytes = await exportProjectDictionaryWorkbook(dictionary.value, {
       key: t('dictionaryEditor.columns.key'),
       base: t('dictionaryEditor.columns.base'),
@@ -571,14 +571,14 @@ async function exportDictionaryWorkbook(): Promise<void> {
 
 async function importDictionaryWorkbook(): Promise<void> {
   if (!dictionary.value || dictionaryWorkbookBusy.value) return
-  const path = await fileSystemService.pickFile({
-    title: t('dictionaryEditor.workbook.import'),
-    fileTypeName: 'Excel Workbook',
-    extensions: ['xlsx'],
-  })
-  if (!path) return
   dictionaryWorkbookBusy.value = true
   try {
+    const path = await fileSystemService.pickFile({
+      title: t('dictionaryEditor.workbook.import'),
+      fileTypeName: 'Excel Workbook',
+      extensions: ['xlsx'],
+    })
+    if (!path) return
     pendingWorkbookImport.value = await importProjectDictionaryWorkbook(
       await fileSystemService.readBinaryFile(path),
       dictionary.value,
@@ -619,14 +619,15 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'file.dictionary',
 }))
 
-defineExpose({
-  save,
-  presentation,
-  importDataTableWorkbook: importDictionaryWorkbook,
-  exportDataTableWorkbook: exportDictionaryWorkbook,
-  dataTableWorkbookBusy: dictionaryWorkbookBusy,
-  canExportDataTableWorkbook: canExportDictionaryWorkbook,
-})
+const headerActions = computed<OcActionDefinition[]>(() => [
+  { key: 'dictionary.workbook.import', icon: 'action.import', title: t('dictionaryEditor.workbook.import'), disabled: dictionaryWorkbookBusy.value },
+  { key: 'dictionary.workbook.export', icon: 'action.export', title: t('dictionaryEditor.workbook.export'), disabled: dictionaryWorkbookBusy.value || !canExportDictionaryWorkbook.value },
+])
+async function onHeaderAction(key: string): Promise<void> {
+  if (key === 'dictionary.workbook.import') await importDictionaryWorkbook()
+  else if (key === 'dictionary.workbook.export') await exportDictionaryWorkbook()
+}
+defineExpose({ save, presentation, headerActions, onHeaderAction })
 </script>
 
 <style scoped>

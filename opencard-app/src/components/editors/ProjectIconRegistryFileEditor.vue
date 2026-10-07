@@ -49,7 +49,7 @@ import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
 import type { HistoryOperationMeta } from '../../features/editor-runtime/history/history.types'
 import type { ContentHistoryOperationMeta } from '../../features/editor-runtime/history/contentHistory'
-import type { ShellWorkspaceAction } from '../../features/shell/shell.types'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import type {
   EditorIssue,
@@ -681,32 +681,32 @@ const presentation = computed<EditorPresentation>(() => ({
 const WORKSPACE_CREATE_PACK_ACTION_KEY = 'project-icon-registry.create-pack'
 const WORKSPACE_IMPORT_PACK_ACTION_KEY = 'project-icon-registry.import-pack'
 
-const workspaceActions = computed<ShellWorkspaceAction[]>(() => [
+const headerActions = computed<OcActionDefinition[]>(() => [
   {
     key: WORKSPACE_CREATE_PACK_ACTION_KEY,
     icon: 'action.add',
-    hoverTip: t('projectConfig.icons.createPack'),
+    title: t('projectConfig.icons.createPack'),
     disabled: !document.value || packTaskBusy.value,
   },
   {
     key: WORKSPACE_IMPORT_PACK_ACTION_KEY,
     icon: 'action.import',
-    hoverTip: t('projectConfig.icons.importPack'),
+    title: t('projectConfig.icons.importPack'),
     disabled: !document.value || packTaskBusy.value,
   },
 ])
 
-async function runWorkspaceAction(actionKey: string): Promise<boolean> {
+async function onHeaderAction(actionKey: string): Promise<void> {
   if (actionKey === WORKSPACE_CREATE_PACK_ACTION_KEY) {
     openCreatePackDialog()
-    return true
+    return
   }
   if (actionKey === WORKSPACE_IMPORT_PACK_ACTION_KEY) {
     openImportPackDialog()
-    return true
+    return
   }
-  return false
+  return
 }
 
-defineExpose({ save, navigate, workspaceActions, runWorkspaceAction, presentation })
+defineExpose({ save, navigate, headerActions, onHeaderAction, presentation })
 </script>

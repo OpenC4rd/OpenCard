@@ -18,27 +18,26 @@ import { resolveSessionLabel } from '../../workspace/model/sessionLabel'
 import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../../workspace/model/projectStructure'
 import { formatPackageCoordinate } from '../../workspace/model/packageCoordinate'
 import { useProjectExport } from './useProjectExport'
-import { useShellCloseCoordinator } from './useShellCloseCoordinator'
+import { useWorkbenchCloseCoordinator } from './useWorkbenchCloseCoordinator'
 import type { ApplicationCloseAction } from './useUnsavedSessionGuard'
-import { useShellEditorHost } from './useShellEditorHost'
-import { useShellWorkbenchActions } from './useShellWorkbenchActions'
-import { useShellWorkbenchVersionActions } from './useShellWorkbenchVersionActions'
-import { useShellProjectExportFeature } from './useShellProjectExportFeature'
-import { useShellVersionControl } from './useShellVersionControl'
-import { useShellFileTree } from './useShellFileTree'
-import { useWorkspaceIssues } from './useWorkspaceIssues'
+import { useWorkbenchEditorHost } from './useWorkbenchEditorHost'
+import { useWorkbenchActions } from './useWorkbenchActions'
+import { useWorkbenchVersionActions } from './useWorkbenchVersionActions'
+import { useWorkbenchProjectExport } from './useWorkbenchProjectExport'
+import { useWorkbenchVersionControl } from './useWorkbenchVersionControl'
+import { useWorkbenchFileTree } from './useWorkbenchFileTree'
+import { useWorkbenchIssues } from './useWorkbenchIssues'
 import { navigateWorkspaceIssue } from '../services/workspaceIssueNavigation'
 import { useShellNavigation } from './useShellNavigation'
 import { createWorkbenchSection } from '../sections/workbenchSection'
-import { createWorkbenchHeaderActions, CARD_DESIGNER_MODE_ACTION_KEY, CARD_DATA_TABLE_IMPORT_ACTION_KEY, CARD_DATA_TABLE_EXPORT_ACTION_KEY, DICTIONARY_IMPORT_ACTION_KEY, DICTIONARY_EXPORT_ACTION_KEY, DIFF_EXIT_ACTION_KEY, CARD_RENDER_IMAGE_OPTION_PREFIX } from '../workbenchHeaderActions'
-import type { ShellWorkspaceAction } from '../shell.types'
+import type { PageHeaderAction } from '../shell.types'
 import type { SpacePage, SpacePageProblems } from '../spacePage'
 import type { ProjectCloseDestination } from '../shellLocation'
 import { requestConfirmation } from '../services/appConfirmation'
 import { useAppProjectActions } from '../services/appProjectActions'
-import WorkbenchWorkspace from '../components/WorkbenchWorkspace.vue'
+import WorkbenchPageContent from '../components/WorkbenchPageContent.vue'
 import WorkbenchOverlays from '../components/WorkbenchOverlays.vue'
-import { useShellKeyboardShortcuts } from './useShellKeyboardShortcuts'
+import { useWorkbenchKeyboardShortcuts } from './useWorkbenchKeyboardShortcuts'
 import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
 import { PROJECT_FILES_LIST_KEY, PROJECT_NEW_FOLDER_ACTION_KEY, PROJECT_NEW_OPENCARD_ACTION_KEY, PROJECT_REVEAL_ACTION_KEY, TIMELINE_LIST_KEY, TIMELINE_REFRESH_ACTION_KEY } from '../shellSidebarConfig'
 
@@ -178,7 +177,7 @@ export function createWorkbenchPage(options: {
     closeCommitVersionDialog,
     initializeProjectRepository,
     commitVersion,
-  } = useShellVersionControl({
+  } = useWorkbenchVersionControl({
     projectPath,
     activeSession,
     locale,
@@ -197,7 +196,7 @@ export function createWorkbenchPage(options: {
     handleTimelineAction,
     handleChangesNodeActivate,
     selectWorkspaceDiff,
-  } = useShellWorkbenchVersionActions({
+  } = useWorkbenchVersionActions({
     projectRoot: projectPath,
     activeSession,
     timelineFilePath,
@@ -212,21 +211,30 @@ export function createWorkbenchPage(options: {
     onChangesExpansionChange: handleChangesExpansionChange,
   })
   const {
+    showExportRenderer,
+    exportCardFace,
+    exportResourceContext,
+    isRunning: isProjectExportRunning,
+    loadDocumentSnapshot,
+    prepare: prepareProjectExport,
+    run: runProjectExport,
+    renderCardImages,
+  } = useProjectExport({
+    sessions,
+    exportRendererRef,
+    renderEnvironment: projectRenderEnvironment,
+    readProjectFile,
+    resolveProjectPath,
+    getRelativeProjectPath,
+    translate: t,
+  })
+  const {
     editorRef: currentEditorRef,
     component: currentEditorComponent,
     key: currentEditorKey,
     props: currentEditorProps,
-    isCardDesigner: isActiveCardDesignerEditor,
-    isDictionaryEditor: isActiveDictionaryEditor,
     canUndo: canUndoActiveEditor,
     canRedo: canRedoActiveEditor,
-    cardDesignerMode: activeCardDesignerMode,
-    dataTableWorkbookBusy: isDataTableWorkbookBusy,
-    canExportDataTableWorkbook,
-    canRenderCardImage,
-    importDataTableWorkbook,
-    exportDataTableWorkbook,
-    getCardImageRenderSource,
     handleViewportTransform: handleViewportTransformUpdate,
     handleImagePreviewPixelated: handleImagePreviewPixelatedUpdate,
     handleCardDesignerMode: handleCardDesignerModeUpdate,
@@ -240,7 +248,8 @@ export function createWorkbenchPage(options: {
     redo: triggerCurrentEditorRedo,
     flushAffectedSessions: flushActiveEditorForClose,
     dispose: disposeEditorHost,
-  } = useShellEditorHost({
+  } = useWorkbenchEditorHost({
+    renderCardImages, imageExportBusy: isProjectExportRunning,
     activeSession,
     projectPath,
     projectProfile,
@@ -262,7 +271,11 @@ export function createWorkbenchPage(options: {
 
 
   const isDiffMode = computed(() => isWorkbenchMode.value && activeSession.value?.mode === 'diff')
-  function setCurrentEditorRef(value: unknown): void { currentEditorRef.value = value as typeof currentEditorRef.value }
+  const mountedEditorKey = ref<string | null>(null)
+  function setCurrentEditorRef(value: unknown): void {
+    currentEditorRef.value = value as typeof currentEditorRef.value
+    mountedEditorKey.value = value ? currentEditorKey.value : null
+  }
   const {
     pendingIntent: pendingCloseIntent,
     decisions: unsavedEditorDecisions,
@@ -290,7 +303,7 @@ export function createWorkbenchPage(options: {
     requestApplicationClose,
     discardSingle: discardSingleUnsavedEditor,
     saveSingle: saveSingleUnsavedEditor,
-  } = useShellCloseCoordinator({
+  } = useWorkbenchCloseCoordinator({
     sessions,
     flushAffectedSessions: flushActiveEditorForClose,
     pickDraftDirectory: () => fileSystemService.pickDirectory(t('app.unsavedEditors.pickDraftDirectory')),
@@ -329,28 +342,11 @@ export function createWorkbenchPage(options: {
     reportSessionIssueSnapshot,
     clearAllSessionIssues,
     setIssueNodeExpanded,
-  } = useWorkspaceIssues({ sessions, copyIssueLabel: t('app.problems.copyIssue') })
+  } = useWorkbenchIssues({ sessions, copyIssueLabel: t('app.problems.copyIssue') })
 
   watch(locale, clearAllSessionIssues, { flush: 'sync' })
   watch(projectPath, (nextPath, previousPath) => { if (nextPath !== previousPath) clearAllSessionIssues() })
-  const {
-    showExportRenderer,
-    exportCardFace,
-    exportResourceContext,
-    isRunning: isProjectExportRunning,
-    loadDocumentSnapshot,
-    prepare: prepareProjectExport,
-    run: runProjectExport,
-    renderCardImages,
-  } = useProjectExport({
-    sessions,
-    exportRendererRef,
-    renderEnvironment: projectRenderEnvironment,
-    readProjectFile,
-    resolveProjectPath,
-    getRelativeProjectPath,
-    translate: t,
-  })
+
   const {
     open: projectExportDialogOpen,
     task: projectExportDialogTask,
@@ -360,7 +356,7 @@ export function createWorkbenchPage(options: {
     show: openProjectExportDialog,
     close: closeProjectExportDialog,
     submit: startProjectExport,
-  } = useShellProjectExportFeature({
+  } = useWorkbenchProjectExport({
     projectProfile,
     indexedEntries,
     running: isProjectExportRunning,
@@ -384,7 +380,7 @@ export function createWorkbenchPage(options: {
     setProjectManagementEntryExpanded,
     findProjectEntryByKey,
     setProjectEntryExpanded,
-  } = useShellFileTree({
+  } = useWorkbenchFileTree({
     projectPath,
     indexedEntries,
     hideDotFiles: computed(() => settingsStore.settings.value.workspace.hideDotFiles),
@@ -418,7 +414,7 @@ export function createWorkbenchPage(options: {
     handleProjectExternalDrop,
     handleProjectAction,
     handleProjectNodeActivate,
-  } = useShellWorkbenchActions({
+  } = useWorkbenchActions({
     projectPath,
     openedEditorTreeData,
     tree: {
@@ -527,31 +523,40 @@ export function createWorkbenchPage(options: {
       },
     },
   })
-  /** The active editor owns its own header actions and exposes them through the editor ref. */
-  const editorHeaderActions = computed<readonly ShellWorkspaceAction[]>(() => (
-    visibleEditorSession.value ? currentEditorRef.value?.workspaceActions ?? [] : []
-  ))
-
-  const workspaceActions = computed<ShellWorkspaceAction[]>(() => createWorkbenchHeaderActions({
-    translate: t,
-    isWorkbench: Boolean(visibleEditorSession.value),
-    isDiff: isDiffMode.value,
-    beforeRevisionId: visibleEditorSession.value?.diff?.beforeRevisionId
-      ?? diffSessionState.before.value?.commitId
-      ?? null,
-    afterRevisionId: visibleEditorSession.value?.diff?.afterRevisionId
-      ?? diffSessionState.after.value?.commitId
-      ?? null,
-    timelineRevisionOptions: timelineRevisionOptions.value,
-    editorHeaderActions: editorHeaderActions.value,
-    isDictionaryEditor: isActiveDictionaryEditor.value,
-    isCardDesignerEditor: isActiveCardDesignerEditor.value,
-    activeCardDesignerMode: activeCardDesignerMode.value,
-    isDataTableWorkbookBusy: isDataTableWorkbookBusy.value,
-    canExportDataTableWorkbook: canExportDataTableWorkbook.value,
-    isProjectExportRunning: isProjectExportRunning.value,
-    canRenderCardImage: canRenderCardImage.value,
-  }))
+  const headerContribution = computed(() => {
+    const session = visibleEditorSession.value
+    const instance = currentEditorRef.value
+    const editorKey = currentEditorKey.value
+    if (!session) return { actions: [], onAction: () => {} }
+    const isCurrent = () => visibleEditorSession.value?.id === session.id
+      && currentEditorKey.value === editorKey
+    if (!isDiffMode.value) return {
+      actions: mountedEditorKey.value === editorKey ? instance?.headerActions ?? [] : [],
+      onAction: (key: string) => { if (isCurrent() && currentEditorRef.value === instance && mountedEditorKey.value === editorKey) return instance?.onHeaderAction?.(key) },
+    }
+    const revisions = timelineRevisionOptions.value
+    const actions: PageHeaderAction[] = []
+    for (const side of ['before', 'after'] as const) {
+      const id = session.diff?.[`${side}RevisionId`] ?? diffSessionState[side].value?.commitId ?? null
+      const selected = revisions.find(option => option.commitId === id)
+      const title = t(side === 'before' ? 'sidebar.diffViewer.versionA' : 'sidebar.diffViewer.versionB')
+      actions.push(selected?.shortId ?? selected?.label ?? t('sidebar.diffViewer.diskVersion'), {
+        key: `diff.${side}`, icon: 'file.git', title,
+        children: revisions.map(option => ({
+          key: `diff.${side}:${option.commitId ?? 'current'}`,
+          title: option.shortId ? `${option.label} ${option.shortId}` : option.label,
+          icon: option.commitId === id ? 'action.check' : 'file.git',
+        })),
+      })
+    }
+    actions.push({ key: 'diff.exit', icon: 'nav.arrow-left', title: t('sidebar.diffViewer.exitComparison') })
+    return { actions, onAction: async (key: string) => {
+      if (!isCurrent() || !isDiffMode.value) return
+      if (key === 'diff.exit') { setSessionMode(session.id, 'edit'); return }
+      const match = /^diff\.(before|after):(.+)$/.exec(key)
+      if (match) await selectWorkspaceDiff(match[1] as 'before' | 'after', match[2] === 'current' ? null : match[2]!)
+    } }
+  })
 
   function handleEditorIssueSnapshot(sessionId: string, snapshot: EditorIssueSnapshot): void {
     reportSessionIssueSnapshot(sessionId, snapshot)
@@ -632,59 +637,6 @@ export function createWorkbenchPage(options: {
     })
   }
 
-  async function handleWorkspaceFrameAction(actionKey: string) {
-    if (!visibleEditorSession.value) return
-    if (actionKey === BUILD_RESOURCE_PACKAGE_ACTION_KEY) return openResourcePackageBuilder()
-    if (actionKey === DIFF_EXIT_ACTION_KEY) { if (activeSession.value) setSessionMode(activeSession.value.id, 'edit'); return }
-    if (actionKey === CARD_DESIGNER_MODE_ACTION_KEY) return handleCardDesignerModeUpdate(activeCardDesignerMode.value === 'design' ? 'data-table' : 'design')
-    if (actionKey === CARD_DATA_TABLE_IMPORT_ACTION_KEY || actionKey === DICTIONARY_IMPORT_ACTION_KEY) return importDataTableWorkbook()
-    if (actionKey === CARD_DATA_TABLE_EXPORT_ACTION_KEY || actionKey === DICTIONARY_EXPORT_ACTION_KEY) return exportDataTableWorkbook()
-    const diff = /^diff\.(before|after):(.+)$/.exec(actionKey)
-    if (diff) return selectWorkspaceDiff(diff[1] as 'before' | 'after', diff[2] === 'current' ? null : diff[2]!)
-    const render = new RegExp(`^${CARD_RENDER_IMAGE_OPTION_PREFIX}(current|both)\\.(0\\.5|1|2)$`).exec(actionKey)
-    if (render) return handleRenderCardImageAction(render[1] as 'current' | 'both', Number(render[2]) as 0.5 | 1 | 2)
-    if (await currentEditorRef.value?.runWorkspaceAction?.(actionKey)) return
-    await runWorkbenchAction(actionKey)
-  }
-
-  async function handleRenderCardImageAction(faceMode: 'current' | 'both', scale: 0.5 | 1 | 2): Promise<void> {
-    const source = getCardImageRenderSource()
-    if (!source) return
-
-    const faceKeys = faceMode === 'current'
-      ? [source.activeFaceKey]
-      : ['front', 'back'] as const
-    const stem = (activeSession.value?.name ?? 'card').replace(/\.ocdocument$/i, '')
-
-    if (faceMode === 'current') {
-      const faceKey = faceKeys[0]!
-      const outputPath = await fileSystemService.pickSavePath({
-        defaultPath: `${stem}_${faceKey}.png`,
-        fileTypeName: t('cardDesigner.renderImage.pngFile'),
-        extensions: ['png'],
-        title: t('cardDesigner.renderImage.saveCurrent'),
-      })
-      if (!outputPath) return
-      const images = await renderCardImages(source.render, faceKeys, scale)
-      const bytes = images?.get(faceKey)
-      if (bytes) await fileSystemService.writeBinaryFile(outputPath, bytes)
-      return
-    }
-
-    const outputDirectory = await fileSystemService.pickDirectory(t('cardDesigner.renderImage.saveBoth'))
-    if (!outputDirectory) return
-    const images = await renderCardImages(source.render, faceKeys, scale)
-    if (!images) return
-    const separator = outputDirectory.includes('\\') ? '\\' : '/'
-    for (const faceKey of faceKeys) {
-      const bytes = images.get(faceKey)
-      if (bytes) await fileSystemService.writeBinaryFile(
-        `${outputDirectory.replace(/[\\/]+$/, '')}${separator}${stem}_${faceKey}.png`,
-        bytes,
-      )
-    }
-  }
-
   async function handleOpenFile(path: string): Promise<EditorSession | null> {
     try {
       return await openEditorSession(path)
@@ -752,7 +704,7 @@ export function createWorkbenchPage(options: {
     }
   }
 
-  const { handle: handleKeydown } = useShellKeyboardShortcuts({
+  const { handle: handleKeydown } = useWorkbenchKeyboardShortcuts({
     saveKey: 's', undoKey: 'z', redoKey: 'y',
     hasVisibleEditor: computed(() => Boolean(visibleEditorSession.value)), isDiffMode,
     canUndo: canUndoActiveEditor, canRedo: canRedoActiveEditor,
@@ -827,7 +779,7 @@ export function createWorkbenchPage(options: {
     menuContribution,
     key: 'workbench',
     navigation: { key: 'workbench', icon: 'nav.workbench', labelKey: 'app.shell.space.workbench' },
-    content: WorkbenchWorkspace,
+    content: WorkbenchPageContent,
     contentProps: computed(() => {
       const session = activeSession.value
       return {
@@ -850,12 +802,12 @@ export function createWorkbenchPage(options: {
       lists: group.lists.map(list => ({ ...list, onAction: key => handleSidebarListAction(list.key, key) })),
     }))),
     sidebarLayout: { persistenceKey: computed(() => projectPath.value.replace(/\\/g, '/').replace(/\/+$/, '')) },
-    header: computed(() => ({
+    header: computed(() => projectPath.value || activeSession.value ? ({
       title: activeSession.value ? formatSessionTitle(activeSession.value) : projectName.value || t('app.menu.workbench'),
       titleLoading: Boolean(activeSession.value && activeSession.value.presentation === undefined),
       icon: activeSession.value?.presentation?.icon, iconTone: activeSession.value?.presentation?.iconTone,
-      subtitle: activeSession.value?.presentation?.description, actions: workspaceActions.value, onAction: handleWorkspaceFrameAction,
-    })),
+      subtitle: activeSession.value?.presentation?.description, actions: headerContribution.value.actions, onAction: headerContribution.value.onAction,
+    }) : null),
     bottomPanel: computed<SpacePageProblems>(() => ({
       treeData: issueTreeData.value, count: issueCount.value, severity: highestIssueSeverity.value,
       expandedKeys: expandedIssueKeys.value, setExpanded: setIssueNodeExpanded,

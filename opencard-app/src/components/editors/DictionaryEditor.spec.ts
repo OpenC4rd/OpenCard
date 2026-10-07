@@ -62,13 +62,12 @@ describe('DictionaryEditor', () => {
       global: { stubs: { Teleport: true } },
     })
     const editor = wrapper.vm as unknown as {
-      importDataTableWorkbook: () => Promise<void>
-      exportDataTableWorkbook: () => Promise<void>
+      onHeaderAction: (key: string) => Promise<void>
     }
 
-    await editor.exportDataTableWorkbook()
+    await editor.onHeaderAction('dictionary.workbook.export')
     expect(writeBinaryFile).toHaveBeenCalledWith('D:/Demo/export.xlsx', expect.any(Uint8Array))
-    await editor.importDataTableWorkbook()
+    await editor.onHeaderAction('dictionary.workbook.import')
     await flushPromises()
     expect(wrapper.text()).toContain('dictionaryEditor.workbook.reviewTitle')
     await wrapper.get('button.oc-button--variant-solid').trigger('click')
@@ -76,6 +75,24 @@ describe('DictionaryEditor', () => {
       base: { title: 'Changed' },
       languages: { en_US: { title: 'English' } },
     })
+  })
+
+  it('locks workbook operations while the picker is open and releases on cancellation', async () => {
+    let finish!: (path: string | null) => void
+    const pick = vi.spyOn(fileSystemService, 'pickSavePath').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockResolvedValue()
+    const wrapper = mount(DictionaryEditor, { props: { filePath: 'locale.json', modelValue: '{"base":{"title":"Title"}}' } })
+    const editor = wrapper.vm as unknown as { onHeaderAction: (key: string) => Promise<void> }
+    const pending = editor.onHeaderAction('dictionary.workbook.export')
+    await editor.onHeaderAction('dictionary.workbook.export')
+    expect(pick).toHaveBeenCalledTimes(1)
+    finish(null)
+    await pending
+    expect(write).not.toHaveBeenCalled()
+    pick.mockResolvedValue(null)
+    await editor.onHeaderAction('dictionary.workbook.export')
+    expect(pick).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 
   it('adds records and language columns in place inside the grid', async () => {

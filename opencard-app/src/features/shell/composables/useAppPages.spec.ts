@@ -47,6 +47,8 @@ describe('application page ownership', () => {
       expect(listeners.mock.calls.length).toBe(listenerCount)
       const navigation = useShellNavigation()
       const store = useEditorSessionStore()
+      expect(app.pages.welcome.header.value).toBeNull()
+      expect(app.pages.workbench.header.value).toBeNull()
       const session = store.createDraftSession({ fileTypeId: 'opencard-dictionary', name: 'locale.json', content: '{}' })
       store.updateDraftContent(session.id, '{"base":{"title":"edited"}}')
       store.updateSessionUiState(session.id, { imagePreview: { pixelated: true } })
@@ -67,7 +69,8 @@ describe('application page ownership', () => {
         navigation.selectSpace(space)
         await nextTick()
         expect(app.currentPage.value).toBe(app.pages[space])
-        expect(app.currentPage.value.header.value.title).toBeTruthy()
+        if (space === 'welcome') expect(app.currentPage.value.header.value).toBeNull()
+        else expect(app.currentPage.value.header.value?.title).toBeTruthy()
         expect(app.currentPage.value.bottomPanel).toBeUndefined()
         expect(app.pages.workbench.menuContribution?.value.edit?.actions[0]).toMatchObject({ disabled: true })
       }
@@ -80,7 +83,25 @@ describe('application page ownership', () => {
       expect(appOutputEntries.value.some(entry => entry.message === 'background output')).toBe(true)
       expect(useShellProgressTasks().tasks.value.some(task => task.key === 'page-test')).toBe(true)
 
+      const diffAction = workbench.header.value!.onAction!
+      await diffAction('diff.exit')
+      expect(store.activeSession.value?.mode).toBe('edit')
+      const onHeaderAction = vi.fn()
+      const editor = workbench.contentProps.value.editor as { capture: (value: unknown) => void }
+      editor.capture({ headerActions: [{ key: 'local', title: 'Local' }], onHeaderAction })
+      await nextTick()
+      const action = workbench.header.value!.onAction!
+      await action('local')
+      expect(onHeaderAction).toHaveBeenCalledTimes(1)
+      navigation.selectSpace('settings')
+      await action('local')
+      expect(onHeaderAction).toHaveBeenCalledTimes(1)
+      navigation.selectSpace('workbench')
+
       const second = store.createDraftSession({ fileTypeId: 'plaintext', name: 'other.txt' })
+      await action('local')
+      await diffAction('diff.exit')
+      expect(onHeaderAction).toHaveBeenCalledTimes(1)
       ;(oldEditor.props.onIssueSnapshot as (value: EditorIssueSnapshot) => void)(snapshot)
       await nextTick()
       await workbench.bottomPanel!.value.activate(`workspace-issue-session:${session.id}`)

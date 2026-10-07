@@ -9,7 +9,7 @@ import { classifyExternalOpenPath } from '../services/externalOpenService'
 import { initializeAppProjectActions } from '../services/appProjectActions'
 import { openFlow } from '../shellLocation'
 import { useShellNavigation } from './useShellNavigation'
-import { useShellProjectLifecycle } from './useShellProjectLifecycle'
+import { useAppProjectLifecycle } from './useAppProjectLifecycle'
 import type { createWorkbenchPage } from './createWorkbenchPage'
 import type { createCreateProjectPage } from './createCreateProjectPage'
 import type { createExportTemplatePage } from './createExportTemplatePage'
@@ -27,7 +27,7 @@ export function useApplicationActions(options: {
   const settings = useAppSettingsStore()
   const templates = useProjectTemplateStore()
   const navigation = useShellNavigation()
-  const lifecycle = useShellProjectLifecycle({
+  const lifecycle = useAppProjectLifecycle({
     project,
     sessions: { closeWorkspaceSessions: () => options.workbench().closeWorkspaceSessions(), open: path => options.workbench().open(path) },
     closeCurrentProject: () => options.workbench().requestProjectClose('current'),

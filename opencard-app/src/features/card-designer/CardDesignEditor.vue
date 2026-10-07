@@ -228,7 +228,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, shallowRef, toRef, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, shallowRef, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../editor-runtime/registry/editorRegistry'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
@@ -287,7 +287,6 @@ import { useCdeDataTableWorkbook } from './useCdeDataTableWorkbook'
 import { useAppSettingsStore } from '../settings/store/appSettingsStore'
 import { useCdeRenderProjection } from './useCdeRenderProjection'
 import { useCdeViewportCardInfo } from './useCdeViewportCardInfo'
-import type { PreparedCardRender } from '../card-rendering/renderPipeline'
 import {
   createOcBlockDocument,
   createOcBlockPublicFields,
@@ -332,6 +331,7 @@ import {
 } from '../../shared/model/clipboard/cardBlockClipboard'
 import { readOcClipboard, writeOcClipboard } from '../../shared/model/clipboard/ocClipboardService'
 import { fileSystemService } from '../workspace/services/fileSystemService'
+import { notifyError } from '../notifications/titlebarNotices'
 import { createResourceDirectoryProvider } from '../workspace/services/resourceDirectoryProvider'
 import {
   isCardDesignerNavigationToken,
@@ -1911,9 +1911,54 @@ watch(
   { immediate: true },
 )
 
-function getImageRenderSource(): { render: PreparedCardRender; activeFaceKey: CardFaceKey } | null {
+const imageExporting = ref(false)
+let disposed = false
+onScopeDispose(() => { disposed = true })
+const headerActions = computed<OcActionDefinition[]>(() => {
+  const mode = {
+    key: 'card-designer.toggle-mode', icon: workspaceMode.value === 'data-table' ? 'file.opencard' : 'data.table',
+    title: t(workspaceMode.value === 'data-table' ? 'cardDesigner.dataTable.switchToDesignMode' : 'cardDesigner.dataTable.switchToTableMode'),
+  } satisfies OcActionDefinition
+  if (workspaceMode.value === 'data-table') return [
+    { key: 'card-designer.data-table.import', icon: 'action.import', title: t('cardDesigner.dataTable.importWorkbook'), disabled: dataTableWorkbookBusy.value },
+    { key: 'card-designer.data-table.export', icon: 'action.export', title: t('cardDesigner.dataTable.exportWorkbook'), disabled: dataTableWorkbookBusy.value || !canExportDataTableWorkbook.value }, mode,
+  ]
+  return [{
+    key: 'card-designer.render-image', icon: 'action.image-plus', title: t('cardDesigner.renderImage.title'),
+    disabled: imageExporting.value || props.imageExportBusy || !props.renderCardImages || !renderPipelineResult.value,
+    children: ['current', 'both'].map(face => ({
+      key: `render.${face}`, title: t(`cardDesigner.renderImage.${face}`),
+      children: [0.5, 1, 2].map(scale => ({ key: `render.${face}.${scale}`, title: t(`cardDesigner.renderImage.${scale === 0.5 ? 'preview' : scale === 1 ? 'standard' : 'highDefinition'}`) })),
+    })),
+  }, mode]
+})
+async function onHeaderAction(key: string): Promise<void> {
+  if (disposed || props.mode === 'diff') return
+  if (key === 'card-designer.toggle-mode') { emit('update:card-designer-mode', workspaceMode.value === 'design' ? 'data-table' : 'design'); return }
+  if (key === 'card-designer.data-table.import') { await importDataTableWorkbook(); return }
+  if (key === 'card-designer.data-table.export') { await exportDataTableWorkbook(); return }
+  const match = /^render\.(current|both)\.(0\.5|1|2)$/.exec(key)
   const render = renderPipelineResult.value
-  return render ? { render, activeFaceKey: activeFaceKey.value } : null
+  const renderImages = props.renderCardImages
+  if (!match || !render || !renderImages || imageExporting.value || props.imageExportBusy) return
+  const faces: readonly CardFaceKey[] = match[1] === 'current' ? [activeFaceKey.value] : ['front', 'back']
+  const stem = (props.fileName ?? 'card').replace(/\.ocdocument$/i, '')
+  const scale = Number(match[2])
+  imageExporting.value = true
+  try {
+    const destination = match[1] === 'current'
+      ? await fileSystemService.pickSavePath({ defaultPath: `${stem}_${faces[0]}.png`, fileTypeName: t('cardDesigner.renderImage.pngFile'), extensions: ['png'], title: t('cardDesigner.renderImage.saveCurrent') })
+      : await fileSystemService.pickDirectory(t('cardDesigner.renderImage.saveBoth'))
+    if (!destination || disposed) return
+    const images = await renderImages(render, faces, scale)
+    for (const face of faces) {
+      const bytes = images?.get(face)
+      if (!bytes) continue
+      const path = match[1] === 'current' ? destination : `${destination.replace(/[\\/]+$/, '')}/${stem}_${face}.png`
+      await fileSystemService.writeBinaryFile(path, bytes)
+    }
+  } catch (error) { notifyError(error instanceof Error ? error.message : String(error)) }
+  finally { imageExporting.value = false }
 }
 
 /** The card document names itself, so the workspace header shows that instead of the file name. */
@@ -1926,17 +1971,7 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'file.opencard',
 }))
 
-defineExpose({
-  save: saveFile,
-  flush: flushPendingChanges,
-  navigate,
-  presentation,
-  importDataTableWorkbook,
-  exportDataTableWorkbook,
-  dataTableWorkbookBusy,
-  canExportDataTableWorkbook,
-  getImageRenderSource,
-})
+defineExpose({ save: saveFile, flush: flushPendingChanges, navigate, presentation, headerActions, onHeaderAction })
 
 </script>
 

@@ -10,6 +10,7 @@ import {
 } from '../../entities/card/model'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import type { SessionNavigationToken } from '../editor-runtime/model/editorIssue'
+import * as notices from '../notifications/titlebarNotices'
 import { fileSystemService } from '../workspace/services/fileSystemService'
 import {
   cdeStub,
@@ -45,6 +46,72 @@ describe('CardDesignEditor issue navigation', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('exports the captured card and faces after props change, while preventing duplicate requests', async () => {
+    let finish!: (path: string | null) => void
+    const pick = vi.spyOn(fileSystemService, 'pickDirectory').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const bytes = new Uint8Array([1])
+    const render = vi.fn().mockResolvedValue(new Map([['front', bytes], ['back', bytes]]))
+    const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockResolvedValue()
+    const wrapper = mountCde({ props: { fileName: 'hero.ocdocument', renderCardImages: render } })
+    const editor = wrapper.vm as unknown as { onHeaderAction: (key: string) => Promise<void> }
+    await editor.onHeaderAction('card-designer.toggle-mode')
+    expect(wrapper.emitted('update:card-designer-mode')?.[0]).toEqual(['data-table'])
+    const pending = editor.onHeaderAction('render.both.2')
+    await editor.onHeaderAction('render.both.2')
+    expect(pick).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ filePath: 'other.ocdocument', fileName: 'other.ocdocument', modelValue: { ...createCdeDocument(), name: 'Other' } })
+    finish('D:/exports')
+    await pending
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ document: expect.objectContaining({ name: 'Document' }) }), ['front', 'back'], 2)
+    expect(write.mock.calls.map(call => call[0])).toEqual(['D:/exports/hero_front.png', 'D:/exports/hero_back.png'])
+    wrapper.unmount()
+  })
+
+  it('runs table workbook actions through the editor and locks the open picker', async () => {
+    const document = createCdeDocument()
+    document.dataTable = { blocks: { 'text-1': ['content'] } }
+    let finish!: (path: string | null) => void
+    const pick = vi.spyOn(fileSystemService, 'pickSavePath').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockResolvedValue()
+    const wrapper = mountCde({ props: { modelValue: document, cardDesignerMode: 'data-table' } })
+    const editor = wrapper.vm as unknown as { onHeaderAction: (key: string) => Promise<void> }
+    const pending = editor.onHeaderAction('card-designer.data-table.export')
+    await editor.onHeaderAction('card-designer.data-table.export')
+    expect(pick).toHaveBeenCalledTimes(1)
+    finish('D:/table.xlsx')
+    await pending
+    const bytes = write.mock.calls[0]![1]
+    vi.spyOn(fileSystemService, 'pickFile').mockResolvedValue('D:/table.xlsx')
+    vi.spyOn(fileSystemService, 'readBinaryFile').mockResolvedValue(bytes)
+    await editor.onHeaderAction('card-designer.data-table.import')
+    expect(wrapper.findComponent({ name: 'DataTableWorkbookImportDialog' }).props('result')).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('does not render cancelled or unmounted requests and reports image write errors', async () => {
+    const pick = vi.spyOn(fileSystemService, 'pickSavePath').mockResolvedValue(null)
+    const render = vi.fn().mockResolvedValue(new Map([['front', new Uint8Array([1])]]))
+    const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockRejectedValue(new Error('disk full'))
+    const notice = vi.spyOn(notices, 'notifyError').mockReturnValue(0)
+    const wrapper = mountCde({ props: { renderCardImages: render } })
+    const editor = wrapper.vm as unknown as { onHeaderAction: (key: string) => Promise<void> }
+    await editor.onHeaderAction('render.current.0.5')
+    expect(render).not.toHaveBeenCalled()
+    expect(write).not.toHaveBeenCalled()
+    pick.mockResolvedValue('D:/export.png')
+    await editor.onHeaderAction('render.current.0.5')
+    expect(render).toHaveBeenCalledWith(expect.anything(), ['front'], 0.5)
+    expect(notice).toHaveBeenCalledWith('disk full')
+    let finish!: (path: string | null) => void
+    pick.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const pending = editor.onHeaderAction('render.current.1')
+    wrapper.unmount()
+    finish('D:/late.png')
+    await pending
+    expect(render).toHaveBeenCalledTimes(1)
   })
 
   it('toggles structure containers through double-click activation', async () => {

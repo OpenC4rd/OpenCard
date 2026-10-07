@@ -1,7 +1,7 @@
 import { onUnmounted } from 'vue'
 import type { ProjectCloseDestination } from '../shellLocation'
 import type { ApplicationCloseAction } from '../composables/useUnsavedSessionGuard'
-import type { CloseOutcome } from '../composables/useShellCloseCoordinator'
+import type { CloseOutcome } from '../composables/useWorkbenchCloseCoordinator'
 
 /** Application entry points shared by pages, menus and external-open requests. */
 export interface AppProjectActions {

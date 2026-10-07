@@ -1,19 +1,19 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { createProjectForm } from '../../project-templates/composables/createProjectForm'
-import CreateProjectWorkspace from '../../project-templates/components/CreateProjectWorkspace.vue'
+import CreateProjectPageContent from '../../project-templates/components/CreateProjectPageContent.vue'
 import type { CreatedProject, ProjectTemplateKey } from '../../project-templates/model/projectTemplate'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { requestConfirmation } from '../services/appConfirmation'
 import type { SpacePage } from '../spacePage'
-import type { useShellProjectLifecycle } from './useShellProjectLifecycle'
+import type { useAppProjectLifecycle } from './useAppProjectLifecycle'
 import { useShellNavigation } from './useShellNavigation'
-import { useShellCreateProjectFeature } from './useShellCreateProjectFeature'
+import { useCreateProjectPageState } from './useCreateProjectPageState'
 
-export function createCreateProjectPage(lifecycle: ReturnType<typeof useShellProjectLifecycle>) {
+export function createCreateProjectPage(lifecycle: ReturnType<typeof useAppProjectLifecycle>) {
   const { t } = useI18n()
   const { isCreateProject, returnFromFlow } = useShellNavigation()
-  const feature = useShellCreateProjectFeature({
+  const feature = useCreateProjectPageState({
     projectStore: useProjectStore(), isCreateProjectMode: isCreateProject, isActivatingProject: lifecycle.isActivating,
     requestConfirmation, enterCreateProject: lifecycle.enterCreateProject,
     onTemplateImport: () => form.beginImport(),
@@ -26,7 +26,7 @@ export function createCreateProjectPage(lifecycle: ReturnType<typeof useShellPro
     onBusy: busy => { feature.isCreateProjectOperationBusy.value = busy },
   })
   const page: SpacePage = {
-    key: 'create-project', content: CreateProjectWorkspace,
+    key: 'create-project', content: CreateProjectPageContent,
     contentProps: computed(() => ({
       model: form, attachedResourcePackages: feature.attachedResourcePackages.value,
     })),

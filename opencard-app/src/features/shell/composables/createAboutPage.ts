@@ -1,6 +1,6 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AboutWorkspace from '../components/AboutWorkspace.vue'
+import AboutPageContent from '../components/AboutPageContent.vue'
 import type { SpacePage } from '../spacePage'
 import type { useApplicationServices } from './useApplicationServices'
 import { useShellNavigation } from './useShellNavigation'
@@ -12,7 +12,7 @@ export function createAboutPage(about: ReturnType<typeof useApplicationServices>
     if (active && release?.seenAt === null) void about.markCurrentReleaseNotesSeen()
   })
   return {
-    key: 'about', content: AboutWorkspace,
+    key: 'about', content: AboutPageContent,
     contentProps: computed(() => ({
       currentReleaseNotes: about.currentReleaseNotes.value,
       availableUpdateVersion: about.availableUpdate.value ? about.updateVersion.value : undefined,

@@ -20,6 +20,9 @@ import type { ProjectInformation } from '../../workspace/model/projectMetadata'
 import type { ProjectIconCatalog } from '../../workspace/services/projectIconCatalog'
 import type { ContentHistoryOperationMeta } from '../history/contentHistory'
 
+import type { PreparedCardRender } from '../../card-rendering/renderPipeline'
+import type { CardFaceKey } from '../../../entities/card/model'
+
 export interface EditorProps {
   mode?: 'edit' | 'diff'
   comparison?: EditorComparisonInput
@@ -33,6 +36,8 @@ export interface EditorProps {
   savedContent?: string
   viewportTransform?: EditorViewportTransform
   pixelated?: boolean
+  renderCardImages?: (render: PreparedCardRender, faces: readonly CardFaceKey[], scale: number) => Promise<ReadonlyMap<CardFaceKey, Uint8Array> | null>
+  imageExportBusy?: boolean
   cardDesignerMode?: CardDesignerMode
   cardDesignerLayout?: CardDesignerLayoutState
   cardDesignerView?: CardDesignerViewState

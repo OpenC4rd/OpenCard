@@ -34,16 +34,15 @@ export function useCdeDataTableWorkbook(options: UseCdeDataTableWorkbookOptions)
   async function exportWorkbook(): Promise<void> {
     const document = options.cardDoc.value
     if (!document || !canExport.value || busy.value) return
-    const path = await fileSystemService.pickSavePath({
-      defaultPath: `${safeFileName(document.name?.trim() || document.id)}.xlsx`,
-      fileTypeName: 'Excel Workbook',
-      extensions: ['xlsx'],
-      title: options.translate('cardDesigner.dataTable.exportWorkbook'),
-    })
-    if (!path) return
-
     busy.value = true
     try {
+      const path = await fileSystemService.pickSavePath({
+        defaultPath: `${safeFileName(document.name?.trim() || document.id)}.xlsx`,
+        fileTypeName: 'Excel Workbook',
+        extensions: ['xlsx'],
+        title: options.translate('cardDesigner.dataTable.exportWorkbook'),
+      })
+      if (!path) return
       await options.flushPendingChanges()
       const bytes = await exportCardDataWorkbook({
         document,
@@ -74,15 +73,14 @@ export function useCdeDataTableWorkbook(options: UseCdeDataTableWorkbookOptions)
   async function importWorkbook(): Promise<void> {
     const document = options.cardDoc.value
     if (!document || busy.value) return
-    const path = await fileSystemService.pickFile({
-      title: options.translate('cardDesigner.dataTable.importWorkbook'),
-      fileTypeName: 'Excel Workbook',
-      extensions: ['xlsx'],
-    })
-    if (!path) return
-
     busy.value = true
     try {
+      const path = await fileSystemService.pickFile({
+        title: options.translate('cardDesigner.dataTable.importWorkbook'),
+        fileTypeName: 'Excel Workbook',
+        extensions: ['xlsx'],
+      })
+      if (!path) return
       await options.flushPendingChanges()
       const bytes = await fileSystemService.readBinaryFile(path)
       pendingImport.value = await importCardDataWorkbook(bytes, document, options.faceGroups.value)
