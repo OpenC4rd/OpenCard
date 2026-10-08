@@ -63,7 +63,6 @@
       :anchor="triggerRef"
       placement="bottom-start"
       :max-height="360"
-      :z-index="zIndex"
       class="oc-color-picker__floating oc-floating-layer--surface"
       :data-oc-color-owner="pickerId"
     >
@@ -205,7 +204,6 @@ const props = withDefaults(defineProps<{
   embedded?: boolean
   size?: 'sm' | 'md' | 'lg'
   variant?: 'default' | 'field'
-  zIndex?: number
   presets?: readonly string[]
   allowAlpha?: boolean
 }>(), {
@@ -215,7 +213,6 @@ const props = withDefaults(defineProps<{
   embedded: false,
   size: 'md',
   variant: 'default',
-  zIndex: 2000,
   presets: () => ['#FFFFFF', '#B8B8B8', '#1F2430', '#000000', '#F14C4C', '#F59E0B', '#3FB950', '#58A6FF', '#7C6CFF', '#A855F7'],
   allowAlpha: true,
 })

@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport :to="overlayRoot">
     <Transition name="oc-floating-layer-fade" appear>
       <div
         v-if="open && anchor"
@@ -17,6 +17,7 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, type CSSProperties } from 'vue'
+import { isOverlayRootActive, resolveOverlayRoot } from '../../shared/ui/overlayScope'
 import {
   autoUpdate,
   flip,
@@ -37,23 +38,23 @@ defineOptions({
 const props = withDefaults(defineProps<{
   open: boolean
   anchor: HTMLElement | DOMRect | null
+  owner?: HTMLElement | null
   placement?: Placement
   gap?: number
   viewportPadding?: number
   matchAnchorWidth?: boolean
   maxHeight?: number
-  zIndex?: number
 }>(), {
   placement: 'bottom-start',
   gap: 4,
   viewportPadding: 8,
   matchAnchorWidth: false,
   maxHeight: 320,
-  zIndex: 2000,
 })
 
 
 const floatingRef = ref<HTMLElement | null>(null)
+const overlayRoot = computed(() => resolveOverlayRoot(props.owner ?? (props.anchor instanceof HTMLElement ? props.anchor : null)))
 const anchorRef = computed<ReferenceElement | null>(() => {
   const anchor = props.anchor
   if (!anchor || anchor instanceof HTMLElement) {
@@ -91,13 +92,13 @@ const { floatingStyles, isPositioned, placement: resolvedPlacement } = useFloati
 
 const layerStyle = computed<CSSProperties>(() => ({
   ...floatingStyles.value,
-  zIndex: props.zIndex,
-  visibility: isPositioned.value ? 'visible' : 'hidden',
+  visibility: isPositioned.value && isOverlayRootActive(overlayRoot.value) ? 'visible' : 'hidden',
 }))
 </script>
 
 <style scoped>
 .oc-floating-layer {
+  z-index: var(--oc-z-popover);
   box-sizing: border-box;
   color: var(--oc-fg-default, #cccccc);
   background-color: var(--oc-bg-surface, #252526);

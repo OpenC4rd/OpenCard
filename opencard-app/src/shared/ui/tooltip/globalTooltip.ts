@@ -1,4 +1,5 @@
-import { h, render } from 'vue';
+import { h, render, watch } from 'vue';
+import { activeDialogRoot, isOverlayRootActive, resolveOverlayRoot } from '../overlayScope';
 import OcInlineMarkup from '../../../components/standard/OcInlineMarkup.vue';
 
 const TOOLTIP_SELECTOR = '[data-tooltip]';
@@ -271,7 +272,7 @@ export function setupGlobalTooltip(): void {
     cancelPendingTooltip();
     cancelHideTimer();
     const text = getTooltipText(target);
-    if (!text || !target.isConnected) {
+    if (!text || !target.isConnected || !isOverlayRootActive(resolveOverlayRoot(target))) {
       dismissTooltip();
       return;
     }
@@ -419,4 +420,7 @@ export function setupGlobalTooltip(): void {
 
   window.addEventListener('resize', onViewportChanged);
   window.addEventListener('scroll', onViewportChanged, true);
+  watch(activeDialogRoot, () => {
+    if (activeTarget && !isOverlayRootActive(resolveOverlayRoot(activeTarget))) dismissTooltip();
+  });
 }

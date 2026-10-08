@@ -316,6 +316,11 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 
 ### 铁律 26 — 模态对话框一律使用 `OcDialog`
 
+- 层叠按所有权隔离：壳层的页面内容容器建立稳定层叠上下文；编辑器、表格等内部层级不得参与壳层排序。卡片块的 zIndex 只影响卡片内容。
+- 软件级顺序统一为：页面内容 → 壳层浮动控件（10）→ 壳层拖动预览（20）→ 普通浮层（100）→ 文件拖放提示（200）→ 模态（1000 起，按打开顺序）→ 当前有效所属者的文字提示（2000）。值只在 foundation 定义，禁止业务组件传 zIndex 或使用极大值抢层级。
+- `OcFloatingLayer` 根据锚点归属挂载到对应模态的 backdrop，否则挂到 body；坐标锚点必须传所属元素。子菜单继承这一归属，模态及其内部浮层作为整体排序；非当前模态的浮层与背景页面浮层不能覆盖当前模态。
+- 组件内部可重复使用小整数；必要的层叠边界显式使用 isolation 或定位加 z-index，不能依赖动画中的 opacity、transform 或玻璃效果偶然建立。overflow 裁剪不等于层级隔离。
+
 - 应用级模态对话框必须使用 `components/standard/OcDialog.vue`；feature 组件不得自行实现 Teleport、backdrop、`aria-modal`、焦点陷阱、容器几何、z-index 或进出动画。
 - `OcDialog` 负责模态语义、初始焦点、Tab 收束、焦点恢复、关闭来源、表面几何与动效；调用方只负责业务状态、内容布局、校验与命令处理。
 - 除非确实需要额外头部控件，使用默认的标题与描述头部；自定义头部必须把 slot 提供的 `titleId` 与 `descriptionId` 应用到可见标题与描述上。

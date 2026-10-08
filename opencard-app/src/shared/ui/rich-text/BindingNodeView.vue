@@ -48,7 +48,6 @@
       :anchor="inputElement"
       :items="suggestions"
       :active-key="activeKey"
-      :z-index="2500"
       @select="acceptSuggestionByKey"
     />
   </NodeViewWrapper>

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
-    <Transition name="oc-dialog" @after-leave="restoreFocus">
-      <div v-if="open" class="oc-dialog__backdrop" @pointerdown.self="handleBackdropPointerDown">
+    <Transition name="oc-dialog" @after-leave="finishClose">
+      <div v-if="open" ref="backdropRef" class="oc-dialog__backdrop" @pointerdown.self="handleBackdropPointerDown" @keydown="handleKeydown">
         <component
           :is="as"
           ref="dialogRef"
@@ -20,7 +20,6 @@
           :aria-describedby="description ? descriptionId : undefined"
           tabindex="-1"
           v-bind="$attrs"
-          @keydown="handleKeydown"
           @submit.prevent="emit('submit', $event)"
         >
           <header class="oc-dialog__header">
@@ -47,6 +46,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch, watchEffect } from 'vue'
+import { activeDialogRoot, registerDialogRoot } from '../../shared/ui/overlayScope'
 
 defineOptions({ name: 'OcDialog', inheritAttrs: false })
 
@@ -88,6 +88,8 @@ const emit = defineEmits<{
   submit: [event: Event]
 }>()
 const dialogRef = ref<HTMLElement | null>(null)
+const backdropRef = ref<HTMLElement | null>(null)
+let unregister: (() => void) | undefined
 const dialogId = `oc-dialog-${useId().replace(/:/g, '')}`
 const titleId = `${dialogId}-title`
 const descriptionId = `${dialogId}-description`
@@ -119,15 +121,26 @@ watch(() => props.open, async open => {
   if (!open) return
   returnFocusTarget = document.activeElement instanceof HTMLElement ? document.activeElement : null
   await nextTick()
+  if (!props.open || !backdropRef.value) return
+  unregister?.()
+  unregister = registerDialogRoot(backdropRef.value)
   focusInitialControl()
 }, { immediate: true })
 
 onBeforeUnmount(() => {
+  unregister?.()
   if (props.open) restoreFocus()
 })
 
+function finishClose(): void {
+  if (props.open) return
+  unregister?.()
+  unregister = undefined
+  restoreFocus()
+}
+
 function enabledFocusTargets(): HTMLElement[] {
-  return Array.from(dialogRef.value?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
+  return Array.from(backdropRef.value?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
     .filter(element => !element.closest('[inert]') && element.getAttribute('aria-hidden') !== 'true')
 }
 
@@ -153,6 +166,7 @@ function handleBackdropPointerDown(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  if (activeDialogRoot.value !== backdropRef.value) return
   if (event.key === 'Escape' && props.closeOnEscape && props.dismissible) {
     event.preventDefault()
     event.stopPropagation()
@@ -169,7 +183,7 @@ function handleKeydown(event: KeyboardEvent): void {
   }
   const first = targets[0]!
   const last = targets[targets.length - 1]!
-  if (event.shiftKey && (document.activeElement === first || !dialogRef.value?.contains(document.activeElement))) {
+  if (event.shiftKey && (document.activeElement === first || !backdropRef.value?.contains(document.activeElement))) {
     event.preventDefault()
     last.focus()
   } else if (!event.shiftKey && document.activeElement === last) {

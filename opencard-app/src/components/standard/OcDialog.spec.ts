@@ -1,13 +1,17 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import OcDialog from './OcDialog.vue'
+import { activeDialogRoot } from '../../shared/ui/overlayScope'
+
+const wrappers: ReturnType<typeof mount>[] = []
 
 afterEach(() => {
+  wrappers.splice(0).reverse().forEach(wrapper => wrapper.unmount())
   document.body.innerHTML = ''
 })
 
 function mountDialog(props: Record<string, unknown> = {}) {
-  return mount(OcDialog, {
+  const wrapper = mount(OcDialog, {
     attachTo: document.body,
     props: { open: true, title: 'Example dialog', ...props },
     slots: {
@@ -16,9 +20,27 @@ function mountDialog(props: Record<string, unknown> = {}) {
     },
     global: { stubs: { transition: false } },
   })
+  wrappers.push(wrapper)
+  return wrapper
 }
 
 describe('OcDialog', () => {
+  it('activates dialogs by opening order and restores the previous scope on release', async () => {
+    const first = mountDialog({ open: false })
+    const second = mountDialog()
+    await second.vm.$nextTick()
+    const previous = activeDialogRoot.value!
+
+    await first.setProps({ open: true })
+    await first.vm.$nextTick()
+    const current = activeDialogRoot.value!
+    expect(current).not.toBe(previous)
+    expect(previous.inert).toBe(true)
+    first.unmount()
+    wrappers.splice(wrappers.indexOf(first), 1)
+    expect(activeDialogRoot.value).toBe(previous)
+    expect(previous.inert).toBe(false)
+  })
   it('owns modal semantics and focuses the requested initial control', async () => {
     const trigger = document.createElement('button')
     document.body.appendChild(trigger)

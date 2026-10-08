@@ -3,6 +3,7 @@ import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useFloatingMenu } from '../../composables/useFloatingMenu'
 import FloatingMenuHost from './FloatingMenuHost.vue'
+import OcDialog from '../standard/OcDialog.vue'
 
 describe('FloatingMenuHost pointer dismissal', () => {
   afterEach(() => {
@@ -57,9 +58,18 @@ describe('FloatingMenuHost pointer dismissal', () => {
   it('selects a leaf through arbitrarily nested teleported context menus', async () => {
     const onSelect = vi.fn()
     const wrapper = mount(FloatingMenuHost, { attachTo: document.body })
+    const dialog = mount(OcDialog, {
+      attachTo: document.body,
+      props: { open: true, title: 'Context menu owner' },
+      slots: { default: '<button class="context-target">Open menu</button>' },
+      global: { stubs: { transition: false } },
+    })
+    await nextTick()
+    const backdrop = document.body.querySelector<HTMLElement>('.oc-dialog__backdrop')!
+    const target = backdrop.querySelector<HTMLElement>('.context-target')!
     const menu = useFloatingMenu()
-    menu.openMenu({
-      anchor: new DOMRect(10, 10, 0, 0),
+    target.addEventListener('contextmenu', event => menu.openContextMenu({
+      event,
       items: [{
         key: 'level-1',
         title: 'Level 1',
@@ -74,7 +84,8 @@ describe('FloatingMenuHost pointer dismissal', () => {
         }],
       }],
       onSelect,
-    })
+    }))
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 10, clientY: 10 }))
     await nextTick()
 
     for (let depth = 1; depth < 4; depth += 1) {
@@ -88,6 +99,8 @@ describe('FloatingMenuHost pointer dismissal', () => {
       '.oc-action-menu__button[aria-label="Leaf"]',
     )
     expect(leafButton).not.toBeNull()
+    expect(Array.from(document.body.querySelectorAll('.oc-floating-layer'))
+      .every(layer => layer.parentElement === backdrop)).toBe(true)
     leafButton?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }))
     await flushPromises()
     expect(leafButton?.isConnected).toBe(true)
@@ -98,5 +111,6 @@ describe('FloatingMenuHost pointer dismissal', () => {
     expect(onSelect).toHaveBeenCalledWith('leaf')
     expect(menu.state.value.isOpen).toBe(false)
     wrapper.unmount()
+    dialog.unmount()
   })
 })

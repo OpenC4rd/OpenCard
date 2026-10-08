@@ -324,7 +324,7 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--oc-duration-fast) var(--oc-ease);
-  z-index: 2147483647;
+  z-index: var(--oc-z-tooltip);
   white-space: pre-line;
 }
 
@@ -913,6 +913,7 @@
 
 
 .open-card-shell__page-stack {
+  isolation: isolate;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -963,7 +964,7 @@
   position: absolute;
   right: 0;
   left: 0;
-  z-index: 3;
+  z-index: var(--oc-z-shell-resize-preview);
   height: 1px;
   pointer-events: none;
   background: var(--oc-border-accent);
@@ -986,6 +987,7 @@
 }
 
 .open-card-shell__page-content {
+  isolation: isolate;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -1012,7 +1014,7 @@
 .shell-file-drop-overlay {
   position: fixed;
   inset: 8px;
-  z-index: 2147483646;
+  z-index: var(--oc-z-file-drop);
   display: flex;
   flex-direction: column;
   align-items: center;

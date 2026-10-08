@@ -7,6 +7,7 @@
 }
 
 .oc-data-grid {
+  isolation: isolate;
   --oc-field-control-height: calc(var(--oc-table-row-height) - var(--oc-border-width));
   background: var(--oc-bg-base);
 }

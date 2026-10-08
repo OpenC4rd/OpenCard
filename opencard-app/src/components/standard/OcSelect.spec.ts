@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import OcSelect from './OcSelect.vue'
+import OcDialog from './OcDialog.vue'
+import { h } from 'vue'
 
 const options = [
   { value: 'one', label: 'One' },
@@ -9,6 +11,31 @@ const options = [
 ]
 
 describe('OcSelect', () => {
+  it('keeps a modal dropdown inside its owner and commits its real option', async () => {
+    const selected = [] as string[]
+    const wrapper = mount(OcDialog, {
+      attachTo: document.body,
+      props: { open: true, title: 'Choose' },
+      slots: { default: () => h(OcSelect, {
+        modelValue: 'one', options,
+        'onUpdate:modelValue': value => selected.push(String(value)),
+      }) },
+      global: { stubs: { transition: false } },
+    })
+    try {
+      await wrapper.vm.$nextTick()
+      const backdrop = document.body.querySelector('.oc-dialog__backdrop')!
+      backdrop.querySelector<HTMLButtonElement>('.oc-select__trigger')!.click()
+      await wrapper.vm.$nextTick()
+      const layer = backdrop.querySelector('.oc-floating-layer')!
+      expect(layer.parentElement).toBe(backdrop)
+      layer.querySelectorAll<HTMLButtonElement>('.oc-select__option')[2]!.click()
+      await wrapper.vm.$nextTick()
+      expect(selected).toEqual(['three'])
+    } finally {
+      wrapper.unmount()
+    }
+  })
   it('opens a themed listbox and commits a selected option', async () => {
     const wrapper = mount(OcSelect, {
       props: { modelValue: 'one', options },

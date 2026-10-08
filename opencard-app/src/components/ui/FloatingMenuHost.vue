@@ -3,6 +3,7 @@
   <OcFloatingLayer
     :open="state.isOpen && Boolean(menuAnchor)"
     :anchor="menuAnchor"
+    :owner="state.owner"
     :placement="state.placement"
     class="floating-menu-surface oc-floating-layer--surface"
     :data-oc-action-menu-branch="menuBranchId"

@@ -10,9 +10,9 @@
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.font', '字体')">
           <OcSelect class="oc-rich-text-editor__font" :data-tooltip="tr('propertyEditor.richText.font', '字体')" :aria-label="tr('propertyEditor.richText.font', '字体')"
-            :model-value="activeFontFamily" :options="fontOptions" :z-index="2500" @update:model-value="setFontFamily" />
+            :model-value="activeFontFamily" :options="fontOptions" @update:model-value="setFontFamily" />
           <OcSelect class="oc-rich-text-editor__font-size" :data-tooltip="tr('propertyEditor.richText.fontSize', '字号')" :aria-label="tr('propertyEditor.richText.fontSize', '字号')"
-            :model-value="activeFontSize" :options="fontSizeOptions" :z-index="2500" @update:model-value="setFontSize" />
+            :model-value="activeFontSize" :options="fontSizeOptions" @update:model-value="setFontSize" />
           <OcButton size="md" icon-only icon="format.font-size-decrease" :data-tooltip="tr('propertyEditor.richText.decreaseFontSize', '减小字号')" :aria-label="tr('propertyEditor.richText.decreaseFontSize', '减小字号')"
             @mousedown.prevent @click="adjustFontSize(-1)" />
           <OcButton size="md" icon-only icon="format.font-size-increase" :data-tooltip="tr('propertyEditor.richText.increaseFontSize', '增大字号')" :aria-label="tr('propertyEditor.richText.increaseFontSize', '增大字号')"
@@ -56,28 +56,28 @@
           </OcButton>
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupColorAndStroke', '颜色与描边')">
-          <OcColorPicker :label="tr('propertyEditor.richText.foregroundColor', '前景色')" :model-value="foregroundColor" :z-index="2500"
+          <OcColorPicker :label="tr('propertyEditor.richText.foregroundColor', '前景色')" :model-value="foregroundColor"
             @open-change="captureColorSnapshot('foreground', $event)"
             @preview="setForegroundColor" @cancel="restoreColorSnapshot('foreground')">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command">
               <OcIcon name="format.color-fill" size="md" /><span :style="{ backgroundColor: color }" />
             </span></template>
           </OcColorPicker>
-          <OcColorPicker :label="tr('propertyEditor.richText.textBackgroundColor', '文字背景色')" :model-value="backgroundColor" :z-index="2500"
+          <OcColorPicker :label="tr('propertyEditor.richText.textBackgroundColor', '文字背景色')" :model-value="backgroundColor"
             @open-change="captureColorSnapshot('background', $event)"
             @preview="setBackgroundColor" @cancel="restoreColorSnapshot('background')">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command">
               <OcIcon name="format.color-highlight" size="md" /><span :style="{ backgroundColor: color }" />
             </span></template>
           </OcColorPicker>
-          <OcColorPicker :label="tr('propertyEditor.richText.strokeColor', '描边颜色')" :model-value="strokeColor" :z-index="2500"
+          <OcColorPicker :label="tr('propertyEditor.richText.strokeColor', '描边颜色')" :model-value="strokeColor"
             @open-change="captureColorSnapshot('stroke', $event)"
             @preview="setStrokeColor" @cancel="restoreColorSnapshot('stroke')">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command oc-rich-text-editor__color-command--stroke"
               :style="{ WebkitTextStrokeColor: color }">A</span></template>
           </OcColorPicker>
           <OcSelect class="oc-rich-text-editor__stroke-width" :data-tooltip="tr('propertyEditor.richText.strokeWidth', '描边宽度')" :aria-label="tr('propertyEditor.richText.strokeWidth', '描边宽度')"
-            :model-value="strokeWidth" :options="strokeWidthOptions" :z-index="2500" @update:model-value="setStrokeWidth" />
+            :model-value="strokeWidth" :options="strokeWidthOptions" @update:model-value="setStrokeWidth" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupAlignment', '段落对齐')">
           <OcButton v-for="alignment in alignments" :key="alignment.value" size="md" icon-only
@@ -93,7 +93,7 @@
     </div>
 
     <OcFloatingLayer v-if="selectedNodeAnchor && selectedNodeKind" :open="nodeEditOpen"
-      :anchor="selectedNodeAnchor" placement="top-start" :z-index="2500">
+      :anchor="selectedNodeAnchor" :owner="editor?.view.dom" placement="top-start">
       <div class="oc-rich-text-editor__node-edit-layer">
         <OcActionButton v-if="selectedNodeKind === 'projectIcon'" :action="projectIconAction"
           size="sm" variant="ghost" @mousedown.prevent @select="handleProjectIconAction" />

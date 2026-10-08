@@ -9,12 +9,14 @@ interface FloatingMenuState {
   isOpen: boolean
   items: readonly FloatingMenuItem[]
   anchor: HTMLElement | DOMRect | null
+  owner: HTMLElement | null
   placement: FloatingMenuPlacement
   focusOnOpen: boolean
 }
 
 export interface OpenFloatingMenuOptions {
   anchor: HTMLElement | DOMRect
+  owner?: HTMLElement | null
   items: readonly FloatingMenuItem[]
   placement?: FloatingMenuPlacement
   onSelect?: (key: string) => void
@@ -33,6 +35,7 @@ const state = shallowRef<FloatingMenuState>({
   isOpen: false,
   items: [],
   anchor: null,
+  owner: null,
   placement: 'bottom-end',
   focusOnOpen: false,
 })
@@ -47,6 +50,7 @@ function openMenu(options: OpenFloatingMenuOptions): void {
     isOpen: true,
     items: options.items,
     anchor: options.anchor,
+    owner: options.owner ?? (options.anchor instanceof HTMLElement ? options.anchor : null),
     placement: options.placement ?? 'bottom-end',
     focusOnOpen: options.focusOnOpen ?? false,
   }
@@ -64,6 +68,7 @@ function openContextMenu(options: OpenContextMenuOptions): boolean {
   event?.preventDefault()
   openMenu({
     anchor,
+    owner: event?.target instanceof Element ? event.target.closest<HTMLElement>('.oc-dialog__backdrop') : null,
     items: options.items,
     placement: 'bottom-start',
     onSelect: options.onSelect,
@@ -94,6 +99,7 @@ function closeMenu(): void {
     isOpen: false,
     items: [],
     anchor: null,
+    owner: null,
   }
   selectHandler = null
   returnFocusTarget = null

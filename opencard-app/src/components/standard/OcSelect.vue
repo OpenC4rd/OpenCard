@@ -49,7 +49,6 @@
       placement="bottom-start"
       :match-anchor-width="true"
       :max-height="maxHeight"
-      :z-index="zIndex"
       class="oc-select__floating oc-floating-layer--surface"
       :data-oc-select-owner="selectId"
     >
@@ -117,7 +116,6 @@ const props = withDefaults(defineProps<{
   invalid?: boolean
   busy?: boolean
   maxHeight?: number
-  zIndex?: number
 }>(), {
   modelValue: '',
   placeholder: 'Select',
@@ -129,7 +127,6 @@ const props = withDefaults(defineProps<{
   invalid: false,
   busy: false,
   maxHeight: 240,
-  zIndex: 2000,
 })
 
 const emit = defineEmits<{

@@ -1978,7 +1978,7 @@ defineExpose({ save: saveFile, flush: flushPendingChanges, navigate, presentatio
 <style scoped>
 .card-design-editor {
   position: relative;
-  z-index: var(--oc-z-card-designer);
+  isolation: isolate;
   opacity: 1;
   transition: opacity var(--oc-duration-normal) var(--oc-ease);
 }
@@ -2176,7 +2176,7 @@ defineExpose({ save: saveFile, flush: flushPendingChanges, navigate, presentatio
   flex-direction: column;
   overflow: hidden;
   pointer-events: none;
-  z-index: var(--oc-z-card-designer);
+  z-index: 7;
   opacity: 1;
   transition: opacity var(--oc-duration-normal) var(--oc-ease);
 }

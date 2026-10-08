@@ -4,7 +4,6 @@
     :anchor="anchor"
     :placement="placement"
     :max-height="maxHeight"
-    :z-index="zIndex"
     :match-anchor-width="matchAnchorWidth"
     class="oc-autocomplete-popover oc-floating-layer--surface"
     role="listbox"
@@ -69,12 +68,10 @@ const props = withDefaults(defineProps<{
   activeKey: string | null
   placement?: Placement
   maxHeight?: number
-  zIndex?: number
   matchAnchorWidth?: boolean
 }>(), {
   placement: 'bottom-start',
   maxHeight: 220,
-  zIndex: 2000,
   matchAnchorWidth: true,
 })
 
