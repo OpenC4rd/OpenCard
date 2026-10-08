@@ -28,7 +28,7 @@ import {
 } from '../workspace/services/projectIconCompletion'
 import { createCustomBlockCompletionProvider } from '../workspace/services/customBlockCompletion'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
-import { resolveProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
+import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
 import { buildResourceFontCatalog } from '../workspace/services/resourceReference'
 import {
   resolveReferenceCompletion,
@@ -136,7 +136,10 @@ export function enrichCardPropertyFieldDefinition(options: {
       catalog: options.projectIconCatalog ?? EMPTY_PROJECT_ICON_CATALOG,
     },
     ...Array.from(options.resourceEnvironment?.packageEnvironments ?? []).flatMap(([packageKey, environment]) => {
-      const pkg = options.resourceEnvironment?.packages?.get(packageKey)
+      const qualifier = parsePackageQualifier(packageKey)
+      const pkg = qualifier && options.resourceEnvironment
+        ? resolveProjectResourcePackage(options.resourceEnvironment, qualifier)
+        : null
       return pkg && environment.iconCatalog.entries.length
         ? [{
           packageKey: formatPackageCoordinate(pkg.coordinate),
@@ -173,7 +176,7 @@ export function enrichCardPropertyFieldDefinition(options: {
           ? { fontSize: options.record.fontSize }
           : {}),
         ...(typeof options.record.fontFamily === 'string' && options.record.fontFamily
-          ? { fontFamily: toCssFontFamily(options.record.fontFamily) }
+          ? { fontFamily: options.resourceEnvironment ? resolveProjectEnvironmentFontFamily(options.record.fontFamily, options.resourceEnvironment) : toCssFontFamily(options.record.fontFamily) }
           : {}),
       }
     : undefined

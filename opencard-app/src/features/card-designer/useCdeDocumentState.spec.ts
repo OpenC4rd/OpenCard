@@ -27,23 +27,21 @@ afterEach(() => {
 describe('useCdeDocumentState lifecycle', () => {
   it('publishes typing immediately with a stable merge identity for session history', () => {
     vi.useFakeTimers()
-    const emitModelValueUpdate = vi.fn()
+    const updateContent = vi.fn()
     const state = useCdeDocumentState({
-      emitModelValueUpdate,
-      emitModified: vi.fn(),
-      emitSave: vi.fn(),
+      updateContent,
       resetSelection: vi.fn(),
     })
     state.loadRawDoc(stringifyCardDocument(createDocument()))
-    emitModelValueUpdate.mockClear()
+    updateContent.mockClear()
 
     state.cardDoc.value!.name = 'Latest typing'
     state.markDocumentChanged('typing', 'document:name')
-    expect(emitModelValueUpdate).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(emitModelValueUpdate.mock.calls[0]![0])).toMatchObject({
+    expect(updateContent).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(updateContent.mock.calls[0]![0])).toMatchObject({
       name: 'Latest typing',
     })
-    expect(emitModelValueUpdate.mock.calls[0]![1]).toEqual({
+    expect(updateContent.mock.calls[0]![1]).toEqual({
       mode: 'debounced',
       merge: { family: 'card-edit', target: 'document:name' },
       structural: false,

@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectConfigEditor from './ProjectConfigEditor.vue'
@@ -31,10 +32,7 @@ describe('ProjectConfigEditor', () => {
 
   it('edits only project name, description, and version', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: {
-        filePath: 'D:/Demo/.opencard/project.json',
-        modelValue: JSON.stringify({ name: 'Demo', description: 'Info', version: '1.0.0' }),
-      },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: JSON.stringify({ name: 'Demo', description: 'Info', version: '1.0.0' }) }),  },
     })
 
     expect(wrapper.vm.presentation).toEqual({
@@ -47,23 +45,23 @@ describe('ProjectConfigEditor', () => {
     expect(wrapper.find('.property-editor').exists()).toBe(false)
     await wrapper.get('[data-field-key="version"] input').setValue('2.0.0')
 
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    const updated = updates[updates.length - 1]?.[0] as string
+    const updates = wrapper.props('session').state.draftContent
+    const updated = updates as string
     expect(JSON.parse(updated)).toEqual({ name: 'Demo', description: 'Info', version: '2.0.0' })
   })
 
   it('omits empty profile fields', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{"name":"Demo"}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{"name":"Demo"}' }),  },
     })
     await wrapper.get('[data-field-key="name"] input').setValue('')
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(updates[updates.length - 1]?.[0] as string)).toEqual({})
+    const updates = wrapper.props('session').state.draftContent
+    expect(JSON.parse(updates as string)).toEqual({})
   })
 
   it('edits the project HTTPS host allowlist with custom controls', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }),  },
     })
 
     const modeControl = wrapper.getComponent(OcOptionGroup)
@@ -78,8 +76,8 @@ describe('ProjectConfigEditor', () => {
     await wrapper.get('.project-profile-editor__add-host').trigger('click')
     await wrapper.findAll('.project-profile-editor__host-row input')[1]!.setValue('*.cdn.example.com')
 
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(updates[updates.length - 1]?.[0] as string).remoteResources).toEqual({
+    const updates = wrapper.props('session').state.draftContent
+    expect(JSON.parse(updates as string).remoteResources).toEqual({
       mode: 'allowlist',
       allowedHosts: ['images.example.com', '*.cdn.example.com'],
     })
@@ -87,20 +85,20 @@ describe('ProjectConfigEditor', () => {
 
   it('stores allow-all without rendering a host list', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }),  },
     })
 
     wrapper.getComponent(OcOptionGroup).vm.$emit('update:modelValue', 'allow-all')
     await wrapper.vm.$nextTick()
 
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(updates[updates.length - 1]?.[0] as string).remoteResources).toEqual({ mode: 'allow-all' })
+    const updates = wrapper.props('session').state.draftContent
+    expect(JSON.parse(updates as string).remoteResources).toEqual({ mode: 'allow-all' })
     expect(wrapper.find('.project-profile-editor__host-list').exists()).toBe(false)
   })
 
   it('stores export fields only as the default export configuration', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }),  },
     })
     const task = {
       documentPaths: ['cards/main.ocdocument'],
@@ -114,14 +112,14 @@ describe('ProjectConfigEditor', () => {
 
     wrapper.getComponent(ProjectExportTaskEditor).vm.$emit('update:modelValue', task)
     await wrapper.vm.$nextTick()
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(updates[updates.length - 1]?.[0] as string).exportTask).toEqual(task)
+    const updates = wrapper.props('session').state.draftContent
+    expect(JSON.parse(updates as string).exportTask).toEqual(task)
     expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
   })
 
   it('persists collapsed project-profile sections and exposes them in the outline', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }),  },
     })
 
     expect(wrapper.findAll('.project-profile-editor__outline-item')).toHaveLength(3)
@@ -136,7 +134,7 @@ describe('ProjectConfigEditor', () => {
 
     expect(wrapper.get('#project-profile-section-information-content').attributes('aria-hidden')).toBe('true')
     expect(wrapper.find('[data-field-key="name"]').exists()).toBe(true)
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.props('session').state.isDirty).toBe(false)
     expect(useAppSettingsStore().settings.value.projectCreation.workspaceStates['D:/Demo']).toEqual({
       expandedDirectories: [],
       projectProfile: { collapsedSections: ['information'] },
@@ -153,10 +151,7 @@ describe('ProjectConfigEditor', () => {
       },
     })
     const wrapper = mount(ProjectConfigEditor, {
-      props: {
-        filePath: 'D:/Demo/.opencard/project.json',
-        modelValue: '{}',
-      },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }),  },
     })
 
     expect(wrapper.get('#project-profile-section-remote-resources-content').attributes('aria-hidden')).toBe('true')
@@ -164,7 +159,7 @@ describe('ProjectConfigEditor', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.get('#project-profile-section-remote-resources-content').attributes('aria-hidden')).toBe('false')
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.props('session').state.isDirty).toBe(false)
     expect(useAppSettingsStore().settings.value.projectCreation.workspaceStates['D:/Demo']).toEqual({
       expandedDirectories: [],
     })
@@ -172,26 +167,26 @@ describe('ProjectConfigEditor', () => {
 
   it('stores the project cover as a project-relative path', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{"name":"Demo"}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{"name":"Demo"}' }),  },
     })
 
     expect(wrapper.get('[data-field-key="cover"]').text()).toContain('projectConfig.fields.cover')
     wrapper.getComponent(ProjectCoverField).vm.$emit('update:modelValue', 'assets/cover.png')
     await wrapper.vm.$nextTick()
 
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(updates[updates.length - 1]?.[0] as string))
+    const updates = wrapper.props('session').state.draftContent
+    expect(JSON.parse(updates as string))
       .toEqual({ name: 'Demo', cover: 'assets/cover.png' })
 
     wrapper.getComponent(ProjectCoverField).vm.$emit('update:modelValue', '')
     await wrapper.vm.$nextTick()
-    const cleared = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(cleared[cleared.length - 1]?.[0] as string)).toEqual({ name: 'Demo' })
+    const cleared = wrapper.props('session').state.draftContent
+    expect(JSON.parse(cleared as string)).toEqual({ name: 'Demo' })
   })
 
   it('shows the embedded JSON repair editor for invalid content', () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{broken' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{broken' }),  },
     })
     expect(wrapper.find('.project-profile-editor__repair').exists()).toBe(true)
     expect(wrapper.find('.monaco-stub').exists()).toBe(true)
@@ -199,10 +194,12 @@ describe('ProjectConfigEditor', () => {
 
   it('emits the standard save command from Ctrl+S for valid content', async () => {
     const wrapper = mount(ProjectConfigEditor, {
-      props: { filePath: 'D:/Demo/.opencard/project.json', modelValue: '{}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }),  },
     })
+    const save = vi.spyOn(wrapper.props('session'), 'save').mockResolvedValue('saved')
     await wrapper.get('.project-profile-editor').trigger('keydown', { ctrlKey: true, key: 's' })
-    expect(wrapper.emitted('save')).toHaveLength(1)
+    expect(save).toHaveBeenCalledOnce()
+    expect(wrapper.vm.canSave).toBe(true)
   })
 
 })

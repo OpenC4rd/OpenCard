@@ -18,7 +18,6 @@ describe('gitignore patterns', () => {
   })
 
   it('only offers a whole-extension pattern for a real extension', () => {
-    expect(gitignorePatternForExtension('packs/status.ociconpack')).toBe('*.ociconpack')
     expect(gitignorePatternForExtension('.env')).toBeNull()
     expect(gitignorePatternForExtension('Makefile')).toBeNull()
   })

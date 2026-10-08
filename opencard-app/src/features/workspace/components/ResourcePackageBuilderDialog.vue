@@ -288,16 +288,17 @@ const treeData = computed<OcNodeCollection>(() => {
       return key
     }))
   }
-  const customBlocks = Object.values(projectStore.projectCustomBlockRegistry?.value ?? {})
+  const customBlockCollections = projectStore.projectResourceEnvironment.value.customBlockDocument?.collections ?? []
   {
     const categoryKey = 'category:custom-blocks'
     rootKeys.push(categoryKey)
     items.set(categoryKey, { label: t('resourcePackage.customBlocks'), visual: { type: 'icon', icon: 'entity.block-custom', iconTone: 'file-config' } })
-    children.set(categoryKey, customBlocks.map(block => {
-      const key = `custom-block:${block.key}`
-      const selected = selectedCustomBlockKeys.value.has(block.key)
+    children.set(categoryKey, customBlockCollections.map(collection => {
+      const collectionKey = collection.key
+      const key = `custom-block-collection:${collectionKey}`
+      const selected = selectedCustomBlockKeys.value.has(collectionKey)
       items.set(key, {
-        label: block.name, tail: [block.key, ...toggleSelection(selected)],
+        label: collection.name, tail: [t('resourcePackage.blockCount', { count: collection.blocks.length }), ...toggleSelection(selected)],
         visual: { type: 'icon', icon: 'entity.block-custom', iconTone: selected ? 'active' : 'muted' },
         contextActions: toggleSelection(selected),
       })
@@ -353,7 +354,7 @@ watch(() => props.open, open => {
     cached?.iconSeriesKeys,
   )
   selectedCustomBlockKeys.value = restoreSelection(
-    Object.keys(projectStore.projectCustomBlockRegistry?.value ?? {}),
+    (projectStore.projectResourceEnvironment.value.customBlockDocument?.collections ?? []).map(collection => collection.key),
     cached?.customBlockKeys,
   )
   selectedOtherPaths.value = restoreSelection(
@@ -421,8 +422,8 @@ function handleTreeAction(event: OcNodeActionEvent): void {
     selectedIconSeriesKeys.value = nextSeries
     return
   }
-  if (event.key.startsWith('custom-block:')) {
-    const blockKey = event.key.slice('custom-block:'.length)
+  if (event.key.startsWith('custom-block-collection:')) {
+    const blockKey = event.key.slice('custom-block-collection:'.length)
     const nextBlocks = new Set(selectedCustomBlockKeys.value)
     if (selected) nextBlocks.add(blockKey)
     else nextBlocks.delete(blockKey)

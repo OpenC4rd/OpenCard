@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { fileSystemService } from '../../features/workspace/services/fileSystemService'
 import { resolveFileType } from '../../features/workspace/model/fileTypes'
@@ -38,16 +38,18 @@ import MonacoEditor from './MonacoEditor.vue'
 defineOptions({ name: 'UnsupportedFileEditor' })
 
 const props = defineProps<EditorProps>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
 const mode = ref<'prompt' | 'text'>('prompt')
 const textContent = ref('')
 const errorMessage = ref('')
 let actionPending = false
 
-const displayName = computed(() => props.fileName || props.filePath.split(/[/\\]/).pop() || props.filePath)
+const displayName = computed(() => editorState.value.name || filePath.value.split(/[/\\]/).pop() || filePath.value)
 
 /** 没有专门编辑器的文件仍由它自己的文件类型说话，于是文件树与被打开的会话认出同一个形状。 */
-const fileType = computed(() => resolveFileType(props.filePath))
+const fileType = computed(() => resolveFileType(filePath.value))
 
 const presentation = computed<EditorPresentation>(() => ({
   title: displayName.value,
@@ -58,9 +60,9 @@ const presentation = computed<EditorPresentation>(() => ({
 
 defineExpose({ presentation })
 const absolutePath = computed(() => {
-  if (/^[a-z]:[/\\]/i.test(props.filePath) || props.filePath.startsWith('/')) return props.filePath
+  if (/^[a-z]:[/\\]/i.test(filePath.value) || filePath.value.startsWith('/')) return filePath.value
   const root = props.resourceRootPath?.replace(/[/\\]+$/, '')
-  return root ? `${root}/${props.filePath}` : props.filePath
+  return root ? `${root}/${filePath.value}` : filePath.value
 })
 
 async function openAsReadonlyText(): Promise<void> {

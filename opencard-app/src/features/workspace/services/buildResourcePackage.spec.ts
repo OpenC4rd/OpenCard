@@ -47,8 +47,8 @@ function createFileSystem(): MemoryFileSystem {
   })
   fs.putText(`/project/${PROJECT_ICON_REGISTRY_FILE_NAME}`, {
     iconSeries: [
-      { key: 'status', name: 'Status', icons: [{ iconKey: 'ok', name: 'OK', source: 'alice/support@1.2.0#icons/ok.svg', tint: 'theme' }] },
-      { key: 'unused', name: 'Unused', icons: [{ iconKey: 'idle', name: 'Idle', source: '.opencard/icons/idle.svg', tint: 'theme' }] },
+      { key: 'status', name: 'Status', icons: [{ iconKey: 'ok', name: 'OK', source: 'alice/support@1.2.0#icons/ok.svg', tint: 'context' }] },
+      { key: 'unused', name: 'Unused', icons: [{ iconKey: 'idle', name: 'Idle', source: '.opencard/icons/idle.svg', tint: 'context' }] },
     ],
   })
   fs.putText(`/project/${PROJECT_PROFILE_FILE_NAME}`, { name: 'Demo', cover: 'images/cover.png' })

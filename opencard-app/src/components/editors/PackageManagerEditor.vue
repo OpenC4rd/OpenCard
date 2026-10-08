@@ -21,7 +21,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorEmits, EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import type { OcNode, OcNodeAction, OcNodeActionEvent, OcNodeActivateEvent, OcNodeCollection } from '../../shared/ui/node/node.types'
 import { formatPackageCoordinate } from '../../features/workspace/model/packageCoordinate'
@@ -124,7 +124,6 @@ const presentation = computed<EditorPresentation>(() => ({
 
 defineExpose({ presentation })
 
-emit('modified', false)
 </script>
 
 <style scoped>

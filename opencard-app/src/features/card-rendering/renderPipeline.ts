@@ -27,6 +27,7 @@ export type RenderPipelineContext = {
 
 export type CardRenderEnvironment = RenderPipelineContext & {
   remoteResourcePolicy?: ProjectRemoteResourcePolicy
+  remoteResourceStatus?: (url: string) => 'pending' | 'ready' | 'failed' | 'blocked'
   resolveRemoteResource?: (url: string) => string | null
   projectIconCatalog: ProjectIconCatalog
   /** Reads an icon's size, which is what asks for it and re-renders the consumer that read it. */
@@ -52,20 +53,18 @@ export function prepareCardRender(request: CardRenderRequest): PreparedCardRende
     catalog: request.environment.customBlockCatalog ?? { resolve: () => null },
     maxDepth: request.environment.customBlockLimits?.maxDepth,
     maxNodes: request.environment.customBlockLimits?.maxNodes,
-  })
+  }, request.environment.projectResourceEnvironment?.namespace ?? 'project')
   const resolved = resolveReferences(materialized.document, {
     currentCard: request.instance,
     project: request.environment.project,
     dictionary: request.environment.dictionary,
   })
-  const resourceScopes: ProjectResourceScopeMap = new Map()
+  const resourceScopes = materialized.resourceScopes
   const richText = prepareRichText({
     document: resolved.document,
     currentCard: request.instance,
     project: request.environment.project,
     dictionary: request.environment.dictionary,
-    hostEnvironment: request.environment.projectResourceEnvironment,
-    resourceScopes,
   })
   const parsed = parseRenderDocument(resolved.document, {
     instanceId: request.instance?.id ?? null,
@@ -78,6 +77,7 @@ export function prepareCardRender(request: CardRenderRequest): PreparedCardRende
     packageEnvironments: request.environment.projectResourceEnvironment?.packageEnvironments,
     remoteResourcePolicy: request.environment.remoteResourcePolicy,
     resolveRemoteResource: request.environment.resolveRemoteResource,
+    remoteResourceStatus: request.environment.remoteResourceStatus,
     projectIconCatalog: request.environment.projectIconCatalog,
     resolveIconDimensions: request.environment.resolveIconDimensions,
     resourceScopes,

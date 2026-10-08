@@ -1,3 +1,7 @@
+import { createResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
+import type { FileSystemService } from '../workspace/services/fileSystemService'
+import type { CardDesignerSessionView, CardDesignerViewState } from './cardDesigner.types'
+import { getTestSession } from '../editor-runtime/editorTestSession'
 import { defineComponent, nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -38,6 +42,7 @@ const heroFileName = 'hero.ocdocument'
 const flowFilePath = 'D:/Project/cards/flow.ocdocument'
 const flowFileName = 'flow.ocdocument'
 const neutralView = () => ({ activeFace: 'front' as const, clipToFace: false, selectedInstanceId: null })
+const sessionView = (wrapper: Parameters<typeof getTestSession>[0]) => (getTestSession(wrapper).state.viewState['card-designer'] as CardDesignerSessionView).view as CardDesignerViewState
 
 describe('CardDesignEditor issue navigation', () => {
   beforeEach(() => {
@@ -58,15 +63,17 @@ describe('CardDesignEditor issue navigation', () => {
     const wrapper = mountCde({ props: { fileName: 'hero.ocdocument', renderCardImages: render } })
     const editor = wrapper.vm as unknown as { onHeaderAction: (key: string) => Promise<void> }
     await editor.onHeaderAction('card-designer.toggle-mode')
-    expect(wrapper.emitted('update:card-designer-mode')?.[0]).toEqual(['data-table'])
+    expect(getTestSession(wrapper).state.viewState['card-designer']).toMatchObject({ mode: 'data-table' })
     const pending = editor.onHeaderAction('render.both.2')
     await editor.onHeaderAction('render.both.2')
     expect(pick).toHaveBeenCalledTimes(1)
-    await wrapper.setProps({ filePath: 'other.ocdocument', fileName: 'other.ocdocument', modelValue: { ...createCdeDocument(), name: 'Other' } })
+    getTestSession(wrapper).remapPath('other.ocdocument')
+    getTestSession(wrapper).updateContent(JSON.stringify({ ...createCdeDocument(), name: 'Other' }))
+    await nextTick()
     finish('D:/exports')
     await pending
-    expect(render).toHaveBeenCalledWith(expect.objectContaining({ document: expect.objectContaining({ name: 'Document' }) }), ['front', 'back'], 2)
-    expect(write.mock.calls.map(call => call[0])).toEqual(['D:/exports/hero_front.png', 'D:/exports/hero_back.png'])
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ document: expect.objectContaining({ name: 'Document' }) }), ['front', 'back'], 2, new Map([['front', 'D:/exports/hero_front.png'], ['back', 'D:/exports/hero_back.png']]))
+    expect(write).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
@@ -93,7 +100,7 @@ describe('CardDesignEditor issue navigation', () => {
 
   it('does not render cancelled or unmounted requests and reports image write errors', async () => {
     const pick = vi.spyOn(fileSystemService, 'pickSavePath').mockResolvedValue(null)
-    const render = vi.fn().mockResolvedValue(new Map([['front', new Uint8Array([1])]]))
+    const render = vi.fn().mockRejectedValue(new Error('disk full'))
     const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockRejectedValue(new Error('disk full'))
     const notice = vi.spyOn(notices, 'notifyError').mockReturnValue(0)
     const wrapper = mountCde({ props: { renderCardImages: render } })
@@ -103,7 +110,7 @@ describe('CardDesignEditor issue navigation', () => {
     expect(write).not.toHaveBeenCalled()
     pick.mockResolvedValue('D:/export.png')
     await editor.onHeaderAction('render.current.0.5')
-    expect(render).toHaveBeenCalledWith(expect.anything(), ['front'], 0.5)
+    expect(render).toHaveBeenCalledWith(expect.anything(), ['front'], 0.5, new Map([['front', 'D:/export.png']]))
     expect(notice).toHaveBeenCalledWith('disk full')
     let finish!: (path: string | null) => void
     pick.mockImplementation(() => new Promise(resolve => { finish = resolve }))
@@ -374,8 +381,8 @@ describe('CardDesignEditor issue navigation', () => {
     expect(result).toBe('success')
     expect(revealCell).toHaveBeenCalledWith('instance-1', 'text-1', 'content', 2)
     expect(wrapper.find('.card-data-table-stub').exists()).toBe(true)
-    const viewUpdates = wrapper.emitted('update-card-designer-view') ?? []
-    expect(viewUpdates[viewUpdates.length - 1]?.[0]).toMatchObject({
+    const viewUpdates = sessionView(wrapper)
+    expect(viewUpdates).toMatchObject({
       selectedInstanceId: 'instance-1',
     })
   })
@@ -437,8 +444,9 @@ describe('CardDesignEditor issue navigation', () => {
       },
     })
     await nextTick()
-    expect(wrapper.emitted('update:card-designer-mode')).toEqual([['design']])
-    await wrapper.setProps({ cardDesignerMode: 'design' })
+    expect(getTestSession(wrapper).state.viewState['card-designer']).toMatchObject({ mode: 'design' })
+    getTestSession(wrapper).updateViewState('card-designer', { mode: 'design' })
+    await nextTick()
     const result = await navigation
 
     expect(result).toBe('success')
@@ -473,7 +481,8 @@ describe('CardDesignEditor issue navigation', () => {
     expect(wrapper.findAll('.card-design-editor__card-info > .is-group-separated').map((item) => item.text()))
       .toEqual(['Front Face', 'Review print\nmargins.'])
 
-    await wrapper.setProps({ cardDesignerView: { ...neutralView(), selectedInstanceId: 'instance-1' } })
+    getTestSession(wrapper).updateViewState('card-designer', { view: { ...neutralView(), selectedInstanceId: 'instance-1' } })
+    await nextTick()
     await nextTick()
 
     expect(infoValues()).toEqual([
@@ -550,22 +559,22 @@ describe('CardDesignEditor issue navigation', () => {
     expect(alignmentSnappingAction?.props('action').icon).toBe('tool.snap-grid-on')
     expect(viewport.props('alignmentSnappingEnabled')).toBe(true)
 
-    const viewUpdates = wrapper.emitted('update-card-designer-view') ?? []
-    expect(viewUpdates[viewUpdates.length - 1]?.[0]).toEqual({
+    const viewUpdates = sessionView(wrapper)
+    expect(viewUpdates).toEqual({
       activeFace: 'front',
       clipToFace: true,
       alignmentSnappingEnabled: true,
       selectedInstanceId: null,
       selectedBlockIdsByFace: { front: [], back: [] },
     })
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
+    expect(getTestSession(wrapper).state.isDirty).toBe(false)
+    expect(getTestSession(wrapper).state.isDirty).toBe(false)
 
     viewport.vm.$emit('face-dimension-change', { dimension: 'width', value: 600, final: false })
     viewport.vm.$emit('face-dimension-change', { dimension: 'width', value: 600, final: true })
     await nextTick()
     expect(emittedDocument(wrapper).width).toBe('600')
-    expect(wrapper.emitted('modified')?.[0]?.[0]).toBe(true)
+    expect(getTestSession(wrapper).state.isDirty).toBe(true)
   })
 
   it('keeps independent block selections for each face', async () => {
@@ -588,18 +597,18 @@ describe('CardDesignEditor issue navigation', () => {
     const editor = wrapper.vm as unknown as EditorHandle
     editor.selectViewportBlock('text-1')
     await nextTick()
-    const selectionUpdateCount = (wrapper.emitted('update-card-designer-view') ?? []).length
+    const selectionBefore = sessionView(wrapper)
     editor.selectViewportBlock('text-1')
     await nextTick()
-    expect((wrapper.emitted('update-card-designer-view') ?? []).length).toBe(selectionUpdateCount)
+    expect(sessionView(wrapper)).toEqual(selectionBefore)
     editor.toggleActiveFace()
     await nextTick()
-    const updates = wrapper.emitted('update-card-designer-view') ?? []
-    const backState = updates[updates.length - 1]?.[0] as { selectedBlockIdsByFace?: Record<string, string[]> }
+    const updates = sessionView(wrapper)
+    const backState = updates as { selectedBlockIdsByFace?: Record<string, string[]> }
     expect(backState.selectedBlockIdsByFace).toEqual({ front: ['text-1'], back: [] })
     editor.selectViewportBlock('back-text-1')
     await nextTick()
-    const latest = (wrapper.emitted('update-card-designer-view') ?? []).slice(-1)[0]?.[0] as { selectedBlockIdsByFace?: Record<string, string[]> }
+    const latest = sessionView(wrapper) as { selectedBlockIdsByFace?: Record<string, string[]> }
     expect(latest.selectedBlockIdsByFace).toEqual({ front: ['text-1'], back: ['back-text-1'] })
   })
 
@@ -718,7 +727,7 @@ describe('CardDesignEditor issue navigation', () => {
     }
   })
 
-  it('fits the viewport when opening a card file without refitting content updates', async () => {
+  it('restores the session viewport without refitting content updates', async () => {
     const fitView = vi.fn()
     const wrapper = mountCde({
       props: {
@@ -737,19 +746,19 @@ describe('CardDesignEditor issue navigation', () => {
     await nextTick()
 
     const viewport = editorViewport(wrapper)
-    expect(viewport.props('transform')).toEqual({ x: 0, y: 0, scale: 1 })
+    expect(viewport.props('transform')).toEqual({ x: 80, y: -40, scale: 2 })
     viewport.vm.$emit('viewport-size-change', { width: 1000, height: 800 })
     await nextTick()
-    expect(fitView).toHaveBeenCalledTimes(1)
+    expect(fitView).not.toHaveBeenCalled()
 
     const updatedDocument = createCdeDocument({ name: 'Updated Document' })
-    await wrapper.setProps({ modelValue: JSON.stringify(updatedDocument) })
+    getTestSession(wrapper).updateContent(JSON.stringify(updatedDocument))
     await nextTick()
-    expect(fitView).toHaveBeenCalledTimes(1)
+    expect(fitView).not.toHaveBeenCalled()
 
-    await wrapper.setProps({ filePath: 'D:/Project/cards/other.ocdocument' })
+    getTestSession(wrapper).remapPath('D:/Project/cards/other.ocdocument')
     await nextTick()
-    expect(fitView).toHaveBeenCalledTimes(2)
+    expect(fitView).not.toHaveBeenCalled()
   })
 
   it('maps canvas keyboard shortcuts to viewport selection commands', async () => {
@@ -913,8 +922,8 @@ describe('CardDesignEditor issue navigation', () => {
       children: Array<{ block: { children: Array<{ block: { id: string } }> } }>
     }
     expect(duplicatedFace.children[0]?.block.children).toHaveLength(2)
-    const duplicateViewUpdates = wrapper.emitted('update-card-designer-view') ?? []
-    const duplicateViewState = duplicateViewUpdates[duplicateViewUpdates.length - 1]?.[0] as {
+    const duplicateViewUpdates = sessionView(wrapper)
+    const duplicateViewState = duplicateViewUpdates as unknown as {
       selectedBlockIdsByFace: Record<string, string[]>
     }
     expect(duplicateViewState.selectedBlockIdsByFace.front)
@@ -927,28 +936,22 @@ describe('CardDesignEditor issue navigation', () => {
     expect(restoredFace.children[0]?.block.children).toHaveLength(1)
 
     // 选择变化会提交视图状态：Delete 清空该面的块选择。
-    const selectionViewUpdates = wrapper.emitted('update-card-designer-view') ?? []
-    const clearedViewState = selectionViewUpdates[selectionViewUpdates.length - 1]?.[0] as {
+    const selectionViewUpdates = sessionView(wrapper)
+    const clearedViewState = selectionViewUpdates as unknown as {
       selectedBlockIdsByFace: Record<string, string[]>
     }
     expect(clearedViewState.selectedBlockIdsByFace).toEqual({ front: [], back: [] })
     await root.trigger('keydown', { key: 's' })
-    const snappingEvents = wrapper.emitted('update-card-designer-view') ?? []
-    const snappingUpdate = snappingEvents[snappingEvents.length - 1]?.[0] as {
+    const snappingEvents = sessionView(wrapper)
+    const snappingUpdate = snappingEvents as {
       alignmentSnappingEnabled: boolean
     }
     await root.trigger('keydown', { key: 's' })
     await root.trigger('keydown', { key: 'x' })
     await root.trigger('keydown', { key: 'b' })
-    const viewUpdates = wrapper.emitted('update-card-designer-view') as Array<[
-      { activeFace: string; clipToFace: boolean; alignmentSnappingEnabled: boolean }
-    ]>
-    expect(viewUpdates[viewUpdates.length - 3]?.[0].alignmentSnappingEnabled)
-      .toBe(!snappingUpdate.alignmentSnappingEnabled)
-    expect(viewUpdates.map(([view]) => view)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ clipToFace: true }),
-      expect.objectContaining({ activeFace: 'back' }),
-    ]))
+    expect(sessionView(wrapper)).toMatchObject({
+      alignmentSnappingEnabled: !snappingUpdate.alignmentSnappingEnabled, clipToFace: true, activeFace: 'back',
+    })
     expect(flashStatus.mock.calls).toEqual(expect.arrayContaining([
       [{ icon: 'tool.snap-grid-on', message: 'Alignment snapping enabled' }],
       [{ icon: 'tool.snap-grid', message: 'Alignment snapping disabled' }],
@@ -1059,7 +1062,7 @@ describe('CardDesignEditor issue navigation', () => {
     docks[0]?.vm.$emit('update:extent', 120)
     await nextTick()
     expect(docks[0]?.props('extent')).toBe(120)
-    expect(wrapper.emitted('update-card-designer-layout')).toBeUndefined()
+    expect((getTestSession(wrapper).state.viewState['card-designer'] as CardDesignerSessionView).layout).toBeUndefined()
     expect(editorViewport(wrapper).props('viewportInsets')).toMatchObject({
       left: expect.closeTo(120 + 6 * (120 / 280)),
       right: 286,
@@ -1068,8 +1071,7 @@ describe('CardDesignEditor issue navigation', () => {
     docks[0]?.vm.$emit('update:extent', 420)
     docks[0]?.vm.$emit('resize-end', 'width')
     await nextTick()
-    const layoutUpdates = wrapper.emitted('update-card-designer-layout') ?? []
-    expect(layoutUpdates[layoutUpdates.length - 1]?.[0]).toMatchObject({
+    expect((getTestSession(wrapper).state.viewState['card-designer'] as CardDesignerSessionView).layout).toMatchObject({
       leftDockExtent: 420,
       leftExpandedDockExtent: 420,
     })
@@ -1108,10 +1110,10 @@ describe('CardDesignEditor issue navigation', () => {
       expect.objectContaining({ key: 'text-1', fields: [expect.objectContaining({ key: 'content' })] }),
     ])
     expect(emittedDocument(wrapper).dataTable?.blocks).toEqual({ 'text-1': ['content'] })
-    const modifiedUpdates = wrapper.emitted('modified') ?? []
-    expect(modifiedUpdates[modifiedUpdates.length - 1]?.[0]).toBe(true)
+    expect(getTestSession(wrapper).state.isDirty).toBe(true)
 
-    await wrapper.setProps({ cardDesignerMode: 'design' })
+    getTestSession(wrapper).updateViewState('card-designer', { mode: 'design' })
+    await nextTick()
     await nextTick()
     expect(wrapper.get('.card-design-editor__stage-layer').classes()).not.toContain('is-data-table-mode')
     expect(wrapper.get('.card-design-editor__data-table-view').classes()).not.toContain('is-active')
@@ -1252,10 +1254,11 @@ describe('CardDesignEditor issue navigation', () => {
       isFile: true,
       isSymlink: false,
     }])
+    const resourceEnvironment = await createResourceEnvironment('D:/Project', { watch: false, snapshotsRoot: 'D:/cache', fs: { fileExists: async () => false } as unknown as FileSystemService })
     const wrapper = mountCde({
       props: {
         filePath: 'D:/Project/cards/card.ocdocument',
-        resourceRootPath: 'D:/Project',
+        resourceRootPath: 'D:/Project', resourceEnvironment,
         modelValue: document,
         cardDesignerMode: 'data-table',
         cardDesignerView: neutralView(),
@@ -1300,6 +1303,6 @@ describe('CardDesignEditor issue navigation', () => {
     expect(contentDefinition.fontOptions).toEqual([])
     expect(imageEntries?.map(item => item.name)).toContain('portrait.png')
     expect(readDirectoryEntries).toHaveBeenCalledWith('D:/Project', 1)
-    readDirectoryEntries.mockRestore()
+    readDirectoryEntries.mockRestore(); wrapper.unmount(); await resourceEnvironment.dispose()
   })
 })

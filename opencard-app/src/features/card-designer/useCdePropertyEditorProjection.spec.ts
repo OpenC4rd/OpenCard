@@ -11,7 +11,6 @@ import { buildParentLookup } from '../../entities/card/tree'
 import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
 import type { CardPropertyEditorInput } from '../card-properties/cardPropertyFieldDefinitions'
 import { useCdePropertyEditorProjection } from './useCdePropertyEditorProjection'
-import { setProjectFonts } from '../workspace/model/projectFonts'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import { normalizeResourcePackageManifest } from '../workspace/model/resourcePackage'
@@ -217,11 +216,6 @@ describe('useCdePropertyEditorProjection', () => {
   })
 
   it('adds project fonts and rich-text base styles without owning UI state', async () => {
-    setProjectFonts([{
-      key: 'body',
-      name: 'Body Font',
-      files: { normal: { upright: 'fonts/body.woff2' } },
-    }])
     const { state } = createHarness()
     const fields = state.propertyEditorInputs.value[0]!.fields
     const rootItems = await completionItems(fields.fontFamily?.completion?.provider, '', 0)

@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import PackageManagerEditor from './PackageManagerEditor.vue'
@@ -38,7 +39,7 @@ function packageEntry(options: {
 /** 不桩掉 OcAlbum：这一页要的正是它在卡片里画出来的那点东西。 */
 function mountEditor() {
   return mount(PackageManagerEditor, {
-    props: { filePath: 'D:/project/.opencard/packages', languageId: 'plaintext' },
+    props: { session: createTestSession({ path: 'D:/project/.opencard/packages' }), languageId: 'plaintext' },
     global: { stubs: { ProjectRegistryEditorShell: { template: '<div><slot /></div>' } } },
   })
 }

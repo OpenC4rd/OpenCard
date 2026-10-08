@@ -14,7 +14,7 @@ const vectorSeries = {
   name: 'Outline icons',
   key: 'outline',
   icons: [
-    { iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'theme' as const },
+    { iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'context' as const },
     { iconKey: 'logo', name: 'Logo', source: 'icons/logo.svg', tint: 'original' as const },
   ],
 }
@@ -83,7 +83,6 @@ describe('projectIconCatalog', () => {
       '--oc-project-icon-background-color': 'currentColor',
       '--oc-project-icon-source-width': '1em',
       '--oc-project-icon-source-height': '1em',
-      '--oc-project-icon-transform': 'rotate(0deg)',
     })
     expect(masked).not.toHaveProperty('--oc-project-icon-background-image')
 
@@ -116,25 +115,6 @@ describe('projectIconCatalog', () => {
     })
   })
 
-  it('swaps the paint box of a rotated icon and pixelates a raster one', () => {
-    const catalog = buildProjectIconCatalog([{
-      name: 'Pixels', key: 'pixels',
-      icons: [{
-        iconKey: 'coin', name: 'Coin', source: 'icons/coin.png', tint: 'original' as const,
-        pixelated: true, rotation: 90 as const,
-      }],
-    }], src => `asset://${src}`)
-
-    // An 8×24 icon turned on its side paints three units wide for one unit of height.
-    expect(createProjectIconStyle(catalog.entries[0]!, readSize)).toMatchObject({
-      width: '3em', height: '1em', '--oc-project-icon-transform': 'rotate(90deg)',
-    })
-    expect(createProjectIconBlockStyle(catalog.entries[0]!, 'contain', readSize)).toMatchObject({
-      '--oc-project-icon-source-width': 'var(--oc-project-icon-display-height)',
-      '--oc-project-icon-source-height': 'var(--oc-project-icon-display-width)',
-      '--oc-project-icon-transform': 'rotate(90deg)',
-    })
-  })
 
   it('emits css property names for an inline style attribute', () => {
     const catalog = buildProjectIconCatalog([vectorSeries], src => `asset://${src}`)

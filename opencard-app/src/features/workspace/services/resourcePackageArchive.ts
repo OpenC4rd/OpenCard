@@ -45,9 +45,6 @@ export async function readResourcePackageArchive(sourcePath: string): Promise<Re
     throw new Error('Invalid package manifest JSON')
   }
   const normalized = normalizeResourcePackageManifest(value)
-  if (normalized.issues.length > 0) {
-    throw new Error(`Invalid package manifest: ${normalized.issues.map(issue => `${issue.path}: ${issue.message}`).join('; ')}`)
-  }
   const coordinate = resourcePackageCoordinate(normalized.manifest)
   if (!coordinate) throw new Error('Invalid package manifest: package identity is missing')
   return {

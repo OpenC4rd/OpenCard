@@ -8,6 +8,12 @@ import type { RenderReadyImageBlock } from '../render.types'
 import { cardEditorContextKey } from './cardEditorContext'
 import { createCardRenderResourceContext, createCardResourceResolver } from '../cardRenderResources'
 import ProjectIconGraphic from './ProjectIconGraphic.vue'
+import { createResourceEnvironment } from '../../workspace/services/projectResourceEnvironment'
+import type { FileSystemService } from '../../workspace/services/fileSystemService'
+
+vi.mock('@tauri-apps/api/core', () => ({
+  convertFileSrc: (path: string) => `https://asset.localhost/${encodeURIComponent(path)}`,
+}))
 
 vi.mock('../../workspace/store/projectStore', () => ({
   useProjectStore: () => ({ resolveAssetSrc: (path: string) => path }),
@@ -20,11 +26,51 @@ function createBlock(source: string, fit: 'cover' | 'contain' | 'fill' = 'contai
 }
 
 describe('ImageBlockRenderer', () => {
+  it('reloads local images after resource changes and shows a failure if the file was removed', async () => {
+    let exists = true
+    const environment = await createResourceEnvironment('D:/project', { watch: false, snapshotsRoot: 'D:/cache',
+      fs: { fileExists: async (path: string) => path.endsWith('logo.png') && exists } as unknown as FileSystemService,
+    })
+    const resources = createCardResourceResolver(() => createCardRenderResourceContext({
+      resourceRootPath: 'D:/project',
+      hostEnvironment: environment.state.value,
+    }))
+    const wrapper = mount(ImageBlockRenderer, {
+      props: { block: createBlock('Assets/logo.png'), placement: { kind: 'root' } },
+      global: { provide: { [cardEditorContextKey as symbol]: {
+        transformDisabledBlockIds: computed(() => new Set<string>()), handleBlockClick: () => undefined, resources,
+      } } },
+    })
+    try {
+      await environment.state.value.waitForResources?.()
+      await wrapper.vm.$nextTick()
+      const oldImage = wrapper.get('img')
+      await oldImage.trigger('load')
+      expect(wrapper.find('.image-block__placeholder').exists()).toBe(false)
+      await environment.refresh(['D:/project/Assets/logo.png'])
+      await wrapper.vm.$nextTick()
+      await environment.state.value.waitForResources?.()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.get('img').attributes('src')).not.toBe(oldImage.attributes('src'))
+      expect(wrapper.get('img').classes()).not.toContain('is-loaded')
+      await oldImage.trigger('load')
+      expect(wrapper.get('img').classes()).not.toContain('is-loaded')
+      await wrapper.get('img').trigger('error')
+      expect(wrapper.find('[aria-label="图片加载失败"]').exists()).toBe(true)
+      exists = false
+      await environment.refresh(['D:/project/Assets'])
+      await wrapper.vm.$nextTick()
+      await environment.state.value.waitForResources?.()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('img').exists()).toBe(false)
+      expect(wrapper.find('[aria-label="图片加载失败"]').exists()).toBe(true)
+    } finally { wrapper.unmount(); await environment.dispose() }
+  })
   it.each(['cover', 'contain', 'fill'] as const)('renders icon sources through the real resolver with %s fit', async (fit) => {
     const entry = {
       seriesKey: 'status', iconKey: 'warning', name: 'Warning',
       source: 'icons/warning.svg', src: 'asset:///icons/warning.svg',
-      tint: 'theme' as const, imageWidth: 64, imageHeight: 64,
+      tint: 'context' as const, imageWidth: 64, imageHeight: 64,
     }
     const resources = createCardResourceResolver(createCardRenderResourceContext({
       projectIconCatalog: { series: [], entries: [entry] },

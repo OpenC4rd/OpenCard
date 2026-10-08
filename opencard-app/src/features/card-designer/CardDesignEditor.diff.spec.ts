@@ -1,3 +1,5 @@
+import { nextTick } from 'vue'
+import { getTestSession } from '../editor-runtime/editorTestSession'
 /**
  * Diff-mode coverage for `CardDesignEditor`.
  *
@@ -32,7 +34,7 @@ import {
   createTextBlock,
   type CardFace,
 } from '../../entities/card/model'
-import type { EditorComparisonInput } from '../editor-runtime/registry/editorRegistry'
+import type { EditorComparisonInput } from '../editor-runtime/editorProtocol'
 import type { SessionNavigationToken } from '../editor-runtime/model/editorIssue'
 import type { PropertyEditorInput } from '../../shared/ui/property-editor/propertyEditor.types'
 import {
@@ -168,6 +170,7 @@ async function settle(wrapper: VueWrapper): Promise<void> {
 
 /** `mountCde` returns an unparameterised wrapper, so reading a root prop needs one local cast. */
 function editorProp<T>(wrapper: VueWrapper, key: string): T {
+  if (key === 'modelValue') return getTestSession(wrapper).state.draftContent as T
   return (wrapper.props as unknown as (name: string) => T)(key)
 }
 
@@ -261,7 +264,6 @@ describe('CardDesignEditor diff mode', () => {
       .toBe('Adjust version divider [key]A[/key] left [key]S[/key] center [key]D[/key] right')
     expect(viewport.get('.card-viewport-comparison-label--before').text()).toBe('a1b2c3d Version A')
     expect(viewport.get('.card-viewport-comparison-label--after').text()).toBe('Disk version')
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   it('shows the loading placeholder while the comparison is unavailable', async () => {
@@ -320,8 +322,6 @@ describe('CardDesignEditor diff mode', () => {
     expect(wrapper.get('.card-design-editor__transform-preview-host').text()).toContain('Working text')
     expect(treeLabels(structureTree)).not.toContain('Working title')
     expect(treeLabels(instanceTree)).not.toContain('Working instance')
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
   })
 
   it('does not expand the diff structure tree on double-click activation', async () => {
@@ -381,8 +381,6 @@ describe('CardDesignEditor diff mode', () => {
     editorViewport(wrapper).vm.$emit('blank-click')
     await settle(wrapper)
     expect(wrapper.getComponent({ name: 'PropertyEditor' }).props('inputs')).toEqual([])
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
   })
 
   it('summarises a multiple diff selection instead of projecting one block', async () => {
@@ -397,7 +395,6 @@ describe('CardDesignEditor diff mode', () => {
 
     expect(wrapper.get('.card-design-editor__multi-selection-summary').text()).toBe('2 blocks selected')
     expect(wrapper.findComponent({ name: 'PropertyEditor' }).exists()).toBe(false)
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
   it('renders diff highlight markup for added, removed and changed blocks', async () => {
@@ -460,9 +457,6 @@ describe('CardDesignEditor diff mode', () => {
     // The selection really happened before the "nothing was written" assertions below.
     expect(editorTrees(wrapper).structureTree.props('selectedKeys')).toEqual(['text-1'])
     // A diff block selection is diff-scoped: no document write, no session view-state commit.
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
 
     selectInstance(wrapper, 'instance-1')
     await settle(wrapper)
@@ -475,11 +469,7 @@ describe('CardDesignEditor diff mode', () => {
     expect(editorTrees(wrapper).instanceTree.props('selectedKeys')).toEqual(['instance-added'])
     expect(wrapper.find('.card-viewport-comparison-layer .card-comparison-placeholder').exists()).toBe(true)
 
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
-    expect(wrapper.emitted('save')).toBeUndefined()
     // Diff instance selection stays inside the diff projection: no session view-state commit.
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
@@ -498,9 +488,6 @@ describe('CardDesignEditor diff mode', () => {
     expect(inputs[0]!.record).toMatchObject({ 'name@new': 'Added block', 'content@new': 'New' })
     expect(inputs[1]!.record).toMatchObject({ 'anchor@new': 'lt' })
 
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
   })
 
   it('swallows a save request in diff mode', async () => {
@@ -510,12 +497,9 @@ describe('CardDesignEditor diff mode', () => {
     // The open document is loaded and rendered, so `save` reaches the real serialisation path.
     expect(wrapper.get('.card-design-editor__transform-preview-host').text()).toContain('Working text')
 
-    await (wrapper.vm as unknown as { save: () => Promise<void> }).save()
+    await expect(getTestSession(wrapper).save()).resolves.toBe('skipped')
     await settle(wrapper)
 
-    expect(wrapper.emitted('save')).toBeUndefined()
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
@@ -543,10 +527,7 @@ describe('CardDesignEditor diff mode', () => {
     expect(wrapper.get('.property-editor__row[data-input-key="text-1:layout"][data-field-key="x@new"]')
       .classes()).toContain('is-revealed')
 
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
     // Navigating inside the comparison never commits the open document's selection.
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
@@ -562,7 +543,6 @@ describe('CardDesignEditor diff mode', () => {
     expect(editorTrees(wrapper).structureTree.props('selectedKeys')).toEqual(['text-removed'])
     expect(wrapper.get('.property-editor__row[data-input-key="text-removed"][data-field-key="content@old"]')
       .classes()).toContain('is-revealed')
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
   })
 
   it('returns not-found in diff mode when the target is not in the comparison', async () => {
@@ -610,9 +590,6 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
     expect(editorTrees(wrapper).instanceTree.props('selectedKeys')).toEqual(['instance-added'])
 
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toBeUndefined()
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
@@ -644,7 +621,8 @@ describe('CardDesignEditor diff mode', () => {
     expect(viewport.get('.card-viewport-comparison-divider').classes()).toContain('is-static')
     expect(diffUiPayloads(wrapper)).toEqual([])
 
-    await wrapper.setProps({ diffUiState: { divider: 0.75, viewMode: 'split' } })
+    getTestSession(wrapper).updateDiffUiState({ divider: 0.75, viewMode: 'split' })
+    await nextTick()
     await settle(wrapper)
     expect(viewport.props('comparison')).toMatchObject({ divider: 0.75, viewMode: 'split' })
     expect(diffUiPayloads(wrapper)).toEqual([])
@@ -675,7 +653,6 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
     expect(diffUiPayloads(wrapper)[3]).toEqual({ divider: 0.5, viewMode: 'split' })
     // `S` is also `view.toggle-snapping`; in diff mode the divider preset is registered first.
-    expect(wrapper.emitted('update-card-designer-view')).toBeUndefined()
   })
 
   it('toggles split and side-by-side through the face toolbar', async () => {

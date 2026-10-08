@@ -1,8 +1,9 @@
 use notify::{Event, EventKind, RecursiveMode, Watcher};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{Emitter, State};
 
 #[cfg(target_os = "windows")]
@@ -24,6 +25,7 @@ mod resource_package_builder;
 const FILE_CHANGE_BATCH_MS: u64 = 120;
 /// 一批最多带多少条路径，超过就先发出去。
 const FILE_CHANGE_BATCH_MAX: usize = 256;
+static WATCHER_ID: AtomicU64 = AtomicU64::new(1);
 
 /*
  * 递归监听项目根会把版本库内部也报上来，而界面不关心：版本控制自己读仓库。
@@ -39,7 +41,7 @@ fn is_ignored_change(path: &str) -> bool {
 
 // 存储 watcher 的全局状态
 struct WatcherState {
-    watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    watchers: Mutex<HashMap<String, notify::RecommendedWatcher>>,
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -116,9 +118,9 @@ fn watch_directory(
     app_handle: tauri::AppHandle,
     state: State<WatcherState>,
 ) -> Result<String, String> {
-    // 停止之前的监听
-    let mut watcher_lock = state.watcher.lock().unwrap();
-    *watcher_lock = None;
+    let id = WATCHER_ID.fetch_add(1, Ordering::Relaxed).to_string();
+    let event_id = id.clone();
+    let root = path.clone();
 
     // 创建新的 watcher
     let (tx, rx) = std::sync::mpsc::channel::<Result<Event, notify::Error>>();
@@ -142,7 +144,7 @@ fn watch_directory(
                 return;
             }
             let paths = std::mem::take(pending);
-            let payload = serde_json::json!({ "paths": paths });
+            let payload = serde_json::json!({ "id": event_id, "root": root, "paths": paths });
             if let Err(e) = app_handle_clone.emit("file-changed", payload) {
                 eprintln!("发送事件失败: {}", e);
             }
@@ -184,15 +186,13 @@ fn watch_directory(
     });
 
     // 保存 watcher（防止被 drop）
-    *watcher_lock = Some(watcher);
-
-    Ok(format!("开始监听: {}", path))
+    state.watchers.lock().unwrap().insert(id.clone(), watcher);
+    Ok(id)
 }
 
 #[tauri::command]
-fn stop_watching(state: State<WatcherState>) -> Result<String, String> {
-    let mut watcher_lock = state.watcher.lock().unwrap();
-    *watcher_lock = None;
+fn stop_watching(id: String, state: State<WatcherState>) -> Result<String, String> {
+    state.watchers.lock().unwrap().remove(&id);
     Ok("停止监听".to_string())
 }
 
@@ -384,7 +384,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(WatcherState {
-            watcher: Mutex::new(None),
+            watchers: Mutex::new(HashMap::new()),
         })
         .setup(|app| {
             // 文件类型图标是尽力而为的一步：注册失败只影响资源管理器里的图标，不应拦住启动。
@@ -455,6 +455,7 @@ pub fn run() {
             git_service::git_file_history,
             git_service::git_read_file_at_revision,
             git_service::git_materialize_revision,
+            git_service::git_release_revision_snapshot,
             git_service::git_conflicts,
             git_service::git_merge,
             git_service::git_rebase_start,

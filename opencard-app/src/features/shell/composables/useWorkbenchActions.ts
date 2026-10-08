@@ -11,6 +11,7 @@ import type {
   OcNodeSelectionEvent,
 } from '../../../shared/ui/node/node.types'
 import type { Ref } from 'vue'
+import { isSameOrDescendantPath } from '../../../shared/model/filePath'
 import {
   OPENED_EDITOR_CLOSE_ACTION_KEY, PROJECT_PACKAGE_ADD_ACTION_KEY,
   PROJECT_ENTRY_RENAME_ACTION_KEY, PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY,
@@ -24,12 +25,14 @@ export function useWorkbenchActions(options: {
   projectPath: Readonly<Ref<string>>
   openedEditorTreeData: Readonly<Ref<OcNodeCollection>>
   tree: Pick<ReturnType<typeof useWorkbenchFileTree>, 'handleOpenedEditorsSelect' | 'handleProjectManagementSelect'
-    | 'handleFileTreeSelect' | 'setProjectManagementEntryExpanded' | 'findProjectEntryByKey' | 'setProjectEntryExpanded'>
+    | 'handleFileTreeSelect' | 'selectedProjectEntryKeys' | 'setProjectManagementEntryExpanded' | 'findProjectEntryByKey' | 'setProjectEntryExpanded'>
   project: Pick<ReturnType<typeof useProjectStore>, 'setDirectoryExpanded' | 'readDirectoryEntries'
     | 'renameEntry' | 'moveEntryByDrop' | 'copyExternalEntriesIntoProject' | 'revealEntryInFileManager' | 'getRelativeProjectPath'>
   close: {
     requestSessionClose: (ids: readonly string[]) => Promise<unknown>
     requestPathTrash: (path: string) => Promise<unknown>
+    requestPathChanges: (paths: readonly string[], perform: () => Promise<void>) => Promise<unknown>
+    performPathTrash: (path: string) => Promise<void>
   }
   editor: {
     openFile: (path: string) => Promise<void>
@@ -129,7 +132,31 @@ export function useWorkbenchActions(options: {
   }
   async function handleProjectAction(event: OcNodeActionEvent): Promise<void> {
     const entry = options.tree.findProjectEntryByKey(event.key)
-    if (entry) await runProjectEntryAction(event.actionKey, entry.key, options.beginRename)
+    if (!entry) return
+    const selection = options.tree.selectedProjectEntryKeys.value
+    const paths = selection.includes(entry.key) ? [...selection] : [entry.key]
+    if (paths.length === 1) {
+      await runProjectEntryAction(event.actionKey, entry.key, options.beginRename)
+      return
+    }
+    if (event.actionKey === PROJECT_ENTRY_RENAME_ACTION_KEY) return
+    if (event.actionKey === PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY) {
+      const roots = paths.filter(path => !paths.some(parent => parent !== path && isSameOrDescendantPath(path, parent)))
+      try {
+        await options.close.requestPathChanges(roots, async () => {
+          for (const path of roots) await options.close.performPathTrash(path)
+        })
+      } catch (error) { notifyAppError('OC-E3016', { path: entry.key, paths: roots, error }, locale.value) }
+      return
+    }
+    if (event.actionKey === PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY || event.actionKey === PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY) {
+      try {
+        await navigator.clipboard.writeText(paths.map(path => event.actionKey === PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY
+          ? options.project.getRelativeProjectPath(path) : path).join('\n'))
+      } catch (error) { notifyAppError('OC-E1002', { paths, error }, locale.value) }
+      return
+    }
+    await runProjectEntryAction(event.actionKey, entry.key, options.beginRename)
   }
   async function handleProjectNodeActivate(event: OcNodeActivateEvent): Promise<void> {
     const entry = options.tree.findProjectEntryByKey(event.key)

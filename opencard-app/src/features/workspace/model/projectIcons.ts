@@ -8,17 +8,15 @@ export const projectIconSourcePattern = /\.(?:svg|png|jpe?g|webp)$/i
 export const PROJECT_ICON_FILE_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'webp'] as const
 export const projectIconVectorSourcePattern = /\.svg$/i
 export const DEFAULT_PROJECT_ICON_DIRECTORY = 'icons'
-export const PROJECT_ICON_ROTATIONS = [0, 90, 180, 270] as const
-export const PROJECT_ICON_TINTS = ['theme', 'original'] as const
+export const PROJECT_ICON_TINTS = ['context', 'original'] as const
 
-export type ProjectIconRotation = typeof PROJECT_ICON_ROTATIONS[number]
 export type ProjectIconTint = typeof PROJECT_ICON_TINTS[number]
 
 /**
- * Tint of an icon whose persisted field is absent. `theme` is the default because an icon set exists
- * to be recolored by the surrounding theme; importers persist the tint they detect.
+ * Tint of an icon whose persisted field is absent. `context` is the default because an icon set exists
+ * to be recolored by the surrounding context; importers persist the tint they detect.
  */
-export const DEFAULT_PROJECT_ICON_TINT: ProjectIconTint = 'theme'
+export const DEFAULT_PROJECT_ICON_TINT: ProjectIconTint = 'context'
 
 /**
  * One icon of a set: exactly one project-relative file. A vector source is tinted through its alpha
@@ -27,7 +25,7 @@ export const DEFAULT_PROJECT_ICON_TINT: ProjectIconTint = 'theme'
  * This model deliberately has no spritesheet, no crop rectangle, and no per-set `source`, and those
  * must not be reintroduced: merging standalone icons into one atlas means rewriting every internal
  * `id`, `url(#…)`, and `<style>` reference inside the files, and an atlas cannot be painted as a mask
- * over `currentColor`, so it would permanently lose theme tinting for vector icons. An earlier revision
+ * over `currentColor`, so it would permanently lose context tinting for vector icons. An earlier revision
  * of this model did carry the atlas and was removed on purpose — its absence is the decision, not an
  * oversight.
  */
@@ -38,7 +36,6 @@ export type ProjectIcon = {
   tint: ProjectIconTint
   /** Nearest-neighbour scaling. Set for pixel art, where smooth scaling would blur the art. */
   pixelated?: boolean
-  rotation?: ProjectIconRotation
   /**
    * Natural size of the icon's own file, filled in the first time the icon is painted. It is a fact
    * about the file rather than part of the authored model, so a registry never stores it.
@@ -56,10 +53,6 @@ export type ProjectIconSeries = {
 export type ProjectIconKeyConflict =
   | { kind: 'series'; seriesIndex: number; key: string }
   | { kind: 'icon'; seriesIndex: number; iconIndex: number; key: string }
-
-function isProjectIconRotation(value: unknown): value is ProjectIconRotation {
-  return PROJECT_ICON_ROTATIONS.includes(value as ProjectIconRotation)
-}
 
 function isProjectIconTint(value: unknown): value is ProjectIconTint {
   return PROJECT_ICON_TINTS.includes(value as ProjectIconTint)
@@ -107,16 +100,13 @@ export function parseProjectIconSeries(value: unknown): ProjectIconSeries[] | nu
       if (typeof icon.name !== 'string' || typeof icon.source !== 'string') return null
       const source = normalizeProjectIconSource(icon.source)
       if (!source) return null
-      if ((icon.rotation !== undefined && !isProjectIconRotation(icon.rotation))
-        || (icon.tint !== undefined && !isProjectIconTint(icon.tint))
-        || (icon.pixelated !== undefined && typeof icon.pixelated !== 'boolean')) return null
+      if (icon.pixelated !== undefined && typeof icon.pixelated !== 'boolean') return null
       icons.push({
         iconKey: icon.iconKey,
         name: icon.name,
         source,
-        tint: icon.tint ?? DEFAULT_PROJECT_ICON_TINT,
+        tint: isProjectIconTint(icon.tint) ? icon.tint : DEFAULT_PROJECT_ICON_TINT,
         ...(icon.pixelated !== undefined ? { pixelated: icon.pixelated } : {}),
-        ...(icon.rotation !== undefined ? { rotation: icon.rotation } : {}),
       })
     }
     result.push({ name: candidate.name.trim(), key: candidate.key, icons })

@@ -1,3 +1,4 @@
+import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('../../version-control/gitService', () => mocks)
 
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { createDefaultAppSettings, defaultCommitterEmail } from '../../settings/model/appSettings'
 import { titleBarNotices } from '../../notifications/titlebarNotices'
 import { useWorkbenchVersionControl } from './useWorkbenchVersionControl'
@@ -72,7 +73,7 @@ const commitSummary = (
 })
 
 function workspaceSession(): EditorSession {
-  return {
+  return createTestSession({
     id: 'session-1',
     resourceKind: 'workspace',
     path: `${PROJECT_ROOT}/${DOCUMENT_PATH}`,
@@ -84,7 +85,7 @@ function workspaceSession(): EditorSession {
     isDirty: false,
     isPreview: false,
     mode: 'edit',
-  }
+  })
 }
 
 function createVersionControl(

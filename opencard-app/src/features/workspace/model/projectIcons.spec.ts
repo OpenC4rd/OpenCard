@@ -17,7 +17,7 @@ const series: ProjectIconSeries = {
   name: 'Outline icons',
   key: 'outline',
   icons: [
-    { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' },
+    { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' },
     { iconKey: 'logo', name: 'Logo', source: '.opencard/icons/outline/logo.png', tint: 'original', pixelated: true },
   ],
 }
@@ -53,7 +53,7 @@ describe('projectIcons', () => {
   })
 
   it('defaults an absent tint and drops unknown or superseded fields', () => {
-    expect(DEFAULT_PROJECT_ICON_TINT).toBe('theme')
+    expect(DEFAULT_PROJECT_ICON_TINT).toBe('context')
     const parsed = parseProjectIconSeries([{
       ...series,
       grid: { snapToGrid: true, rows: 3, columns: 3, pixelated: false },
@@ -65,22 +65,22 @@ describe('projectIcons', () => {
     expect(parsed).toEqual([{
       name: 'Outline icons',
       key: 'outline',
-      icons: [{ iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'theme' }],
+      icons: [{ iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'context' }],
     }])
   })
 
-  it('keeps optional pixelated and rotation and rejects invalid values', () => {
+  it('keeps pixelated, ignores removed fields and rejects unusable sources', () => {
     const icon = series.icons[0]!
     const withPixelated = parseProjectIconSeries([{
       ...series, icons: [{ ...icon, pixelated: true, rotation: 270 as const }],
     }])
-    expect(withPixelated?.[0]?.icons[0]).toEqual({ ...icon, pixelated: true, rotation: 270 })
+    expect(withPixelated?.[0]?.icons[0]).toEqual({ ...icon, pixelated: true })
 
     const reject = (patch: Record<string, unknown>) => parseProjectIconSeries([{
       ...series, icons: [{ ...icon, ...patch }],
     }])
-    expect(reject({ tint: 'blue' })).toBeNull()
-    expect(reject({ rotation: 45 })).toBeNull()
+    expect(reject({ tint: 'blue' })?.[0]?.icons[0]?.tint).toBe('context')
+    expect(reject({ rotation: 45 })?.[0]?.icons[0]).not.toHaveProperty('rotation')
     expect(reject({ pixelated: 'yes' })).toBeNull()
     expect(reject({ source: 'icons/warn.svgx' })).toBeNull()
     expect(reject({ source: 7 })).toBeNull()
@@ -109,7 +109,7 @@ describe('projectIcons', () => {
 
   it('finds every case-insensitive key conflict in one projection', () => {
     expect(findProjectIconKeyConflicts([
-      { ...series, icons: [{ iconKey: 'same', name: '', source: 'a.svg', tint: 'theme' }, { iconKey: 'SAME', name: '', source: 'b.svg', tint: 'theme' }] },
+      { ...series, icons: [{ iconKey: 'same', name: '', source: 'a.svg', tint: 'context' }, { iconKey: 'SAME', name: '', source: 'b.svg', tint: 'context' }] },
       { ...series, key: 'OUTLINE', icons: [] },
     ])).toEqual([
       { kind: 'series', seriesIndex: 0, key: 'outline' },
@@ -122,7 +122,7 @@ describe('projectIcons', () => {
   it('reads each icon key once when checking a 400-icon set', () => {
     let keyReads = 0
     const icons = Array.from({ length: 400 }, (_, index) => new Proxy({
-      iconKey: `icon-${index}`, name: '', source: 'a.svg', tint: 'theme' as const,
+      iconKey: `icon-${index}`, name: '', source: 'a.svg', tint: 'context' as const,
     }, {
       get(target, property, receiver) {
         if (property === 'iconKey') keyReads += 1

@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -5,15 +6,11 @@ import { nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import enUS from '../../locales/en-US'
 import ImagePreviewEditor from './ImagePreviewEditor.vue'
+import { useProjectStore } from '../../features/workspace/store/projectStore'
 
 vi.mock('@tauri-apps/api/core', () => ({
+  isTauri: () => false,
   convertFileSrc: (path: string) => `asset://${path}`,
-}))
-
-vi.mock('../../features/workspace/store/projectStore', () => ({
-  useProjectStore: () => ({
-    resolveAssetSrc: (path: string) => `asset://${path}`,
-  }),
 }))
 
 class ResizeObserverMock {
@@ -91,15 +88,14 @@ function wheelTargetScale(startScale: number, deltaY: number): number {
 }
 
 function createEditor(viewportTransform?: ViewportTransform): EditorWrapper {
-  return mount(ImagePreviewEditor, {
-    props: {
-      filePath: 'assets/example.png',
-      ...(viewportTransform ? { viewportTransform } : {}),
-    },
+  const wrapper = mount(ImagePreviewEditor, {
+    props: { session: createTestSession({ path: 'assets/example.png', viewState: { 'image-preview': { viewportTransform } } }),  },
     global: {
       plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })],
     },
   })
+  vi.spyOn(wrapper.props('session'), 'updateViewState')
+  return wrapper
 }
 
 async function loadImage(
@@ -120,7 +116,9 @@ function mockViewportRect(wrapper: EditorWrapper): void {
 }
 
 function transformEmits(wrapper: EditorWrapper): unknown[][] {
-  return wrapper.emitted('update-viewport-transform') ?? []
+  return vi.mocked(wrapper.props('session').updateViewState).mock.calls
+    .filter(([id, patch]) => id === 'image-preview' && patch.viewportTransform)
+    .map(([, patch]) => [patch.viewportTransform])
 }
 
 function transformCount(wrapper: EditorWrapper): number {
@@ -207,14 +205,27 @@ describe('ImagePreviewEditor', () => {
     vi.restoreAllMocks()
   })
 
+  it('previews an external image without requiring an open project', async () => {
+    expect(useProjectStore().projectPath.value).toBe('')
+    const wrapper = mount(ImagePreviewEditor, {
+      props: { session: createTestSession({ path: 'D:/Downloads/example.png' }) },
+      global: { plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })] },
+    })
+    expect(wrapper.get('img').attributes('src')).toBe('asset://D:/Downloads/example.png')
+    await loadImage(wrapper)
+    expect(wrapper.find('.image-preview-editor__image').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('uses fit-to-window as scale 1 and emits keyboard pan transforms', async () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverMock)
     const wrapper = mount(ImagePreviewEditor, {
-      props: { filePath: 'assets/example.png' },
+      props: { session: createTestSession({ path: 'assets/example.png' }),  },
       global: {
         plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })],
       },
     })
+    vi.spyOn(wrapper.props('session'), 'updateViewState')
     const image = wrapper.get('img').element as HTMLImageElement
     Object.defineProperty(image, 'naturalWidth', { value: 1000 })
     Object.defineProperty(image, 'naturalHeight', { value: 500 })
@@ -226,14 +237,14 @@ describe('ImagePreviewEditor', () => {
     const pixelatedToggle = wrapper.get('button[aria-label="Pixelated"]')
     expect(pixelatedToggle.attributes('aria-pressed')).toBe('false')
     await pixelatedToggle.trigger('click')
-    expect(wrapper.emitted('update:pixelated')).toEqual([[true]])
+    expect(wrapper.props('session').state.viewState['image-preview']).toMatchObject({ pixelated: true })
 
-    await wrapper.setProps({ pixelated: true })
+    await nextTick()
     expect(wrapper.get('.image-preview-editor__image').classes()).toContain('is-pixelated')
     expect(pixelatedToggle.attributes('aria-pressed')).toBe('true')
 
     await wrapper.get('.image-preview-editor').trigger('keydown', { key: 'ArrowLeft' })
-    const panEmits = wrapper.emitted('update-viewport-transform') ?? []
+    const panEmits = transformEmits(wrapper)
     expect(panEmits[panEmits.length - 1]).toEqual([{
       x: 32,
       y: 0,
@@ -241,7 +252,7 @@ describe('ImagePreviewEditor', () => {
     }])
 
     await wrapper.get('[aria-label="Fit viewport"]').trigger('click')
-    const resetEmits = wrapper.emitted('update-viewport-transform') ?? []
+    const resetEmits = transformEmits(wrapper)
     expect(resetEmits[resetEmits.length - 1]).toEqual([{
       x: 0,
       y: 0,
@@ -258,7 +269,7 @@ describe('ImagePreviewEditor', () => {
     await dispatchPointer(viewport.element, 'pointermove', { pointerId: 7, clientX: 130, clientY: 120 })
     await dispatchPointer(viewport.element, 'pointerup', { pointerId: 7, clientX: 130, clientY: 120 })
 
-    const dragEmits = wrapper.emitted('update-viewport-transform') ?? []
+    const dragEmits = transformEmits(wrapper)
     expect(dragEmits[dragEmits.length - 1]).toEqual([{
       x: 30,
       y: 20,
@@ -269,15 +280,10 @@ describe('ImagePreviewEditor', () => {
   it('renders two labeled synchronized snapshot viewports in diff mode', async () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverMock)
     const wrapper = mount(ImagePreviewEditor, {
-      props: {
-        filePath: 'D:/project/assets/example.png',
-        resourceRootPath: 'D:/project',
-        mode: 'diff',
-        comparison: {
+      props: { session: createTestSession({ path: 'D:/project/assets/example.png', mode: 'diff' }), resourceRootPath: 'D:/project', comparison: {
           before: { revisionId: 'a', label: 'A', content: '', resourceRootPath: 'D:/snapshot-a' },
           after: { revisionId: null, label: 'Current', content: '', resourceRootPath: 'D:/project' },
-        },
-      },
+        } },
       global: {
         plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })],
       },
@@ -304,7 +310,6 @@ describe('ImagePreviewEditor', () => {
         before: { revisionId: 'a', label: 'A', content: '', resourceRootPath: 'D:/snapshot-a' },
         after: { revisionId: null, label: 'Current', content: '', resourceRootPath: 'D:/project' },
       },
-      viewportTransform: { x: 12, y: 8, scale: 1 },
     })
     expect(images[0]!.attributes('style')).toContain('width: 1000px')
     expect(images[1]!.attributes('style')).toContain('width: 2000px')
@@ -446,12 +451,13 @@ describe('ImagePreviewEditor', () => {
     expect(transformCount(wrapper)).toBe(0)
     expect(wrapper.get('.image-preview-editor__image').attributes('style')).toContain('scale(1.536)')
 
-    await wrapper.setProps({ viewportTransform: { x: 10, y: 20, scale: 100 } })
+    wrapper.props('session').updateViewState('image-preview', { viewportTransform: { x: 10, y: 20, scale: 100 } })
+    await nextTick()
     await nextTick()
     await flushAnimation()
 
     // 应用传入变换不会把同样的值回显出去。
-    expect(transformCount(wrapper)).toBe(0)
+    expect(transformCount(wrapper)).toBe(1)
     expect(wrapper.get('.oc-overlay-toolbar__text').text()).toBe('1229%')
 
     const applied = await readSettledTransform(wrapper)
@@ -474,12 +480,13 @@ describe('ImagePreviewEditor', () => {
     const emittedCount = transformCount(wrapper)
     expect(animationFrames).toHaveLength(1)
 
-    await wrapper.setProps({ viewportTransform: echo })
+    wrapper.props('session').updateViewState('image-preview', { viewportTransform: echo })
+    await nextTick()
     await nextTick()
 
     // 回显既不改动状态，也不打断在飞的动画。
     expect(animationFrames).toHaveLength(1)
-    expect(transformCount(wrapper)).toBe(emittedCount)
+    expect(transformCount(wrapper)).toBe(emittedCount + 1)
 
     await flushAnimation()
     expect(lastTransform(wrapper)!.scale).toBeGreaterThan(echo.scale)

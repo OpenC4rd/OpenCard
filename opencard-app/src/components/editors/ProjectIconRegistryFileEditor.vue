@@ -1,16 +1,16 @@
 <template>
-  <MonacoEditor v-if="props.mode === 'diff'" :model-value="props.modelValue ?? ''" language="json"
-    :mode="props.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
+  <MonacoEditor v-if="editorState.mode === 'diff'" :model-value="editorState.draftContent ?? ''" language="json"
+    :mode="editorState.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
   <ProjectRegistryEditorShell v-else content-mode="workspace" @keydown.ctrl.s.prevent="save">
     <ProjectIconRegistryWorkbench v-if="document" ref="workbenchRef" :series="document.iconSeries"
-      :resolve-asset-src="source => projectStore.resolveResourceAssetSrcFromFile(props.filePath, source)"
-      :default-open-path="iconDirectory" :pack-busy="packTaskBusy"
+      :resolve-asset-src="source => projectStore.resolveResourceAssetSrcFromFile(filePath, source)"
+      :default-open-path="iconDirectory" :import-busy="importBusy"
       :project-icon-catalog="projectStore.projectIconCatalog.value"
       @update:series="updateIconSeries" @key-conflicts="updateKeyConflicts"
-      @export-pack="exportIconPack" @remove-series="openSeriesRemovalDialog"
+      @remove-series="openSeriesRemovalDialog"
       @add-icons="openAddIconsDialog" />
 
-    <ProjectRegistryRepairEditor v-else :model-value="props.modelValue ?? ''" :theme-id="themeId"
+    <ProjectRegistryRepairEditor v-else :model-value="editorState.draftContent ?? ''" :theme-id="themeId"
       :theme-overrides="themeOverrides" :heading="t('iconRegistry.invalid')" :description="t('iconRegistry.repair')"
       @update:model-value="updateRawSource" @save="save" />
 
@@ -38,15 +38,13 @@
     <ProjectIconRegistrationDialog :open="registrationDialogOpen" :series="document?.iconSeries"
       :target-series="registrationTargetSeries" :default-open-path="iconDirectory"
       @close="closeRegistrationDialog" @submit="registerIconSet" />
-    <ProjectIconPackImportDialog :open="packImportDialogOpen" :series="document?.iconSeries"
-      :default-open-path="projectDirectory" @close="closeImportPackDialog" @submit="importIconPack" />
   </ProjectRegistryEditorShell>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorEmits, EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { HistoryOperationMeta } from '../../features/editor-runtime/history/history.types'
 import type { ContentHistoryOperationMeta } from '../../features/editor-runtime/history/contentHistory'
 import type { OcActionDefinition } from '../../shared/ui/action/action.types'
@@ -58,7 +56,6 @@ import type {
   SessionNavigationToken,
 } from '../../features/editor-runtime/model/editorIssue'
 import { reportAppError, type AppErrorCode } from '../../features/logging/appErrorCatalog'
-import { editorHistoryManager } from '../../features/editor-runtime/history/editorHistoryManager'
 import { notifyAppError, notifySuccess } from '../../features/notifications/titlebarNotices'
 import { useShellProgressTasks } from '../../features/shell/composables/useShellProgressTasks'
 import {
@@ -83,10 +80,6 @@ import OcButton from '../base/OcButton.vue'
 import OcCheckbox from '../base/OcCheckbox.vue'
 import OcText from '../base/OcText.vue'
 import OcDialog from '../standard/OcDialog.vue'
-import {
-  exportProjectIconPack,
-  readProjectIconPack,
-} from '../../features/workspace/services/projectIconPack'
 import { inspectProjectIconFile } from '../../features/workspace/services/projectIconFileFacts'
 import { mapWithConcurrency } from '../../shared/async/mapWithConcurrency'
 import MonacoEditor from './MonacoEditor.vue'
@@ -94,14 +87,13 @@ import ProjectIconRegistrationDialog, {
   type ProjectIconImport,
   type ProjectIconRegistrationRequest,
 } from './ProjectIconRegistrationDialog.vue'
-import ProjectIconPackImportDialog, {
-  type ProjectIconPackImportRequest,
-} from './ProjectIconPackImportDialog.vue'
 import ProjectIconRegistryWorkbench from './ProjectIconRegistryWorkbench.vue'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
 import ProjectRegistryRepairEditor from './ProjectRegistryRepairEditor.vue'
 
 const props = defineProps<EditorProps>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const emit = defineEmits<EditorEmits>()
 const { t } = useI18n()
 const projectStore = useProjectStore()
@@ -109,7 +101,6 @@ const document = ref<ProjectIconRegistryDocument | null>(null)
 const registrationDialogOpen = ref(false)
 /** 打开注册对话框时选定的追加目标；为空表示这次是新建图标集。 */
 const registrationTargetSeries = ref<ProjectIconSeries | undefined>(undefined)
-const packImportDialogOpen = ref(false)
 const pendingRemovalSeriesKey = ref<string>()
 const cleanupOrphanedFiles = ref(true)
 const cleanupBusy = ref(false)
@@ -118,7 +109,7 @@ const keyConflicts = ref<readonly ProjectIconKeyConflict[]>([])
 const workbenchRef = ref<InstanceType<typeof ProjectIconRegistryWorkbench> | null>(null)
 const { tasks, setTask, removeTask } = useShellProgressTasks()
 
-const ICON_PACK_TASK_KEY = 'project-icon-pack'
+const ICON_IMPORT_TASK_KEY = 'project-icon-import'
 /**
  * How many imported icons are read and probed at once. Probing a raster decodes it, so a large set
  * must not run strictly one icon after another; the cap keeps a several-hundred-icon import from
@@ -130,12 +121,12 @@ const ICON_IMPORT_CONCURRENCY = 8
  * editor whenever the active file changes, so a local flag would come back reset and re-enable the
  * commands while the task was still running.
  */
-const packTaskBusy = computed(() => tasks.value.some(task => task.key === ICON_PACK_TASK_KEY))
+const importBusy = computed(() => tasks.value.some(task => task.key === ICON_IMPORT_TASK_KEY))
 
 const themeId = computed(() => props.themeId ?? 'dark')
 const themeOverrides = computed(() => props.themeOverrides ?? {})
 const projectDirectory = computed(() => {
-  const source = projectStore.projectPath.value || props.filePath
+  const source = projectStore.projectPath.value || filePath.value
   const normalized = source.replace(/\\/g, '/').replace(/\/+$/, '')
   return normalized.endsWith(`/${PROJECT_ICON_REGISTRY_FILE_NAME}`)
     ? normalized.slice(0, -PROJECT_ICON_REGISTRY_FILE_NAME.length - 1)
@@ -201,7 +192,7 @@ const issueSnapshot = computed<EditorIssueSnapshot>(() => ({
   }),
 }))
 
-watch(() => props.modelValue, content => {
+watch(() => editorState.value.draftContent, content => {
   document.value = parseProjectIconRegistryText(content ?? '')
   if (!document.value) keyConflicts.value = []
 }, { immediate: true })
@@ -212,7 +203,7 @@ function commit(next: ProjectIconRegistryDocument, history?: ContentHistoryOpera
   try {
     const content = serializeProjectIconRegistry(next)
     document.value = parseProjectIconRegistryText(content)
-    emit('update:modelValue', content, history)
+    props.session.updateContent(content, history)
     return true
   } catch (error) {
     document.value = previous
@@ -232,7 +223,7 @@ let mounted = true
 onBeforeUnmount(() => { mounted = false })
 
 /**
- * Applies a finished icon-pack result to the session that owns this registry.
+ * Applies a finished icon import result to the session that owns this registry.
  *
  * The shell rebuilds the editor whenever the active file changes, and a vnode listener stops being
  * invoked once the emitting component unmounts — so a copy that finishes after the user navigates away
@@ -248,12 +239,11 @@ function applyCompletedIconSeries(
     updateIconSeries(iconSeries, history)
     return
   }
-  const sessionId = props.sessionId
-  if (!sessionId) return
+  if (props.session.disposed) return
   try {
     const content = serializeProjectIconRegistry(iconSeries.length > 0 ? { iconSeries } : {})
     document.value = parseProjectIconRegistryText(content)
-    editorHistoryManager.recordContent(sessionId, content, history)
+    props.session.updateContent(content, history)
   } catch (error) {
     reportAppError('OC-E3012', error)
   }
@@ -263,23 +253,18 @@ function updateKeyConflicts(conflicts: readonly ProjectIconKeyConflict[]): void 
   keyConflicts.value = conflicts
 }
 
-function openCreatePackDialog(): void {
-  if (!document.value || packTaskBusy.value) return
+function openCreateCollectionDialog(): void {
+  if (!document.value || importBusy.value) return
   registrationTargetSeries.value = undefined
   registrationDialogOpen.value = true
 }
 
 function openAddIconsDialog(seriesKey: string): void {
-  if (!document.value || packTaskBusy.value) return
+  if (!document.value || importBusy.value) return
   const target = findRegisteredSeries(seriesKey)
   if (!target) return
   registrationTargetSeries.value = target
   registrationDialogOpen.value = true
-}
-
-function openImportPackDialog(): void {
-  if (!document.value || packTaskBusy.value) return
-  packImportDialogOpen.value = true
 }
 
 function closeRegistrationDialog(): void {
@@ -287,41 +272,37 @@ function closeRegistrationDialog(): void {
   registrationTargetSeries.value = undefined
 }
 
-function closeImportPackDialog(): void {
-  packImportDialogOpen.value = false
-}
-
 /**
- * Runs one icon-pack file operation on the shell's global progress bar instead of blocking a dialog,
+ * Runs one icon import on the shell's global progress bar instead of blocking a dialog,
  * so the editor stays responsive and the outcome arrives as an instant message. Related commands are
- * disabled for the duration through `packTaskBusy`.
+ * disabled for the duration through `importBusy`.
  */
-async function runIconPackTask<T>(options: {
+async function runIconImportTask<T>(options: {
   title: string
   total: number
   errorCode: AppErrorCode
   run: (report: (completed: number, total?: number) => void) => Promise<T>
   success: (result: T) => string
 }): Promise<void> {
-  if (packTaskBusy.value) return
+  if (importBusy.value) return
   let total = options.total
   const publish = (completed: number, nextTotal?: number) => {
     if (nextTotal !== undefined) total = nextTotal
     setTask({
-      key: ICON_PACK_TASK_KEY,
+      key: ICON_IMPORT_TASK_KEY,
       title: options.title,
       progress: total > 0 ? Math.min(1, completed / total) : 1,
       cancellable: false,
     })
   }
-  // Registering the task is what makes `packTaskBusy` true, so the commands disable themselves.
+  // Registering the task is what makes `importBusy` true, so the commands disable themselves.
   publish(0)
   try {
     notifySuccess(options.success(await options.run(publish)))
   } catch (error) {
     notifyAppError(options.errorCode, error)
   } finally {
-    removeTask(ICON_PACK_TASK_KEY)
+    removeTask(ICON_IMPORT_TASK_KEY)
   }
 }
 
@@ -381,14 +362,14 @@ async function confirmSeriesRemoval(): Promise<void> {
 }
 
 async function registerIconSet(request: ProjectIconRegistrationRequest): Promise<void> {
-  if (!document.value || packTaskBusy.value) return
+  if (!document.value || importBusy.value) return
   // The dialog already guarantees a unique Key, so closing it up front is safe: the copy itself
   // runs in the background and reports through the global progress bar.
   const target = registrationTargetSeries.value
   registrationDialogOpen.value = false
   registrationTargetSeries.value = undefined
   const seriesKey = target?.key ?? request.key
-  await runIconPackTask({
+  await runIconImportTask({
     title: target
       ? t('projectConfig.icons.addingIcons', { name: target.name })
       : t('projectConfig.icons.creatingSet', { name: request.name }),
@@ -424,7 +405,7 @@ async function registerIconSet(request: ProjectIconRegistrationRequest): Promise
  * Copies every imported icon into the folder chosen for the set, storing each file under its icon Key
  * with its original extension, and deriving what the file itself decides (its tint, and whether a
  * raster is pixel art). Naming by Key rather than by the source file is what makes creating a set and
- * importing a pack produce the same layout, and it keeps references case-stable.
+ * adding icons produce the same layout, and it keeps references case-stable.
  *
  * The icons are prepared first and copied afterwards, in the order the user picked them. Reading and
  * probing is the slow half of an import: a raster has to be decoded before it is known whether it is
@@ -485,7 +466,7 @@ function projectIconSetDirectory(seriesKey: string): string {
  * One folder belongs to one set, so a folder left behind by an earlier set must not absorb a new set's
  * files: the leftovers would sit alongside them, indistinguishable from the new set's own files. The
  * folder name is suffixed rather than the file names inside it, which keeps every file in a set folder
- * named exactly after its icon Key and keeps creating a set producing the layout a pack import does.
+ * named exactly after its icon Key and keeps creating a set producing the layout adding icons does.
  *
  * A folder that exists but holds no files is reused as-is. Removing a set with cleanup moves its files
  * out but leaves the folder behind, so suffixing there would rename the folder on every removal and
@@ -537,67 +518,6 @@ function findRegisteredSeries(seriesKey: string): ProjectIconSeries | null {
   return (document.value?.iconSeries ?? []).find(candidate => sameKey(candidate.key, seriesKey)) ?? null
 }
 
-async function importIconPack(request: ProjectIconPackImportRequest): Promise<void> {
-  if (!document.value || packTaskBusy.value) return
-  // The dialog already guarantees a unique Key, so the unpack runs in the background.
-  packImportDialogOpen.value = false
-  await runIconPackTask({
-    title: t('projectConfig.icons.importingPack', { name: request.name }),
-    total: 1,
-    errorCode: 'OC-E3013',
-    run: async report => {
-      const iconPack = await readProjectIconPack(fileSystemService, request.packPath)
-      const directory = await resolveIconSetDirectory(request.key)
-      const icons: ProjectIcon[] = []
-      // The manifest declares every file up front, so it sets the real progress total.
-      report(0, iconPack.manifest.icons.length)
-      for (const icon of iconPack.manifest.icons) {
-        const bytes = iconPack.iconSources.get(icon.source)
-        if (!bytes) throw new Error(`Icon pack is missing '${icon.source}'`)
-        const extension = icon.source.slice(icon.source.lastIndexOf('.')).toLocaleLowerCase()
-        icons.push({ ...icon, source: await writeManagedIconFile(directory, `${icon.iconKey}${extension}`, bytes) })
-        report(icons.length)
-      }
-      const iconSeries = [...(document.value?.iconSeries ?? [])]
-      iconSeries.push({ name: request.name, key: request.key, icons })
-      applyCompletedIconSeries(iconSeries)
-      await nextTick()
-      await workbenchRef.value?.selectSeries(request.key)
-      return icons.length
-    },
-    success: count => t('projectConfig.icons.packImported', { name: request.name, count }),
-  })
-}
-
-async function exportIconPack(series: ProjectIconSeries): Promise<void> {
-  if (packTaskBusy.value) return
-  const outputPath = await fileSystemService.pickSavePath({
-    defaultPath: `${projectDirectory.value}/${safeFileName(series.name)}.ociconpack`,
-    title: t('projectConfig.icons.exportPack'),
-    fileTypeName: t('projectConfig.icons.packFileType'),
-    extensions: ['ociconpack'],
-  })
-  if (!outputPath) return
-  await runIconPackTask({
-    title: t('projectConfig.icons.exportingPack', { name: series.name }),
-    total: series.icons.length,
-    errorCode: 'OC-E3014',
-    run: report => exportProjectIconPack({
-      fs: fileSystemService,
-      series,
-      resolveSourcePath: source => projectStore.resolveResourcePathFromFile(props.filePath, source),
-      outputPath,
-      onProgress: report,
-    }),
-    success: path => t('projectConfig.icons.packExported', { name: savePathName(path) }),
-  })
-}
-
-function savePathName(path: string): string {
-  const segments = path.replace(/\\/g, '/').split('/')
-  return segments[segments.length - 1] ?? path
-}
-
 /**
  * Writes one icon file into a project icon folder, under an available name within that folder.
  *
@@ -627,17 +547,12 @@ async function writeManagedIconFile(
   return `${PROJECT_INTERNAL_DIRECTORY_NAME}/${candidatePath}`
 }
 
-function safeFileName(value: string): string {
-  return value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/[. ]+$/g, '') || 'icon-pack'
-}
-
 function updateRawSource(content: string, history?: HistoryOperationMeta): void {
-  emit('update:modelValue', content, history)
+  props.session.updateContent(content, history)
 }
 
-function save(): void {
-  if (document.value && keyConflicts.value.length === 0) emit('save')
-}
+const canSave = computed(() => Boolean(document.value) && keyConflicts.value.length === 0)
+async function save(): Promise<void> { await props.session.save().catch(error => notifyAppError('OC-E4002', error)) }
 
 function isNavigationToken(token: SessionNavigationToken): token is {
   protocol: 'icon-registry'
@@ -678,35 +593,24 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'file.project-icon',
 }))
 
-const WORKSPACE_CREATE_PACK_ACTION_KEY = 'project-icon-registry.create-pack'
-const WORKSPACE_IMPORT_PACK_ACTION_KEY = 'project-icon-registry.import-pack'
+const CREATE_COLLECTION_ACTION_KEY = 'project-icon-registry.create-collection'
 
 const headerActions = computed<OcActionDefinition[]>(() => [
   {
-    key: WORKSPACE_CREATE_PACK_ACTION_KEY,
+    key: CREATE_COLLECTION_ACTION_KEY,
     icon: 'action.add',
-    title: t('projectConfig.icons.createPack'),
-    disabled: !document.value || packTaskBusy.value,
-  },
-  {
-    key: WORKSPACE_IMPORT_PACK_ACTION_KEY,
-    icon: 'action.import',
-    title: t('projectConfig.icons.importPack'),
-    disabled: !document.value || packTaskBusy.value,
+    title: t('projectConfig.icons.createCollection'),
+    disabled: !document.value || importBusy.value,
   },
 ])
 
 async function onHeaderAction(actionKey: string): Promise<void> {
-  if (actionKey === WORKSPACE_CREATE_PACK_ACTION_KEY) {
-    openCreatePackDialog()
-    return
-  }
-  if (actionKey === WORKSPACE_IMPORT_PACK_ACTION_KEY) {
-    openImportPackDialog()
+  if (actionKey === CREATE_COLLECTION_ACTION_KEY) {
+    openCreateCollectionDialog()
     return
   }
   return
 }
 
-defineExpose({ save, navigate, headerActions, onHeaderAction, presentation })
+defineExpose({ canSave, navigate, headerActions, onHeaderAction, presentation })
 </script>

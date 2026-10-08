@@ -65,7 +65,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { clamp } from '../../shared/model/number'
 import {
@@ -91,7 +91,10 @@ const VIEWPORT_PADDING = 32
 const KEYBOARD_PAN_STEP = 32
 
 const props = defineProps<EditorProps>()
-const emit = defineEmits<EditorEmits>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
+type ImageViewState = { viewportTransform?: ViewportTransform; pixelated?: boolean }
+const viewState = computed(() => (editorState.value.viewState['image-preview'] as ImageViewState | undefined) ?? {})
 const { t } = useI18n()
 const { resolveAssetSrc } = useProjectStore()
 
@@ -103,9 +106,9 @@ const imageStates = reactive<Record<ImageSideKey, ImageState>>({
   before: { width: 0, height: 0, failed: false },
   after: { width: 0, height: 0, failed: false },
 })
-const panX = ref(props.viewportTransform?.x ?? 0)
-const panY = ref(props.viewportTransform?.y ?? 0)
-const scale = ref(clamp(props.viewportTransform?.scale ?? 1, MIN_SCALE, MAX_SCALE))
+const panX = ref(viewState.value.viewportTransform?.x ?? 0)
+const panY = ref(viewState.value.viewportTransform?.y ?? 0)
+const scale = ref(clamp(viewState.value.viewportTransform?.scale ?? 1, MIN_SCALE, MAX_SCALE))
 const targetPanX = ref(panX.value)
 const targetPanY = ref(panY.value)
 const targetScale = ref(scale.value)
@@ -116,14 +119,16 @@ const lastPointerY = ref(0)
 
 let resizeObserver: ResizeObserver | null = null
 let zoomAnimationFrame: number | null = null
-let lastEmittedTransform: ViewportTransform | null = props.viewportTransform
-  ? normalizeTransform(props.viewportTransform)
+let lastEmittedTransform: ViewportTransform | null = viewState.value.viewportTransform
+  ? normalizeTransform(viewState.value.viewportTransform)
   : null
 
-const imageSrc = computed(() => resolveAssetSrc(props.filePath))
-const isDiff = computed(() => props.mode === 'diff' && Boolean(props.comparison))
+const imageSrc = computed(() => editorState.value.resourceKind === 'workspace'
+  ? resolveAssetSrc(filePath.value)
+  : convertFileSrc(filePath.value))
+const isDiff = computed(() => editorState.value.mode === 'diff' && Boolean(props.comparison))
 function snapshotRelativePath(): string {
-  const normalizedPath = props.filePath.replace(/\\/g, '/')
+  const normalizedPath = filePath.value.replace(/\\/g, '/')
   const normalizedProjectRoot = props.resourceRootPath?.replace(/\\/g, '/').replace(/\/+$/, '')
   if (normalizedProjectRoot
     && normalizedPath.toLocaleLowerCase().startsWith(`${normalizedProjectRoot.toLocaleLowerCase()}/`)) {
@@ -151,7 +156,7 @@ const diffSides = computed(() => ([
     src: afterImageSrc.value,
   },
 ]))
-const fileName = computed(() => props.filePath.split(/[/\\]/).pop() || props.filePath)
+const fileName = computed(() => filePath.value.split(/[/\\]/).pop() || filePath.value)
 const loadError = computed(() => !imageSrc.value || imageStates.single.failed)
 const primaryImageState = computed(() => {
   if (!isDiff.value) return imageStates.single
@@ -186,7 +191,7 @@ function resolveImageStyle(side: ImageSideKey): CSSProperties {
   }
 }
 const scaleLabel = computed(() => `${Math.round(renderedScale.value * 100)}%`)
-const pixelated = computed(() => props.pixelated ?? false)
+const pixelated = computed(() => viewState.value.pixelated ?? false)
 const pixelatedLabel = computed(() => t('projectConfig.icons.pixelated'))
 const toolbarItems = computed(() => [
   ...createViewportToolbarItems(scaleLabel.value, {
@@ -208,7 +213,7 @@ function handleToolbarSelect({ key }: { key: string }): void {
   if (key === 'viewport.zoom-out') zoomBy(1 / ZOOM_STEP)
   else if (key === 'viewport.fit') resetView()
   else if (key === 'viewport.zoom-in') zoomBy(ZOOM_STEP)
-  else if (key === 'toggle-pixelated') emit('update:pixelated', !pixelated.value)
+  else if (key === 'toggle-pixelated') props.session.updateViewState('image-preview', { pixelated: !pixelated.value })
 }
 
 function normalizeTransform(value: ViewportTransform): ViewportTransform {
@@ -253,7 +258,7 @@ function handleLoad(event: Event): void {
   state.width = image.naturalWidth
   state.height = image.naturalHeight
   state.failed = false
-  emit('modified', false)
+
 }
 
 function handleError(event: Event): void {
@@ -263,7 +268,7 @@ function handleError(event: Event): void {
   state.width = 0
   state.height = 0
   state.failed = true
-  emit('modified', false)
+
 }
 
 function handlePointerDown(event: PointerEvent): void {
@@ -411,9 +416,6 @@ function hasSameTransform(left: ViewportTransform | null, right: ViewportTransfo
     && Math.abs(left!.scale - right.scale) < TRANSFORM_EPSILON
 }
 
-function save(): void {
-  emit('save')
-}
 
 watch([imageSrc, beforeImageSrc, afterImageSrc], () => {
   for (const state of Object.values(imageStates)) {
@@ -421,11 +423,11 @@ watch([imageSrc, beforeImageSrc, afterImageSrc], () => {
     state.height = 0
     state.failed = false
   }
-  applyViewportTransform(props.viewportTransform)
+  applyViewportTransform(viewState.value.viewportTransform)
 })
 
 watch(
-  () => props.viewportTransform,
+  () => viewState.value.viewportTransform,
   (value) => {
     if (!value || hasSameTransform(value, { x: panX.value, y: panY.value, scale: scale.value })) return
     applyViewportTransform(value)
@@ -439,7 +441,7 @@ watch(
     const next = { x, y, scale: zoomScale }
     if (hasSameTransform(lastEmittedTransform, next)) return
     lastEmittedTransform = next
-    emit('update-viewport-transform', next)
+    props.session.updateViewState('image-preview', { viewportTransform: next })
   },
 )
 
@@ -455,7 +457,7 @@ onMounted(() => {
     viewportHeight.value = viewport.clientHeight
     resizeObserver.observe(viewport)
   }
-  emit('modified', false)
+
 })
 
 onBeforeUnmount(() => {
@@ -469,7 +471,7 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'file.image',
 }))
 
-defineExpose({ save, resetView, presentation })
+defineExpose({ resetView, presentation })
 </script>
 
 <style scoped>

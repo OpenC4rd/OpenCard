@@ -11,7 +11,7 @@ import {
 import {
   resolveProjectResourcePackage,
 } from '../workspace/services/projectResourceEnvironment'
-import { resolveCardResourceEnvironment, type CardRenderResourceContext } from './cardRenderResources'
+import { resolveCardResource, resolveCardResourceEnvironment, type CardRenderResourceContext } from './cardRenderResources'
 import { createCardPipelineIssue, type CardPipelineIssue } from './cardPipelineIssue'
 import { joinBlockPath } from './renderBlockPath'
 import type { RenderReadyCardBlock, RenderReadyCardDocument } from './render.types'
@@ -67,6 +67,10 @@ function validateBlock(
     }))
   }
   if (resources && block.type === 'image-block') {
+    const resolved = resolveCardResource({ value: block.source, expect: 'asset', blockId: block.id, fieldKey: 'source' }, resources)
+    if (resolved.kind === 'unavailable' && ['missing', 'read-failed', 'decode-failed'].includes(resolved.code)) {
+      pushPackageResourceIssue('card-designer.resource.file-missing', block.source, { code: 'resource-unavailable', reference: block.source, message: resolved.message }, { documentId, instanceId, faceKey, blockId: block.id, blockPath, fieldKey: 'source', issues })
+    }
     const diagnostic = resolvePackageReferenceDiagnostic(block.source, resources, block.id, 'source')
     if (diagnostic) {
       pushPackageResourceIssue(

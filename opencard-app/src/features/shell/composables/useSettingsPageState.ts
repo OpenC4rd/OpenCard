@@ -10,6 +10,7 @@ import { describeError } from '../../../shared/model/error'
 import { createPublisherKey, isSettingsCategoryKey, parseAppTheme, serializeAppTheme, type SettingsCategoryKey, type SettingsIntent } from '../../settings/model/appSettings'
 import { createSettingsSection } from '../sections/settingsSection'
 import { useSettingsViewModel } from '../../settings/composables/useSettingsViewModel'
+import { useProjectStore } from '../../workspace/store/projectStore'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 
 export function useSettingsPageState(options: {
@@ -18,6 +19,7 @@ export function useSettingsPageState(options: {
   projectOpen: Readonly<Ref<boolean>>
   isSettingsMode: Readonly<Ref<boolean>>
   resetWorkspace: () => Promise<void>
+  cancelExportsAndWait: () => Promise<void>
   selectCategory: (key: SettingsCategoryKey) => void
 }) {
   const { t } = useI18n()
@@ -92,7 +94,8 @@ export function useSettingsPageState(options: {
       case 'locale.refresh': return reloadLocales()
       case 'locale-folder.open': return openLocaleFolder()
       case 'cache.clear':
-        try { await clearAppCache(fileSystemService); networkResourceCacheService.forget(); await refreshAppCacheUsage() }
+        if (options.projectOpen.value) return
+        try { await options.cancelExportsAndWait(); await useProjectStore().disposeResources(); await clearAppCache(fileSystemService); networkResourceCacheService.forget(); await refreshAppCacheUsage() }
         catch (error) { notifyError(describeError(error)) }
         return
       default: return options.resetWorkspace()

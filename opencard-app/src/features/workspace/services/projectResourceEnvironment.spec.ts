@@ -1,4 +1,9 @@
+import type { FileSystemService } from './fileSystemService'
+import { createSimpleContainerBlock } from '../../../entities/card/model'
 import { describe, expect, it, vi } from 'vitest'
+
+const watcherEvents = vi.hoisted(() => ({ listener: null as ((event: { payload: { id: string, root: string, paths: string[] } }) => void) | null }))
+vi.mock('@tauri-apps/api/event', () => ({ listen: async (_: string, listener: typeof watcherEvents.listener) => { watcherEvents.listener = listener; return () => { watcherEvents.listener = null } } }))
 
 type ArchivedPackage = { manifestJson: string, fingerprint: string }
 
@@ -19,7 +24,7 @@ import { EMPTY_PROJECT_ICON_CATALOG } from './projectIconCatalog'
 import { parsePackageQualifier } from '../model/packageCoordinate'
 import {
   createProjectResourceNamespace,
-  loadProjectResourceEnvironment,
+  loadProjectResourceEnvironment, createResourceEnvironment,
   packageScopeRoots,
   projectResourceScopeIdentity,
   resolveProjectEnvironmentFontFamily,
@@ -105,9 +110,8 @@ describe('ProjectResourceEnvironment', () => {
   it('isolates same-key package fonts by Package ID namespace', () => {
     const alice = packageEnvironment('alice/badge')
     const bob = packageEnvironment('bob/badge')
-    const fallback = (value: string) => value
-    const aliceFamily = resolveProjectEnvironmentFontFamily('font:body', alice, fallback)
-    const bobFamily = resolveProjectEnvironmentFontFamily('font:body', bob, fallback)
+    const aliceFamily = resolveProjectEnvironmentFontFamily('font:body', alice)
+    const bobFamily = resolveProjectEnvironmentFontFamily('font:body', bob)
     expect(aliceFamily).toContain('package-alice-badge')
     expect(bobFamily).toContain('package-bob-badge')
     expect(aliceFamily).not.toBe(bobFamily)
@@ -124,7 +128,7 @@ describe('ProjectResourceEnvironment', () => {
       JSON.stringify({
         iconSeries: [{
           name: 'Outline', key: 'outline',
-          icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' }],
+          icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }],
         }],
       }),
     ]])
@@ -150,7 +154,7 @@ describe('ProjectResourceEnvironment', () => {
       JSON.stringify({
         iconSeries: [{
           name: 'Outline', key: 'outline',
-          icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' }],
+          icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }],
         }],
       }),
     ]])
@@ -158,7 +162,7 @@ describe('ProjectResourceEnvironment', () => {
       series: [{ name: 'Outline', key: 'outline' }],
       entries: [{
         iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg',
-        tint: 'theme' as const, seriesKey: 'outline', src: 'asset:///warn.svg',
+        tint: 'context' as const, seriesKey: 'outline', src: 'asset:///warn.svg',
         imageWidth: 8, imageHeight: 4,
       }]
     }
@@ -308,14 +312,14 @@ describe('ProjectResourceEnvironment', () => {
     files.set(`${aliceRoot}/.opencard/icons/icons.json`, JSON.stringify({
       iconSeries: [{
         name: 'Outline', key: 'outline',
-        icons: [{ iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'theme' }],
+        icons: [{ iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'context' }],
       }],
     }))
     files.set(`${aliceRoot}/icons/warn.svg`, 'bytes')
     files.set(`${bobRoot}/.opencard/icons/icons.json`, JSON.stringify({
       iconSeries: [{
         name: 'Outline', key: 'outline',
-        icons: [{ iconKey: 'gone', name: 'Gone', source: 'icons/gone.svg', tint: 'theme' }],
+        icons: [{ iconKey: 'gone', name: 'Gone', source: 'icons/gone.svg', tint: 'context' }],
       }],
     }))
 
@@ -366,5 +370,80 @@ describe('ProjectResourceEnvironment', () => {
       src: `asset://${aliceRoot}/assets/cover.png`,
     })
     expect(packageAt(environment, 'bob/icons@1.0.0')?.cover).toBeNull()
+  })
+})
+
+describe('resource environment lifecycle', () => {
+  it('drops registered templates when their parent directory is deleted', async () => {
+    const source = '.opencard/blocks/cards/frame.ocblock'
+    const files = new Map([
+      ['/one/.opencard/blocks/blocks.json', JSON.stringify({ collections: [{ key: 'cards', name: 'Cards', blocks: [{ key: 'frame', source }] }] })],
+      [`/one/${source}`, JSON.stringify({ type: 'ocblock', block: createSimpleContainerBlock({ id: 'frame' }) })],
+    ])
+    const environment = await createResourceEnvironment('/one', { watch: false, snapshotsRoot: SNAPSHOTS_ROOT, fs: memoryFileSystem(files) as unknown as FileSystemService })
+    try {
+      expect(environment.state.value.customBlockSources?.has(source)).toBe(true)
+      files.delete(`/one/${source}`)
+      await environment.refresh(['/one/.opencard/blocks/cards'])
+      expect(environment.state.value.customBlockSources?.has(source)).toBe(false)
+    } finally { await environment.dispose() }
+  })
+  it('invalidates deleted descendants without rescanning unrelated registries and isolates environments', async () => {
+    const files = new Map([['/one/Assets/image.png', 'image'], ['/two/Assets/image.png', 'other']])
+    const reads: string[] = []
+    const memory = memoryFileSystem(files)
+    const fs = { ...memory, readFile: async (path: string) => { reads.push(path); return memory.readFile(path) } } as unknown as FileSystemService
+    const one = await createResourceEnvironment('/one', { watch: false, fs, snapshotsRoot: SNAPSHOTS_ROOT })
+    const two = await createResourceEnvironment('/two', { watch: false, fs, snapshotsRoot: SNAPSHOTS_ROOT })
+    try {
+      one.state.value.asset!('/one/Assets/image.png'); two.state.value.asset!('/two/Assets/image.png')
+      await Promise.all([one.state.value.waitForResources!(), two.state.value.waitForResources!()])
+      expect(one.state.value.asset!('/one/Assets/image.png').status).toBe('ready')
+      files.delete('/one/Assets/image.png')
+      const priorReads = [...reads]
+      await one.refresh(['/one/Assets'])
+      one.state.value.asset!('/one/Assets/image.png')
+      await one.state.value.waitForResources!()
+      expect(one.state.value.asset!('/one/Assets/image.png').status).toBe('missing')
+      expect(two.state.value.asset!('/two/Assets/image.png').status).toBe('ready')
+      expect(reads).toEqual(priorReads)
+      expect(one.state.value.namespace).not.toBe(two.state.value.namespace)
+    } finally { await one.dispose(); await two.dispose() }
+  })
+
+  it('captures changes during initial scanning, ignores another watcher and stops its own handle once', async () => {
+    vi.useFakeTimers()
+    const files = new Map<string, string>()
+    const memory = memoryFileSystem(files)
+    let opening = true
+    const stopped: string[] = []
+    const batches: string[][] = []
+    const fs = { ...memory,
+      startWatching: async () => 'one', stopWatching: async (id: string) => { stopped.push(id) },
+      fileExists: async (path: string) => {
+        if (opening) { opening = false; watcherEvents.listener?.({ payload: { id: 'one', root: '/one', paths: ['/one/new.png'] } }) }
+        return memory.fileExists(path)
+      },
+    } as unknown as FileSystemService
+    let environment: Awaited<ReturnType<typeof createResourceEnvironment>> | undefined
+    try {
+      environment = await createResourceEnvironment('/one', { watch: true, fs, snapshotsRoot: SNAPSHOTS_ROOT, onFilesChanged: paths => batches.push([...paths]) })
+      await vi.advanceTimersByTimeAsync(150)
+      expect(batches).toEqual([['/one/new.png']])
+      watcherEvents.listener?.({ payload: { id: 'other', root: '/two', paths: ['/two/file.png'] } })
+      await vi.advanceTimersByTimeAsync(150)
+      expect(batches).toHaveLength(1)
+      await environment.dispose(); await environment.dispose()
+      expect(stopped).toEqual(['one'])
+      expect(environment.watching.value).toBe(false)
+    } finally { await environment?.dispose(); vi.useRealTimers() }
+  })
+
+  it('keeps diagnostics for broken definitions without making the environment unusable', async () => {
+    const fs = memoryFileSystem(new Map([['/one/.opencard/icons/icons.json', '{broken']])) as unknown as FileSystemService
+    const environment = await createResourceEnvironment('/one', { watch: false, fs, snapshotsRoot: SNAPSHOTS_ROOT })
+    expect(environment.state.value.diagnostics?.['.opencard/icons/icons.json']).toBeTruthy()
+    expect(environment.state.value.iconCatalog.entries).toEqual([])
+    await environment.dispose()
   })
 })

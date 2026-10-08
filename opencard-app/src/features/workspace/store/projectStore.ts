@@ -1,12 +1,12 @@
+import type { OcdocumentDiffRuntime } from '../../version-control/useOcdocumentDiffSession'
 /**
  * 模块说明：
  * - 维护项目路径 目录索引 监听与文件树移动重命名事务
  * 职责边界：
  * - 只管理文件系统真相 不管理编辑草稿与会话状态
  */
-import { computed, readonly, ref, shallowRef } from 'vue'
+import { computed, readonly, ref, shallowRef, shallowReactive } from 'vue'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { listen, type Event, type UnlistenFn } from '@tauri-apps/api/event'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { fileSystemService, takeDirectoryWalkMetrics } from '../services/fileSystemService'
 import { createProjectOpenTimer } from '../services/projectOpenTiming'
@@ -16,6 +16,7 @@ import {
   isProjectInternalRelativePath,
   PROJECT_INTERNAL_DIRECTORIES,
   PROJECT_INTERNAL_DIRECTORY_NAME,
+  PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
   PROJECT_PACKAGE_DIRECTORY,
   resolveProjectInternalRelativePath,
 } from '../model/projectStructure'
@@ -24,17 +25,11 @@ import {
   parseProjectMetadataText,
   serializeProjectMetadata,
   toProjectInformation,
-  type ProjectInformation,
-  type ProjectProfile,
 } from '../model/projectMetadata'
 import {
   PROJECT_FONT_REGISTRY_FILE_NAME,
-  buildProjectFontRegistry,
   parseProjectFontRegistryText,
   serializeProjectFontRegistry,
-  type ProjectFontComposition,
-  type ProjectFont,
-  type ProjectFontRegistry,
 } from '../model/projectFontRegistry'
 import {
   PROJECT_ICON_REGISTRY_FILE_NAME,
@@ -46,71 +41,30 @@ import {
   parseProjectDictionaryText,
   resolveProjectDictionary,
   serializeProjectDictionary,
-  type ProjectDictionary,
-  type ResolvedProjectDictionary,
 } from '../model/projectDictionary'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../settings/model/workspaceState'
 import { taskScheduler } from '../../../utils/taskScheduler'
 import type { OcNodeDropPosition } from '../../../shared/ui/node/node.types'
 import { getPathBasename, getPathDirectory, normalizePath } from '../../../shared/model/filePath'
-import {
-  APP_CACHE_SNAPSHOTS_DIRECTORY_NAME,
-  resolveAppCachePath,
-} from '../../../shared/storage/appStoragePaths'
 import { reportAppError } from '../../logging/appErrorCatalog'
-import {
-  clearProjectFonts,
-  syncProjectFonts,
-  type ProjectFontLoadError,
-} from '../services/projectFontLoader'
 import {
   ensureLoadableProjectFont,
   extractFontCollectionFaces,
 } from '../services/trueTypeFontRepair'
-import { readProjectFontCharacterSet } from '../services/projectFontCoverage'
 import {
-  buildProjectIconCatalog,
   EMPTY_PROJECT_ICON_CATALOG,
-  type ProjectIconCatalog,
 } from '../services/projectIconCatalog'
-import { readProjectIconDimensions } from '../services/projectIconDimensions'
-import {
-  clearProjectIconDimensions,
-  forgetProjectIconDimensions,
-  loadProjectImageDimensions,
-  readProjectIconSize,
-  setProjectIconDimensionLoader,
-} from '../services/projectIconDimensionResolver'
 import type { CardRenderEnvironment } from '../../card-rendering/renderPipeline'
-import { isRemoteResourceAllowed } from '../../editor-runtime/services/editorResource'
-import { networkResourceManager } from '../../network-resources/store/networkResourceManager'
 import {
-  DEFAULT_PROJECT_ICON_DIRECTORY,
   findProjectIconKeyConflicts,
-  type ProjectIconSeries,
 } from '../model/projectIcons'
 import {
   DEFAULT_PROJECT_FONT_DIRECTORY,
 } from '../model/projectFonts'
-import {
-  markResourcePackagesUsed,
-  readResourcePackageArchive,
-  unpackResourcePackage,
-  type ResourcePackageArchive,
-} from '../services/resourcePackageArchive'
-import {
-  createProjectResourceNamespace,
-  type ProjectResourceEnvironment,
-  loadProjectResourceEnvironment,
-  packageScopeRoots,
-  type ProjectResourcePackageCatalog,
-  type ProjectResourcePackageFile,
-  type UnreadableProjectPackage,
-} from '../services/projectResourceEnvironment'
-import { createProjectCustomBlockCatalog } from '../../card-rendering/customBlockRuntime'
-import type { OcBlockDocument } from '../../card-rendering/customBlockRuntime'
-import type { CustomBlockRegistry } from '../model/customBlockRegistry'
+import { readResourcePackageArchive } from '../services/resourcePackageArchive'
+import { createResourceEnvironment, type ResourceEnvironment, type ProjectResourceEnvironment, packageScopeRoots } from '../services/projectResourceEnvironment'
+import { parseCustomBlockRegistryText, serializeCustomBlockRegistry } from '../model/customBlockRegistry'
 import {
   relativizeResourcePath,
   resolveResourcePath as resolveScopedResourcePath,
@@ -128,9 +82,7 @@ const PROJECT_TREE_LOOKAHEAD_DEPTH = 2
  */
 const FILE_CHANGE_REFRESH_DELAY_MS = 150
 const FILE_CHANGE_INDEX_REFRESH_KEY = 'project-index-refresh'
-const FILE_CHANGE_RESOURCE_ENVIRONMENT_REFRESH_KEY = 'project-resource-environment-refresh'
 const PROJECT_FONT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc'])
-const PROJECT_ICON_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg'])
 
 export type ImportedProjectFontFiles = {
   sources: readonly string[]
@@ -141,11 +93,6 @@ export type ProjectAssetImportConflict = {
   availableCopySource: string
 }
 export type ProjectAssetImportResolution = 'rename-copy' | 'use-existing'
-
-interface FileChangedPayload {
-  /** 后端会把一段时间内的变化合并成一批，所以这里只关心路径。 */
-  paths: string[]
-}
 
 type MoveEntryByDropResult =
   | { ok: true; fromPath: string; toPath: string }
@@ -173,87 +120,53 @@ type CopyExternalEntriesResult =
   | { ok: false; reason: 'project-not-open' | 'invalid-target' }
 
 const projectPath = ref('')
+let projectOpenRevision = 0
 const indexedEntries = ref<DirEntry[]>([])
-const isWatching = ref(false)
+const comparisons = shallowReactive(new Map<string, OcdocumentDiffRuntime>())
+const comparisonDisposals = new Set<Promise<void>>()
+function releaseComparison(id: string): Promise<void> {
+  const comparison = comparisons.get(id)
+  comparisons.delete(id)
+  const work = comparison?.dispose() ?? Promise.resolve()
+  comparisonDisposals.add(work)
+  void work.finally(() => comparisonDisposals.delete(work)).catch(error => reportAppError('OC-E3016', { path: projectPath.value, error }))
+  return work
+}
+const resourceEnvironment = shallowRef<ResourceEnvironment | null>(null)
+const isWatching = computed(() => resourceEnvironment.value?.watching.value ?? false)
 const fileChangeRevision = ref(0)
 const registeredDirectories = ref(new Map<string, number>())
 const expandedDirectories = ref(new Set<string>())
-const projectProfile = ref<ProjectProfile | null>(null)
-const resolvedProject = ref<ProjectInformation | null>(null)
-const profileError = ref<string | null>(null)
-const projectFontFamilies = ref<readonly ProjectFont[]>([])
-const projectFontCompositions = ref<readonly ProjectFontComposition[]>([])
-const projectFonts = ref<ProjectFontRegistry>({})
-const fontRegistryError = ref<string | null>(null)
-const fontRegistryReady = ref(false)
-const projectFontLoadErrors = ref<readonly ProjectFontLoadError[]>([])
-const projectIconSeries = ref<readonly ProjectIconSeries[]>([])
-const iconRegistryError = ref<string | null>(null)
-const projectIconCatalog = ref<ProjectIconCatalog>(EMPTY_PROJECT_ICON_CATALOG)
-const projectDictionary = ref<ProjectDictionary | null>(null)
-const resolvedDictionary = ref<ResolvedProjectDictionary | null>(null)
-const dictionaryError = ref<string | null>(null)
-const projectResourcePackages = shallowRef<ProjectResourcePackageCatalog>(new Map())
-/** 项目里每一个归档文件，含内容相同的那几份：包管理器按文件列，引用解析仍按指纹去重。 */
-const projectResourcePackageFiles = shallowRef<readonly ProjectResourcePackageFile[]>([])
-/** 说不出身份的归档：包管理器整页要能让人看到它们，而不是留一个解释不了的空缺。 */
-const unreadableProjectResourcePackages = shallowRef<readonly UnreadableProjectPackage[]>([])
-const projectResourceEnvironments = shallowRef<ReadonlyMap<string, ProjectResourceEnvironment>>(new Map())
-const projectCustomBlockRegistry = shallowRef<CustomBlockRegistry>({})
-const projectCustomBlockSources = shallowRef<ReadonlyMap<string, OcBlockDocument>>(new Map())
-let resourceEnvironmentReloadVersion = 0
 const settingsStore = useAppSettingsStore()
-const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => ({
-  kind: 'project',
-  namespace: createProjectResourceNamespace('project', projectPath.value || 'root'),
-  rootPath: projectPath.value || null,
-  generation: fileChangeRevision.value,
-  fontDocument: {
-    families: projectFontFamilies.value,
-    compositions: projectFontCompositions.value,
-  },
-  fonts: projectFonts.value,
-  iconDocument: { iconSeries: projectIconSeries.value },
-  iconCatalog: projectIconCatalog.value,
-  packages: projectResourcePackages.value,
-  packageEnvironments: projectResourceEnvironments.value,
-  customBlockRegistry: projectCustomBlockRegistry.value ?? {},
-  customBlockSources: projectCustomBlockSources.value ?? new Map(),
-}))
-/**
- * One icon's paint asks for its size here. The catalog entry is the shared record every render path
- * reads, so the answer is written onto it: the surfaces that already hold this entry re-render, and a
- * later reader sees a measured icon without asking again.
- */
+const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => resourceEnvironment.value?.state.value ?? {
+  kind: 'project' as const, namespace: 'unbound', rootPath: null,
+  fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+})
+const projectProfile = computed(() => projectResourceEnvironment.value.profile ?? null)
+const resolvedProject = computed(() => projectProfile.value ? toProjectInformation(projectProfile.value) : null)
+const profileError = computed(() => projectResourceEnvironment.value.diagnostics?.[PROJECT_PROFILE_FILE_NAME] ?? null)
+const projectFontFamilies = computed(() => projectResourceEnvironment.value.fontDocument.families ?? [])
+const projectFontCompositions = computed(() => projectResourceEnvironment.value.fontDocument.compositions ?? [])
+const projectFonts = computed(() => projectResourceEnvironment.value.fonts)
+const fontRegistryError = computed(() => projectResourceEnvironment.value.diagnostics?.[PROJECT_FONT_REGISTRY_FILE_NAME] ?? null)
+const fontRegistryReady = computed(() => !!resourceEnvironment.value)
+const projectFontLoadErrors = computed(() => resourceEnvironment.value?.fontErrors.value ?? [])
+const projectIconSeries = computed(() => projectResourceEnvironment.value.iconDocument.iconSeries ?? [])
+const iconRegistryError = computed(() => projectResourceEnvironment.value.diagnostics?.[PROJECT_ICON_REGISTRY_FILE_NAME] ?? null)
+const projectIconCatalog = computed(() => projectResourceEnvironment.value.iconCatalog)
+const projectDictionary = computed(() => projectResourceEnvironment.value.dictionary ?? null)
+const resolvedDictionary = computed(() => projectDictionary.value ? resolveProjectDictionary(projectDictionary.value).values : null)
+const dictionaryError = computed(() => projectResourceEnvironment.value.diagnostics?.[PROJECT_DICTIONARY_FILE_NAME] ?? null)
+const projectResourcePackages = computed(() => projectResourceEnvironment.value.packages ?? new Map())
+const projectResourcePackageFiles = computed(() => projectResourceEnvironment.value.packageFiles ?? [])
+const unreadableProjectResourcePackages = computed(() => projectResourceEnvironment.value.unreadablePackages ?? [])
+const projectCustomBlockRegistry = computed(() => projectResourceEnvironment.value.customBlockRegistry ?? {})
 const renderEnvironment = computed<CardRenderEnvironment>(() => ({
-  project: resolvedProject.value,
-  dictionary: resolvedDictionary.value,
-  remoteResourcePolicy: projectProfile.value?.remoteResources,
-  resolveRemoteResource: url => {
-    const path = projectPath.value
-    if (!path || !isRemoteResourceAllowed(url, projectProfile.value?.remoteResources)) return null
-    const resource = networkResourceManager.forProject(
-      path,
-      source => isRemoteResourceAllowed(source, projectProfile.value?.remoteResources),
-    ).get(url)
-    return resource ? convertFileSrc(resource.path) : null
-  },
-  projectIconCatalog: projectIconCatalog.value,
-  resolveIconDimensions: readProjectIconSize,
-  projectResourceEnvironment: projectResourceEnvironment.value,
-  customBlockCatalog: createProjectCustomBlockCatalog(projectResourceEnvironment.value),
-  customBlockLimits: {
-    maxDepth: settingsStore.settings.value.rendering.customBlockMaxDepth,
-    maxNodes: settingsStore.settings.value.rendering.customBlockMaxNodes,
-  },
-}) as CardRenderEnvironment)
-
-let unlistenFn: UnlistenFn | null = null
-let projectIconLoadVersion = 0
+  ...(resourceEnvironment.value?.renderEnvironment.value ?? { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG }),
+  customBlockLimits: { maxDepth: settingsStore.settings.value.rendering.customBlockMaxDepth, maxNodes: settingsStore.settings.value.rendering.customBlockMaxNodes },
+}))
 let projectManagementStructurePromise: Promise<void> | null = null
 
-/** Sizes are read from the project files, once per icon, only when an icon is painted. */
-setProjectIconDimensionLoader(loadProjectIconDimensions)
 
 function pathIdentity(path: string): string {
   const normalized = normalizePath(path)
@@ -394,6 +307,19 @@ async function saveProjectIconRegistry(path: string, content: string): Promise<s
   return canonicalContent
 }
 
+async function saveProjectCustomBlockRegistry(path: string, content: string): Promise<string> {
+  const document = parseCustomBlockRegistryText(content)
+  if (!document) throw new Error('Invalid project custom block registry')
+  const resolvedPath = resolveProjectPath(path)
+  if (pathIdentity(resolvedPath) !== pathIdentity(resolveProjectPath(PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME))) {
+    throw new Error('Project custom block registry must be stored at the project root')
+  }
+  const canonicalContent = serializeCustomBlockRegistry(document)
+  await fileSystemService.writeFile(resolvedPath, canonicalContent)
+  await reloadProjectResourceEnvironment()
+  return canonicalContent
+}
+
 async function saveProjectDictionary(path: string, content: string): Promise<string> {
   const dictionary = parseProjectDictionaryText(content)
   if (!dictionary) throw new Error('Invalid locale.json content')
@@ -407,249 +333,22 @@ async function saveProjectDictionary(path: string, content: string): Promise<str
   return canonicalContent
 }
 
-function clearProjectProfile() {
-  projectProfile.value = null
-  resolvedProject.value = null
-  profileError.value = null
-}
-
-function clearProjectFontRegistry() {
-  clearProjectFonts()
-  projectFontFamilies.value = []
-  projectFontCompositions.value = []
-  projectFonts.value = {}
-  fontRegistryError.value = null
-  projectFontLoadErrors.value = []
-  fontRegistryReady.value = false
-}
-
-function clearProjectIconRegistry() {
-  projectIconLoadVersion += 1
-  // Sizes belong to the project that is closing.
-  clearProjectIconDimensions()
-  projectIconSeries.value = []
-  iconRegistryError.value = null
-  projectIconCatalog.value = EMPTY_PROJECT_ICON_CATALOG
-}
-
-async function syncRegisteredProjectFonts(
-  fonts: readonly ProjectFont[],
-  compositions: readonly ProjectFontComposition[] = projectFontCompositions.value,
-): Promise<void> {
-  const result = await syncProjectFonts(
-    fonts,
-    source => resolveResourceAssetSrcFromFile(PROJECT_FONT_REGISTRY_FILE_NAME, source),
-    compositions,
-    async source => readProjectFontCharacterSet(
-      await fileSystemService.readBinaryFile(resolveResourcePathFromFile(PROJECT_FONT_REGISTRY_FILE_NAME, source)),
-    ),
-  )
-  if (result.current) projectFontLoadErrors.value = result.errors
-}
-
-/** Whether a project-relative path is a file one icon set owns, whatever the registry currently says. */
-function isManagedProjectIconFile(relativePath: string): boolean {
-  const normalized = relativePath.replace(/\\/g, '/').toLocaleLowerCase()
-  const iconRoot = `${PROJECT_INTERNAL_DIRECTORY_NAME}/${DEFAULT_PROJECT_ICON_DIRECTORY}/`.toLocaleLowerCase()
-  return normalized.startsWith(iconRoot)
-    && PROJECT_ICON_EXTENSIONS.has(normalized.slice(normalized.lastIndexOf('.') + 1))
-}
-
-/**
- * Resolves one icon's natural size when its first paint asks for it.
- *
- * A vector states its size in its own markup, so reading that text is much cheaper than decoding the
- * image and is tried first; everything else is handed to the decoder.
- */
-async function loadProjectIconDimensions(
-  src: string,
-  source: string,
-): Promise<{ width: number; height: number }> {
-  try {
-    const content = await fileSystemService.readFile(
-      resolveResourcePathFromFile(PROJECT_ICON_REGISTRY_FILE_NAME, source),
-    )
-    const dimensions = readProjectIconDimensions(source, content)
-    if (dimensions) return dimensions
-  } catch {
-    // Fall through to the decoder: an unreadable or unusual file still deserves a real measurement.
-  }
-  return await loadProjectImageDimensions(src)
-}
-
-function syncRegisteredProjectIcons(iconSeries: readonly ProjectIconSeries[]): void {
-  const version = ++projectIconLoadVersion
-  const catalog = buildProjectIconCatalog(
-    iconSeries,
-    source => resolveResourceAssetSrcFromFile(PROJECT_ICON_REGISTRY_FILE_NAME, source),
-  )
-  if (version !== projectIconLoadVersion) return
-  projectIconCatalog.value = catalog
-}
-
-function clearProjectDictionary() {
-  projectDictionary.value = null
-  resolvedDictionary.value = null
-  dictionaryError.value = null
-}
-
 async function reloadProjectResourceEnvironment(): Promise<boolean> {
-  const expectedVersion = ++resourceEnvironmentReloadVersion
-  const expectedProjectPath = projectPath.value
-  if (!expectedProjectPath) {
-    projectResourcePackages.value = new Map()
-    projectResourcePackageFiles.value = []
-    unreadableProjectResourcePackages.value = []
-    projectResourceEnvironments.value = new Map()
-    projectCustomBlockRegistry.value = {}
-    projectCustomBlockSources.value = new Map()
-    stampedPackageUsageFor = null
-    return false
-  }
-  try {
-    const snapshotsRoot = await resolveAppCachePath(APP_CACHE_SNAPSHOTS_DIRECTORY_NAME)
-    const environment = await loadProjectResourceEnvironment({
-      fs: fileSystemService,
-      rootPath: expectedProjectPath,
-      snapshotsRoot,
-      kind: 'project',
-      identity: expectedProjectPath,
-      generation: fileChangeRevision.value,
-      iconCatalog: projectIconCatalog.value,
-      unusableFingerprints,
-      onPackagePending: schedulePackageUnpacking,
-    })
-    if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
-    projectResourcePackages.value = environment.packages ?? new Map()
-    projectResourcePackageFiles.value = environment.packageFiles ?? []
-    unreadableProjectResourcePackages.value = environment.unreadablePackages ?? []
-    projectResourceEnvironments.value = environment.packageEnvironments ?? new Map()
-    projectCustomBlockRegistry.value = environment.customBlockRegistry ?? {}
-    projectCustomBlockSources.value = environment.customBlockSources ?? new Map()
-    stampPackageUsage(expectedProjectPath, snapshotsRoot)
-    return true
-  } catch (error) {
-    if (expectedVersion !== resourceEnvironmentReloadVersion || expectedProjectPath !== projectPath.value) return false
-    projectResourcePackages.value = new Map()
-    projectResourcePackageFiles.value = []
-    unreadableProjectResourcePackages.value = []
-    projectResourceEnvironments.value = new Map()
-    projectCustomBlockRegistry.value = {}
-    projectCustomBlockSources.value = new Map()
-    reportAppError('OC-E3016', { path: `${expectedProjectPath}/.opencard/packages`, error })
-    return false
-  }
+  const environment = resourceEnvironment.value
+  if (!environment) return false
+  try { await environment.refresh(); return resourceEnvironment.value === environment }
+  catch (error) { reportAppError('OC-E3016', { path: projectPath.value, error }); return false }
 }
-
-function scheduleProjectResourceEnvironmentRefresh(): void {
-  taskScheduler.schedule(
-    FILE_CHANGE_RESOURCE_ENVIRONMENT_REFRESH_KEY,
-    FILE_CHANGE_REFRESH_DELAY_MS,
-    async () => {
-      await reloadProjectResourceEnvironment()
-    },
-  )
+async function reloadRegistry(path: string): Promise<boolean> {
+  const environment = resourceEnvironment.value
+  if (!environment) return false
+  await environment.refresh([`${projectPath.value}/${path}`])
+  return resourceEnvironment.value === environment
 }
-
-async function reloadProjectProfile(): Promise<boolean> {
-  if (!projectPath.value) return false
-  const path = resolveProjectPath(PROJECT_PROFILE_FILE_NAME)
-  if (!await fileSystemService.fileExists(path)) {
-    clearProjectProfile()
-    return false
-  }
-  try {
-    const profile = parseProjectMetadataText(await fileSystemService.readFile(path))
-    if (!profile) throw new Error('Invalid project profile')
-    projectProfile.value = profile
-    resolvedProject.value = toProjectInformation(profile)
-    profileError.value = null
-    return true
-  } catch (error) {
-    profileError.value = error instanceof Error ? error.message : String(error)
-    projectProfile.value = null
-    resolvedProject.value = null
-    reportAppError('OC-E3002', { path, error })
-    return false
-  }
-}
-
-async function reloadProjectFontRegistry(): Promise<boolean> {
-  if (!projectPath.value) return false
-  const path = resolveProjectPath(PROJECT_FONT_REGISTRY_FILE_NAME)
-  if (!await fileSystemService.fileExists(path)) {
-    clearProjectFontRegistry()
-    fontRegistryReady.value = true
-    return false
-  }
-  try {
-    const document = parseProjectFontRegistryText(await fileSystemService.readFile(path))
-    if (!document) throw new Error('Invalid project font registry')
-    projectFontFamilies.value = document.families ?? []
-    projectFontCompositions.value = document.compositions ?? []
-    projectFonts.value = buildProjectFontRegistry(document)
-    await syncRegisteredProjectFonts(projectFontFamilies.value, projectFontCompositions.value)
-    fontRegistryError.value = null
-    fontRegistryReady.value = true
-    return true
-  } catch (error) {
-    clearProjectFontRegistry()
-    fontRegistryError.value = error instanceof Error ? error.message : String(error)
-    reportAppError('OC-E3009', { path, error })
-    return false
-  }
-}
-
-async function reloadProjectIconRegistry(): Promise<boolean> {
-  if (!projectPath.value) return false
-  const path = resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)
-  if (!await fileSystemService.fileExists(path)) {
-    clearProjectIconRegistry()
-    return false
-  }
-  try {
-    const document = parseProjectIconRegistryText(await fileSystemService.readFile(path))
-    if (!document || findProjectIconKeyConflicts(document.iconSeries).length > 0) {
-      throw new Error('Invalid project icon registry')
-    }
-    projectIconSeries.value = document.iconSeries ?? []
-    await syncRegisteredProjectIcons(projectIconSeries.value)
-    iconRegistryError.value = null
-    return true
-  } catch (error) {
-    clearProjectIconRegistry()
-    iconRegistryError.value = error instanceof Error ? error.message : String(error)
-    reportAppError('OC-E3010', { path, error })
-    return false
-  }
-}
-
-async function reloadProjectDictionary(): Promise<boolean> {
-  if (!projectPath.value) return false
-  const path = resolveProjectPath(PROJECT_DICTIONARY_FILE_NAME)
-  if (!await fileSystemService.fileExists(path)) {
-    clearProjectDictionary()
-    return false
-  }
-  try {
-    const dictionary = parseProjectDictionaryText(await fileSystemService.readFile(path))
-    if (!dictionary) throw new Error('Invalid project dictionary')
-    const resolution = resolveProjectDictionary(dictionary)
-    projectDictionary.value = dictionary
-    resolvedDictionary.value = resolution.values
-    dictionaryError.value = resolution.warning
-    if (resolution.warning) {
-      console.warn('[project-dictionary] Active language is missing:', { path, active: dictionary.active })
-    }
-    return true
-  } catch (error) {
-    dictionaryError.value = error instanceof Error ? error.message : String(error)
-    projectDictionary.value = null
-    resolvedDictionary.value = null
-    reportAppError('OC-E3003', { path, error })
-    return false
-  }
-}
+const reloadProjectProfile = () => reloadRegistry(PROJECT_PROFILE_FILE_NAME)
+const reloadProjectFontRegistry = () => reloadRegistry(PROJECT_FONT_REGISTRY_FILE_NAME)
+const reloadProjectIconRegistry = () => reloadRegistry(PROJECT_ICON_REGISTRY_FILE_NAME)
+const reloadProjectDictionary = () => reloadRegistry(PROJECT_DICTIONARY_FILE_NAME)
 
 function loadProjectWorkspaceState() {
   const state = findProjectWorkspaceState(
@@ -692,7 +391,8 @@ function isMetadataPath(path: string): boolean {
 
 async function refreshIndexedEntries(options?: { persist?: boolean }) {
   if (!projectPath.value) return
-
+  const request = projectOpenRevision
+  const root = projectPath.value
   try {
     const nextEntries = new Map<string, DirEntry>()
     const unavailableDirectories = new Set<string>()
@@ -707,7 +407,8 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
       .sort(([leftPath], [rightPath]) => leftPath.length - rightPath.length)
 
     for (const [relativePath, depth] of registrations) {
-      const directoryPath = relativePath ? resolveProjectPath(relativePath) : ensureProjectOpen()
+      if (request !== projectOpenRevision) return
+      const directoryPath = relativePath ? `${root}/${relativePath}` : root
       let entries: DirEntry[]
       try {
         entries = await fileSystemService.readDirectoryEntries(directoryPath, depth, relativePath, {
@@ -724,6 +425,7 @@ async function refreshIndexedEntries(options?: { persist?: boolean }) {
       }
     }
 
+    if (request !== projectOpenRevision) return
     if (unavailableDirectories.size > 0) {
       registeredDirectories.value = new Map([...registeredDirectories.value]
         .filter(([relativePath]) => !unavailableDirectories.has(relativePath)))
@@ -790,134 +492,48 @@ function resolveAssetSrc(path: string): string {
   return convertFileSrc(resolveProjectPath(path))
 }
 
-async function startWatching() {
-  if (!projectPath.value || isWatching.value) return
-
-  try {
-    unlistenFn = await listen<FileChangedPayload>('file-changed', (event: Event<FileChangedPayload>) => {
-      // 项目里的 `.ocpack` 现在就是"这个项目装了哪些包"本身，所以它们的变化必须看见：
-      // 用户从资源管理器拖进来一个、或者 `git pull` 拉回来一个，都要重扫。
-      const changedPaths = event.payload.paths.map((path) => normalizePath(path))
-      if (changedPaths.length === 0) return
-      fileChangeRevision.value += 1
-      if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_PROFILE_FILE_NAME)))) {
-        void reloadProjectProfile()
-      }
-      if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_FONT_REGISTRY_FILE_NAME)))) {
-        void reloadProjectFontRegistry()
-      }
-      if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)))) {
-        void reloadProjectIconRegistry()
-      }
-      // Resource environments scan more than the changed path, so wait for a quiet window.
-      scheduleProjectResourceEnvironmentRefresh()
-      if (changedPaths.some(path => pathIdentity(path) === pathIdentity(resolveProjectPath(PROJECT_DICTIONARY_FILE_NAME)))) {
-        void reloadProjectDictionary()
-      }
-      const fontSources = projectFontFamilies.value.flatMap(font => Object.values(font.files)
-        .flatMap(styles => Object.values(styles ?? {}))
-        .map(source => resolveResourcePathFromFile(PROJECT_FONT_REGISTRY_FILE_NAME, source)))
-      if (changedPaths.some(path => fontSources.some(source => pathIdentity(path) === pathIdentity(source)))) {
-        void syncRegisteredProjectFonts(projectFontFamilies.value)
-      }
-      // Any managed icon file that changed may have changed size. This is keyed by path rather than
-      // by current registration, because a set being created writes its files before its registry
-      // entry exists, and a re-created set reuses the same paths for new content.
-      for (const path of changedPaths) {
-        const relative = toRelativeProjectPath(path)
-        // Any measured size for a managed icon file that changed is stale.
-        if (isManagedProjectIconFile(relative)) forgetProjectIconDimensions(relative)
-      }
-      const iconSources = projectIconSeries.value.flatMap(series => series.icons.map(icon => (
-        resolveResourcePathFromFile(PROJECT_ICON_REGISTRY_FILE_NAME, icon.source)
-      )))
-      if (changedPaths.some(path => iconSources.some(source => pathIdentity(path) === pathIdentity(source)))) {
-        void syncRegisteredProjectIcons(projectIconSeries.value)
-      }
-      taskScheduler.schedule(FILE_CHANGE_INDEX_REFRESH_KEY, FILE_CHANGE_REFRESH_DELAY_MS, refreshIndexedEntries)
-    })
-
-    await fileSystemService.startWatching(projectPath.value)
-    isWatching.value = true
-  } catch (error) {
-    reportAppError('OC-E2006', error)
-  }
-}
-
-async function stopWatching() {
+async function disposeResources(invalidate = true) {
+  if (invalidate) projectOpenRevision++
   taskScheduler.cancel(PROJECT_METADATA_SAVE_KEY)
-  // A pending coalesced refresh belongs to the project that just stopped being watched.
   taskScheduler.cancel(FILE_CHANGE_INDEX_REFRESH_KEY)
-  taskScheduler.cancel(FILE_CHANGE_RESOURCE_ENVIRONMENT_REFRESH_KEY)
-
-  if (unlistenFn) {
-    unlistenFn()
-    unlistenFn = null
-  }
-
-  await fileSystemService.stopWatching()
-  isWatching.value = false
+  const environment = resourceEnvironment.value
+  resourceEnvironment.value = null
+  const released = await Promise.allSettled([...comparisonDisposals, ...[...comparisons.keys()].map(releaseComparison)])
+  await environment?.dispose()
+  const failure = released.find(result => result.status === 'rejected')
+  if (failure?.status === 'rejected') throw failure.reason
 }
-
 async function setProjectPath(path: string) {
   const normalizedPath = normalizePath(path)
-
-  if (projectPath.value === normalizedPath) {
-    return
-  }
-
-  if (isWatching.value) {
-    await stopWatching()
-  }
-
+  if (projectPath.value === normalizedPath) return
+  const request = ++projectOpenRevision
+  await disposeResources(false)
+  if (request !== projectOpenRevision) return
   projectPath.value = normalizedPath
   projectManagementStructurePromise = null
   indexedEntries.value = []
   registeredDirectories.value = new Map()
   expandedDirectories.value = new Set()
-  // 换项目就把"解不开的包"忘掉：那个记录只在同一个项目里说得通。
-  unusableFingerprints.clear()
-    clearProjectProfile()
-    clearProjectFontRegistry()
-    clearProjectIconRegistry()
-    clearProjectDictionary()
-
-  if (!projectPath.value) {
-    return
-  }
-
+  if (!normalizedPath) return
   const openTimer = createProjectOpenTimer(normalizedPath)
-  openTimer.step('reset')
-  const walkStartedAt = performance.now()
   loadProjectWorkspaceState()
+  let environment: ResourceEnvironment
+  try { environment = await createResourceEnvironment(normalizedPath, { watch: true, onFilesChanged() {
+    if (request !== projectOpenRevision) return
+    fileChangeRevision.value++
+    taskScheduler.schedule(FILE_CHANGE_INDEX_REFRESH_KEY, FILE_CHANGE_REFRESH_DELAY_MS, refreshIndexedEntries)
+  } }) } catch (error) { if (request === projectOpenRevision) projectPath.value = ''; throw error }
+  if (request !== projectOpenRevision) { await environment.dispose(); return }
+  resourceEnvironment.value = environment
   await refreshIndexedEntries({ persist: false })
-  const walk = takeDirectoryWalkMetrics()
-  openTimer.mark(`index tree (${walk.reads} dir reads)`, performance.now() - walkStartedAt)
-  // Each registry records its own duration so one slow branch cannot be hidden by its siblings.
-  const registriesStartedAt = performance.now()
-  const timed = <T>(label: string, work: Promise<T>): Promise<T> => work.then((result) => {
-    openTimer.mark(label, performance.now() - registriesStartedAt)
-    return result
-  })
-  await Promise.all([
-    timed('profile', reloadProjectProfile()),
-    timed('fonts', reloadProjectFontRegistry()),
-    timed('icons', reloadProjectIconRegistry()),
-    timed('dictionary', reloadProjectDictionary()),
-  ])
-  openTimer.step(`registries (${projectIconSeries.value.reduce((total, series) => total + series.icons.length, 0)} icons/${Object.keys(projectFonts.value).length} fonts)`)
-  // After the registries: the environment carries the project icon catalog, so it must not start
-  // before that catalog exists.
-  await reloadProjectResourceEnvironment()
-  openTimer.step('resource environment')
-  await startWatching()
-  openTimer.step('watcher')
-  if (await fileSystemService.fileExists(resolveProjectPath(PROJECT_INTERNAL_DIRECTORY_NAME))) {
-    void ensureProjectManagementStructure()
-  }
+  if (request !== projectOpenRevision) return
+  openTimer.step('environment and index')
+  const internalDirectoryExists = await fileSystemService.fileExists(`${normalizedPath}/${PROJECT_INTERNAL_DIRECTORY_NAME}`)
+  if (request !== projectOpenRevision) return
+  if (internalDirectoryExists) void ensureProjectManagementStructure()
   scheduleProjectMetadataSave()
-  openTimer.step('tail')
-  openTimer.done(`entries ${walk.entries}, worst dir read ${walk.worstMs.toFixed(1)}ms ${walk.worstPath}`)
+  const walk = takeDirectoryWalkMetrics()
+  openTimer.done(`entries ${walk.entries}, ${walk.reads} directory reads`)
 }
 
 async function chooseProjectDirectory(title: string): Promise<string | null> {
@@ -1125,45 +741,6 @@ async function getProjectFontImportConflict(
   )
 }
 
-/** 已盖过使用印记的项目：一个项目每次打开补一次，环境反复重建不重复写。 */
-let stampedPackageUsageFor: string | null = null
-
-/**
- * 盖"最后用到"印记。缓存淘汰按这个时间排序，而"用到"是这里 —— 加载环境那一次；
- * 已经解开的包不会再走 unpack，所以印记得由这一次补。写不上只影响淘汰顺序，不阻止缓存使用。
- */
-function stampPackageUsage(projectRoot: string, snapshotsRoot: string): void {
-  if (stampedPackageUsageFor === projectRoot) return
-  stampedPackageUsageFor = projectRoot
-  const inUse = [...projectResourcePackages.value]
-    .filter(([, entry]) => entry.rootPath)
-    .map(([fingerprint]) => fingerprint)
-  void markResourcePackagesUsed(snapshotsRoot, inUse).catch(() => undefined)
-}
-
-/** 解不开的包：别再排一次队，也别指望它。为什么解不开已经报在发生处了。 */
-const unusableFingerprints = new Set<string>()
-
-/**
- * 发现一个还没解开的包就把它排上队，**不等它**。解开是幂等的、按指纹去重的，
- * 所以两个项目同时用到同一个包也只会解一次。解完之后重建一次环境，引用它的图标与字体自己出现。
- */
-function schedulePackageUnpacking(
-  archive: ResourcePackageArchive,
-  archivePath: string,
-  snapshotsRoot: string,
-): void {
-  void unpackResourcePackage(archive, archivePath, snapshotsRoot).then(
-    () => reloadProjectResourceEnvironment(),
-    (error: unknown) => {
-      // 错误对象就在手边，报一次就够；不再往别的地方挂第二份文案。
-      unusableFingerprints.add(archive.fingerprint)
-      reportAppError('OC-E3017', { path: archivePath, error })
-      void reloadProjectResourceEnvironment()
-    },
-  )
-}
-
 /**
  * 把一个 `.ocpack` 复制进项目 —— 这就是"装"。装进去就算数：机器上那份删了也不影响，
  * 项目自己带着归档提交进 git。
@@ -1221,11 +798,7 @@ async function trashFile(relativePath: string) {
   }
   const resolvedPath = resolveProjectPath(relativePath)
   await fileSystemService.trashFile(resolvedPath)
-  scheduleProjectResourceEnvironmentRefresh()
-  if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_PROFILE_FILE_NAME))) clearProjectProfile()
-  if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_FONT_REGISTRY_FILE_NAME))) clearProjectFontRegistry()
-  if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME))) clearProjectIconRegistry()
-  if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_DICTIONARY_FILE_NAME))) clearProjectDictionary()
+  await resourceEnvironment.value?.refresh([resolvedPath])
   await refreshIndexedEntries()
 }
 
@@ -1548,7 +1121,9 @@ export function useProjectStore() {
     projectResourcePackages: readonly(projectResourcePackages),
     projectResourcePackageFiles,
     unreadableProjectResourcePackages,
+    comparisons, releaseComparison,
     projectResourceEnvironment,
+    resourceEnvironment: computed(() => resourceEnvironment.value),
     resolvedDictionary: readonly(resolvedDictionary),
     dictionaryError: readonly(dictionaryError),
     projectName: computed(() => {
@@ -1566,16 +1141,13 @@ export function useProjectStore() {
     saveProjectConfiguration,
     saveProjectFontRegistry,
     saveProjectIconRegistry,
+    saveProjectCustomBlockRegistry,
     saveProjectDictionary,
     reloadProjectProfile,
     reloadProjectFontRegistry,
     reloadProjectIconRegistry,
     reloadProjectDictionary,
     reloadProjectResourceEnvironment,
-    clearProjectProfile,
-    clearProjectFontRegistry,
-    clearProjectIconRegistry,
-    clearProjectDictionary,
     setProjectPath,
     readDirectoryEntries,
     setDirectoryExpanded,
@@ -1598,8 +1170,7 @@ export function useProjectStore() {
     moveEntryByDrop,
     copyExternalEntriesIntoProject,
     renameEntry,
-    startWatching,
-    stopWatching,
+    disposeResources,
     resolveProjectPath,
   }
 }

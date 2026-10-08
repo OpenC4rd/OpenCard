@@ -10,8 +10,9 @@ import {
 export interface ProjectNetworkResources {
   /** 读这个 URL 的缓存；没有就顺手在后台取一次，命中前先返回 null。 */
   get(url: string): CachedNetworkResource | null
+  status(url: string): 'pending' | 'ready' | 'failed' | 'blocked'
+  wait(): Promise<void>
 }
-
 type ProjectRuntimeState = {
   cache: Promise<NetworkResourceCacheProject>
   resources: Map<string, CachedNetworkResource | null>
@@ -34,6 +35,8 @@ export class NetworkResourceManager {
   constructor(dependencies: Partial<NetworkResourceManagerDependencies> = {}) {
     this.dependencies = { ...defaultDependencies, ...dependencies }
   }
+
+  async dispose(): Promise<void> { const requests = [...this.projects.values()].flatMap(state => [...state.requests.values()]); this.projects.clear(); await Promise.allSettled(requests) }
 
   forProject(projectPath: string, canRequest: (url: string) => boolean): ProjectNetworkResources {
     const projectKey = normalizeNetworkResourceProjectPath(projectPath)
@@ -62,16 +65,16 @@ export class NetworkResourceManager {
           const cached = await cache.getCached(url)
           state.loadedUrls.add(url)
           if (cached) {
-            state.resources.set(url, cached)
+            if (this.projects.get(projectKey) === state) state.resources.set(url, cached)
             return cached
           }
           const refreshed = await cache.refresh(url)
           state.loadedUrls.add(url)
-          state.resources.set(url, refreshed)
+          if (this.projects.get(projectKey) === state) state.resources.set(url, refreshed)
           return refreshed
         } catch (error) {
           state.loadedUrls.add(url)
-          if (!state.resources.has(url)) state.resources.set(url, null)
+          if (this.projects.get(projectKey) === state && !state.resources.has(url)) state.resources.set(url, null)
           throw error
         }
       })()
@@ -85,6 +88,8 @@ export class NetworkResourceManager {
     }
 
     return {
+      status: source => { const url = allowedUrl(source); return !url ? 'blocked' : state.resources.get(url) ? 'ready' : state.loadedUrls.has(url) ? 'failed' : 'pending' },
+      wait: async () => { await Promise.allSettled([...state.requests.values()]) },
       get: source => {
         const url = allowedUrl(source)
         if (!url) return null
@@ -95,5 +100,3 @@ export class NetworkResourceManager {
     }
   }
 }
-
-export const networkResourceManager = new NetworkResourceManager()

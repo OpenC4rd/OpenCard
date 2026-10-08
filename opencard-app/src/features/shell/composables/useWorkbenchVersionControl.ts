@@ -34,7 +34,7 @@ import { gitignorePatternForExtension, gitignorePatternForPath } from '../../ver
 import { useProjectTimeline } from '../../version-control/useProjectTimeline'
 import { notifyError, notifyWarning } from '../../notifications/titlebarNotices'
 import { resolveCommitterIdentity, type AppSettingKey, type AppSettings } from '../../settings/model/appSettings'
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { isRepositorySidebarReady } from '../shellSidebarConfig'
 
 /**
@@ -131,8 +131,8 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
 
   const timelineFilePath = computed(() => {
     const session = activeSession.value
-    if (!projectPath.value || session?.resourceKind !== 'workspace' || !session.path) return null
-    return getRelativeProjectPath(session.path)
+    if (!projectPath.value || session?.state.resourceKind !== 'workspace' || !session.state.path) return null
+    return getRelativeProjectPath(session.state.path)
   })
   const projectTimeline = useProjectTimeline(
     projectPath,
@@ -202,7 +202,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
   watch(fileChangeRevision, () => {
     if (projectPath.value) void refreshTimelineStatus()
   })
-  const timelineFileName = computed(() => activeSession.value?.name ?? timelineFilePath.value?.split(/[\\/]/).pop() ?? 'ocdocument')
+  const timelineFileName = computed(() => activeSession.value?.state.name ?? timelineFilePath.value?.split(/[\\/]/).pop() ?? 'ocdocument')
 
   function handleVersionGraphExpansionChange(event: OcNodeExpansionEvent): void {
     versionGraphExpandedKeys.value = event.expanded

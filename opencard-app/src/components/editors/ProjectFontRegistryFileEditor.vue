@@ -1,11 +1,11 @@
 <template>
-  <MonacoEditor v-if="props.mode === 'diff'" :model-value="props.modelValue ?? ''" language="json"
-    :mode="props.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
+  <MonacoEditor v-if="editorState.mode === 'diff'" :model-value="editorState.draftContent ?? ''" language="json"
+    :mode="editorState.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
 
   <ProjectRegistryEditorShell v-else content-mode="workspace" @keydown.ctrl.s.prevent="save">
     <ProjectFontRegistryEditor v-if="document" ref="workbenchRef" :families="document.families ?? []"
       :compositions="document.compositions ?? []"
-      :resolve-asset-src="source => projectStore.resolveResourceAssetSrcFromFile(props.filePath, source)"
+      :resolve-asset-src="source => projectStore.resolveResourceAssetSrcFromFile(filePath, source)"
       :read-font-bytes="readFontBytes"
       :load-errors="projectStore.projectFontLoadErrors.value"
       :error="importError" @update:families="updateFamilies" @update:compositions="updateCompositions"
@@ -13,7 +13,7 @@
       @remove-family="openFamilyRemovalDialog" @add-composition="openCompositionDialog"
       @configure-composition="openCompositionDialog" />
 
-    <ProjectRegistryRepairEditor v-else :model-value="props.modelValue ?? ''" :theme-id="themeId"
+    <ProjectRegistryRepairEditor v-else :model-value="editorState.draftContent ?? ''" :theme-id="themeId"
       :theme-overrides="themeOverrides" :heading="t('fontRegistry.invalid')" :description="t('fontRegistry.repair')"
       @update:model-value="updateRawSource" @save="save" />
 
@@ -52,11 +52,12 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MonacoEditor from './MonacoEditor.vue'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorEmits, EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { ContentHistoryOperationMeta } from '../../features/editor-runtime/history/contentHistory'
 import type { EditorIssue, EditorIssueSnapshot, EditorNavigationResult, SessionNavigationToken } from '../../features/editor-runtime/model/editorIssue'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { reportAppError } from '../../features/logging/appErrorCatalog'
+import { notifyAppError } from '../../features/notifications/titlebarNotices'
 import {
   buildProjectFontRegistry,
   parseProjectFontRegistryText,
@@ -90,6 +91,8 @@ import OcText from '../base/OcText.vue'
 import OcDialog from '../standard/OcDialog.vue'
 
 const props = defineProps<EditorProps>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const emit = defineEmits<EditorEmits>()
 const { t } = useI18n()
 const projectStore = useProjectStore()
@@ -126,7 +129,7 @@ const sharedRemovalSourceCount = computed(() => (
   new Set(pendingRemovalFamily.value ? projectFontSources(pendingRemovalFamily.value) : []).size - orphanedRemovalSources.value.length
 ))
 const projectDirectory = computed(() => {
-  const source = projectStore.projectPath.value || props.filePath
+  const source = projectStore.projectPath.value || filePath.value
   const normalized = source.replace(/\\/g, '/').replace(/\/+$/, '')
   return normalized.endsWith(`/${PROJECT_FONT_REGISTRY_FILE_NAME}`)
     ? normalized.slice(0, -PROJECT_FONT_REGISTRY_FILE_NAME.length - 1)
@@ -134,7 +137,7 @@ const projectDirectory = computed(() => {
 })
 const fontDirectory = computed(() => `${projectDirectory.value}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${DEFAULT_PROJECT_FONT_DIRECTORY}`)
 const readFontBytes = (source: string) => fileSystemService.readBinaryFile(
-  projectStore.resolveResourcePathFromFile(props.filePath, source),
+  projectStore.resolveResourcePathFromFile(filePath.value, source),
 )
 const issueSnapshot = computed<EditorIssueSnapshot>(() => {
   const families = document.value?.families ?? []
@@ -172,7 +175,7 @@ const issueSnapshot = computed<EditorIssueSnapshot>(() => {
   return { scopeKey: 'project-font-registry', scopeOrder: ['project-font-registry'], issues: [...registryIssues, ...loadIssues] }
 })
 
-watch(() => props.modelValue, content => {
+watch(() => editorState.value.draftContent, content => {
   document.value = parseProjectFontRegistryText(content ?? '')
 }, { immediate: true })
 watch(issueSnapshot, snapshot => emit('issue-snapshot', snapshot), { immediate: true })
@@ -182,7 +185,7 @@ function commit(next: ProjectFontRegistryDocument, history?: ContentHistoryOpera
   try {
     const content = serializeProjectFontRegistry(next)
     document.value = parseProjectFontRegistryText(content)
-    emit('update:modelValue', content, history)
+    props.session.updateContent(content, history)
     return true
   } catch (error) {
     document.value = previous
@@ -386,12 +389,11 @@ function saveComposition(request: ProjectFontCompositionRequest): void {
 }
 
 function updateRawSource(content: string, history?: ContentHistoryOperationMeta): void {
-  emit('update:modelValue', content, history)
+  props.session.updateContent(content, history)
 }
 
-function save(): void {
-  if (document.value) emit('save')
-}
+const canSave = computed(() => Boolean(document.value))
+async function save(): Promise<void> { await props.session.save().catch(error => notifyAppError('OC-E4002', error)) }
 
 function isNavigationToken(token: SessionNavigationToken): token is {
   protocol: 'font-registry'; version: 1; target: { kind: 'family' | 'composition'; key: string }
@@ -416,5 +418,5 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'file.font',
 }))
 
-defineExpose({ save, navigate, presentation })
+defineExpose({ canSave, navigate, presentation })
 </script>

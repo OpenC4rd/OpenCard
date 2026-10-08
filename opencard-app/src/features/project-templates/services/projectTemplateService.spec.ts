@@ -239,7 +239,7 @@ class MemoryFileSystem implements FileSystemService {
     this.putDirectory(path)
   }
 
-  async startWatching(_path: string): Promise<void> {}
+  async startWatching(_path: string): Promise<string> { return 'watcher' }
 
   async stopWatching(): Promise<void> {}
 

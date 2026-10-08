@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UnsupportedFileEditor from './UnsupportedFileEditor.vue'
@@ -36,11 +37,7 @@ describe('UnsupportedFileEditor', () => {
 
   it('loads workspace content only after the user chooses readonly text', async () => {
     const wrapper = mount(UnsupportedFileEditor, {
-      props: {
-        filePath: 'assets/reference.bin',
-        fileName: 'reference.bin',
-        resourceRootPath: 'D:/project',
-      },
+      props: { session: createTestSession({ path: 'assets/reference.bin', name: 'reference.bin' }), resourceRootPath: 'D:/project' },
     })
 
     expect(mocks.readFile).not.toHaveBeenCalled()
@@ -57,7 +54,7 @@ describe('UnsupportedFileEditor', () => {
 
   it('delegates system opening without reading the file', async () => {
     const wrapper = mount(UnsupportedFileEditor, {
-      props: { filePath: 'D:/outside/reference.bin', fileName: 'reference.bin' },
+      props: { session: createTestSession({ path: 'D:/outside/reference.bin', name: 'reference.bin' }),  },
     })
 
     await wrapper.findAll('button')[1]!.trigger('click')

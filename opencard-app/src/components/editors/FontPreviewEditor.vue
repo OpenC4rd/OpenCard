@@ -1,5 +1,5 @@
 <template>
-  <FontDiffView v-if="props.mode === 'diff'" :comparison="props.comparison" :file-path="props.filePath"
+  <FontDiffView v-if="editorState.mode === 'diff'" :comparison="props.comparison" :file-path="filePath"
     :project-root-path="props.resourceRootPath" />
   <ProjectRegistryEditorShell v-else content-mode="workspace">
     <section class="font-preview-editor" :aria-label="t('fontPreview.title', { name: displayName })">
@@ -33,7 +33,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { fileSystemService } from '../../features/workspace/services/fileSystemService'
 import { repairTrueTypeFont } from '../../features/workspace/services/trueTypeFontRepair'
@@ -46,7 +46,8 @@ import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
 defineOptions({ name: 'FontPreviewEditor' })
 
 const props = defineProps<EditorProps>()
-const emit = defineEmits<EditorEmits>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
 const previewFamily = `OpenCardFontPreview-${crypto.randomUUID()}`
 const loading = ref(true)
@@ -58,7 +59,7 @@ let loadedFace: FontFace | null = null
 let fontObjectUrl: string | null = null
 let loadVersion = 0
 
-const displayName = computed(() => props.fileName || props.filePath.split(/[/\\]/).pop() || props.filePath)
+const displayName = computed(() => editorState.value.name || filePath.value.split(/[/\\]/).pop() || filePath.value)
 
 const presentation = computed<EditorPresentation>(() => ({
   title: displayName.value,
@@ -69,9 +70,9 @@ const presentation = computed<EditorPresentation>(() => ({
 defineExpose({ presentation })
 const specimenStyle = computed<CSSProperties>(() => ({ fontFamily: previewFamily }))
 const absolutePath = computed(() => {
-  if (/^[a-z]:[/\\]/i.test(props.filePath) || props.filePath.startsWith('/')) return props.filePath
+  if (/^[a-z]:[/\\]/i.test(filePath.value) || filePath.value.startsWith('/')) return filePath.value
   const root = props.resourceRootPath?.replace(/[/\\]+$/, '')
-  return root ? `${root}/${props.filePath}` : props.filePath
+  return root ? `${root}/${filePath.value}` : filePath.value
 })
 
 function removeLoadedFace(): void {
@@ -94,7 +95,7 @@ async function loadFont(): Promise<void> {
 
   try {
     const bytes = await fileSystemService.readBinaryFile(absolutePath.value)
-    const blob = new Blob([new Uint8Array(bytes)], { type: resolveFontMimeType(props.filePath) })
+    const blob = new Blob([new Uint8Array(bytes)], { type: resolveFontMimeType(filePath.value) })
     const source = URL.createObjectURL(blob)
     if (version !== loadVersion) {
       URL.revokeObjectURL(source)
@@ -113,7 +114,7 @@ async function loadFont(): Promise<void> {
   } finally {
     if (version === loadVersion) {
       loading.value = false
-      emit('modified', false)
+
     }
   }
 }
@@ -178,7 +179,7 @@ function resolveFontMimeType(path: string): string {
   return 'font/ttf'
 }
 
-watch(() => props.filePath, () => void loadFont(), { immediate: true })
+watch(() => filePath.value, () => void loadFont(), { immediate: true })
 
 onBeforeUnmount(() => {
   loadVersion += 1

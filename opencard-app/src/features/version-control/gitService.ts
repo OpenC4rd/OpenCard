@@ -70,3 +70,5 @@ export const materializeRevision = (projectRoot: string, request: MaterializeRev
 
 export const merge = (projectRoot: string, request: MergeRequest) =>
   invokeRequest<OperationState, MergeRequest>('git_merge', projectRoot, request)
+
+export const releaseRevisionSnapshot = (rootPath: string): Promise<void> => invoke('git_release_revision_snapshot', { rootPath })

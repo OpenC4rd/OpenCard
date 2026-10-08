@@ -36,7 +36,8 @@ export function useWorkbenchProjectExport(options: {
   async function submit(): Promise<boolean> {
     if (preparing.value || options.running.value) return false
     preparing.value = true; issues.value = []
-    const result = await options.prepare(task.value)
+    let result: ExportPreparationResult
+    try { result = await options.prepare(task.value) } finally { preparing.value = false }
     if (!result.ok) { issues.value = result.issues; preparing.value = false; return false }
     open.value = false; preparing.value = false; void options.run(result.plan); return true
   }

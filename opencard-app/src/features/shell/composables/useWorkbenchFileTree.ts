@@ -1,6 +1,6 @@
 /** Workspace entry lookup and OcNode collection projection. */
 import { computed, ref, watch, type Ref } from 'vue'
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { resolveEntryIcon, resolveFileTypeById, type EntryIconPresentation } from '../../workspace/model/fileTypes'
 import { normalizeNodeTail, type OcNode, type OcNodeAction, type OcNodeCollection, type OcNodeRenameSelection } from '../../../shared/ui/node/node.types'
 import type { IconToken } from '../../../shared/ui/icon/iconRegistry'
@@ -142,11 +142,19 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       else byRelativePath.get(relativePath.slice(0, separatorIndex))?.children.push(entry)
     }
 
+    const compareEntries = (left: ProjectEntryView, right: ProjectEntryView) =>
+      Number(right.isDirectory) - Number(left.isDirectory)
+      || left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: 'base' })
+    roots.sort(compareEntries)
+    for (const entry of byKey.values()) entry.children.sort(compareEntries)
+
     return { roots, byKey }
   })
 
   /** Inline actions always target the row that carries them, so keys are node-local and static. */
   function createProjectEntryNode(entry: ProjectEntryView): OcNode {
+    const selectionCount = selectedProjectEntryKeys.value.includes(entry.key)
+      ? selectedProjectEntryKeys.value.length : 1
     const presentation = resolveEntryIcon(
       entry.key,
       entry.isDirectory,
@@ -158,6 +166,7 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       key: PROJECT_ENTRY_RENAME_ACTION_KEY,
       title: options.translate('sidebar.fileActions.rename'),
       icon: 'action.edit',
+      disabled: selectionCount > 1,
     }
     const reveal: OcNodeAction = {
       key: PROJECT_ENTRY_REVEAL_ACTION_KEY,
@@ -180,7 +189,9 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       icon: 'action.delete',
       children: [{
         key: PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY,
-        title: options.translate('sidebar.fileActions.confirmDeleteFile', { fileName: entry.label }),
+        title: selectionCount > 1
+          ? options.translate('sidebar.fileActions.confirmDeleteSelected', { count: selectionCount })
+          : options.translate('sidebar.fileActions.confirmDeleteFile', { fileName: entry.label }),
         icon: 'action.delete',
         iconTone: 'danger',
       }],
@@ -333,20 +344,20 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
    * 这类信息只有项目知道）；编辑器也声明了色调时才以它为准。没声明的会话整份按条目或文件类型算。
    */
   function resolveSessionVisual(session: EditorSession): EntryIconPresentation {
-    const fileType = resolveFileTypeById(session.fileTypeId)
-    const entry = session.resourceKind === 'workspace' && session.path
+    const fileType = resolveFileTypeById(session.state.fileTypeId)
+    const entry = session.state.resourceKind === 'workspace' && session.state.path
       ? resolveEntryIcon(
-          session.path,
+          session.state.path,
           false,
           false,
           options.projectPath.value,
           registeredFontSourceSet.value,
         )
       : { icon: fileType.icon, tone: fileType.iconTone }
-    if (!session.presentation) return entry
+    if (!session.state.presentation) return entry
     return {
-      icon: session.presentation.icon,
-      tone: session.presentation.iconTone ?? entry.tone,
+      icon: session.state.presentation.icon,
+      tone: session.state.presentation.iconTone ?? entry.tone,
     }
   }
 
@@ -359,16 +370,16 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     const items = new Map<string, OcNode>()
     for (const session of options.sessions.value) {
       const visual = resolveSessionVisual(session)
-      items.set(session.id, {
+      items.set(session.state.id, {
         label: options.formatSessionTitle(session),
-        loading: session.presentation === undefined,
+        loading: session.state.presentation === undefined,
         visual: { type: 'icon', icon: visual.icon, iconTone: visual.tone },
         tail: [closeAction],
         contextActions: [closeAction],
       })
     }
     return {
-      rootKeys: options.sessions.value.map((session) => session.id),
+      rootKeys: options.sessions.value.map((session) => session.state.id),
       items,
       children: new Map(),
     }
@@ -406,19 +417,22 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       return
     }
 
-    const opened = options.sessions.value.some((candidate) => candidate.id === session.id)
-    setSelectedKeys(openedEditorSelectedKeys, opened ? [session.id] : [])
+    const opened = options.sessions.value.some((candidate) => candidate.state.id === session.state.id)
+    setSelectedKeys(openedEditorSelectedKeys, opened ? [session.state.id] : [])
 
-    if (session.resourceKind !== 'workspace' || !session.path) {
+    if (session.state.resourceKind !== 'workspace' || !session.state.path) {
       setSelectedKeys(selectedProjectEntryKeys, [])
       setSelectedKeys(selectedManagementKeys, [])
       return
     }
 
-    const normalizedSessionPath = normalizeShellPath(session.path)
+    const normalizedSessionPath = normalizeShellPath(session.state.path)
     const entry = findProjectEntryByKey(normalizedSessionPath)
     const managedKey = projectManagementProjection.value.nodeKeyByTargetPath.get(normalizedSessionPath)
-    setSelectedKeys(selectedProjectEntryKeys, entry ? [normalizedSessionPath] : [])
+    const selection = selectedProjectEntryKeys.value.filter(key => projectProjection.value.byKey.has(key))
+    setSelectedKeys(selectedProjectEntryKeys, entry
+      ? selection.includes(normalizedSessionPath) ? selection : [normalizedSessionPath]
+      : [])
     setSelectedKeys(selectedManagementKeys, managedKey ? [managedKey] : [])
   }
 
@@ -443,9 +457,13 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
   watch(
     [() => {
       const session = options.activeSession.value
-      return session ? `${session.id}\0${session.resourceKind}\0${session.path ?? ''}` : ''
+      return session ? `${session.state.id}\0${session.state.resourceKind}\0${session.state.path ?? ''}` : ''
     }, () => projectProjection.value.byKey, () => projectManagementProjection.value.nodeKeyByTargetPath],
-    () => syncSelectionFromActiveSession(options.activeSession.value),
+    (next, previous) => {
+      if (previous && next[0] === previous[0] && selectedProjectEntryKeys.value.length > 1) {
+        setSelectedKeys(selectedProjectEntryKeys, selectedProjectEntryKeys.value.filter(key => projectProjection.value.byKey.has(key)))
+      } else syncSelectionFromActiveSession(options.activeSession.value)
+    },
     { immediate: true },
   )
 

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearProjectFonts, createProjectFontCss, syncProjectFonts } from './projectFontLoader'
+import { createProjectFontCss, createResourceFontLoader } from './projectFontLoader'
 
 const originalFontSetDescriptor = Object.getOwnPropertyDescriptor(document, 'fonts')
 const font = (key: string, source: string) => ({ key, name: key, files: { normal: { upright: source } } })
 
 describe('projectFontLoader', () => {
   afterEach(() => {
-    clearProjectFonts(); vi.restoreAllMocks()
+    document.head.querySelectorAll('style[data-opencard-resource-fonts]').forEach(style => style.remove()); vi.restoreAllMocks()
     if (originalFontSetDescriptor) Object.defineProperty(document, 'fonts', originalFontSetDescriptor)
     else Reflect.deleteProperty(document, 'fonts')
   })
@@ -32,12 +32,17 @@ describe('projectFontLoader', () => {
     expect(rules[1]).toContain('unicode-range: U+43')
   })
 
-  it('atomically replaces the owned stylesheet', async () => {
-    Object.defineProperty(document, 'fonts', { configurable: true, value: { load: vi.fn(async () => [{}]), ready: Promise.resolve() } })
-    await syncProjectFonts([font('first', 'fonts/First.ttf')], source => source)
-    await syncProjectFonts([font('second', 'fonts/Second.ttf')], source => source)
-    const styles = document.head.querySelectorAll('style[data-opencard-project-fonts]')
+  it('keeps two environments independent and removes only the disposed stylesheet', async () => {
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { load: vi.fn(async () => [{}]) } })
+    const first = createResourceFontLoader(key => `First-${key}`)
+    const second = createResourceFontLoader(key => `Second-${key}`)
+    await first.sync([font('body', 'fonts/First.ttf')], [], source => source, async () => new Set())
+    await second.sync([font('body', 'fonts/Second.ttf')], [], source => source, async () => new Set())
+    first.dispose()
+    const styles = document.head.querySelectorAll('style[data-opencard-resource-fonts]')
     expect(styles).toHaveLength(1)
-    expect(styles[0]?.textContent).toContain('OpenCardProjectFont-second')
+    expect(styles[0]?.textContent).toContain('Second-body')
+    second.dispose()
+    expect(document.head.querySelectorAll('style[data-opencard-resource-fonts]')).toHaveLength(0)
   })
 })

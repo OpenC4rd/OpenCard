@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import {
   projectResourceScopeIdentity,
@@ -13,7 +13,6 @@ import {
   type ResourceIssueCode,
   type ResolvedResource,
 } from './cardRenderResources'
-import { setProjectFonts } from '../workspace/model/projectFonts'
 import { normalizeResourcePackageManifest } from '../workspace/model/resourcePackage'
 import type { PackageCoordinate } from '../workspace/model/packageCoordinate'
 import type { ProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
@@ -69,11 +68,9 @@ function resolveIconEntry(
 
 describe('cardRenderResources', () => {
   beforeEach(() => convertFileSrc.mockClear())
-  afterEach(() => setProjectFonts([]))
 
   it('keeps project font conversion identical after field scopes are derived', () => {
     const font = { key: 'brand', name: 'Brand', files: { normal: { upright: 'fonts/Brand.ttf' } } }
-    setProjectFonts([font])
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project',
       fontDocument: {}, fonts: { brand: { kind: 'family', name: 'Brand', family: font } },
@@ -86,16 +83,16 @@ describe('cardRenderResources', () => {
     ]]))
 
     expect(root.resolve({ value: 'font:brand', expect: 'font', blockId: 'native-text', fieldKey: 'fontFamily' }))
-      .toEqual({ kind: 'font', cssFamily: '"OpenCardProjectFont-brand"' })
+      .toEqual({ kind: 'font', cssFamily: '"OpenCardResource-project-root-brand"' })
     expect(derived.resolve({ value: 'font:brand', expect: 'font', blockId: 'custom-text', fieldKey: 'fontFamily' }))
-      .toEqual({ kind: 'font', cssFamily: '"OpenCardProjectFont-brand"' })
+      .toEqual({ kind: 'font', cssFamily: '"OpenCardResource-project-root-brand"' })
   })
 
   it('keeps assets, icons, and missing-resource behavior identical after scopes are derived', () => {
     const icon = {
       seriesKey: 'status', iconKey: 'warning', name: 'Warning',
       source: 'icons/warning.svg', src: 'asset://icons/warning.svg',
-      tint: 'theme' as const, imageWidth: 16, imageHeight: 16,
+      tint: 'context' as const, imageWidth: 16, imageHeight: 16,
     }
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project', fontDocument: {}, fonts: {},
@@ -133,7 +130,7 @@ describe('cardRenderResources', () => {
     const icon = {
       seriesKey: 'status', iconKey: 'warning', name: 'Warning',
       source: 'icons/warning.svg', src: 'asset://icons/warning.svg',
-      tint: 'theme' as const, imageWidth: 16, imageHeight: 16,
+      tint: 'context' as const, imageWidth: 16, imageHeight: 16,
     }
     const coordinate = { author: 'alice', name: 'theme', version: '1.0.0' }
     const packageEnvironment: ProjectResourceEnvironment = {
@@ -310,7 +307,6 @@ describe('cardRenderResources', () => {
 
   it('keeps the font list join and reports an empty font field as empty', () => {
     const font = { key: 'brand', name: 'Brand', files: { normal: { upright: 'fonts/Brand.ttf' } } }
-    setProjectFonts([font])
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project',
       fontDocument: {}, fonts: { brand: { kind: 'family', name: 'Brand', family: font } },
@@ -319,7 +315,7 @@ describe('cardRenderResources', () => {
     const context = createCardRenderResourceContext({ hostEnvironment: environment })
 
     expect(resolveCardResource({ value: 'font:brand; Arial', expect: 'font' }, context))
-      .toEqual({ kind: 'font', cssFamily: '"OpenCardProjectFont-brand", Arial' })
+      .toEqual({ kind: 'font', cssFamily: '"OpenCardResource-project-root-brand", Arial' })
     expect(resolveCardResource({ value: '   ', expect: 'font' }, context))
       .toEqual({ kind: 'empty' })
   })

@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import {
   type CardDocument,
 } from '../../entities/card/model'
@@ -13,9 +13,7 @@ import type { HistoryOperationMeta } from '../editor-runtime/history/history.typ
 export type CdeDocumentChangeMode = 'typing' | 'action'
 
 type UseCdeDocumentStateOptions = {
-  emitModelValueUpdate: (content: string, history?: HistoryOperationMeta) => void
-  emitModified: (modified: boolean) => void
-  emitSave: () => void
+  updateContent: (content: string, history?: HistoryOperationMeta) => void
   resetSelection: () => void
 }
 
@@ -23,25 +21,7 @@ export function useCdeDocumentState(options: UseCdeDocumentStateOptions) {
   const rawContent = ref('')
   const cardDoc = ref<CardDocument | null>(null)
   const parentLookup = ref<ParentLookup>(new Map())
-  const isModified = ref(false)
-  const savedContent = ref('')
   const documentRevision = ref(0)
-
-  const hasDocument = computed(() => Boolean(cardDoc.value))
-
-  function serializeCurrentDocument(document: CardDocument): string {
-    return stringifyCardDocument(document)
-  }
-
-  function updateModifiedState(nextContent: string) {
-    const nextIsModified = nextContent !== savedContent.value
-    if (nextIsModified === isModified.value) {
-      return
-    }
-
-    isModified.value = nextIsModified
-    options.emitModified(nextIsModified)
-  }
 
   function rebuildParentLookup() {
     parentLookup.value = cardDoc.value ? buildParentLookup(cardDoc.value) : new Map()
@@ -57,63 +37,18 @@ export function useCdeDocumentState(options: UseCdeDocumentStateOptions) {
     if (structural) rebuildParentLookup()
   }
 
-  function applyDocumentContent(content: string, history?: HistoryOperationMeta) {
-    const hasChanged = content !== rawContent.value
-    if (hasChanged) {
-      rawContent.value = content
-      options.emitModelValueUpdate(content, history)
-    }
-
-    updateModifiedState(content)
-  }
-
-  function commitCurrentDocument(history: HistoryOperationMeta) {
-    if (!cardDoc.value) {
-      return false
-    }
-
-    const content = serializeCurrentDocument(cardDoc.value)
-    if (content === rawContent.value) {
-      updateModifiedState(content)
-      return false
-    }
-
-    applyDocumentContent(content, history)
-    return true
-  }
-
-  function markDirtyImmediately() {
-    if (isModified.value) {
-      return
-    }
-
-    isModified.value = true
-    options.emitModified(true)
-  }
-
   function markDocumentChanged(
     mode: CdeDocumentChangeMode = 'action',
     target = 'document',
     structural = false,
   ) {
-    if (!hasDocument.value) {
-      return
-    }
-
-    markDirtyImmediately()
-
-    commitCurrentDocument(mode === 'typing'
+    if (!cardDoc.value) return
+    const content = stringifyCardDocument(cardDoc.value)
+    if (content === rawContent.value) return
+    rawContent.value = content
+    options.updateContent(content, mode === 'typing'
       ? { mode: 'debounced', merge: { family: 'card-edit', target }, structural }
       : { mode: 'immediate', structural })
-  }
-
-  async function flushPendingChanges() {
-    // Session history owns debounced grouping and is flushed by the editor host.
-  }
-
-  function setSavedContent(content: string) {
-    savedContent.value = content
-    updateModifiedState(content)
   }
 
   function loadRawDoc(content: string, saved = true) {
@@ -124,28 +59,10 @@ export function useCdeDocumentState(options: UseCdeDocumentStateOptions) {
       const parsed = JSON.parse(content) as unknown
       cardDoc.value = parseCardDocument(parsed)
       rebuildParentLookup()
-      if (saved) setSavedContent(content)
-      else updateModifiedState(content)
     } catch (e) {
       notifyAppError('OC-E4003', e)
       cardDoc.value = null
       rebuildParentLookup()
-      if (saved) setSavedContent(content)
-      else updateModifiedState(content)
-    }
-  }
-
-  async function saveFile() {
-    if (!cardDoc.value) return
-    try {
-      await flushPendingChanges()
-      const content = serializeCurrentDocument(cardDoc.value)
-      rawContent.value = content
-      setSavedContent(content)
-      options.emitModelValueUpdate(content)
-      options.emitSave()
-    } catch (e) {
-      notifyAppError('OC-E4004', e)
     }
   }
 
@@ -154,11 +71,8 @@ export function useCdeDocumentState(options: UseCdeDocumentStateOptions) {
     cardDoc,
     documentRevision,
     parentLookup,
-    isModified,
     markDocumentChanged,
     refreshDocumentState,
-    flushPendingChanges,
     loadRawDoc,
-    saveFile,
   }
 }

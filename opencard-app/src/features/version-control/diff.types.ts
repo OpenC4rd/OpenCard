@@ -1,5 +1,4 @@
-import type { ProjectInformation, ProjectRemoteResourcePolicy } from '../workspace/model/projectMetadata'
-import type { ProjectIconCatalog } from '../workspace/services/projectIconCatalog'
+import type { ResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 
 export interface DiffSnapshot {
   commitId: string | null
@@ -7,11 +6,7 @@ export interface DiffSnapshot {
   content: string
   resourceRootPath?: string | null
   sourceFilePath?: string | null
-  project?: Readonly<ProjectInformation> | null
-  dictionary?: Readonly<Record<string, string>>
-  projectIconCatalog?: ProjectIconCatalog
-  resolveFontFamily?: (references: string) => string
-  remoteResourcePolicy?: ProjectRemoteResourcePolicy
+  resourceEnvironment?: ResourceEnvironment | null
 }
 
 export interface DiffRevisionOption {

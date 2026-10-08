@@ -352,6 +352,7 @@ export const iconGlyphs = {
   'status.unknown': glyph(mdiHelpCircleOutline),
   'status.warning': glyph(mdiAlertOutline),
   'status.circle-medium': glyph(mdiCircleMedium),
+  'circle': glyph(mdiCircleMedium),
 
   'file.css': glyph(mdiLanguageCss3),
   'file.dictionary': glyph(mdiTranslate),

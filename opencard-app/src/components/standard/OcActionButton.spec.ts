@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import OcActionButton from './OcActionButton.vue'
+import { setupGlobalTooltip } from '../../shared/ui/tooltip/globalTooltip'
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   return {
@@ -18,9 +19,32 @@ function rect(left: number, top: number, width: number, height: number): DOMRect
 
 describe('OcActionButton', () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     document.body.innerHTML = ''
+  })
+
+  it('shows a submenu trigger tooltip on hover and dismisses it when clicked', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(OcActionButton, {
+      attachTo: document.body,
+      props: { action: { key: 'export', title: 'Export images', children: [{ key: 'front', title: 'Front' }] } },
+    })
+    setupGlobalTooltip()
+    try {
+      await wrapper.get('button').trigger('mouseover')
+      await vi.advanceTimersByTimeAsync(350)
+      const tooltip = document.getElementById('oc-tooltip-layer')!
+      expect(tooltip.getAttribute('aria-hidden')).toBe('false')
+      expect(tooltip.textContent).toBe('Export images')
+      expect(document.body.querySelector('.oc-action-menu')).toBeNull()
+      await wrapper.get('button').trigger('pointerdown')
+      await wrapper.get('button').trigger('click')
+      await flushPromises()
+      expect(tooltip.getAttribute('aria-hidden')).toBe('true')
+      expect(document.body.querySelector('.oc-action-menu')).not.toBeNull()
+    } finally { wrapper.unmount() }
   })
 
 

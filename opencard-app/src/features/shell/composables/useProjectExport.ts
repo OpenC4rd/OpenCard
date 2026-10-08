@@ -23,9 +23,8 @@ import type { PreparedCardRender } from '../../card-rendering/renderPipeline'
 import type { CardFaceKey } from '../../../entities/card/model'
 import type { CardRenderResourceContext } from '../../card-rendering/cardRenderResources'
 import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
-import { waitForProjectFonts } from '../../workspace/services/projectFontLoader'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import domtoimage from 'dom-to-image-more'
 import { reportAppError } from '../../logging/appErrorCatalog'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning } from '../../notifications/titlebarNotices'
@@ -150,15 +149,18 @@ export function useProjectExport(options: UseProjectExportOptions) {
   const exportCardFace = shallowRef<RenderReadyCardFace | null>(null)
   const exportResourceContext = shallowRef<CardRenderResourceContext | null>(null)
   const isRunning = ref(false)
+  let settle: (() => void) | undefined
+  let settled: Promise<void> = Promise.resolve()
+  function start() { controller.value = new AbortController(); settled = new Promise(resolve => { settle = resolve }) }
   const controller = ref<AbortController | null>(null)
   const { setTask, removeTask } = useShellProgressTasks()
 
   async function loadDocumentSnapshot(relativePath: string): Promise<ExportDocumentSnapshot> {
     const normalizedRelativePath = normalizePath(relativePath)
-    const session = options.sessions.value.find(candidate => candidate.resourceKind === 'workspace'
-      && candidate.path
-      && options.getRelativeProjectPath(candidate.path).toLocaleLowerCase() === normalizedRelativePath.toLocaleLowerCase())
-    const content = session?.draftContent ?? await options.readProjectFile(normalizedRelativePath)
+    const session = options.sessions.value.find(candidate => candidate.state.resourceKind === 'workspace'
+      && candidate.state.path
+      && options.getRelativeProjectPath(candidate.state.path).toLocaleLowerCase() === normalizedRelativePath.toLocaleLowerCase())
+    const content = session?.state.draftContent ?? await options.readProjectFile(normalizedRelativePath)
     const document = parseCardDocument(JSON.parse(content) as unknown)
     return {
       sourcePath: normalizedRelativePath,
@@ -175,23 +177,29 @@ export function useProjectExport(options: UseProjectExportOptions) {
   }
 
   async function prepare(task: ProjectExportTask): Promise<ExportPreparationResult> {
-    const snapshots = new Map<string, ExportDocumentSnapshot>()
-    for (const path of task.documentPaths) {
-      const snapshot = await loadDocumentSnapshot(path)
-      snapshots.set(normalizePath(path).toLowerCase(), snapshot)
-    }
+    if (isRunning.value) throw new Error('Export renderer is busy')
+    isRunning.value = true
+    start()
     const environment = options.renderEnvironment.value
-    return await prepareExportTask({
-      task,
-      source: { load: async path => snapshots.get(normalizePath(path).toLowerCase()) ?? await loadDocumentSnapshot(path) },
-      destination,
-      environment,
-    })
+    const signal = controller.value!.signal
+    try {
+      const snapshots = new Map<string, ExportDocumentSnapshot>()
+      for (const path of task.documentPaths) {
+        if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+        snapshots.set(normalizePath(path).toLowerCase(), await loadDocumentSnapshot(path))
+      }
+      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+      const request = { task, source: { load: async (path: string) => snapshots.get(normalizePath(path).toLowerCase())! }, destination, environment }
+      await prepareExportTask(request)
+      await environment.projectResourceEnvironment?.waitForResources?.()
+      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+      return await prepareExportTask(request)
+    } finally { controller.value = null; isRunning.value = false; settle?.(); settle = undefined }
   }
 
   const renderer: ExportFaceRenderer = {
     async render(request, signal) {
-      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+      if (signal.aborted || request.render.resources.hostEnvironment.isDisposed?.()) throw new DOMException('Export cancelled', 'AbortError')
       showExportRenderer.value = true
       exportCardFace.value = request.render.document.faces[request.faceKey]
       exportResourceContext.value = request.render.resources
@@ -200,8 +208,9 @@ export function useProjectExport(options: UseProjectExportOptions) {
 
       const canvas = options.exportRendererRef.value?.getCanvasElement?.()
       if (!canvas) throw new Error('Export renderer is unavailable')
+      await request.render.resources.hostEnvironment.waitForResources?.()
+      await nextTick()
       await waitForExportAssets(canvas)
-      await waitForProjectFonts()
       await waitForNextPaint()
       if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
       const restoreProjectIcons = await inlineProjectIconSources(canvas)
@@ -256,7 +265,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
   async function run(plan: ExportPlan): Promise<ExportRunResult | null> {
     if (isRunning.value) return null
     isRunning.value = true
-    controller.value = new AbortController()
+    start()
     setTask({
       key: PROJECT_EXPORT_PROGRESS_KEY,
       title: options.translate('app.exportProgress.project'),
@@ -269,12 +278,13 @@ export function useProjectExport(options: UseProjectExportOptions) {
         plan,
         renderer,
         destination,
-        signal: controller.value.signal,
+        signal: controller.value!.signal,
         report: reportProgress,
       })
       reportResult(result)
       return result
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return null
       notifyAppError('OC-E5006', error)
       return null
     } finally {
@@ -282,6 +292,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
       renderer.reset()
       controller.value = null
       isRunning.value = false
+      settle?.(); settle = undefined
     }
   }
 
@@ -289,9 +300,11 @@ export function useProjectExport(options: UseProjectExportOptions) {
     render: PreparedCardRender,
     faceKeys: readonly CardFaceKey[],
     scale: number,
+    outputs?: ReadonlyMap<CardFaceKey, string>,
   ): Promise<ReadonlyMap<CardFaceKey, Uint8Array> | null> {
-    if (isRunning.value) return null
+    if (isRunning.value || render.resources.hostEnvironment.isDisposed?.()) return null
     isRunning.value = true
+    start()
     const result = new Map<CardFaceKey, Uint8Array>()
     try {
       for (const faceKey of faceKeys) {
@@ -301,15 +314,23 @@ export function useProjectExport(options: UseProjectExportOptions) {
           faceKey,
           render,
           scale,
-        }, new AbortController().signal))
+        }, controller.value!.signal))
+      }
+      for (const [face, path] of outputs ?? []) {
+        if (controller.value!.signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+        const bytes = result.get(face)
+        if (bytes) await destination.write(path, bytes)
       }
       return result
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return null
       notifyAppError('OC-E5006', error)
       return null
     } finally {
       renderer.reset()
+      controller.value = null
       isRunning.value = false
+      settle?.(); settle = undefined
     }
   }
 
@@ -327,5 +348,6 @@ export function useProjectExport(options: UseProjectExportOptions) {
     run,
     renderCardImages,
     cancel,
+    cancelAndWait: async () => { cancel(); await settled },
   }
 }

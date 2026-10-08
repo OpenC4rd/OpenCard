@@ -120,16 +120,6 @@ export const APP_ERROR_CATALOG = {
     meaning: { 'zh-CN': '注册表草稿无效', 'en-US': 'The project registry draft is invalid' },
     solution: '在源码中修复注册表 JSON，确认内容有效后再次保存。',
   },
-  'OC-E3013': {
-    area: '项目与资源',
-    meaning: { 'zh-CN': '无法导入图标包', 'en-US': 'Could not import the icon pack' },
-    solution: '确认 .ociconpack 文件包含有效的 JSON 与所声明的图标文件，并检查项目目录写入权限。',
-  },
-  'OC-E3014': {
-    area: '项目与资源',
-    meaning: { 'zh-CN': '无法导出图标包', 'en-US': 'Could not export the icon pack' },
-    solution: '确认项目图标文件可读取，并检查目标路径和磁盘写入权限。',
-  },
   'OC-E3016': {
     area: '项目与资源',
     meaning: { 'zh-CN': '无法读取项目里的资源包', 'en-US': 'Could not read the project resource packages' },

@@ -35,7 +35,7 @@ vi.mock('../../features/workspace/services/projectIconCatalog', async (importOri
 const series: ProjectIconSeries[] = [
   {
     name: 'Status icons', key: 'status',
-    icons: [{ iconKey: 'warning', name: 'Warning', source: '.opencard/icons/status/warning.svg', tint: 'theme' }],
+    icons: [{ iconKey: 'warning', name: 'Warning', source: '.opencard/icons/status/warning.svg', tint: 'context' }],
   },
   { name: 'Action icons', key: 'actions', icons: [] },
 ]
@@ -52,7 +52,7 @@ function iconsOf(candidate: ProjectIconSeries): ProjectIconSeries['icons'] {
   return [
     ...candidate.icons,
     { iconKey: 'success', name: 'Success', source: '.opencard/icons/status/success.svg', tint: 'original' },
-    { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'theme' },
+    { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'context' },
   ]
 }
 function seriesAction(wrapper: ReturnType<typeof mount>, key: string, actionKey: string): OcNodeAction | undefined {
@@ -88,8 +88,6 @@ describe('ProjectIconRegistryWorkbench', () => {
     })
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('button[aria-label="projectConfig.icons.createPack"]').exists()).toBe(false)
-    expect(wrapper.find('button[aria-label="projectConfig.icons.importPack"]').exists()).toBe(false)
   })
 
   it('offers the set commands on the set row and no crop or even-grid actions', () => {
@@ -97,18 +95,16 @@ describe('ProjectIconRegistryWorkbench', () => {
       props: { ...baseProps, projectIconCatalog },
     })
 
-    expect(seriesAction(wrapper, 'status', 'export-pack')).toBeDefined()
     expect(seriesAction(wrapper, 'status', 'add-icons')).toBeDefined()
     expect(wrapper.find('button[aria-label="projectConfig.icons.addSingleCrop"]').exists()).toBe(false)
     expect(wrapper.find('button[aria-label="projectConfig.icons.generateIcons"]').exists()).toBe(false)
   })
 
-  it('disables the pack commands while an icon-pack task owns the progress bar', () => {
+  it('disables the import commands while an icon import task owns the progress bar', () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, {
-      props: { ...baseProps, projectIconCatalog, packBusy: true },
+      props: { ...baseProps, projectIconCatalog, importBusy: true },
     })
 
-    expect(seriesAction(wrapper, 'status', 'export-pack')?.disabled).toBe(true)
     expect(seriesAction(wrapper, 'status', 'add-icons')?.disabled).toBe(true)
   })
 
@@ -215,13 +211,6 @@ describe('ProjectIconRegistryWorkbench', () => {
     expect(renamed[0]?.icons[0]?.name).toBe('Alert')
     expect(series[0]?.icons[0]?.name).toBe('Warning')
 
-    wrapper.getComponent(PropertyEditor).vm.$emit('update-property', {
-      key: 'icon:0', fieldKey: 'rotation', value: '90°',
-    })
-    await wrapper.vm.$nextTick()
-    const rotatedUpdates = wrapper.emitted('update:series') ?? []
-    const rotated = rotatedUpdates[rotatedUpdates.length - 1]?.[0] as ProjectIconSeries[]
-    expect(rotated[0]?.icons[0]?.rotation).toBe(90)
   })
 
   it('exposes tint for every icon and pixelated only for a raster', async () => {

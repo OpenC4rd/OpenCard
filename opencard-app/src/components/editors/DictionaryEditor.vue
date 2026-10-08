@@ -149,7 +149,7 @@
           </div>
         </div>
         <div class="dictionary-editor__source">
-          <MonacoEditor :model-value="modelValue ?? ''" language="json" :theme-id="themeId"
+          <MonacoEditor :model-value="editorState.draftContent ?? ''" language="json" :theme-id="themeId"
             :theme-overrides="themeOverrides"
             @update:model-value="updateRawSource" @save="save" />
         </div>
@@ -164,7 +164,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notifyAppError, notifyError } from '../../features/notifications/titlebarNotices'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import type { HistoryOperationMeta } from '../../features/editor-runtime/history/history.types'
 import { parseProjectDictionaryText, serializeProjectDictionary, type ProjectDictionary } from '../../features/workspace/model/projectDictionary'
@@ -208,7 +208,8 @@ import OcActionButton from '../standard/OcActionButton.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
 const props = defineProps<EditorProps>()
-const emit = defineEmits<EditorEmits>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
 const { openContextMenu, openKeyboardContextMenu } = useFloatingMenu()
 const dictionary = ref<ProjectDictionary | null>(null)
@@ -265,7 +266,7 @@ const tableWidth = computed(() => getColumnWidth(KEY_COLUMN_KEY) + tailColumnWid
 
 const { setCellElement, shouldMountCell } = useDataGridCellMounting({ scrollRoot: scrollRef })
 
-watch(() => props.modelValue, content => {
+watch(() => editorState.value.draftContent, content => {
   dictionary.value = parseProjectDictionaryText(content ?? '')
 }, { immediate: true })
 
@@ -283,11 +284,11 @@ function canUseLanguageKey(candidate: string, current?: string) {
 
 function commit(next: ProjectDictionary, history: HistoryOperationMeta = { mode: 'immediate' }) {
   dictionary.value = next
-  emit('update:modelValue', serializeProjectDictionary(next), history)
+  props.session.updateContent(serializeProjectDictionary(next), history)
 }
 
 function updateRawSource(content: string, history?: HistoryOperationMeta): void {
-  emit('update:modelValue', content, history)
+  props.session.updateContent(content, history)
 }
 
 function beginRecordCreate(): void {
@@ -597,7 +598,7 @@ function confirmWorkbookImport(): void {
 }
 
 function dictionaryWorkbookFileName(): string {
-  const source = (props.fileName || props.filePath.split(/[\\/]/).pop() || '')
+  const source = (editorState.value.name || filePath.value.split(/[\\/]/).pop() || '')
     .replace(/\.json$/i, '')
   const normalized = source.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').trim()
   return normalized || 'OpenCard Dictionary'
@@ -607,9 +608,8 @@ async function notifyWorkbookError(error: unknown, fallbackKey: string): Promise
   notifyError(error instanceof Error && error.message ? error.message : t(fallbackKey))
 }
 
-function save() {
-  if (dictionary.value) emit('save')
-}
+const canSave = computed(() => Boolean(dictionary.value))
+async function save(): Promise<void> { await props.session.save().catch(error => notifyAppError('OC-E4002', error)) }
 
 onBeforeUnmount(finishColumnResize)
 
@@ -627,7 +627,7 @@ async function onHeaderAction(key: string): Promise<void> {
   if (key === 'dictionary.workbook.import') await importDictionaryWorkbook()
   else if (key === 'dictionary.workbook.export') await exportDictionaryWorkbook()
 }
-defineExpose({ save, presentation, headerActions, onHeaderAction })
+defineExpose({ canSave, presentation, headerActions, onHeaderAction })
 </script>
 
 <style scoped>

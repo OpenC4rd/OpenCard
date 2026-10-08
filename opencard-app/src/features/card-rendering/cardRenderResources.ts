@@ -11,6 +11,7 @@ import {
   createScopedProjectFontFamily,
   packageScopeRoots,
   projectResourceScopeIdentity,
+  resolveProjectResourcePackage,
   type ProjectResourceEnvironment,
   type ProjectResourceScopeMap,
 } from '../workspace/services/projectResourceEnvironment'
@@ -24,7 +25,7 @@ import {
 import { projectFontSources, type ProjectFontRegistryEntry } from '../workspace/model/projectFontRegistry'
 import { toCssFontFamily } from '../workspace/model/projectFonts'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { parsePackageQualifier, resolvePackageQualifier } from '../workspace/model/packageCoordinate'
+import { parsePackageQualifier } from '../workspace/model/packageCoordinate'
 import { isRemoteResourceAllowed } from '../editor-runtime/services/editorResource'
 import { resolveResourcePath, type PackageScopeRoots, type ScopedResourcePathIssueCode } from '../workspace/model/scopedResourcePath'
 
@@ -33,6 +34,7 @@ export type CardRenderResourceContext = {
   readonly sourceFilePath: string | null
   readonly hostEnvironment: ProjectResourceEnvironment
   readonly remoteResourcePolicy?: ProjectRemoteResourcePolicy
+  readonly remoteResourceStatus?: (url: string) => 'pending' | 'ready' | 'failed' | 'blocked'
   readonly resolveRemoteResource?: (url: string) => string | null
   /** Reads an icon's size, which is what asks for it and re-renders the consumer that read it. */
   readonly resolveIconDimensions?: ProjectIconDimensionReader
@@ -58,6 +60,10 @@ export type ResourceIssueCode =
   | 'package-unavailable'
   | 'resource-unavailable'
   | 'kind-mismatch'
+  | 'pending'
+  | 'missing'
+  | 'read-failed'
+  | 'decode-failed'
 
 /** What the field is asking for: one asset reference — a path or an icon — or a font list. */
 export type ResourceExpectation = 'asset' | 'font'
@@ -79,6 +85,7 @@ export type ResolvedResource =
   | { kind: 'unavailable', code: ResourceIssueCode, message: string }
 
 export interface CardResourceResolver {
+  reportError?: (src: string, message: string) => void
   resolve: (request: ResourceRequest) => ResolvedResource
   /** Reads an icon's size, which is what asks for it. */
   resolveIconDimensions: ProjectIconDimensionReader
@@ -109,6 +116,7 @@ export function createCardResourceResolver(
   }
 
   return {
+    reportError: (src, message) => context().hostEnvironment.reportAssetError?.(src, message),
     resolve: request => resolveCardResource(request, context()),
     resolveIconDimensions: entry => (context().resolveIconDimensions ?? noopIconDimensionReader)(entry),
     withScopes: scopes => createCardResourceResolver(contextSource, [...scopeSources, scopes]),
@@ -188,7 +196,7 @@ function resolveFontResource(
     const key = resolved.value.kind === 'family'
       ? resolved.value.family.key
       : resolved.value.composition.key
-    if (resolved.environment?.kind === 'package') {
+    if (resolved.environment) {
       return JSON.stringify(createScopedProjectFontFamily(resolved.environment.namespace, key))
     }
     return fallback(`font:${key}`)
@@ -208,7 +216,8 @@ function resolveAssetResource(
     if (!isRemoteResourceAllowed(value, context.remoteResourcePolicy)) {
       return { kind: 'unavailable', code: 'unsafe-path', message: `Resource scheme is not permitted: ${value}` }
     }
-    return { kind: 'url', src: context.resolveRemoteResource?.(value) ?? value }
+    const src = context.resolveRemoteResource ? context.resolveRemoteResource(value) : value
+    return src ? { kind: 'url', src } : context.remoteResourceStatus?.(value) === 'failed' ? { kind: 'unavailable', code: 'read-failed', message: `Unable to load remote resource: ${value}` } : { kind: 'empty' }
   }
   const projectRootPath = context.resourceRootPath ?? context.hostEnvironment.rootPath ?? environment.rootPath
   const scopeRootPath = environment.rootPath ?? context.hostEnvironment.rootPath
@@ -221,7 +230,12 @@ function resolveAssetResource(
     reference: value,
     packageRoots: context.packageRoots,
   })
-  if (resolved.ok) return { kind: 'url', src: convertFileSrc(resolved.value) }
+  if (resolved.ok) {
+    const fact = context.hostEnvironment.asset?.(resolved.value)
+    if (fact?.status === 'pending') return { kind: 'empty' }
+    if (fact?.status === 'missing' || fact?.status === 'failed' || fact?.status === 'decode-failed') return { kind: 'unavailable', code: fact.status === 'failed' ? 'read-failed' : fact.status, message: fact.message ?? 'Resource unavailable' }
+    return { kind: 'url', src: fact?.src ?? convertFileSrc(resolved.value) }
+  }
   // 包正在解开时，它的文件还没有落到磁盘上；这是"再等一下"，不是缺包。
   if (resolved.code === 'package-unavailable' && isMaterializingReference(context, value)) return { kind: 'empty' }
   return { kind: 'unavailable', code: pathIssueCode(resolved.code), message: resolved.message }
@@ -234,8 +248,7 @@ function isMaterializingReference(context: CardRenderResourceContext, value: str
   const qualifier = parsePackageQualifier(value.slice(0, hash))
   const packages = context.hostEnvironment.packages
   if (!qualifier || !packages) return false
-  const coordinate = resolvePackageQualifier(packages.keys(), qualifier)
-  return coordinate ? packages.get(coordinate)?.rootPath === null : false
+  return resolveProjectResourcePackage(context.hostEnvironment, qualifier)?.rootPath === null
 }
 
 /** `resolveResourcePath` carries its own taxonomy; only its syntax name differs here. */
@@ -280,7 +293,6 @@ function fallbackEnvironment(
     kind: 'project',
     namespace: createProjectResourceNamespace('project', resourceRootPath ?? 'root'),
     rootPath: resourceRootPath,
-    generation: 0,
     fontDocument: {},
     fonts: {},
     iconDocument: {},
@@ -294,6 +306,7 @@ export function createCardRenderResourceContext(options: {
   sourceFilePath?: string | null
   hostEnvironment?: ProjectResourceEnvironment
   remoteResourcePolicy?: ProjectRemoteResourcePolicy
+  remoteResourceStatus?: (url: string) => 'pending' | 'ready' | 'failed' | 'blocked'
   resolveRemoteResource?: (url: string) => string | null
   projectIconCatalog?: ProjectIconCatalog
   resolveIconDimensions?: ProjectIconDimensionReader
@@ -319,6 +332,7 @@ export function createCardRenderResourceContext(options: {
       ?? fallbackEnvironment(options.resourceRootPath ?? null, projectIconCatalog),
     remoteResourcePolicy: options.remoteResourcePolicy,
     resolveRemoteResource: options.resolveRemoteResource,
+    remoteResourceStatus: options.remoteResourceStatus,
     resolveIconDimensions: options.resolveIconDimensions,
     resourceScopes: options.resourceScopes ?? new Map(),
     packageEnvironments: options.packageEnvironments ?? new Map(),
@@ -340,6 +354,6 @@ export function resolveCardResourceEnvironment(
   fieldKey?: string,
 ): ProjectResourceEnvironment {
   return blockId && fieldKey
-    ? context.resourceScopes.get(projectResourceScopeIdentity(blockId, fieldKey)) ?? context.hostEnvironment
+    ? context.resourceScopes.get(projectResourceScopeIdentity(blockId, fieldKey)) ?? context.resourceScopes.get(projectResourceScopeIdentity(blockId, '*')) ?? context.hostEnvironment
     : context.hostEnvironment
 }

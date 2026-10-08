@@ -1,16 +1,18 @@
+import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   EditorSession,
+  EditorSessionState,
   SessionSaveResult,
-} from '../../workspace/store/editorSessionStore'
+} from '../../editor-runtime/session/editorSession'
 import { useUnsavedSessionGuard } from './useUnsavedSessionGuard'
 
 function createSession(
   id: string,
-  patch: Partial<EditorSession> = {},
+  patch: Partial<EditorSessionState> = {},
 ): EditorSession {
-  return {
+  return createTestSession({
     id,
     resourceKind: 'workspace',
     path: `${id}.ocdocument`,
@@ -22,7 +24,7 @@ function createSession(
     isDirty: false,
     isPreview: false,
     ...patch,
-  }
+  })
 }
 
 function createGuard(sessions: EditorSession[]) {
@@ -33,10 +35,10 @@ function createGuard(sessions: EditorSession[]) {
   ) => Promise<SessionSaveResult>>(async () => 'saved')
   const pickDraftDirectory = vi.fn<() => Promise<string | null>>(async () => 'D:/drafts')
   const fileExists = vi.fn<(path: string) => Promise<boolean>>(async () => false)
+  for (const session of sessions) vi.spyOn(session, 'save').mockImplementation(path => saveSession(session.state.id, path))
   const guard = useUnsavedSessionGuard({
     sessions: ref(sessions),
     completeClose,
-    saveSession,
     pickDraftDirectory,
     fileExists,
   })
@@ -53,12 +55,12 @@ describe('useUnsavedSessionGuard', () => {
     const clean = createSession('clean')
     const { guard, completeClose } = createGuard([draft, clean])
 
-    await expect(guard.requestClose({ type: 'sessions', sessionIds: [clean.id] })).resolves.toBe('completed')
-    await expect(guard.requestClose({ type: 'sessions', sessionIds: [draft.id] })).resolves.toBe('prompted')
+    await expect(guard.requestClose({ type: 'sessions', sessionIds: [clean.state.id] })).resolves.toBe('completed')
+    await expect(guard.requestClose({ type: 'sessions', sessionIds: [draft.state.id] })).resolves.toBe('prompted')
 
     expect(completeClose).toHaveBeenCalledTimes(1)
     expect(guard.decisions.value).toMatchObject([{
-      sessionId: draft.id,
+      sessionId: draft.state.id,
       decision: 'pending',
       selected: true,
     }])
@@ -69,7 +71,7 @@ describe('useUnsavedSessionGuard', () => {
     const { guard, completeClose } = createGuard([clean])
     const intent = {
       type: 'project' as const,
-      sessionIds: [clean.id],
+      sessionIds: [clean.state.id],
       projectDestination: 'welcome' as const,
     }
 
@@ -82,7 +84,7 @@ describe('useUnsavedSessionGuard', () => {
     const { guard, completeClose } = createGuard([clean])
     const intent = {
       type: 'project' as const,
-      sessionIds: [clean.id],
+      sessionIds: [clean.state.id],
       projectDestination: 'create-project' as const,
     }
 
@@ -94,23 +96,23 @@ describe('useUnsavedSessionGuard', () => {
     const first = createSession('first', { isDirty: true })
     const second = createSession('second', { isDirty: true })
     const { guard } = createGuard([first, second])
-    await guard.requestClose({ type: 'sessions', sessionIds: [first.id, second.id] })
+    await guard.requestClose({ type: 'sessions', sessionIds: [first.state.id, second.state.id] })
 
-    guard.setRowSelected(second.id, false)
+    guard.setRowSelected(second.state.id, false)
     guard.markSelectedDiscard()
 
-    expect(guard.decisions.value.find(row => row.sessionId === first.id)).toMatchObject({
+    expect(guard.decisions.value.find(row => row.sessionId === first.state.id)).toMatchObject({
       decision: 'discard',
       selected: false,
     })
-    expect(guard.decisions.value.find(row => row.sessionId === second.id)).toMatchObject({
+    expect(guard.decisions.value.find(row => row.sessionId === second.state.id)).toMatchObject({
       decision: 'pending',
       selected: false,
     })
     expect(guard.canConfirm.value).toBe(false)
 
-    guard.resetDecision(first.id)
-    expect(guard.decisions.value.find(row => row.sessionId === first.id)).toMatchObject({
+    guard.resetDecision(first.state.id)
+    expect(guard.decisions.value.find(row => row.sessionId === first.state.id)).toMatchObject({
       decision: 'pending',
       selected: false,
     })
@@ -125,7 +127,7 @@ describe('useUnsavedSessionGuard', () => {
     })
     const { guard, pickDraftDirectory, fileExists } = createGuard([first, second])
     fileExists.mockImplementation(async (path: string) => path === 'D:/drafts/Card Name.ocdocument')
-    await guard.requestClose({ type: 'app', sessionIds: [first.id, second.id] })
+    await guard.requestClose({ type: 'app', sessionIds: [first.state.id, second.state.id] })
 
     await expect(guard.markSelectedSave()).resolves.toBe(true)
 
@@ -146,7 +148,7 @@ describe('useUnsavedSessionGuard', () => {
     const draft = createSession('draft', { resourceKind: 'draft', path: null })
     const { guard, pickDraftDirectory } = createGuard([draft])
     pickDraftDirectory.mockResolvedValueOnce(null)
-    await guard.requestClose({ type: 'app', sessionIds: [draft.id] })
+    await guard.requestClose({ type: 'app', sessionIds: [draft.state.id] })
 
     await expect(guard.markSelectedSave()).resolves.toBe(false)
 
@@ -158,19 +160,19 @@ describe('useUnsavedSessionGuard', () => {
     const save = createSession('save', { isDirty: true })
     const discard = createSession('discard', { isDirty: true })
     const { guard, saveSession, completeClose } = createGuard([save, discard])
-    await guard.requestClose({ type: 'app', sessionIds: [save.id, discard.id] })
-    guard.setRowSelected(discard.id, false)
+    await guard.requestClose({ type: 'app', sessionIds: [save.state.id, discard.state.id] })
+    guard.setRowSelected(discard.state.id, false)
     await guard.markSelectedSave()
     guard.setAllPendingSelected(true)
     guard.markSelectedDiscard()
 
     await expect(guard.confirm()).resolves.toBe(true)
 
-    expect(saveSession).toHaveBeenCalledWith(save.id, undefined)
+    expect(saveSession).toHaveBeenCalledWith(save.state.id, undefined)
     expect(saveSession.mock.invocationCallOrder[0]).toBeLessThan(completeClose.mock.invocationCallOrder[0]!)
     expect(completeClose).toHaveBeenCalledWith({
       type: 'app',
-      sessionIds: [save.id, discard.id],
+      sessionIds: [save.state.id, discard.state.id],
     })
     expect(guard.isOpen.value).toBe(false)
   })
@@ -179,7 +181,7 @@ describe('useUnsavedSessionGuard', () => {
     const session = createSession('failed', { isDirty: true })
     const { guard, saveSession, completeClose } = createGuard([session])
     saveSession.mockResolvedValueOnce('skipped')
-    await guard.requestClose({ type: 'app', sessionIds: [session.id] })
+    await guard.requestClose({ type: 'app', sessionIds: [session.state.id] })
     await guard.markSelectedSave()
 
     await expect(guard.confirm()).resolves.toBe(false)

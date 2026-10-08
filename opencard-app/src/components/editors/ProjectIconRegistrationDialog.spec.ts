@@ -157,7 +157,7 @@ describe('ProjectIconRegistrationDialog', () => {
     mocks.pickFiles.mockResolvedValue(['D:/Icons/Warn.svg', 'D:/Icons/Gem.svg'])
     const outline = {
       name: 'Outline', key: 'outline',
-      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' as const }],
+      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' as const }],
     }
     const wrapper = mountDialog({ series: [outline], targetSeries: outline })
 

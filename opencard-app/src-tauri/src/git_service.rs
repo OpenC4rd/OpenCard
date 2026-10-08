@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Component, Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_GITIGNORE: &str = ".opencard-init-*\n";
+static REVISION_SNAPSHOTS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
 static GIT_OPERATION_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -906,7 +907,7 @@ pub fn discard_paths(
     project_root: &str,
     request: &PathRequest,
 ) -> GitServiceResult<RepositorySummary> {
-    let (root, mut repository) = open_exact_repository(project_root)?;
+    let (root, repository) = open_exact_repository(project_root)?;
     let head_tree = repository
         .head()
         .ok()
@@ -1602,7 +1603,7 @@ fn revision_snapshot_cache_root(project_root: &Path, revision: Oid) -> PathBuf {
         .join("opencard")
         .join("git-snapshots")
         .join(format!("{:016x}", hasher.finish()))
-        .join(revision.to_string())
+        .join(format!("{}-{}-{}", revision, std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos()))
 }
 
 fn materialize_tree(
@@ -1617,7 +1618,7 @@ fn materialize_tree(
                 "Revision contains a path that is not valid UTF-8",
             )
         })?;
-        if name.is_empty() || name == "." || name == ".." {
+        if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\\', ':']) {
             return Err(GitServiceError::new(
                 GitErrorKind::PathOutsideProject,
                 "Revision contains an unsafe path",
@@ -1658,13 +1659,6 @@ pub fn materialize_revision(
     let commit = object.peel_to_commit().map_err(GitServiceError::from_git)?;
     let revision = commit.id();
     let destination = revision_snapshot_cache_root(&root, revision);
-    if destination.is_dir() {
-        return Ok(RevisionSnapshot {
-            revision: revision.to_string(),
-            root_path: normalized_path_string(&destination),
-        });
-    }
-
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -1688,10 +1682,21 @@ pub fn materialize_revision(
             return Err(GitServiceError::from_io(error));
         }
     }
+    REVISION_SNAPSHOTS.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap().insert(destination.clone());
     Ok(RevisionSnapshot {
         revision: revision.to_string(),
         root_path: normalized_path_string(&destination),
     })
+}
+
+#[tauri::command]
+pub fn git_release_revision_snapshot(root_path: String) -> Result<(), String> {
+    let path = PathBuf::from(root_path);
+    let mut snapshots = REVISION_SNAPSHOTS.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap();
+    if !snapshots.contains(&path) { return Err("Snapshot is not owned by this application".to_string()); }
+    if path.exists() { std::fs::remove_dir_all(&path).map_err(|error| error.to_string())?; }
+    snapshots.remove(&path);
+    Ok(())
 }
 
 fn conflict_side(entry: Option<&git2::IndexEntry>) -> ConflictSide {
@@ -2942,7 +2947,13 @@ mod tests {
             std::fs::read(snapshot_root.join("assets/icon.bin")).unwrap(),
             [0_u8, 159, 255]
         );
-        std::fs::remove_dir_all(snapshot_root).unwrap();
+        let second = materialize_revision(root, &MaterializeRevisionRequest { revision: commit.id.clone() }).unwrap();
+        assert_ne!(snapshot.root_path, second.root_path);
+        assert!(git_release_revision_snapshot(root.to_string()).is_err());
+        git_release_revision_snapshot(snapshot.root_path).unwrap();
+        assert!(!snapshot_root.exists());
+        assert!(Path::new(&second.root_path).exists());
+        git_release_revision_snapshot(second.root_path).unwrap();
     }
 
     #[test]

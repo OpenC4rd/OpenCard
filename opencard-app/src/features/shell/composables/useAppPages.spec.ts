@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import enUS from '../../../locales/en-US'
-import { useEditorSessionStore } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { appOutputEntries, clearAppOutputEntries, publishAppOutput } from '../../logging/appOutput'
 import { initializeAppPages, useAppPages } from './useAppPages'
 import { useAppProjectActions } from '../services/appProjectActions'
@@ -20,8 +20,6 @@ vi.mock('../../../shared/storage/appCache', async importOriginal => ({
 }))
 
 afterEach(() => {
-  const sessions = useEditorSessionStore()
-  sessions.sessions.value.forEach(session => sessions.closeSession(session.id))
   useShellNavigation().selectSpace('welcome')
   useShellProgressTasks().removeTask('page-test')
   clearAppOutputEntries()
@@ -46,13 +44,13 @@ describe('application page ownership', () => {
       expect(useAppPages().pages.welcome).toBe(app.pages.welcome)
       expect(listeners.mock.calls.length).toBe(listenerCount)
       const navigation = useShellNavigation()
-      const store = useEditorSessionStore()
       expect(app.pages.welcome.header.value).toBeNull()
       expect(app.pages.workbench.header.value).toBeNull()
-      const session = store.createDraftSession({ fileTypeId: 'opencard-dictionary', name: 'locale.json', content: '{}' })
-      store.updateDraftContent(session.id, '{"base":{"title":"edited"}}')
-      store.updateSessionUiState(session.id, { imagePreview: { pixelated: true } })
-      store.setSessionMode(session.id, 'diff', { beforeRevisionId: 'before', afterRevisionId: 'after' })
+      await app.pages.workbench.menuContribution!.value.file!.onAction('new-open-card')
+      const session = (app.pages.workbench.contentProps.value.editor as { props: { session: EditorSession } }).props.session
+      session.updateContent( '{"base":{"title":"edited"}}')
+      session.updateViewState('image-preview', { pixelated: true })
+      session.setMode( 'diff', { beforeRevisionId: 'before', afterRevisionId: 'after' })
       navigation.selectSpace('workbench')
       await nextTick()
       const workbench = app.currentPage.value
@@ -77,15 +75,15 @@ describe('application page ownership', () => {
       navigation.selectSpace('workbench')
       await nextTick()
       expect(app.currentPage.value).toBe(workbench)
-      expect(store.activeSession.value).toMatchObject({ id: session.id, draftContent: '{"base":{"title":"edited"}}', mode: 'diff',
-        diff: { beforeRevisionId: 'before', afterRevisionId: 'after' }, uiState: { imagePreview: { pixelated: true } } })
+      expect((workbench.contentProps.value.editor as { props: { session: EditorSession } }).props.session.state).toMatchObject({ id: session.state.id, draftContent: '{"base":{"title":"edited"}}', mode: 'diff',
+        diff: { beforeRevisionId: 'before', afterRevisionId: 'after' }, viewState: { 'image-preview': { pixelated: true } } })
       expect(workbench.bottomPanel?.value.count).toBe(1)
       expect(appOutputEntries.value.some(entry => entry.message === 'background output')).toBe(true)
       expect(useShellProgressTasks().tasks.value.some(task => task.key === 'page-test')).toBe(true)
 
       const diffAction = workbench.header.value!.onAction!
       await diffAction('diff.exit')
-      expect(store.activeSession.value?.mode).toBe('edit')
+      expect(session.state.mode).toBe('edit')
       const onHeaderAction = vi.fn()
       const editor = workbench.contentProps.value.editor as { capture: (value: unknown) => void }
       editor.capture({ headerActions: [{ key: 'local', title: 'Local' }], onHeaderAction })
@@ -98,14 +96,15 @@ describe('application page ownership', () => {
       expect(onHeaderAction).toHaveBeenCalledTimes(1)
       navigation.selectSpace('workbench')
 
-      const second = store.createDraftSession({ fileTypeId: 'plaintext', name: 'other.txt' })
+      await app.pages.workbench.menuContribution!.value.file!.onAction('new-open-card')
+      const second = (workbench.contentProps.value.editor as { props: { session: EditorSession } }).props.session
       await action('local')
       await diffAction('diff.exit')
       expect(onHeaderAction).toHaveBeenCalledTimes(1)
       ;(oldEditor.props.onIssueSnapshot as (value: EditorIssueSnapshot) => void)(snapshot)
       await nextTick()
-      await workbench.bottomPanel!.value.activate(`workspace-issue-session:${session.id}`)
-      expect(store.activeSession.value?.id).toBe(second.id)
+      await workbench.bottomPanel!.value.activate(`workspace-issue-session:${session.state.id}`)
+      expect((workbench.contentProps.value.editor as { props: { session: EditorSession } }).props.session).toBe(second)
       expect(workbench.bottomPanel!.value.count).toBe(1)
     } finally { wrapper.unmount() }
     expect(() => useAppPages()).toThrow('Application pages have not been initialized')

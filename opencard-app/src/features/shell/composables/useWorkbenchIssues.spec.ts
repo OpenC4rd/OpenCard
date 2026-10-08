@@ -1,15 +1,16 @@
+import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { nextTick, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { normalizeNodeTail } from '../../../shared/ui/node/node.types'
 import type { EditorIssue } from '../../editor-runtime/model/editorIssue'
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import {
   buildWorkspaceIssueProjection,
   useWorkbenchIssues,
 } from './useWorkbenchIssues'
 
 function createSession(id: string, name: string): EditorSession {
-  return {
+  return createTestSession({
     id,
     resourceKind: 'workspace',
     path: `/project/${name}.ocdocument`,
@@ -20,7 +21,7 @@ function createSession(id: string, name: string): EditorSession {
     draftContent: '',
     isDirty: false,
     isPreview: false,
-  }
+  })
 }
 
 function createIssue(id: string, severity: EditorIssue['severity'] = 'warning'): EditorIssue {
@@ -41,7 +42,7 @@ describe('workspace issue projection', () => {
     const session = createSession('a', 'Card A')
     const projection = buildWorkspaceIssueProjection(
       [session],
-      new Map([[session.id, new Map([
+      new Map([[session.state.id, new Map([
         ['blueprint', [createIssue('invalid', 'error')]],
       ])]]),
       COPY_ISSUE_LABEL,
@@ -73,17 +74,17 @@ describe('workspace issue projection', () => {
     const sessions = ref<EditorSession[]>([session])
     const issues = useWorkbenchIssues({ sessions, copyIssueLabel: COPY_ISSUE_LABEL })
 
-    issues.reportSessionIssueSnapshot(session.id, {
+    issues.reportSessionIssueSnapshot(session.state.id, {
       scopeKey: 'instance-a',
       scopeOrder: ['blueprint', 'instance-a', 'instance-b'],
       issues: [createIssue('a-old')],
     })
-    issues.reportSessionIssueSnapshot(session.id, {
+    issues.reportSessionIssueSnapshot(session.state.id, {
       scopeKey: 'instance-b',
       scopeOrder: ['blueprint', 'instance-a', 'instance-b'],
       issues: [createIssue('b')],
     })
-    issues.reportSessionIssueSnapshot(session.id, {
+    issues.reportSessionIssueSnapshot(session.state.id, {
       scopeKey: 'instance-a',
       scopeOrder: ['instance-b', 'instance-a'],
       issues: [createIssue('a-new'), createIssue('a-new', 'error')],
@@ -107,12 +108,12 @@ describe('workspace issue projection', () => {
     const sessions = ref<EditorSession[]>([first, second])
     const issues = useWorkbenchIssues({ sessions, copyIssueLabel: COPY_ISSUE_LABEL })
 
-    issues.reportSessionIssueSnapshot(first.id, {
+    issues.reportSessionIssueSnapshot(first.state.id, {
       scopeKey: 'blueprint',
       scopeOrder: ['blueprint'],
       issues: [createIssue('a')],
     })
-    issues.reportSessionIssueSnapshot(second.id, {
+    issues.reportSessionIssueSnapshot(second.state.id, {
       scopeKey: 'blueprint',
       scopeOrder: ['blueprint'],
       issues: [createIssue('b')],
@@ -131,12 +132,12 @@ describe('workspace issue projection', () => {
     const sessions = ref<EditorSession[]>([session])
     const issues = useWorkbenchIssues({ sessions, copyIssueLabel: COPY_ISSUE_LABEL })
 
-    issues.reportSessionIssueSnapshot(session.id, {
+    issues.reportSessionIssueSnapshot(session.state.id, {
       scopeKey: 'blueprint',
       scopeOrder: ['blueprint', 'instance-a'],
       issues: [createIssue('blueprint')],
     })
-    issues.reportSessionIssueSnapshot(session.id, {
+    issues.reportSessionIssueSnapshot(session.state.id, {
       scopeKey: 'blueprint',
       scopeOrder: [],
       issues: [],
@@ -157,9 +158,9 @@ describe('workspace issue projection', () => {
       issues: [createIssue('same')],
     }
 
-    issues.reportSessionIssueSnapshot(session.id, snapshot)
+    issues.reportSessionIssueSnapshot(session.state.id, snapshot)
     const projection = issues.issueTreeData.value
-    issues.reportSessionIssueSnapshot(session.id, snapshot)
+    issues.reportSessionIssueSnapshot(session.state.id, snapshot)
 
     expect(issues.issueTreeData.value).toBe(projection)
   })

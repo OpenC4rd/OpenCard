@@ -92,8 +92,8 @@ export interface FileSystemService {
     options?: ReadDirectoryEntriesOptions,
   ): Promise<DirEntry[]>
   createDirectory(path: string): Promise<void>
-  startWatching(path: string): Promise<void>
-  stopWatching(): Promise<void>
+  startWatching(path: string): Promise<string>
+  stopWatching(id: string): Promise<void>
 }
 
 class FileSystemServiceImpl implements FileSystemService {
@@ -260,12 +260,12 @@ class FileSystemServiceImpl implements FileSystemService {
     await mkdir(path, { recursive: true })
   }
 
-  async startWatching(path: string): Promise<void> {
-    await invoke('watch_directory', { path })
+  async startWatching(path: string): Promise<string> {
+    return await invoke('watch_directory', { path })
   }
 
-  async stopWatching(): Promise<void> {
-    await invoke('stop_watching')
+  async stopWatching(id: string): Promise<void> {
+    await invoke('stop_watching', { id })
   }
 }
 

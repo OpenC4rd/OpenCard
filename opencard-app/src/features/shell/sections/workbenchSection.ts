@@ -205,7 +205,7 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
           selectedKeys: options.project.files.selectedKeys.value,
           expandedKeys: options.project.files.expandedKeys.value,
           role: 'tree' as const,
-          selectionMode: 'single' as const,
+          selectionMode: 'multiple' as const,
           activationMode: 'double-click' as const,
           onSelectionChange: options.project.files.onSelectionChange,
           onExpansionChange: options.project.files.onExpansionChange,

@@ -43,7 +43,7 @@ const lastPointerY = ref(0)
 
 /**
  * The icon paints itself in `em`, so zoom is a font size and pan is a translation. No second
- * rendering path: a rotated, theme-tinted or pixelated icon looks here exactly as it does on a card.
+ * rendering path: a context-tinted or pixelated icon looks here exactly as it does on a card.
  */
 const iconStyle = computed<CSSProperties>(() => ({
   fontSize: `calc(var(--oc-project-icon-preview-size) * ${scale.value})`,

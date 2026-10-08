@@ -7,7 +7,7 @@ import type {
   SessionIssueNavigationRequest,
 } from '../../editor-runtime/model/editorIssue'
 import { resolveFileTypeById } from '../../workspace/model/fileTypes'
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import type { OcNode, OcNodeAction, OcNodeCollection } from '../../../shared/ui/node/node.types'
 
 const SESSION_KEY_PREFIX = 'workspace-issue-session:'
@@ -97,26 +97,26 @@ export function buildWorkspaceIssueProjection(
   let highestSeverity: EditorIssueSeverity | null = null
 
   for (const session of sessions) {
-    const scopes = issuesBySession.get(session.id)
+    const scopes = issuesBySession.get(session.state.id)
     if (!scopes) continue
 
     const sessionIssues: Array<{ scopeKey: string; issue: SessionIssue }> = []
     for (const [scopeKey, issues] of scopes) {
       for (const issue of issues) {
-        sessionIssues.push({ scopeKey, issue: { ...issue, sessionId: session.id } })
+        sessionIssues.push({ scopeKey, issue: { ...issue, sessionId: session.state.id } })
       }
     }
     if (sessionIssues.length === 0) continue
 
-    const rootKey = sessionNodeKey(session.id)
-    const fileType = resolveFileTypeById(session.fileTypeId)
+    const rootKey = sessionNodeKey(session.state.id)
+    const fileType = resolveFileTypeById(session.state.fileTypeId)
     const addIssue = (scopeKey: string, issue: SessionIssue, path: readonly number[]): string => {
-      const key = `${issueNodeKey(session.id, scopeKey, issue.id)}:${path.join('.')}`
+      const key = `${issueNodeKey(session.state.id, scopeKey, issue.id)}:${path.join('.')}`
       items.set(key, issueTreeItem(issue, copyAction))
       issueDetails.set(key, issue)
       if (issue.navigationToken !== undefined) {
         navigationTargets.set(key, {
-          sessionId: session.id,
+          sessionId: session.state.id,
           token: issue.navigationToken,
         })
       }
@@ -125,7 +125,7 @@ export function buildWorkspaceIssueProjection(
         highestSeverity = issue.severity
       }
       const childKeys = (issue.children ?? []).map((child, index) =>
-        addIssue(scopeKey, { ...child, sessionId: session.id }, [...path, index]),
+        addIssue(scopeKey, { ...child, sessionId: session.state.id }, [...path, index]),
       )
       if (childKeys.length > 0) children.set(key, childKeys)
       return key
@@ -134,7 +134,7 @@ export function buildWorkspaceIssueProjection(
 
     rootKeys.push(rootKey)
     items.set(rootKey, {
-      label: `${session.name} (${sessionIssues.length})`,
+      label: `${session.state.name} (${sessionIssues.length})`,
       visual: { type: 'icon', icon: fileType.icon, iconTone: fileType.iconTone },
     })
     children.set(rootKey, issueKeys)
@@ -207,7 +207,7 @@ export function useWorkbenchIssues(options: {
   }
 
   watch(
-    () => options.sessions.value.map((session) => session.id),
+    () => options.sessions.value.map((session) => session.state.id),
     (sessionIds) => {
       const activeIds = new Set(sessionIds)
       issuesBySession.value = new Map(

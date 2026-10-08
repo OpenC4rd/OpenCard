@@ -70,10 +70,6 @@ export function useApplicationActions(options: {
           const imported = await templates.importUserTemplate(path)
           options.createProject().selectTemplate(imported.key)
           navigation.location.value = openFlow(navigation.location.value, 'create-project')
-        } else if (kind === 'icon-pack') {
-          if (!project.projectPath.value) { notifyWarning(t('projectConfig.icons.openProjectFirst')); continue }
-          await options.workbench().openIconRegistry()
-          navigation.showPrimarySpace('workbench')
         }
       } catch (error) { notifyAppError('OC-E2002', { path, error }, locale.value) }
     }

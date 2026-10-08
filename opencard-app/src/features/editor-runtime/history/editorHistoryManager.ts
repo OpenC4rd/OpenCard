@@ -10,16 +10,6 @@ import type { HistoryOperationMeta } from './history.types'
 
 export type EditorHistoryKind = 'structured' | 'monaco' | 'none'
 
-export function resolveEditorHistoryKind(editorId: string): EditorHistoryKind {
-  if (editorId === 'monaco') return 'monaco'
-  if (editorId === 'card-designer'
-    || editorId === 'project-config'
-    || editorId === 'font-registry'
-    || editorId === 'icon-registry'
-    || editorId === 'dictionary') return 'structured'
-  return 'none'
-}
-
 export type EditorHistoryState = {
   canUndo: boolean
   canRedo: boolean
@@ -38,8 +28,7 @@ type SessionHistory = {
   content?: ContentHistoryPort
   model?: Monaco.editor.ITextModel
   modelListener?: Monaco.IDisposable
-  savedAlternativeVersionId?: number
-  viewState?: Monaco.editor.ICodeEditorViewState | null
+  savedContent?: string
   updatingModel: boolean
   publish: (content: string, dirty: boolean) => void
   state: EditorHistoryState
@@ -62,7 +51,7 @@ class EditorHistoryManager {
   ): void {
     this.release(sessionId)
     const state = reactive<EditorHistoryState>({ canUndo: false, canRedo: false })
-    const session: SessionHistory = { kind, publish, state, updatingModel: false }
+    const session: SessionHistory = { kind, publish, state, savedContent: content, updatingModel: false }
     this.sessions.set(sessionId, session)
     if (kind === 'structured') {
       session.content = createContentHistory({
@@ -101,6 +90,8 @@ class EditorHistoryManager {
       return
     }
     if (session.model && session.model.getValue() !== content) this.replaceMonacoValue(session, content)
+    session.publish(content, content !== session.savedContent)
+    this.refreshState(sessionId)
   }
 
   getMonacoModel(sessionId: string): Monaco.editor.ITextModel | null {
@@ -112,25 +103,16 @@ class EditorHistoryManager {
     if (!session || session.kind !== 'monaco') return
     session.modelListener?.dispose()
     session.model = model
-    session.savedAlternativeVersionId = model.getAlternativeVersionId()
+    session.savedContent ??= model.getValue()
     session.modelListener = model.onDidChangeContent(() => {
       if (session.updatingModel || !session.model) return
       session.publish(
         session.model.getValue(),
-        session.model.getAlternativeVersionId() !== session.savedAlternativeVersionId,
+        session.model.getValue() !== session.savedContent,
       )
       this.refreshState(sessionId)
     })
     this.refreshState(sessionId)
-  }
-
-  getMonacoViewState(sessionId: string): Monaco.editor.ICodeEditorViewState | null {
-    return this.sessions.get(sessionId)?.viewState ?? null
-  }
-
-  setMonacoViewState(sessionId: string, viewState: Monaco.editor.ICodeEditorViewState | null): void {
-    const session = this.sessions.get(sessionId)
-    if (session?.kind === 'monaco') session.viewState = viewState
   }
 
   syncExternalContent(sessionId: string, content: string, saved: boolean): void {
@@ -142,7 +124,7 @@ class EditorHistoryManager {
     } else if (session.model && session.model.getValue() !== content) {
       this.replaceMonacoValue(session, content)
     }
-    if (saved && session.model) session.savedAlternativeVersionId = session.model.getAlternativeVersionId()
+    if (saved) session.savedContent = content
     this.refreshState(sessionId)
   }
 
@@ -150,7 +132,7 @@ class EditorHistoryManager {
     const session = this.sessions.get(sessionId)
     if (!session) return
     session.content?.markSaved(content)
-    if (session.model) session.savedAlternativeVersionId = session.model.getAlternativeVersionId()
+    session.savedContent = content
     this.refreshState(sessionId)
   }
 

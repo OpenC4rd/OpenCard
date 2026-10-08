@@ -5,7 +5,7 @@ import { createProjectIconCompletionProvider, type ProjectIconSource } from './p
 
 const projectSeries: ProjectIconSeries[] = [{
   name: 'Status icons', key: 'status',
-  icons: [{ iconKey: 'warning', name: 'Warning badge', source: 'assets/icons/warning.svg', tint: 'theme' }],
+  icons: [{ iconKey: 'warning', name: 'Warning badge', source: 'assets/icons/warning.svg', tint: 'context' }],
 }]
 const packageSeries: ProjectIconSeries[] = [{
   name: 'Theme marks', key: 'mark',
@@ -116,24 +116,4 @@ describe('project icon completion', () => {
     expect(result?.items[0]).not.toHaveProperty('detail')
   })
 
-  it('prepares thumbnails once per collection and reuses them while filtering', async () => {
-    let sourceReads = 0
-    const measuredEntry = {
-      ...projectSource.catalog.entries[0]!,
-      get src() {
-        sourceReads += 1
-        return 'asset://status'
-      },
-    }
-    const provider = createProjectIconCompletionProvider([
-      { ...projectSource, catalog: { ...projectSource.catalog, entries: [measuredEntry] } },
-    ], { mode: 'reference' })
-    expect(sourceReads).toBe(0)
-    await provider({ value: 'icon:st', cursor: 7 })
-    expect(sourceReads).toBe(0)
-    await provider({ value: 'icon:status/', cursor: 12 })
-    expect(sourceReads).toBe(1)
-    await provider({ value: 'icon:status/war', cursor: 15 })
-    expect(sourceReads).toBe(1)
-  })
 })

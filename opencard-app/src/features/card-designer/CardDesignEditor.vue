@@ -20,7 +20,7 @@
       <div class="card-design-editor__mode-view">
           <div class="card-design-editor__stage-base" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }">
             <OcPanel fill tone="transparent" border="none" padding="none" overflow="hidden">
-              <div v-if="props.mode === 'diff'" class="card-design-editor__diff-mode-stage">
+              <div v-if="editorState.mode === 'diff'" class="card-design-editor__diff-mode-stage">
                 <OcEmpty v-if="!props.comparison" tone="muted">{{ t('sidebar.diffViewer.loading') }}</OcEmpty>
                 <OcEmpty v-else-if="!diffBeforeRender || !diffAfterRender">{{ t('sidebar.diffViewer.parseFailedGeneric')
                 }}</OcEmpty>
@@ -37,7 +37,7 @@
                 <CardViewport ref="cardViewportRef" v-if="viewFace && renderResources"
                   class="card-design-editor__viewport" :class="{ 'is-debug-transparent': props.debugTransparentCdeViewport, 'is-debug-passive': props.debugPassiveCdeViewport, 'is-data-table-mode': workspaceMode === 'data-table' }"
                   :face="viewFace" :clip-to-face="clipToFace" :resource-context="renderResources" :readonly="workspaceMode !== 'design'"
-                  :restore-key="props.filePath" :transform="viewportTransform"
+                  :restore-key="filePath" :transform="viewportTransform"
                   :selected-block-id="props.debugPassiveCdeViewport || workspaceMode !== 'design' ? null : selectedBlock?.id ?? null"
                   :selected-location-type="props.debugPassiveCdeViewport || workspaceMode !== 'design' ? null : selectedLocationType"
                   :selected-anchor="selectedAnchor" :selected-parent-block-id="selectedParentBlockId"
@@ -52,8 +52,8 @@
                   :layer-view-shortcut-hints="layerViewShortcutHints"
                   :layer-view-atomic-block-ids="layerViewAtomicBlockIds"
                   :show-info="workspaceMode === 'design' && !selectedBlock && !props.debugPassiveCdeViewport"
-                  :show-position-on-move="workspaceMode === 'design' && !props.debugPassiveCdeViewport && (props.showSelectionPositionOnMove ?? true)"
-                  :show-size-on-resize="workspaceMode === 'design' && !props.debugPassiveCdeViewport && (props.showSelectionSizeOnResize ?? true)"
+                  :show-position-on-move="workspaceMode === 'design' && !props.debugPassiveCdeViewport && (settingsStore.settings.value.workspace.showSelectionPositionOnMove ?? true)"
+                  :show-size-on-resize="workspaceMode === 'design' && !props.debugPassiveCdeViewport && (settingsStore.settings.value.workspace.showSelectionSizeOnResize ?? true)"
                   :alignment-snapping-enabled="workspaceMode === 'design' && !props.debugPassiveCdeViewport && alignmentSnappingEnabled"
                   :transform-disabled-block-ids="transformDisabledBlockIds"
                   @pointerdown.capture="handleCanvasPointerDown" @block-click="handleEffectiveViewportBlockClick"
@@ -94,7 +94,7 @@
           </div>
 
           <div class="card-design-editor__data-table-view" :class="{ 'is-active': workspaceMode === 'data-table' }">
-            <CardDataTable ref="cardDataTableRef" :readonly="props.mode === 'diff'" :columns="dataTableColumns"
+            <CardDataTable ref="cardDataTableRef" :readonly="editorState.mode === 'diff'" :columns="dataTableColumns"
               :catalog-face-groups="dataTableCatalogFaceGroups" :face-groups="dataTableFaceGroups"
               :binding-interpreter="propertyBindingInterpreter" :get-cell-definition="getDataTableCellDefinition"
               @add-instance="createInstance" @rename-instance="renameInstance" @duplicate-card="duplicateDataTableCard"
@@ -122,13 +122,13 @@
           @update:top-size="updateDockTopSize('left', $event)" @toggle-collapse="toggleDockCollapsed('left')"
           @resize-start="handleDockResizeStart" @resize-end="handleDockResizeEnd('left', $event)">
           <template #top>
-            <OcCard fill variant="glass" :title="t('cardDesigner.panels.cardTree')" :actions="props.mode === 'diff' ? [] : instanceCardActions"
+            <OcCard fill variant="glass" :title="t('cardDesigner.panels.cardTree')" :actions="editorState.mode === 'diff' ? [] : instanceCardActions"
               :collapsed="!isInstancePanelExpanded" @action="handleInstanceCardAction">
               <OcPanel fill tone="transparent" border="none" padding="none" overflow="auto" align="stretch">
                 <OcTree v-if="isInstancePanelExpanded" ref="instanceTreeRef" fill role="listbox"
                   data-cde-shortcut-scope="instance-tree" tab-navigation="none"
-                  :data="props.mode === 'diff' ? diffInstanceTreeData : instanceTreeData"
-                  :selected-keys="props.mode === 'diff' ? diffSelectedInstanceKeys : selectedCardKeys" selection-mode="multiple"
+                  :data="editorState.mode === 'diff' ? diffInstanceTreeData : instanceTreeData"
+                  :selected-keys="editorState.mode === 'diff' ? diffSelectedInstanceKeys : selectedCardKeys" selection-mode="multiple"
                   @selection-change="handleInstanceTreeSelection" @action="handleInstanceTreeAction"
                   @rename-commit="handleInstanceRenameCommit" @move="handleInstanceMove" />
               </OcPanel>
@@ -173,15 +173,15 @@
           @update:top-size="updateDockTopSize('right', $event)" @toggle-collapse="toggleDockCollapsed('right')"
           @resize-start="handleDockResizeStart" @resize-end="handleDockResizeEnd('right', $event)">
           <template #top>
-            <OcCard fill variant="glass" :title="t('cardDesigner.panels.structureTree')" :actions="props.mode === 'diff' ? [] : structureTreeCardActions"
+            <OcCard fill variant="glass" :title="t('cardDesigner.panels.structureTree')" :actions="editorState.mode === 'diff' ? [] : structureTreeCardActions"
               :collapsed="!isStructureTreePanelExpanded" @action="handleStructureTreeCardAction">
               <OcPanel align="stretch" fill tone="transparent" border="none" padding="none" overflow="auto">
                 <OcTree ref="structureTreeRef" fill data-cde-shortcut-scope="structure-tree" tab-navigation="none"
-                  :data="props.mode === 'diff' ? diffBlockTreeData : blockTreeData"
-                  :selected-keys="props.mode === 'diff' ? diffSelectedBlockKeys : selectedBlockKeys"
+                  :data="editorState.mode === 'diff' ? diffBlockTreeData : blockTreeData"
+                  :selected-keys="editorState.mode === 'diff' ? diffSelectedBlockKeys : selectedBlockKeys"
                   :expanded-keys="expandedBlockKeys"
-                  :selection-expansion-mode="forceStructureTreeReveal ? 'expand' : props.structureTreeSelectionBehavior ?? 'expand-exclusive'"
-                  :scroll-to-selection="forceStructureTreeReveal || (props.structureTreeScrollToSelection ?? true)"
+                  :selection-expansion-mode="forceStructureTreeReveal ? 'expand' : settingsStore.settings.value.workspace.structureTreeSelectionBehavior ?? 'expand-exclusive'"
+                  :scroll-to-selection="forceStructureTreeReveal || (settingsStore.settings.value.workspace.structureTreeScrollToSelection ?? true)"
                   selection-mode="multiple" activation-mode="double-click"
                   @selection-change="handleStructureTreeSelection" @expansion-change="handleStructureTreeExpansion"
                   @expansion-sync="handleStructureTreeExpansionSync" @node-activate="handleStructureTreeNodeActivate"
@@ -191,14 +191,14 @@
             </OcCard>
           </template>
           <template #bottom>
-            <OcCard fill variant="glass" :title="t('cardDesigner.panels.properties')" :actions="props.mode === 'diff' ? [] : propertyCardActions"
+            <OcCard fill variant="glass" :title="t('cardDesigner.panels.properties')" :actions="editorState.mode === 'diff' ? [] : propertyCardActions"
               :collapsed="!isPropertyPanelExpanded" @action="handlePropertyCardAction">
               <OcPanel fill tone="transparent" border="none" padding="none" overflow="auto">
                 <OcEmpty v-if="isMultiBlockSelection" class="card-design-editor__multi-selection-summary">
                   {{ t('cardDesigner.selectionSummary.multipleBlocks', { count: effectiveSelectedBlockKeys.length }) }}
                 </OcEmpty>
                 <PropertyEditor v-else ref="propertyEditorRef"
-                  :inputs="props.mode === 'diff' ? diffPropertyInputs : propertyEditorInputs"
+                  :inputs="editorState.mode === 'diff' ? diffPropertyInputs : propertyEditorInputs"
                   :categories="propertyCategories" :sort-mode="propertySortMode"
                   :binding-interpreter="propertyBindingInterpreter" :delete-mode="propertyDeleteMode"
                   :field-warnings="propertyFieldWarnings" @update-property="updateBlockProp"
@@ -210,7 +210,7 @@
 
         <OcOverlayToolbar v-if="viewFace" class="card-design-editor__face-tools"
           :class="{ 'is-resizing': isDockResizing }" orientation="vertical" :style="faceToolsStyle" :label="t('cardDesigner.canvas.controls')"
-          :items="props.mode === 'diff' ? diffFaceToolbarItems : faceToolbarItems" @select="handleFaceToolbarSelect" />
+          :items="editorState.mode === 'diff' ? diffFaceToolbarItems : faceToolbarItems" @select="handleFaceToolbarSelect" />
       </div>
     </div>
 
@@ -230,7 +230,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onScopeDispose, ref, shallowRef, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorEmits, EditorProps } from '../editor-runtime/registry/editorRegistry'
+import type { EditorEmits } from '../editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import type { SessionNavigationToken } from '../editor-runtime/model/editorIssue'
 import {
@@ -319,11 +319,11 @@ import type {
 } from '../../shared/ui/node/node.types'
 import { isBlockContainer, isBlockPackaged, visitCardBlockTree } from '../../entities/card/tree'
 import OcCard, { type OcCardAction } from '../../components/standard/OcCard.vue'
-import type { CardDesignerViewState } from '../editor-runtime/model/editorUiState'
+import type { CardDesignerProps, CardDesignerSessionView, CardDesignerViewState } from './cardDesigner.types'
 import { createCardDesignerIssueSnapshot } from './cardDesignerIssues'
 import { isBindingExpression } from '../editor-runtime/model/binding'
 import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
-import { useProjectStore } from '../workspace/store/projectStore'
+import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import {
   cloneClipboardBlocksWithNewIds,
   createCardBlocksClipboard,
@@ -355,10 +355,13 @@ const FLOW_DIRECTION_ACTIONS = [
 }[]
 
 // 组件输入输出
-const props = defineProps<EditorProps>()
+const props = defineProps<CardDesignerProps>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
+const sessionView = computed(() => (editorState.value.viewState['card-designer'] as CardDesignerSessionView | undefined) ?? {})
 const emit = defineEmits<EditorEmits>()
 const { t, te, locale } = useI18n()
-const projectStore = useProjectStore()
+const environment = computed(() => props.resourceEnvironment?.renderEnvironment.value ?? { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG })
 const settingsStore = useAppSettingsStore()
 const propertyBindingInterpreter = { isExpression: isBindingExpression }
 
@@ -387,10 +390,10 @@ const {
   updateDockTopSize,
   viewportInsets,
 } = useCdeOverlayLayout({
-  layout: toRef(props, 'cardDesignerLayout'),
+  layout: computed(() => sessionView.value.layout),
   geometryConfig: overlayGeometryConfig,
   topMinHeight: overlayTopMinHeight,
-  commitLayout: layout => emit('update-card-designer-layout', layout),
+  commitLayout: layout => props.session.updateViewState('card-designer', { layout }),
 })
 const faceToolsStyle = computed(() => ({
   right: `${(viewportInsets.value.right ?? 0) + overlayGeometryConfig.floatingGap}px`,
@@ -423,9 +426,9 @@ function handleDataTableCellSelect(payload: {
 // 文档与编辑器状态
 const propertySortMode = ref<CdePropertySortMode>('category')
 const propertyDeleteMode = ref(false)
-const workspaceMode = computed(() => props.cardDesignerMode ?? 'design')
+const workspaceMode = computed(() => sessionView.value.mode ?? 'design')
 const renderContentReady = ref(false)
-const hasRenderableViewport = computed(() => props.mode === 'diff'
+const hasRenderableViewport = computed(() => editorState.value.mode === 'diff'
   ? Boolean(props.comparison && diffBeforeRender.value && diffAfterRender.value)
   : Boolean(viewFace.value && renderResources.value))
 const editorContentPending = computed(() => (
@@ -437,11 +440,11 @@ function handleRenderReadinessChange(state: { revision: number; status: 'pending
 }
 
 const dataTableCustomFieldTargetBlockId = ref<string | null>(null)
-const activeFaceKey = ref<CardFaceKey>(props.cardDesignerView?.activeFace ?? 'front')
-const clipToFace = ref(props.cardDesignerView?.clipToFace ?? false)
+const activeFaceKey = ref<CardFaceKey>(sessionView.value.view?.activeFace ?? 'front')
+const clipToFace = ref(sessionView.value.view?.clipToFace ?? false)
 const alignmentSnappingEnabled = ref(
-  props.cardDesignerView?.alignmentSnappingEnabled
-  ?? props.alignmentSnappingEnabledByDefault
+  sessionView.value.view?.alignmentSnappingEnabled
+  ?? settingsStore.settings.value.workspace.alignmentSnappingEnabledByDefault
   ?? true,
 )
 
@@ -464,10 +467,10 @@ const {
   setDiffDividerPreset,
   toggleDiffViewMode,
 } = useCdeDiffView({
-  mode: toRef(props, 'mode'),
+  mode: computed(() => editorState.value.mode),
   comparison: toRef(props, 'comparison'),
-  diffUiState: toRef(props, 'diffUiState'),
-  renderEnvironment: projectStore.renderEnvironment,
+  diffUiState: computed(() => editorState.value.diff?.uiState),
+  renderEnvironment: environment,
   activeFaceKey,
   viewportInsets,
   blueprintCardId: BLUEPRINT_CARD_ID,
@@ -490,7 +493,7 @@ function createViewState(): CardDesignerViewState {
 }
 
 function commitViewState(): void {
-  emit('update-card-designer-view', createViewState())
+  props.session.updateViewState('card-designer', { view: createViewState() })
 }
 
 const clipAction = computed<OcActionDefinition>(() => ({
@@ -631,8 +634,8 @@ function createPanelToggleAction(key: string, expanded: boolean): OcCardAction {
 
 // 当前选择状态
 const selectedBlockIdsByFace = ref<Record<CardFaceKey, string[]>>({
-  front: [...(props.cardDesignerView?.selectedBlockIdsByFace?.front ?? [])],
-  back: [...(props.cardDesignerView?.selectedBlockIdsByFace?.back ?? [])],
+  front: [...(sessionView.value.view?.selectedBlockIdsByFace?.front ?? [])],
+  back: [...(sessionView.value.view?.selectedBlockIdsByFace?.back ?? [])],
 })
 function sameBlockSelection(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((key, index) => key === right[index])
@@ -648,11 +651,11 @@ const selectedBlockKeys = computed<string[]>({
     commitViewState()
   },
 })
-const effectiveSelectedBlockKeys = computed(() => props.mode === 'diff' ? diffSelectedBlockKeys.value : selectedBlockKeys.value)
+const effectiveSelectedBlockKeys = computed(() => editorState.value.mode === 'diff' ? diffSelectedBlockKeys.value : selectedBlockKeys.value)
 const isMultiBlockSelection = computed(() => effectiveSelectedBlockKeys.value.length > 1)
 const selectedCardKeys = ref<string[]>([])
 const selectedCardId = ref<string | null>(
-  props.cardDesignerView?.selectedInstanceId ?? BLUEPRINT_CARD_ID,
+  sessionView.value.view?.selectedInstanceId ?? BLUEPRINT_CARD_ID,
 )
 const forceStructureTreeReveal = ref(false)
 
@@ -664,23 +667,15 @@ const {
   parentLookup,
   markDocumentChanged,
   refreshDocumentState,
-  flushPendingChanges,
   loadRawDoc,
-  saveFile: saveDocumentFile,
 } = useCdeDocumentState({
-  emitModelValueUpdate: (content, history) => {
-    if (props.mode !== 'diff') emit('update:modelValue', content, history)
-  },
-  emitModified: (modified) => {
-    if (props.mode !== 'diff') emit('modified', modified)
-  },
-  emitSave: () => {
-    if (props.mode !== 'diff') emit('save')
+  updateContent: (content, history) => {
+    if (editorState.value.mode !== 'diff') props.session.updateContent(content, history)
   },
   resetSelection: () => {
     selectedBlockIdsByFace.value = { front: [], back: [] }
     selectedCardKeys.value = []
-    selectedCardId.value = props.cardDesignerView?.selectedInstanceId ?? BLUEPRINT_CARD_ID
+    selectedCardId.value = sessionView.value.view?.selectedInstanceId ?? BLUEPRINT_CARD_ID
   },
 })
 
@@ -782,7 +777,6 @@ const {
   columns: dataTableColumns,
   faceGroups: dataTableFaceGroups,
   exportInstanceIds: dataTableExportInstanceIds,
-  flushPendingChanges,
   applyImport: applyDataTableWorkbookImport,
   openAfterExport: computed(() => appSettingsStore.settings.value.exporting.openCdeWorkbookAfterExport),
   translate: (key, parameters) => t(key, parameters ?? {}),
@@ -848,7 +842,7 @@ const canMutateSelectedInstance = computed(() => selectedCardKeys.value.some(
 ))
 
 function handleInstanceTreeSelection(event: OcNodeSelectionEvent): void {
-  if (props.mode === 'diff') {
+  if (editorState.value.mode === 'diff') {
     diffSelectedInstanceKeys.value = event.selectedKeys.length > 0
       ? [...event.selectedKeys]
       : [BLUEPRINT_CARD_ID]
@@ -1003,7 +997,7 @@ async function copySelectedBlocks(): Promise<void> {
   if (payloads.length === 0) return
   await writeOcClipboard(createCardBlocksClipboard(payloads, {
     documentId: cardDoc.value?.id,
-    sessionId: props.sessionId,
+    sessionId: editorState.value.id,
     faceKey: activeFaceKey.value,
   }))
 }
@@ -1017,13 +1011,13 @@ async function pasteClipboardBlocks(): Promise<void> {
   commitViewState()
 }
 function clearEffectiveBlockSelection(): void {
-  if (props.mode === 'diff') diffSelectedBlockKeys.value = []
+  if (editorState.value.mode === 'diff') diffSelectedBlockKeys.value = []
   else clearSelection()
 }
 
 /** 画布选中块：对比模式只写对比选择 编辑模式照旧写文档选择。 */
 function handleEffectiveViewportBlockClick(blockId: string): void {
-  if (props.mode === 'diff') {
+  if (editorState.value.mode === 'diff') {
     diffSelectedBlockKeys.value = [blockId]
     void nextTick(() => editorRootRef.value?.focus({ preventScroll: true }))
     return
@@ -1049,7 +1043,7 @@ async function handleStructureTreeAction(event: OcNodeActionEvent): Promise<void
 }
 
 function handleStructureTreeSelection(event: OcNodeSelectionEvent): void {
-  if (props.mode === 'diff') diffSelectedBlockKeys.value = event.selectedKeys
+  if (editorState.value.mode === 'diff') diffSelectedBlockKeys.value = event.selectedKeys
   else handleBlockSelection(event)
 }
 
@@ -1062,7 +1056,7 @@ function handleStructureTreeExpansionSync(event: OcNodeExpansionSyncEvent): void
 }
 
 function handleStructureTreeNodeActivate(event: OcNodeActivateEvent): void {
-  if (props.mode === 'diff') return
+  if (editorState.value.mode === 'diff') return
   if ((blockTreeData.value.children.get(event.key)?.length ?? 0) === 0) return
   toggleBlockExpansion(event.key, !expandedBlockKeys.value.includes(event.key))
 }
@@ -1136,23 +1130,23 @@ const {
   markDocumentChanged,
   translate: (messageKey) => t(messageKey),
   hasMessage: (messageKey) => te(messageKey),
-  customBlockCatalog: projectStore.renderEnvironment.value.customBlockCatalog,
+  get customBlockCatalog() { return environment.value.customBlockCatalog },
 })
 
 const propertyProjectContext = computed(() => ({
-  fonts: projectStore.projectFonts.value,
-  information: projectStore.resolvedProject.value,
-  dictionary: projectStore.resolvedDictionary.value,
-  iconSeries: projectStore.projectIconSeries.value,
-  projectIconCatalog: projectStore.projectIconCatalog.value,
-  resourceEnvironment: projectStore.projectResourceEnvironment.value,
+  fonts: props.resourceEnvironment?.state.value.fonts ?? {},
+  information: environment.value.project,
+  dictionary: environment.value.dictionary,
+  iconSeries: props.resourceEnvironment?.state.value.iconDocument.iconSeries ?? [],
+  projectIconCatalog: environment.value.projectIconCatalog,
+  resourceEnvironment: props.resourceEnvironment?.state.value,
 }))
 const propertyDirectoryProvider = computed<FilePathDirectoryProvider | undefined>(() => {
   const rootPath = props.resourceRootPath
-  return rootPath
+  return rootPath && props.resourceEnvironment
     ? createResourceDirectoryProvider(
         rootPath,
-        projectStore.projectResourceEnvironment.value,
+        props.resourceEnvironment.state.value,
         fileSystemService,
         {
           hideDotFiles: settingsStore.settings.value.workspace.hideDotFiles,
@@ -1363,10 +1357,11 @@ const renderTargetInstance = computed(() => (
 ))
 
 const renderEnvironment = computed(() => ({
-  ...projectStore.renderEnvironment.value,
+  ...environment.value,
+  customBlockLimits: { maxDepth: settingsStore.settings.value.rendering.customBlockMaxDepth, maxNodes: settingsStore.settings.value.rendering.customBlockMaxNodes },
 }))
 const renderResourceRootPath = computed(() => props.resourceRootPath ?? null)
-const renderSourceFilePath = computed(() => props.filePath?.startsWith('draft://') ? null : props.filePath ?? null)
+const renderSourceFilePath = computed(() => filePath.value?.startsWith('draft://') ? null : filePath.value ?? null)
 const {
   findViewBlock,
   renderPipelineResult,
@@ -1411,9 +1406,10 @@ const {
   zoomViewportIn,
   zoomViewportOut,
 } = useCdeViewportController({
+  initialTransform: computed(() => sessionView.value.viewportTransform),
   faceSize: viewportFaceSize,
   viewportPort: cardViewportRef,
-  commitTransform: transform => emit('update-viewport-transform', transform),
+  commitTransform: transform => props.session.updateViewState('card-designer', { viewportTransform: transform }),
 })
 
 watch(workspaceMode, async mode => {
@@ -1444,7 +1440,7 @@ const {
 
 const interactionSelectedBlockId = computed(() => selectedBlock.value?.id ?? null)
 const hasRenderableFace = computed(() => viewFace.value !== null)
-const layerViewAvailable = computed(() => props.mode !== 'diff' && hasRenderableFace.value)
+const layerViewAvailable = computed(() => editorState.value.mode !== 'diff' && hasRenderableFace.value)
 const {
   handleCanvasPointerDown,
   handleLayerZIndexStep,
@@ -1556,19 +1552,19 @@ const cdeShortcutCommands = [
   {
     key: 'view.diff-divider-left',
     scopes: ['canvas'],
-    canRun: () => props.mode === 'diff' && hasRenderableFace.value,
+    canRun: () => editorState.value.mode === 'diff' && hasRenderableFace.value,
     run: () => setDiffDividerPreset(0),
   },
   {
     key: 'view.diff-divider-center',
     scopes: ['canvas'],
-    canRun: () => props.mode === 'diff' && hasRenderableFace.value,
+    canRun: () => editorState.value.mode === 'diff' && hasRenderableFace.value,
     run: () => setDiffDividerPreset(0.5),
   },
   {
     key: 'view.diff-divider-right',
     scopes: ['canvas'],
-    canRun: () => props.mode === 'diff' && hasRenderableFace.value,
+    canRun: () => editorState.value.mode === 'diff' && hasRenderableFace.value,
     run: () => setDiffDividerPreset(1),
   },
   {
@@ -1592,7 +1588,7 @@ const cdeShortcutCommands = [
   {
     key: 'view.toggle-diff-mode',
     scopes: ['canvas'],
-    canRun: () => props.mode === 'diff' && hasRenderableFace.value,
+    canRun: () => editorState.value.mode === 'diff' && hasRenderableFace.value,
     run: toggleDiffViewMode,
   },
 ] as const satisfies readonly CdeShortcutCommand[]
@@ -1630,8 +1626,8 @@ const {
   viewDocument: viewDoc,
   viewFace,
   resourceRootPath: toRef(props, 'resourceRootPath'),
-  filePath: toRef(props, 'filePath'),
-  fileName: toRef(props, 'fileName'),
+  filePath: filePath,
+  fileName: computed(() => editorState.value.name),
   blueprintCardId: BLUEPRINT_CARD_ID,
   translate: (key, parameters) => t(key, parameters ?? {}),
 })
@@ -1676,10 +1672,7 @@ watch(editorIssueSnapshot, (snapshot) => {
   lastEditorIssueSnapshotSignature = signature
   emit('issue-snapshot', snapshot)
 })
-async function saveFile() {
-  await flushPendingChanges()
-  await saveDocumentFile()
-}
+
 
 function ensureSelectionValidity() {
   const selectedKeys = selectedBlockKeys.value
@@ -1770,7 +1763,7 @@ async function navigateDiffTarget(
 async function navigate(token: SessionNavigationToken): Promise<CardDesignerNavigationResult> {
   if (!isCardDesignerNavigationToken(token)) return 'invalid-token'
   // 对比视图是只读视图：定位只作用于对比投影 不触碰文档 也不写会话状态。
-  if (props.mode === 'diff') return await navigateDiffTarget(token)
+  if (editorState.value.mode === 'diff') return await navigateDiffTarget(token)
 
   const document = cardDoc.value
   if (!document) return 'not-found'
@@ -1810,7 +1803,7 @@ async function navigate(token: SessionNavigationToken): Promise<CardDesignerNavi
   }
 
   if (workspaceMode.value !== 'design') {
-    emit('update:card-designer-mode', 'design')
+    props.session.updateViewState('card-designer', { mode: 'design' })
     await nextTick()
     await nextTick()
   }
@@ -1844,7 +1837,7 @@ async function navigate(token: SessionNavigationToken): Promise<CardDesignerNavi
 }
 
 watch(
-  () => [props.cardDesignerView, props.alignmentSnappingEnabledByDefault] as const,
+  () => [sessionView.value.view, settingsStore.settings.value.workspace.alignmentSnappingEnabledByDefault] as const,
   ([view, alignmentSnappingEnabledByDefault]) => {
     const nextFace = view?.activeFace ?? 'front'
     if (activeFaceKey.value !== nextFace) {
@@ -1874,14 +1867,14 @@ watch(
 
 watch(selectedCardId, (cardId) => {
   // 对比视图是只读视图：实例选择不得写入会话视图状态。
-  if (props.mode === 'diff') return
-  const storedId = props.cardDesignerView?.selectedInstanceId ?? null
+  if (editorState.value.mode === 'diff') return
+  const storedId = sessionView.value.view?.selectedInstanceId ?? null
   const nextId = cardId === BLUEPRINT_CARD_ID ? null : cardId
   if (storedId !== nextId) commitViewState()
 })
 
 watch(
-  () => [props.filePath, props.modelValue] as const,
+  () => [filePath.value, editorState.value.draftContent] as const,
   ([nextFilePath, nextValue]) => {
     const content = nextValue ?? ''
     const hasLoadedDocument = loadedFilePath.value !== null
@@ -1904,7 +1897,7 @@ watch(
     if (fileChanged) {
       prepareForFileChange()
     }
-    loadRawDoc(content, fileChanged || !hasLoadedDocument || content === props.savedContent)
+    loadRawDoc(content, fileChanged || !hasLoadedDocument || content === editorState.value.savedContent)
     if (!fileChanged) ensureSelectionValidity()
     if (fileChanged) completeFileLoad()
   },
@@ -1933,8 +1926,8 @@ const headerActions = computed<OcActionDefinition[]>(() => {
   }, mode]
 })
 async function onHeaderAction(key: string): Promise<void> {
-  if (disposed || props.mode === 'diff') return
-  if (key === 'card-designer.toggle-mode') { emit('update:card-designer-mode', workspaceMode.value === 'design' ? 'data-table' : 'design'); return }
+  if (disposed || editorState.value.mode === 'diff') return
+  if (key === 'card-designer.toggle-mode') { props.session.updateViewState('card-designer', { mode: workspaceMode.value === 'design' ? 'data-table' : 'design' }); return }
   if (key === 'card-designer.data-table.import') { await importDataTableWorkbook(); return }
   if (key === 'card-designer.data-table.export') { await exportDataTableWorkbook(); return }
   const match = /^render\.(current|both)\.(0\.5|1|2)$/.exec(key)
@@ -1942,7 +1935,7 @@ async function onHeaderAction(key: string): Promise<void> {
   const renderImages = props.renderCardImages
   if (!match || !render || !renderImages || imageExporting.value || props.imageExportBusy) return
   const faces: readonly CardFaceKey[] = match[1] === 'current' ? [activeFaceKey.value] : ['front', 'back']
-  const stem = (props.fileName ?? 'card').replace(/\.ocdocument$/i, '')
+  const stem = (editorState.value.name ?? 'card').replace(/\.ocdocument$/i, '')
   const scale = Number(match[2])
   imageExporting.value = true
   try {
@@ -1950,13 +1943,8 @@ async function onHeaderAction(key: string): Promise<void> {
       ? await fileSystemService.pickSavePath({ defaultPath: `${stem}_${faces[0]}.png`, fileTypeName: t('cardDesigner.renderImage.pngFile'), extensions: ['png'], title: t('cardDesigner.renderImage.saveCurrent') })
       : await fileSystemService.pickDirectory(t('cardDesigner.renderImage.saveBoth'))
     if (!destination || disposed) return
-    const images = await renderImages(render, faces, scale)
-    for (const face of faces) {
-      const bytes = images?.get(face)
-      if (!bytes) continue
-      const path = match[1] === 'current' ? destination : `${destination.replace(/[\\/]+$/, '')}/${stem}_${face}.png`
-      await fileSystemService.writeBinaryFile(path, bytes)
-    }
+    const outputs = new Map(faces.map(face => [face, match[1] === 'current' ? destination : `${destination.replace(/[\\/]+$/, '')}/${stem}_${face}.png`]))
+    await renderImages(render, faces, scale, outputs)
   } catch (error) { notifyError(error instanceof Error ? error.message : String(error)) }
   finally { imageExporting.value = false }
 }
@@ -1964,14 +1952,16 @@ async function onHeaderAction(key: string): Promise<void> {
 /** The card document names itself, so the workspace header shows that instead of the file name. */
 const presentation = computed<EditorPresentation>(() => ({
   title: viewDoc.value?.name?.trim()
-    || props.fileName?.trim()
-    || props.filePath.split(/[\\/]/).filter(Boolean).pop()
-    || props.filePath,
+    || editorState.value.name?.trim()
+    || filePath.value.split(/[\\/]/).filter(Boolean).pop()
+    || filePath.value,
   description: '',
   icon: 'file.opencard',
 }))
 
-defineExpose({ save: saveFile, flush: flushPendingChanges, navigate, presentation, headerActions, onHeaderAction })
+const canSave = computed(() => Boolean(cardDoc.value))
+
+defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 </script>
 

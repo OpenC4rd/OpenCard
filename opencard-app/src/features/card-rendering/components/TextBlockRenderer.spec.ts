@@ -145,7 +145,7 @@ describe('TextBlockRenderer', () => {
     expect(binding.attributes('data-oc-binding')).toBe('self:name')
   })
 
-  it('renders saved project-icon nodes with their atlas CSS variables', () => {
+  it('renders saved project-icon nodes with their image and pixelated style', () => {
     const block = parseRenderReadyBlockForTest({
       id: 'project-icon-rich-text-block',
       type: 'text-block',
@@ -156,7 +156,7 @@ describe('TextBlockRenderer', () => {
       entries: [{
         seriesKey: 'mc-wu-pin', source: '.opencard/icons/mc-wu-pin/carrot.svg', src: 'asset://icons/carrot.svg',
         imageWidth: 16, imageHeight: 16,
-        iconKey: 'r3-c16', name: 'Carrot on a Stick', tint: 'original', pixelated: true, rotation: 180,
+        iconKey: 'r3-c16', name: 'Carrot on a Stick', tint: 'original', pixelated: true,
       }]
     } as const
 
@@ -170,6 +170,5 @@ describe('TextBlockRenderer', () => {
     expect(icon.style.getPropertyValue('--oc-project-icon-background-image')).toBe('url("asset://icons/carrot.svg")')
     expect(icon.style.getPropertyValue('--oc-project-icon-background-size')).toBe('100% 100%')
     expect(icon.style.getPropertyValue('--oc-project-icon-image-rendering')).toBe('pixelated')
-    expect(icon.style.getPropertyValue('--oc-project-icon-transform')).toBe('rotate(180deg)')
   })
 })

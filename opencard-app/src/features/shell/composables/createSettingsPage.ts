@@ -8,7 +8,7 @@ import type { SpacePage } from '../spacePage'
 import { useShellNavigation } from './useShellNavigation'
 import { useSettingsPageState } from './useSettingsPageState'
 
-export function createSettingsPage() {
+export function createSettingsPage(cancelExportsAndWait: () => Promise<void>) {
   const navigation = useShellNavigation()
   const project = useProjectStore()
   const category = computed<SettingsCategoryKey>(() => navigation.location.value.base.space === 'settings'
@@ -16,7 +16,7 @@ export function createSettingsPage() {
   const feature = useSettingsPageState({
     settingsStore: useAppSettingsStore(), categoryKey: category,
     projectOpen: computed(() => Boolean(project.projectPath.value)), isSettingsMode: navigation.isSettings,
-    resetWorkspace: project.resetProjectWorkspaceState, selectCategory: navigation.showSettings,
+    resetWorkspace: project.resetProjectWorkspaceState, selectCategory: navigation.showSettings, cancelExportsAndWait,
   })
   onMounted(async () => {
     if (!isTauri()) return

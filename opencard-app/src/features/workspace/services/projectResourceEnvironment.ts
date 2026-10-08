@@ -1,13 +1,29 @@
+import { computed, readonly, shallowRef, markRaw, type Ref } from 'vue'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { fileSystemService } from './fileSystemService'
+import { createResourceFontLoader, type ProjectFontLoadError } from './projectFontLoader'
+import { createIconDimensionReader } from './projectIconDimensionResolver'
+import { readProjectFontCharacterSet } from './projectFontCoverage'
+import { NetworkResourceManager } from '../../network-resources/store/networkResourceManager'
+import { isRemoteResourceAllowed } from '../../editor-runtime/services/editorResource'
+import { parseProjectMetadataText, toProjectInformation, PROJECT_PROFILE_FILE_NAME, type ProjectProfile } from '../model/projectMetadata'
+import { parseProjectDictionaryText, resolveProjectDictionary, PROJECT_DICTIONARY_FILE_NAME, type ProjectDictionary } from '../model/projectDictionary'
+import { resolveAppCachePath, APP_CACHE_SNAPSHOTS_DIRECTORY_NAME } from '../../../shared/storage/appStoragePaths'
+import { unpackResourcePackage, markResourcePackagesUsed } from './resourcePackageArchive'
+import { reportAppError } from '../../logging/appErrorCatalog'
+import { createProjectCustomBlockCatalog } from '../../card-rendering/customBlockRuntime'
+import { EMPTY_PROJECT_ICON_CATALOG as emptyIcons } from './projectIconCatalog'
+import type { CardRenderEnvironment } from '../../card-rendering/renderPipeline'
 import { formatPackageCoordinate, parsePackageCoordinate, resolvePackageQualifier, type PackageCoordinate, type PackageQualifier } from '../model/packageCoordinate'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
-import { parseResourceReferenceList } from './resourceReference'
+import { parseResourceReferenceList, resolveResourceReferenceText } from './resourceReference'
 import { RESOURCE_PACKAGE_SUFFIX, type ResourcePackageManifest } from '../model/resourcePackage'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { ProjectFontRegistry, ProjectFontRegistryDocument } from '../model/projectFontRegistry'
 import { buildProjectFontRegistry, parseProjectFontRegistryText } from '../model/projectFontRegistry'
 import type { ProjectIconRegistryDocument } from '../model/projectIconRegistry'
 import { parseProjectIconRegistryText } from '../model/projectIconRegistry'
-import type { ProjectIconCatalog } from './projectIconCatalog'
+import type { ProjectIconCatalog, ProjectIconDimensionReader } from './projectIconCatalog'
 import { buildProjectIconCatalog, EMPTY_PROJECT_ICON_CATALOG } from './projectIconCatalog'
 import type { FileSystemService } from './fileSystemService'
 import { readResourcePackageArchive, type ResourcePackageArchive } from './resourcePackageArchive'
@@ -19,7 +35,7 @@ import {
   PROJECT_INTERNAL_DIRECTORY_NAME,
   PROJECT_PACKAGE_DIRECTORY,
 } from '../model/projectStructure'
-import { buildCustomBlockRegistry, parseCustomBlockRegistryText, type CustomBlockRegistry } from '../model/customBlockRegistry'
+import { buildCustomBlockRegistry, parseCustomBlockRegistryText, type CustomBlockRegistry, type CustomBlockRegistryDocument } from '../model/customBlockRegistry'
 import type { OcBlockDocument } from '../../card-rendering/customBlockRuntime'
 import { parseOcBlock } from '../../card-rendering/customBlockRuntime'
 
@@ -68,7 +84,14 @@ export type ProjectResourceEnvironment = {
   readonly kind: ProjectResourceScopeKind
   readonly namespace: string
   readonly rootPath: string | null
-  readonly generation?: number
+  readonly isDisposed?: () => boolean
+  readonly waitForResources?: () => Promise<void>
+  readonly profile?: ProjectProfile | null
+  readonly dictionary?: ProjectDictionary | null
+  readonly diagnostics?: Readonly<Record<string, string>>
+  readonly asset?: (path: string) => { status: 'pending' | 'ready' | 'missing' | 'failed' | 'decode-failed', src?: string, message?: string }
+  readonly reportAssetError?: (src: string, message: string) => void
+  readonly readCustomBlockSource?: (path: string) => OcBlockDocument | undefined
   readonly fontDocument: ProjectFontRegistryDocument
   readonly fonts: ProjectFontRegistry
   readonly iconDocument: ProjectIconRegistryDocument
@@ -82,6 +105,7 @@ export type ProjectResourceEnvironment = {
   readonly unreadablePackages?: readonly UnreadableProjectPackage[]
   readonly packageEnvironments?: ReadonlyMap<string, ProjectResourceEnvironment>
   readonly customBlockRegistry?: CustomBlockRegistry
+  readonly customBlockDocument?: CustomBlockRegistryDocument
   readonly customBlockSources?: ReadonlyMap<string, OcBlockDocument>
 }
 
@@ -149,18 +173,12 @@ export function createScopedProjectFontFamily(namespace: string, fontKey: string
 export function resolveProjectEnvironmentFontFamily(
   references: string,
   environment: ProjectResourceEnvironment,
-  projectFallback: (references: string) => string,
 ): string {
-  if (environment.kind === 'project') return projectFallback(references)
   return parseResourceReferenceList(references, 'font').map(token => {
     if (token.diagnostics.length > 0) return ''
     if (!token.reference) return token.source
-    if (token.reference.scope !== 'current') return ''
-    const key = token.reference.key
-    const entry = Object.entries(environment.fonts).find(([candidateKey]) => (
-      candidateKey.toLocaleLowerCase() === key.toLocaleLowerCase()
-    ))?.[1]
-    return entry ? JSON.stringify(createScopedProjectFontFamily(environment.namespace, key)) : ''
+    const selected = resolveResourceReferenceText(token.source, { environment, hostEnvironment: environment, packageEnvironments: environment.packageEnvironments })
+    return selected.value && selected.environment ? JSON.stringify(createScopedProjectFontFamily(selected.environment.namespace, token.reference.key)) : ''
   }).filter(Boolean).join(', ')
 }
 
@@ -237,70 +255,35 @@ async function discoverProjectResourcePackages(options: {
 }
 
 /** 注册表读不出来就当作空的：它是描述性的，读不动不该把整个作用域判死。 */
-async function readRegistryDocument<T extends object>(
+async function readRegistryDocument<T>(
   fs: EnvironmentFs,
   path: string,
   parse: (text: string) => T | null,
   empty: T,
+  diagnostics?: Record<string, string>,
 ): Promise<T> {
   try {
-    return await fs.fileExists(path) ? parse(await fs.readFile(path)) ?? empty : empty
-  } catch {
+    if (!await fs.fileExists(path)) return empty
+    const document = parse(await fs.readFile(path))
+    if (!document) throw new Error('Unreadable resource definition')
+    return document
+  } catch (error) {
+    if (diagnostics) diagnostics[path] = String(error)
     return empty
   }
 }
 
-/** 一个作用域的字体与图标注册表。包的作用域根就是它解开后的目录。 */
-async function readScopeRegistries(fs: EnvironmentFs, root: string): Promise<{
-  fonts: ProjectFontRegistryDocument
-  icons: ProjectIconRegistryDocument
-  customBlocks: CustomBlockRegistry
-}> {
-  return {
-    fonts: await readRegistryDocument(fs, `${root}/${PROJECT_INTERNAL_DIRECTORY_NAME}/fonts/fonts.json`, parseProjectFontRegistryText, {}),
-    icons: await readRegistryDocument(fs, `${root}/${PROJECT_INTERNAL_DIRECTORY_NAME}/icons/icons.json`, parseProjectIconRegistryText, {}),
-    customBlocks: buildCustomBlockRegistry(await readRegistryDocument(
-      fs,
-      `${root}/${PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME}`,
-      parseCustomBlockRegistryText,
-      {},
-    )),
-  }
-}
-
-async function readCustomBlockSources(
-  fs: EnvironmentFs,
-  root: string,
-  relative = '',
-  result = new Map<string, OcBlockDocument>(),
-): Promise<ReadonlyMap<string, OcBlockDocument>> {
-  let entries: DirEntry[]
-  try {
-    entries = await fs.readDirectory(`${root}/${relative}`)
-  } catch {
-    return result
-  }
-  for (const entry of entries) {
-    if (entry.isSymlink) continue
-    const relativePath = relative ? `${relative}/${entry.name}` : entry.name
-    const absolutePath = `${root}/${relativePath}`
-    if (entry.isDirectory) {
-      const directory = relativePath.toLocaleLowerCase().replace(/\\/g, '/')
-      if (directory === '.git' || directory.startsWith('.git/')
-        || directory === 'node_modules' || directory.startsWith('node_modules/')
-        || directory === 'dist' || directory.startsWith('dist/')
-        || directory === '.opencard/packages' || directory.startsWith('.opencard/packages/')) continue
-      await readCustomBlockSources(fs, root, relativePath, result)
-      continue
-    }
-    if (!entry.isFile || !entry.name.toLocaleLowerCase().endsWith('.ocblock')) continue
+async function readCustomBlockSources(fs: EnvironmentFs, root: string, registry: CustomBlockRegistry): Promise<ReadonlyMap<string, OcBlockDocument>> {
+  const result = new Map<string, OcBlockDocument>()
+  await Promise.all(Object.values(registry).flatMap(collection => Object.values(collection).map(async entry => {
+    const resolved = resolveResourcePath({ scopeRootPath: root, projectRootPath: root, reference: entry.source })
+    if (!resolved.ok) return
+    const relative = resolved.value.slice(root.length + 1)
     try {
-      const parsed = parseOcBlock(JSON.parse(await fs.readFile(absolutePath)))
-      if (parsed) result.set(relativePath, parsed)
-    } catch {
-      // A malformed source is reported when a custom block references it.
-    }
-  }
+      const document = parseOcBlock(JSON.parse(await fs.readFile(resolved.value)))
+      if (document) result.set(relative, document)
+    } catch { /* Report unavailable sources at their reference. */ }
+  })))
   return result
 }
 
@@ -308,13 +291,15 @@ function buildScopeIconCatalog(
   root: string,
   projectRoot: string,
   icons: ProjectIconRegistryDocument,
+  assetSrc: (path: string) => string = convertFileSrc,
+  readDimensions?: ProjectIconDimensionReader,
 ): ProjectIconCatalog {
   const series = icons.iconSeries ?? []
   if (series.length === 0) return EMPTY_PROJECT_ICON_CATALOG
   return buildProjectIconCatalog(series, source => {
     const resolved = resolveResourcePath({ scopeRootPath: root, projectRootPath: projectRoot, reference: source })
-    return resolved.ok ? convertFileSrc(resolved.value) : ''
-  })
+    return resolved.ok ? assetSrc(resolved.value) : ''
+  }, readDimensions)
 }
 
 export async function loadProjectResourceEnvironment(options: {
@@ -328,7 +313,10 @@ export async function loadProjectResourceEnvironment(options: {
   snapshotsRoot: string
   kind: ProjectResourceScopeKind
   identity: string
-  generation?: number
+  previous?: ProjectResourceEnvironment
+  paths?: readonly string[]
+  assetSrc?: (path: string) => string
+  readDimensions?: ProjectIconDimensionReader
   /**
    * A catalog already assembled by the caller for this same root, so the environment reuses it instead
    * of assembling an identical one.
@@ -350,11 +338,34 @@ export async function loadProjectResourceEnvironment(options: {
   const projectRoot = options.projectRootPath?.replace(/[\\/]+$/, '') ?? root ?? ''
   const snapshotsRoot = options.snapshotsRoot.replace(/[\\/]+$/, '')
 
-  const registries = root
-    ? await readScopeRegistries(options.fs, root)
-    : { fonts: {}, icons: {}, customBlocks: {} }
+  const previous = options.previous
+  const changed = (relative: string) => !previous || !options.paths || options.paths.some(path => {
+    const target = `${root}/${relative}`.replace(/\\/g, '/').toLowerCase()
+    const normalized = path.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
+    return target === normalized || target.startsWith(`${normalized}/`) || normalized.startsWith(`${target}/`)
+  })
+  const diagnostics: Record<string, string> = { ...previous?.diagnostics }
+  const read = async <T>(path: string, parse: (text: string) => T | null, empty: T, prior?: T): Promise<T> => {
+    if (!changed(path) && prior !== undefined) return prior
+    delete diagnostics[path]
+    if (!root) return empty
+    const errors: Record<string, string> = {}
+    const document = await readRegistryDocument(options.fs, `${root}/${path}`, parse, empty, errors)
+    if (errors[`${root}/${path}`]) diagnostics[path] = errors[`${root}/${path}`]!
+    return document
+  }
+  const [fonts, icons, customBlockDocument, profile, dictionary] = await Promise.all([
+    read('.opencard/fonts/fonts.json', parseProjectFontRegistryText, {}, previous?.fontDocument),
+    read('.opencard/icons/icons.json', parseProjectIconRegistryText, {}, previous?.iconDocument),
+    read(PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, parseCustomBlockRegistryText, {}, previous?.customBlockDocument),
+    options.kind === 'project' ? read(PROJECT_PROFILE_FILE_NAME, parseProjectMetadataText, null, previous?.profile) : null,
+    options.kind === 'project' ? read(PROJECT_DICTIONARY_FILE_NAME, parseProjectDictionaryText, null, previous?.dictionary) : null,
+  ])
+  const registries = { fonts, icons, customBlockDocument, customBlocks: buildCustomBlockRegistry(customBlockDocument) }
 
-  const discovered = root && options.kind === 'project'
+  const discovered = previous && !changed(`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`)
+    ? { packages: new Map(previous.packages), unreadable: [...previous.unreadablePackages ?? []], packageFiles: [...previous.packageFiles ?? []] }
+    : root && options.kind === 'project'
     ? await discoverProjectResourcePackages({
       fs: options.fs,
       root,
@@ -371,38 +382,33 @@ export async function loadProjectResourceEnvironment(options: {
     // 包环境按**坐标**索引：引用只认坐标，所以同一坐标有两份时仍然只建一个环境（先出现的那份）。
     const coordinate = formatPackageCoordinate(pkg.coordinate)
     if (packageEnvironments.has(coordinate)) continue
-    const loadedPackageEnvironment = await loadProjectResourceEnvironment({
+    const existing = previous?.packageEnvironments?.get(coordinate)
+    const loadedPackageEnvironment = existing?.rootPath === pkg.rootPath ? existing : await loadProjectResourceEnvironment({
       fs: options.fs,
       rootPath: pkg.rootPath,
       projectRootPath: projectRoot,
       snapshotsRoot,
       kind: 'package',
-      identity: coordinate,
-      generation: options.generation,
+      identity: `${options.identity}-${pkg.fingerprint}`,
+      assetSrc: options.assetSrc,
+      readDimensions: options.readDimensions,
     })
-    const publicBlocks = pkg.manifest.public.blocks ?? []
-    const manifestBlocks = Object.fromEntries(publicBlocks.map((entry) => [entry.key, {
-      key: entry.key,
-      name: entry.title,
-      source: entry.source,
-    }]))
     packageEnvironments.set(coordinate, {
       ...loadedPackageEnvironment,
-      customBlockRegistry: {
-        ...(loadedPackageEnvironment.customBlockRegistry ?? {}),
-        ...manifestBlocks,
-      },
     })
   }
 
-  const iconCatalog = options.iconCatalog ?? (root
-    ? buildScopeIconCatalog(root, projectRoot, registries.icons)
-    : EMPTY_PROJECT_ICON_CATALOG)
+  const iconFilesChanged = root && options.paths?.some(path => (registries.icons.iconSeries ?? []).some(series => series.icons.some(icon => {
+    const resolved = resolveResourcePath({ scopeRootPath: root, projectRootPath: projectRoot, reference: icon.source })
+    const normalized = path.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
+    return resolved.ok && (resolved.value.toLowerCase() === normalized || resolved.value.toLowerCase().startsWith(`${normalized}/`))
+  })))
+  const iconCatalog = options.iconCatalog ?? (previous && options.paths && previous.iconDocument === registries.icons && !iconFilesChanged
+    ? previous.iconCatalog : root ? buildScopeIconCatalog(root, projectRoot, registries.icons, options.assetSrc, options.readDimensions) : EMPTY_PROJECT_ICON_CATALOG)
   return {
     kind: options.kind,
     namespace,
     rootPath: root,
-    generation: options.generation ?? 0,
     fontDocument: registries.fonts,
     fonts: buildProjectFontRegistry(registries.fonts),
     iconDocument: registries.icons,
@@ -412,6 +418,218 @@ export async function loadProjectResourceEnvironment(options: {
     unreadablePackages: discovered.unreadable,
     packageEnvironments,
     customBlockRegistry: registries.customBlocks,
-    customBlockSources: root ? await readCustomBlockSources(options.fs, root) : new Map(),
+    customBlockDocument: registries.customBlockDocument,
+    customBlockSources: root ? (changed(PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME) || options.paths?.some(path => {
+      const changedPath = path.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase()
+      return Object.values(registries.customBlocks).some(collection => Object.values(collection).some(entry => {
+        const result = resolveResourcePath({ scopeRootPath: root, projectRootPath: root, reference: entry.source })
+        return result.ok && (result.value.toLowerCase() === changedPath || result.value.toLowerCase().startsWith(`${changedPath}/`))
+      }))
+    })
+      ? await readCustomBlockSources(options.fs, root, registries.customBlocks) : previous?.customBlockSources ?? new Map()) : new Map(),
+    profile, dictionary, diagnostics,
   }
+}
+
+export type ResourceEnvironment = {
+  readonly state: Readonly<Ref<ProjectResourceEnvironment>>
+  readonly renderEnvironment: Readonly<Ref<CardRenderEnvironment>>
+  readonly fontErrors: Readonly<Ref<readonly ProjectFontLoadError[]>>
+  readonly watching: Readonly<Ref<boolean>>
+  refresh(paths?: readonly string[]): Promise<void>
+  waitForFonts(): Promise<void>
+  dispose(): Promise<void>
+}
+
+export async function createResourceEnvironment(folder: string, options: {
+  watch: boolean
+  cacheIdentity?: string
+  onFilesChanged?: (paths: readonly string[]) => void
+  fs?: FileSystemService
+  snapshotsRoot?: string
+}): Promise<ResourceEnvironment> {
+  const fs = options.fs ?? fileSystemService
+  const root = folder.replace(/\\/g, '/').replace(/\/+$/, '')
+  const identity = crypto.randomUUID()
+  const snapshotsRoot = options.snapshotsRoot ?? await resolveAppCachePath(APP_CACHE_SNAPSHOTS_DIRECTORY_NAME)
+  const state = shallowRef<ProjectResourceEnvironment>({ kind: 'project', namespace: identity, rootPath: root, fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: emptyIcons })
+  const fontErrors = shallowRef<readonly ProjectFontLoadError[]>([])
+  const watching = shallowRef(false)
+  const dimensions = createIconDimensionReader()
+  const fonts = new Map<string, ReturnType<typeof createResourceFontLoader>>()
+  const fontFailures = new Map<string, readonly ProjectFontLoadError[]>()
+  const network = new NetworkResourceManager()
+  let resources: ReturnType<NetworkResourceManager['forProject']> | undefined
+  const facts = shallowRef(new Map<string, { status: 'pending' | 'ready' | 'missing' | 'failed' | 'decode-failed', src?: string, message?: string }>())
+  const revisions = new Map<string, number>()
+  const iconPaths = new Set<string>()
+  const sources = shallowRef(new Map<string, OcBlockDocument>())
+  const loadingSources = new Set<string>()
+  const pendingResources = new Set<Promise<unknown>>()
+  function track<T>(work: Promise<T>) { pendingResources.add(work); void work.finally(() => pendingResources.delete(work)).catch(() => undefined); return work }
+  const failedPackages = new Set<string>()
+  let closed = false
+  let listener: UnlistenFn | undefined
+  let watcher: string | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let queue = Promise.resolve()
+  let initialization = true
+  const changed = new Set<string>()
+  const normalize = (path: string) => path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const affected = (key: string, paths?: readonly string[]) => !paths || paths.some(path => key === normalize(path) || key.startsWith(`${normalize(path)}/`))
+  function asset(path: string) {
+    if (closed) return { status: 'failed' as const, message: 'Resource environment is disposed' }
+    const key = normalize(path)
+    const known = facts.value.get(key)
+    if (known) return known
+    const revision = revisions.get(key) ?? 0
+    facts.value.set(key, { status: 'pending' })
+    void track(fs.fileExists(path).then(exists => {
+      if (closed || (revisions.get(key) ?? 0) !== revision) return
+      facts.value = new Map(facts.value).set(key, exists
+        ? { status: 'ready', src: `${convertFileSrc(path)}?oc-revision=${revision}` }
+        : { status: 'missing', message: `Resource does not exist: ${path}` })
+    }, error => {
+      if (!closed && (revisions.get(key) ?? 0) === revision) facts.value = new Map(facts.value).set(key, { status: 'failed', message: String(error) })
+    }))
+    return { status: 'pending' as const }
+  }
+  function attach(scope: ProjectResourceEnvironment): ProjectResourceEnvironment {
+    return { ...scope, asset, reportAssetError(src, message) {
+      if (closed) return
+      const key = [...facts.value].find(([, fact]) => fact.src === src)?.[0]
+      if (key) facts.value = new Map(facts.value).set(key, { status: 'decode-failed', message })
+    }, isDisposed: () => closed, waitForResources, readCustomBlockSource(path) {
+      const key = `${scope.rootPath}/${path}`
+      const existing = scope.customBlockSources?.get(path) ?? sources.value.get(key)
+      if (existing || loadingSources.has(normalize(key)) || closed) return existing
+      loadingSources.add(normalize(key))
+      const revision = revisions.get(normalize(key)) ?? 0
+      void track(fs.readFile(key).then(text => {
+        const document = parseOcBlock(JSON.parse(text))
+        if (document && !closed && (revisions.get(normalize(key)) ?? 0) === revision) sources.value = new Map(sources.value).set(key, document)
+      }).catch(() => undefined))
+      return undefined
+    } }
+  }
+  function schedule(paths: readonly string[]) {
+    if (closed) return
+    paths.forEach(path => changed.add(path))
+    clearTimeout(timer)
+    if (!initialization) timer = setTimeout(() => {
+      const paths = [...changed]; changed.clear()
+      void refresh(paths).catch(error => reportAppError('OC-E3016', { path: root, error }))
+    }, 150)
+  }
+  async function refresh(paths?: readonly string[]) {
+    if (closed) return
+    queue = queue.catch(() => undefined).then(async () => {
+      if (closed) return
+      for (const key of new Set([...facts.value.keys(), ...revisions.keys(), ...loadingSources.values(), ...iconPaths, ...[...sources.value.keys()].map(normalize)])) {
+        if (affected(key, paths)) {
+          revisions.set(key, (revisions.get(key) ?? 0) + 1)
+          facts.value.delete(key)
+          loadingSources.delete(key)
+          for (const source of sources.value.keys()) if (normalize(source) === key) { sources.value.delete(source); loadingSources.delete(normalize(source)) }
+        }
+      }
+      facts.value = new Map(facts.value)
+      sources.value = new Map(sources.value)
+      if (!paths || affected(normalize(`${root}/${PROJECT_PROFILE_FILE_NAME}`), paths)) { await network.dispose(); resources = undefined }
+      const previous = initialization ? undefined : state.value
+      const loaded = await loadProjectResourceEnvironment({ fs, rootPath: root, snapshotsRoot, kind: 'project', identity, previous, paths, readDimensions: entry => closed ? undefined : dimensions.read(entry), assetSrc: path => { const key = normalize(path); iconPaths.add(key); return `${convertFileSrc(path)}?oc-revision=${revisions.get(key) ?? 0}` }, unusableFingerprints: failedPackages,
+        onPackagePending(archive, archivePath, cache) {
+          void track(unpackResourcePackage(archive, archivePath, cache).then(() => schedule([`${root}/.opencard/packages`]), error => {
+            if (closed) return
+            failedPackages.add(archive.fingerprint)
+            reportAppError('OC-E3017', { path: archivePath, error })
+            schedule([`${root}/.opencard/packages`])
+          }))
+        },
+      })
+      if (closed) return
+      const scopes = new Map([...[...loaded.packageEnvironments ?? []].map(([key, scope]) => [key, attach(scope)] as const)])
+      state.value = { ...attach(loaded), packageEnvironments: scopes }
+      const allScopes = [state.value, ...scopes.values()]
+      for (const [namespace, loader] of fonts) if (!allScopes.some(scope => scope.namespace === namespace)) { loader.dispose(); fonts.delete(namespace); fontFailures.delete(namespace) }
+      if (previous?.iconCatalog !== loaded.iconCatalog) dimensions.clear()
+      const fontScopes = allScopes.filter(scope => {
+        const before = scope.kind === 'project' ? previous : [...previous?.packageEnvironments?.values() ?? []].find(item => item.namespace === scope.namespace)
+        return !before || before.fontDocument !== scope.fontDocument || Object.values(scope.fonts).some(entry => entry.kind === 'family' && Object.values(entry.family.files).some(styles => Object.values(styles ?? {}).some(source => {
+          const result = resolveResourcePath({ scopeRootPath: scope.rootPath!, projectRootPath: root, reference: source, packageRoots: packageScopeRoots(loaded.packages) })
+          return result.ok && affected(normalize(result.value), paths)
+        })))
+      })
+      if (fontScopes.length) {
+        const results = await Promise.all(fontScopes.map(scope => {
+          let loader = fonts.get(scope.namespace)
+          if (!loader) { loader = createResourceFontLoader(key => createScopedProjectFontFamily(scope.namespace, key)); fonts.set(scope.namespace, loader) }
+          const resolve = (source: string) => {
+            const result = resolveResourcePath({ scopeRootPath: scope.rootPath!, projectRootPath: root, reference: source, packageRoots: packageScopeRoots(loaded.packages) })
+            if (!result.ok) throw new Error(result.message)
+            return result.value
+          }
+          return loader.sync(scope.fontDocument.families ?? [], scope.fontDocument.compositions ?? [], source => `${convertFileSrc(resolve(source))}?oc-revision=${revisions.get(normalize(resolve(source))) ?? 0}`, async source => readProjectFontCharacterSet(await fs.readBinaryFile(resolve(source))))
+        }))
+        if (!closed) results.forEach((result, index) => fontFailures.set(fontScopes[index]!.namespace, result.errors))
+      }
+      if (!closed) fontErrors.value = [...fontFailures.values()].flat()
+      if (!closed && paths) options.onFilesChanged?.(paths)
+    })
+    await queue
+  }
+  async function waitForResources() {
+    while (!closed) {
+      await Promise.allSettled([...pendingResources])
+      if (changed.size) { clearTimeout(timer); const paths = [...changed]; changed.clear(); await refresh(paths) }
+      await queue
+      await resources?.wait()
+      await Promise.all([...fonts.values()].map(loader => loader.wait()))
+      if (!pendingResources.size && !changed.size) break
+    }
+  }
+  const renderEnvironment = computed<CardRenderEnvironment>(() => ({
+    project: state.value.profile ? toProjectInformation(state.value.profile) : null,
+    dictionary: state.value.dictionary ? resolveProjectDictionary(state.value.dictionary).values : null,
+    remoteResourcePolicy: state.value.profile?.remoteResources,
+    resolveRemoteResource: url => { if (closed) return null; resources ??= network.forProject(options.cacheIdentity ?? root, url => isRemoteResourceAllowed(url, state.value.profile?.remoteResources)); const cached = resources.get(url); return cached ? convertFileSrc(cached.path) : null },
+    remoteResourceStatus: url => closed ? 'blocked' : resources?.status(url) ?? 'pending',
+    projectIconCatalog: state.value.iconCatalog,
+    resolveIconDimensions: entry => closed ? undefined : dimensions.read(entry),
+    resolveFontFamily: text => resolveProjectEnvironmentFontFamily(text, state.value),
+    projectResourceEnvironment: state.value,
+    customBlockCatalog: createProjectCustomBlockCatalog(state.value),
+  }))
+  let disposal: Promise<void> | undefined
+  function dispose() {
+    return disposal ??= (async () => {
+      closed = true; watching.value = false; clearTimeout(timer); listener?.()
+      const downloads = network.dispose(); dimensions.clear(); fonts.forEach(loader => loader.dispose()); fonts.clear()
+      try { if (watcher) await fs.stopWatching(watcher) }
+      finally {
+        await queue.catch(() => undefined)
+        await Promise.allSettled([...pendingResources])
+        await downloads
+        facts.value = new Map(); sources.value = new Map(); changed.clear(); fontFailures.clear()
+      }
+    })()
+  }
+  try {
+    if (options.watch) {
+      const pending: { id: string, paths: string[] }[] = []
+      listener = await listen<{ id: string, root: string, paths: string[] }>('file-changed', event => {
+        if (!watcher) pending.push(event.payload)
+        else if (event.payload.id === watcher) schedule(event.payload.paths)
+      })
+      watcher = await fs.startWatching(root)
+      watching.value = true
+      pending.filter(event => event.id === watcher).forEach(event => schedule(event.paths))
+    }
+    await refresh()
+    initialization = false
+    if (changed.size) schedule([])
+    void markResourcePackagesUsed(snapshotsRoot, [...state.value.packages?.values() ?? []].filter(pkg => pkg.rootPath).map(pkg => pkg.fingerprint)).catch(() => undefined)
+    return markRaw({ state: readonly(state) as Readonly<Ref<ProjectResourceEnvironment>>, renderEnvironment, fontErrors: readonly(fontErrors), watching: readonly(watching), refresh,
+      waitForFonts: async () => { await Promise.all([...fonts.values()].map(loader => loader.wait())) }, dispose })
+  } catch (error) { await dispose(); throw error }
 }

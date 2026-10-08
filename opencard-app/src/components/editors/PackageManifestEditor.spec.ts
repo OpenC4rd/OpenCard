@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RESOURCE_PACKAGE_TYPE, type ResourcePackageManifest } from '../../features/workspace/model/resourcePackage'
@@ -37,7 +38,7 @@ vi.mock('../../features/workspace/services/resourcePackageArchive', () => ({
 }))
 
 function mountEditor() {
-  const wrapper = mount(PackageManifestEditor, { props: { filePath: ARCHIVE_PATH } })
+  const wrapper = mount(PackageManifestEditor, { props: { session: createTestSession({ path: ARCHIVE_PATH }) } })
   return flushPromises().then(() => wrapper)
 }
 

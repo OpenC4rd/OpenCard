@@ -16,6 +16,7 @@ import type { ProjectIconRenderer } from '../../../shared/ui/visual/projectIconS
 export type ProjectIconCatalogEntry = ProjectIcon & {
   seriesKey: string
   src: string
+  readDimensions?: ProjectIconDimensionReader
 }
 
 /** A set has no image of its own: every icon owns exactly one file. */
@@ -56,6 +57,7 @@ export function projectIconIdentity(seriesKey: string, iconKey: string): string 
 export function buildProjectIconCatalog(
   seriesList: readonly ProjectIconSeries[] | null | undefined,
   resolveAssetSrc: (source: string) => string,
+  readDimensions?: ProjectIconDimensionReader,
 ): ProjectIconCatalog {
   const series = seriesList ?? []
   const runtimeSeries: ProjectIconSeriesRuntime[] = series.map(item => ({ name: item.name, key: item.key }))
@@ -63,7 +65,7 @@ export function buildProjectIconCatalog(
 
   for (const item of series) {
     for (const icon of item.icons) {
-      entries.push({ ...icon, seriesKey: item.key, src: resolveAssetSrc(icon.source) })
+      entries.push({ ...icon, seriesKey: item.key, src: resolveAssetSrc(icon.source), ...(readDimensions ? { readDimensions } : {}) })
     }
   }
 
@@ -95,10 +97,6 @@ export function findProjectIcon(
     ?? null
 }
 
-function isQuarterTurn(rotation: number | undefined): boolean {
-  return rotation === 90 || rotation === 270
-}
-
 /**
  * The size to paint with: whatever the reader knows, or a square box for an icon nobody has measured
  * yet. A square is also what a square icon resolves to, so an unmeasured square icon is already right.
@@ -113,12 +111,12 @@ function displayDimensions(
     && measured.width > 0 && measured.height > 0
   const width = known ? measured!.width : 1
   const height = known ? measured!.height : 1
-  return isQuarterTurn(entry.rotation) ? { width: height, height: width } : { width, height }
+  return { width, height }
 }
 
 function createProjectIconPaint(entry: ProjectIconCatalogEntry): Record<string, string> {
   const image = `url(${JSON.stringify(entry.src)})`
-  return entry.tint === 'theme'
+  return entry.tint === 'context'
     ? {
         '--oc-project-icon-mask-image': image,
         '--oc-project-icon-mask-size': '100% 100%',
@@ -133,12 +131,12 @@ function createProjectIconPaint(entry: ProjectIconCatalogEntry): Record<string, 
 }
 
 function rendererOf(entry: ProjectIconCatalogEntry): ProjectIconRenderer {
-  return entry.tint === 'theme' ? 'mask' : 'image'
+  return entry.tint === 'context' ? 'mask' : 'image'
 }
 
 /**
  * Emits the shared contract every project icon paints through: the box the paint maps onto, the
- * rotation, and the paint itself. A theme-tinted icon paints `currentColor` through its own alpha;
+ * paint itself. A context-tinted icon paints `currentColor` through its own alpha;
  * an original icon keeps its own colors.
  */
 function createProjectIconRenderStyle(
@@ -153,7 +151,6 @@ function createProjectIconRenderStyle(
     '--oc-project-icon-source-width': `${dimensions.width / unit}em`,
     '--oc-project-icon-source-height': `${dimensions.height / unit}em`,
     '--oc-project-icon-image-rendering': entry.pixelated === true ? 'pixelated' : 'auto',
-    '--oc-project-icon-transform': `rotate(${entry.rotation ?? 0}deg)`,
     ...createProjectIconPaint(entry),
   }
 }
@@ -210,21 +207,15 @@ export function createProjectIconBlockStyle(
   readDimensions?: ProjectIconDimensionReader,
 ): Record<string, string> {
   const dimensions = projectIconBlockDimensions(displayDimensions(entry, readDimensions), fit)
-  const quarterTurn = isQuarterTurn(entry.rotation)
   return {
     backgroundImage: 'none',
     imageRendering: entry.pixelated === true ? 'pixelated' : 'auto',
     '--oc-project-icon-renderer': rendererOf(entry),
     '--oc-project-icon-display-width': dimensions.width,
     '--oc-project-icon-display-height': dimensions.height,
-    '--oc-project-icon-source-width': quarterTurn
-      ? 'var(--oc-project-icon-display-height)'
-      : 'var(--oc-project-icon-display-width)',
-    '--oc-project-icon-source-height': quarterTurn
-      ? 'var(--oc-project-icon-display-width)'
-      : 'var(--oc-project-icon-display-height)',
+    '--oc-project-icon-source-width': 'var(--oc-project-icon-display-width)',
+    '--oc-project-icon-source-height': 'var(--oc-project-icon-display-height)',
     '--oc-project-icon-image-rendering': entry.pixelated === true ? 'pixelated' : 'auto',
-    '--oc-project-icon-transform': `rotate(${entry.rotation ?? 0}deg)`,
     ...createProjectIconPaint(entry),
   }
 }

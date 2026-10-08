@@ -6,7 +6,7 @@
  * inset projection.
  */
 import { computed, ref, watch, type CSSProperties, type Ref } from 'vue'
-import type { CardDesignerLayoutState } from '../editor-runtime/model/editorUiState'
+import type { CardDesignerLayoutState } from './cardDesigner.types'
 import {
   clampCdeOverlayExtent,
   resolveCdeOverlayViewportInsets,

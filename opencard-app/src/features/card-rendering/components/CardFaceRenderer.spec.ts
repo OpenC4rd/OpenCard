@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { parseRichTextHtml } from '../../../shared/rich-text/richTextHtml'
 import { createBlock } from '../../../entities/card/model'
 import { createCardRenderResourceContext } from '../cardRenderResources'
@@ -11,14 +11,11 @@ import {
 import type { RenderReadyCardFace } from '../render.types'
 import CardFaceRenderer from './CardFaceRenderer.vue'
 import { parseRenderReadyBlockForTest } from './renderTestUtils'
-import { setProjectFonts } from '../../workspace/model/projectFonts'
 
-afterEach(() => setProjectFonts([]))
 
 describe('CardFaceRenderer resources', () => {
   it('renders the project font for text blocks', () => {
     const font = { key: 'brand', name: 'Brand', files: { normal: { upright: 'fonts/Brand.ttf' } } }
-    setProjectFonts([font])
     const environment: ProjectResourceEnvironment = {
       kind: 'project', namespace: 'project-root', rootPath: '/project',
       fontDocument: {}, fonts: { brand: { kind: 'family', name: 'Brand', family: font } },
@@ -47,7 +44,7 @@ describe('CardFaceRenderer resources', () => {
     const wrapper = mount(CardFaceRenderer, { props: { face, resourceContext } })
 
     expect(wrapper.get<HTMLElement>('[data-block-id="native-text"]').element.style.fontFamily)
-      .toBe('"OpenCardProjectFont-brand"')
+      .toBe('"OpenCardResource-project-root-brand"')
   })
 
   it('does not expose a package-local path to an ordinary native block', () => {

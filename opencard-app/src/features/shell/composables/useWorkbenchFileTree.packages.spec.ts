@@ -1,7 +1,8 @@
+import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { isNodeTailAction, normalizeNodeTail, type OcNode } from '../../../shared/ui/node/node.types'
-import type { EditorSession } from '../../workspace/store/editorSessionStore'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { resolveFileType } from '../../workspace/model/fileTypes'
 import {
   PROJECT_ENTRY_MORE_ACTION_KEY,
@@ -29,7 +30,7 @@ describe('useWorkbenchFileTree package navigation', () => {
         { name: '.opencard/packages/notes.txt', isDirectory: false },
       ]),
       sessions: ref<EditorSession[]>([]),
-      formatSessionTitle: session => session.name,
+      formatSessionTitle: session => session.state.name,
       activeSession,
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
@@ -58,7 +59,7 @@ describe('useWorkbenchFileTree package navigation', () => {
     await tree.handleProjectManagementSelect([archivePath])
     expect(openPreviewFile).toHaveBeenCalledWith(archivePath)
 
-    activeSession.value = {
+    activeSession.value = createTestSession({
       id: 'package-manifest',
       resourceKind: 'workspace',
       path: archivePath,
@@ -69,7 +70,7 @@ describe('useWorkbenchFileTree package navigation', () => {
       draftContent: '',
       isDirty: false,
       isPreview: true,
-    }
+    })
     await nextTick()
     expect(tree.selectedManagementKeys.value).toEqual([archivePath])
     expect(resolveFileType(archivePath, projectPath))

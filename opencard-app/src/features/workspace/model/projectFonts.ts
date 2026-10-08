@@ -19,19 +19,6 @@ export type FontCatalogEntry = {
   cssFamily?: string
 }
 
-let projectFamiliesByKey = new Map<string, ProjectFont>()
-let projectCompositionsByKey = new Map<string, ProjectFontComposition>()
-
-export function setProjectFonts(
-  families: readonly ProjectFont[] | null | undefined,
-  compositions: readonly ProjectFontComposition[] | null | undefined = [],
-): void {
-  projectFamiliesByKey = new Map((families ?? []).map(font => [font.key.toLocaleLowerCase(), font]))
-  projectCompositionsByKey = new Map((compositions ?? []).map(composition => (
-    [composition.key.toLocaleLowerCase(), composition]
-  )))
-}
-
 export type ProjectFontResolutionIssue = {
   kind: 'missing'
   key: string
@@ -84,7 +71,9 @@ export function createProjectFontCompositionCssFamily(key: string): string {
 }
 
 export function toCssFontFamily(reference: string): string {
-  return resolveProjectFontExpression(reference).cssFontFamily
+  return parseResourceReferenceList(reference, 'font').map(token => token.reference?.scope === 'current'
+    ? JSON.stringify(createProjectFontCssFamily(token.reference.key))
+    : token.reference ? JSON.stringify(token.source) : token.source).join(', ')
 }
 
 export function resolveProjectFontExpression(
@@ -93,10 +82,10 @@ export function resolveProjectFontExpression(
 ): ProjectFontResolution {
   const fontsByKey = context
     ? new Map(context.families.map(font => [font.key.toLocaleLowerCase(), font]))
-    : projectFamiliesByKey
+    : new Map<string, ProjectFont>()
   const compositionsByKey = context
     ? new Map(context.compositions.map(composition => [composition.key.toLocaleLowerCase(), composition]))
-    : projectCompositionsByKey
+    : new Map<string, ProjectFontComposition>()
   const familyKeys: string[] = []
   const cssFamilies: string[] = []
   const issues: ProjectFontResolutionIssue[] = []

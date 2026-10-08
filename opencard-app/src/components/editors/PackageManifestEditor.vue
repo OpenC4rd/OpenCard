@@ -50,14 +50,14 @@
       </OcCard>
 
       <OcCard :title="t('packageManifest.blocks')" icon="entity.block-custom">
-        <OcEmpty v-if="!(manifest.public.blocks?.length)" tone="muted" inset="compact">
+        <OcEmpty v-if="!(manifest.public.blockCollections?.length)" tone="muted" inset="compact">
           {{ t('packageManifest.noBlocks') }}
         </OcEmpty>
-        <OcRow v-for="block in manifest.public.blocks ?? []" :key="block.key">
-          <template #title>{{ block.title }}</template>
+        <OcRow v-for="collection in manifest.public.blockCollections ?? []" :key="collection.key">
+          <template #title>{{ collection.title }}</template>
           <template #append>
-            <OcText tone="muted" size="sm">{{ block.source }}</OcText>
-            <OcText size="sm" mono>{{ block.key }}</OcText>
+            <OcText tone="muted" size="sm">{{ t('packageManifest.blockCount', { count: collection.count }) }}</OcText>
+            <OcText size="sm" mono>{{ collection.key }}</OcText>
           </template>
         </OcRow>
       </OcCard>
@@ -68,7 +68,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { getPathBasename } from '../../shared/model/filePath'
 import { notifyAppError } from '../../features/notifications/titlebarNotices'
@@ -86,7 +86,8 @@ import OcRow from '../standard/OcRow.vue'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
 
 const props = defineProps<EditorProps>()
-const emit = defineEmits<EditorEmits>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
 
 /**
@@ -95,7 +96,7 @@ const { t } = useI18n()
  */
 const archive = ref<ResourcePackageArchive | null>(null)
 const coverSrc = ref('')
-watch(() => props.filePath, async path => {
+watch(() => filePath.value, async path => {
   archive.value = await readResourcePackageArchive(path).catch(() => null)
   releaseCover()
   // 封面也只读这个归档里的那一个条目：没解开也能看，重复件看的也是自己那份。
@@ -138,14 +139,14 @@ async function copyRowValue(row: { label: string; value: string }): Promise<void
 const presentation = computed<EditorPresentation>(() => ({
   // 主标题是这个文件本身叫什么，小字是它自述的坐标。文件叫什么名字不算数 —— 那是"它是谁"，
   // 不是"你打开的是哪一个文件"。
-  title: getPathBasename(props.filePath),
+  title: getPathBasename(filePath.value),
   description: coordinate.value || t('packageManifest.description'),
   icon: 'file.package',
 }))
 
 defineExpose({ presentation })
 
-watch(() => props.filePath, () => emit('modified', false), { immediate: true })
+
 </script>
 
 <style scoped>

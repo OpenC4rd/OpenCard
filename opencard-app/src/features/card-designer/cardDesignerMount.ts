@@ -29,7 +29,10 @@ import {
   type CardDocument,
 } from '../../entities/card/model'
 import enUS from '../../locales/en-US'
-import type { EditorProps } from '../editor-runtime/registry/editorRegistry'
+import type { CardDesignerProps, CardDesignerSessionView } from './cardDesigner.types'
+import type { EditorSessionState } from '../editor-runtime/session/editorSession'
+import { useAppSettingsStore } from '../settings/store/appSettingsStore'
+import { createTestSession, getTestSession } from '../editor-runtime/editorTestSession'
 import CardDesignEditor from './CardDesignEditor.vue'
 
 /** A child replacement: a double component, or `false` to force the real child. */
@@ -37,7 +40,7 @@ export type CdeStub = Component | boolean
 
 export interface CdeMountOptions {
   /** Editor props; `filePath` and `modelValue` have suite defaults, `modelValue` accepts a document. */
-  props?: Partial<Omit<EditorProps, 'modelValue'>> & { modelValue?: CardDocument | string }
+  props?: Partial<CardDesignerProps> & { modelValue?: CardDocument | string; filePath?: string; fileName?: string; mode?: 'edit' | 'diff'; diffUiState?: NonNullable<EditorSessionState['diff']>['uiState']; cardDesignerMode?: CardDesignerSessionView['mode']; cardDesignerLayout?: CardDesignerSessionView['layout']; cardDesignerView?: CardDesignerSessionView['view']; viewportTransform?: CardDesignerSessionView['viewportTransform']; structureTreeSelectionBehavior?: 'none' | 'expand' | 'expand-exclusive'; structureTreeScrollToSelection?: boolean; alignmentSnappingEnabledByDefault?: boolean }
   /** Child overrides merged over the default stub set; `false` forces the real child. */
   stubs?: Record<string, CdeStub>
   /** Mounts the editor into `document.body`, for tests that dispatch keyboard events on the host. */
@@ -139,13 +142,20 @@ export function cdeStub(name: string, options: CdeStubOptions = {}): Component {
 /** Mounts the real editor with the default stub set, plus any per-test overrides. */
 export function mountCde(options: CdeMountOptions = {}): VueWrapper {
   const i18n = createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })
-  const { modelValue, filePath: initialFilePath, ...restProps } = options.props ?? {}
+  const { modelValue, filePath: initialFilePath, fileName, mode, diffUiState, cardDesignerMode, cardDesignerLayout, cardDesignerView, viewportTransform, structureTreeSelectionBehavior, structureTreeScrollToSelection, alignmentSnappingEnabledByDefault, ...restProps } = options.props ?? {}
+  const settings = useAppSettingsStore()
+  settings.updateSetting('workspace.structureTreeSelectionBehavior', structureTreeSelectionBehavior ?? 'expand-exclusive')
+  settings.updateSetting('workspace.structureTreeScrollToSelection', structureTreeScrollToSelection ?? true)
+  settings.updateSetting('workspace.alignmentSnappingEnabledByDefault', alignmentSnappingEnabledByDefault ?? true)
   const model = modelValue ?? createCdeDocument()
   return mount(CardDesignEditor, {
     attachTo: options.attachToBody ? document.body : undefined,
     props: {
-      filePath: initialFilePath ?? 'card.ocdocument',
-      modelValue: typeof model === 'string' ? model : JSON.stringify(model),
+      session: createTestSession({ path: initialFilePath ?? 'card.ocdocument', name: fileName ?? 'card.ocdocument',
+        resourceKind: 'external', editorId: 'card-designer', fileTypeId: 'opencard', draftContent: typeof model === 'string' ? model : JSON.stringify(model), mode,
+        diff: mode === 'diff' ? { beforeRevisionId: null, afterRevisionId: null, uiState: diffUiState } : undefined,
+        viewState: { 'card-designer': { mode: cardDesignerMode, layout: cardDesignerLayout, view: cardDesignerView, viewportTransform } },
+      }),
       ...restProps,
     },
     global: {
@@ -222,6 +232,5 @@ export function editorTrees(wrapper: VueWrapper) {
 
 /** Reads the most recent `update:modelValue` payload as a document. */
 export function emittedDocument(wrapper: VueWrapper): CardDocument {
-  const updates = wrapper.emitted('update:modelValue') ?? []
-  return JSON.parse(String(updates[updates.length - 1]?.[0])) as CardDocument
+  return JSON.parse(getTestSession(wrapper).state.draftContent) as CardDocument
 }

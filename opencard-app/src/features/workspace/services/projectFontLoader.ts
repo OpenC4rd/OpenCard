@@ -7,7 +7,6 @@ import { projectFontFileEntries, projectFontWeightValues } from '../model/projec
 import {
   createProjectFontCompositionCssFamily,
   createProjectFontCssFamily,
-  setProjectFonts,
 } from '../model/projectFonts'
 import {
   characterSetToUnicodeRanges,
@@ -15,11 +14,6 @@ import {
   subtractUnicodeRanges,
 } from './projectFontCoverage'
 import { reportAppError } from '../../logging/appErrorCatalog'
-
-let generation = 0
-let projectFontStyle: HTMLStyleElement | null = null
-let readiness: Promise<ProjectFontLoadResult> = Promise.resolve({ current: true, errors: [] })
-const PROJECT_FONT_STYLE_ATTRIBUTE = 'data-opencard-project-fonts'
 
 export type ProjectFontLoadError = {
   fontKey: string
@@ -33,14 +27,6 @@ export type ProjectFontLoadResult = {
 }
 
 export type ProjectFontCharacterSetLoader = (source: string) => Promise<ReadonlySet<number>>
-
-function removeProjectFontStyle(): void {
-  projectFontStyle?.remove()
-  projectFontStyle = null
-  if (typeof document !== 'undefined') {
-    document.querySelectorAll(`style[${PROJECT_FONT_STYLE_ATTRIBUTE}]`).forEach(style => style.remove())
-  }
-}
 
 function cssUnicodeRanges(ranges: readonly UnicodeRange[]): string {
   return ranges.map(range => range.start === range.end
@@ -75,6 +61,8 @@ export async function createProjectFontCss(
   compositions: readonly ProjectFontComposition[] | null | undefined,
   resolveAssetSrc: (source: string) => string,
   loadCharacterSet?: ProjectFontCharacterSetLoader,
+  family: (key: string) => string = createProjectFontCssFamily,
+  compositionFamily: (key: string) => string = createProjectFontCompositionCssFamily,
 ): Promise<{ cssText: string, errors: ProjectFontLoadError[] }> {
   const rules: string[] = []
   const errors: ProjectFontLoadError[] = []
@@ -83,12 +71,9 @@ export async function createProjectFontCss(
 
   for (const font of fonts ?? []) {
     for (const slot of projectFontFileEntries(font)) {
-      rules.push(createFaceRule(
-        createProjectFontCssFamily(font.key),
-        resolveAssetSrc(slot.source),
-        slot.weight,
-        slot.style,
-      ))
+      try {
+        rules.push(createFaceRule(family(font.key), resolveAssetSrc(slot.source), slot.weight, slot.style))
+      } catch (error) { errors.push({ fontKey: font.key, source: slot.source, message: String(error) }) }
     }
   }
 
@@ -112,7 +97,7 @@ export async function createProjectFontCss(
             if (effective.length === 0) continue
             claimedByDescriptor.set(descriptorKey, mergeUnicodeRanges([...claimed, ...effective]))
             rules.push(createFaceRule(
-              createProjectFontCompositionCssFamily(composition.key),
+              compositionFamily(composition.key),
               resolveAssetSrc(slot.source),
               slot.weight,
               slot.style,
@@ -132,82 +117,41 @@ export async function createProjectFontCss(
   return { cssText: rules.join('\n'), errors }
 }
 
-function replaceProjectFontStyle(cssText: string): void {
-  if (typeof document === 'undefined' || !document.head || !cssText) {
-    removeProjectFontStyle()
-    return
+/** Each environment owns only its own style and readiness. */
+export function createResourceFontLoader(family: (key: string) => string) {
+  let generation = 0
+  let style: HTMLStyleElement | null = null
+  let readiness: Promise<ProjectFontLoadResult> = Promise.resolve({ current: true, errors: [] })
+  function dispose() { generation++; style?.remove(); style = null }
+  return {
+    dispose,
+    wait: async () => { await readiness },
+    sync(fonts: readonly ProjectFont[], compositions: readonly ProjectFontComposition[], resolveAssetSrc: (source: string) => string, loadCharacterSet: ProjectFontCharacterSetLoader) {
+      const request = ++generation
+      readiness = (async () => {
+        const result = await createProjectFontCss(fonts, compositions, resolveAssetSrc, loadCharacterSet, family, family)
+        if (request !== generation) return { current: false, errors: [] }
+        style?.remove()
+        if (typeof document !== 'undefined' && result.cssText) {
+          style = document.createElement('style')
+          style.dataset.opencardResourceFonts = family('')
+          style.textContent = result.cssText
+          document.head.appendChild(style)
+          for (const key of [...fonts.map(font => font.key), ...compositions.map(item => item.key)]) {
+            if (request !== generation) return { current: false, errors: [] }
+            try {
+              const faces = await document.fonts?.load(`16px ${JSON.stringify(family(key))}`)
+              if (faces && !faces.length) throw new Error('Font face did not load')
+            } catch (error) {
+              if (request !== generation) return { current: false, errors: [] }
+              result.errors.push({ fontKey: key, source: '', message: String(error) })
+              reportAppError('OC-E3005', { id: key, error })
+            }
+          }
+        }
+        return { current: request === generation, errors: result.errors }
+      })()
+      return readiness
+    },
   }
-  const nextStyle = document.createElement('style')
-  nextStyle.setAttribute(PROJECT_FONT_STYLE_ATTRIBUTE, '')
-  nextStyle.textContent = cssText
-  document.head.appendChild(nextStyle)
-  document.querySelectorAll(`style[${PROJECT_FONT_STYLE_ATTRIBUTE}]`).forEach(style => {
-    if (style !== nextStyle) style.remove()
-  })
-  projectFontStyle = nextStyle
-}
-
-async function loadCssFamilies(
-  currentGeneration: number,
-  fonts: readonly ProjectFont[],
-  compositions: readonly ProjectFontComposition[],
-  existingErrors: readonly ProjectFontLoadError[],
-): Promise<ProjectFontLoadResult> {
-  if (typeof document === 'undefined' || !document.fonts) {
-    return { current: currentGeneration === generation, errors: existingErrors }
-  }
-  const errors = [...existingErrors]
-  for (const entry of [
-    ...fonts.map(font => ({ key: font.key, cssFamily: createProjectFontCssFamily(font.key), source: projectFontFileEntries(font)[0]?.source ?? '' })),
-    ...compositions.map(composition => ({ key: composition.key, cssFamily: createProjectFontCompositionCssFamily(composition.key), source: '' })),
-  ]) {
-    try {
-      const loadedFaces = await document.fonts.load(`16px ${JSON.stringify(entry.cssFamily)}`)
-      if (currentGeneration !== generation) return { current: false, errors: [] }
-      if (loadedFaces.length === 0) throw new Error('Font face did not load')
-    } catch (error) {
-      if (currentGeneration !== generation) return { current: false, errors: [] }
-      const message = error instanceof Error ? error.message : String(error)
-      errors.push({ fontKey: entry.key, source: entry.source, message })
-      reportAppError('OC-E3005', { id: entry.key, source: entry.source, error })
-    }
-  }
-  return { current: currentGeneration === generation, errors }
-}
-
-export function syncProjectFonts(
-  fonts: readonly ProjectFont[] | null | undefined,
-  resolveAssetSrc: (source: string) => string,
-  compositions: readonly ProjectFontComposition[] | null | undefined = [],
-  loadCharacterSet?: ProjectFontCharacterSetLoader,
-): Promise<ProjectFontLoadResult> {
-  generation += 1
-  const currentGeneration = generation
-  const normalizedFonts = fonts ?? []
-  const normalizedCompositions = compositions ?? []
-  setProjectFonts(normalizedFonts, normalizedCompositions)
-  readiness = (async () => {
-    const generated = await createProjectFontCss(
-      normalizedFonts,
-      normalizedCompositions,
-      resolveAssetSrc,
-      loadCharacterSet,
-    )
-    if (currentGeneration !== generation) return { current: false, errors: [] }
-    replaceProjectFontStyle(generated.cssText)
-    return await loadCssFamilies(currentGeneration, normalizedFonts, normalizedCompositions, generated.errors)
-  })()
-  return readiness
-}
-
-export function clearProjectFonts(): void {
-  generation += 1
-  setProjectFonts([])
-  removeProjectFontStyle()
-  readiness = Promise.resolve({ current: true, errors: [] })
-}
-
-export async function waitForProjectFonts(): Promise<void> {
-  await readiness
-  if (typeof document !== 'undefined' && document.fonts) await document.fonts.ready
 }

@@ -2,8 +2,7 @@ import { computed, ref, type Ref } from 'vue'
 import { normalizePath } from '../../../shared/model/filePath'
 import {
   type EditorSession,
-  type SessionSaveResult,
-} from '../../workspace/store/editorSessionStore'
+} from '../../editor-runtime/session/editorSession'
 import { resolveFileTypeById } from '../../workspace/model/fileTypes'
 import type { ProjectCloseDestination } from '../shellLocation'
 
@@ -24,7 +23,7 @@ export type UnsavedEditorDecision = {
   sessionId: string
   name: string
   fileTypeId: string
-  resourceKind: EditorSession['resourceKind']
+  resourceKind: EditorSession['state']['resourceKind']
   path: string | null
   decision: UnsavedDecision
   savePath: string | null
@@ -36,7 +35,6 @@ type UseUnsavedSessionGuardOptions = {
   sessions: Readonly<Ref<readonly EditorSession[]>>
   pickDraftDirectory: () => Promise<string | null>
   fileExists: (path: string) => Promise<boolean>
-  saveSession: (sessionId: string, targetPath?: string) => Promise<SessionSaveResult>
   completeClose: (intent: UnsavedCloseIntent) => Promise<void>
 }
 
@@ -52,7 +50,7 @@ function appendFileNameIndex(name: string, index: number): string {
 }
 
 export function sessionNeedsCloseProtection(session: EditorSession): boolean {
-  return session.resourceKind === 'draft' || session.isDirty
+  return session.state.resourceKind === 'draft' || session.state.isDirty
 }
 
 export function useUnsavedSessionGuard(options: UseUnsavedSessionGuardOptions) {
@@ -87,7 +85,7 @@ export function useUnsavedSessionGuard(options: UseUnsavedSessionGuardOptions) {
 
     const affectedIds = new Set(intent.sessionIds)
     const protectedSessions = options.sessions.value.filter(session => (
-      affectedIds.has(session.id) && sessionNeedsCloseProtection(session)
+      affectedIds.has(session.state.id) && sessionNeedsCloseProtection(session)
     ))
 
     if (protectedSessions.length === 0) {
@@ -97,11 +95,11 @@ export function useUnsavedSessionGuard(options: UseUnsavedSessionGuardOptions) {
 
     pendingIntent.value = intent
     decisions.value = protectedSessions.map(session => ({
-      sessionId: session.id,
-      name: session.name,
-      fileTypeId: session.fileTypeId,
-      resourceKind: session.resourceKind,
-      path: session.path,
+      sessionId: session.state.id,
+      name: session.state.name,
+      fileTypeId: session.state.fileTypeId,
+      resourceKind: session.state.resourceKind,
+      path: session.state.path,
       decision: 'pending',
       savePath: null,
       selected: true,
@@ -218,8 +216,8 @@ export function useUnsavedSessionGuard(options: UseUnsavedSessionGuardOptions) {
 
     for (const row of saveRows) {
       try {
-        const result = await options.saveSession(
-          row.sessionId,
+        const session = options.sessions.value.find(session => session.state.id === row.sessionId)
+        const result = await session?.save(
           row.resourceKind === 'draft' ? row.savePath ?? undefined : undefined,
         )
         if (result !== 'saved') {

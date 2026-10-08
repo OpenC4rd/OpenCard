@@ -32,7 +32,7 @@ import { resolveCardPropertyFields } from '../card-properties/cardPropertyFieldD
 import type {
   EditorComparisonInput,
   EditorSnapshotContext,
-} from '../editor-runtime/registry/editorRegistry'
+} from '../editor-runtime/editorProtocol'
 import type { EditorDiffViewMode, EditorDiffUiState } from '../editor-runtime/model/editorUiState'
 import type {
   PropertyEditorFieldDefinition,
@@ -135,12 +135,8 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
         resourceRootPath: revision.resourceRootPath ?? null,
         sourceFilePath: revision.sourceFilePath ?? null,
         environment: {
-          ...options.renderEnvironment.value,
-          project: revision.project ?? null,
-          dictionary: revision.dictionary,
-          projectIconCatalog: revision.projectIconCatalog ?? EMPTY_PROJECT_ICON_CATALOG,
-          remoteResourcePolicy: revision.remoteResourcePolicy,
-          resolveFontFamily: revision.resolveFontFamily,
+          ...(revision.resourceEnvironment?.renderEnvironment.value ?? { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG }),
+          customBlockLimits: options.renderEnvironment.value.customBlockLimits,
         },
       })
     })

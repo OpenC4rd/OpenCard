@@ -54,10 +54,10 @@ pub struct ResourcePackageBuildPublicIconSeries {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourcePackageBuildPublicBlock {
+pub struct ResourcePackageBuildPublicBlockCollection {
     pub key: String,
     pub title: String,
-    pub source: String,
+    pub count: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,7 +83,7 @@ pub struct ResourcePackageBuildRequest {
     #[serde(default)]
     pub public_icon_series: Vec<ResourcePackageBuildPublicIconSeries>,
     #[serde(default)]
-    pub public_blocks: Vec<ResourcePackageBuildPublicBlock>,
+    pub public_block_collections: Vec<ResourcePackageBuildPublicBlockCollection>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -142,9 +142,9 @@ fn build_manifest(request: &ResourcePackageBuildRequest) -> serde_json::Value {
                 .iter()
                 .map(|series| serde_json::json!({ "key": series.key, "title": series.title, "count": series.count }))
                 .collect::<Vec<_>>(),
-            "blocks": request.public_blocks
+            "blockCollections": request.public_block_collections
                 .iter()
-                .map(|block| serde_json::json!({ "key": block.key, "title": block.title, "source": block.source }))
+                .map(|collection| serde_json::json!({ "key": collection.key, "title": collection.title, "count": collection.count }))
                 .collect::<Vec<_>>(),
         },
     });

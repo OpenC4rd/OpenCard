@@ -3,8 +3,7 @@ import type { Ref } from 'vue'
 import { isSameOrDescendantPath } from '../../../shared/model/filePath'
 import type {
   EditorSession,
-  SessionSaveResult,
-} from '../../workspace/store/editorSessionStore'
+} from '../../editor-runtime/session/editorSession'
 import type { ProjectCloseDestination } from '../shellLocation'
 import {
   useUnsavedSessionGuard,
@@ -25,10 +24,8 @@ type WorkbenchCloseCompletions = {
 
 type UseWorkbenchCloseCoordinatorOptions = {
   sessions: Readonly<Ref<readonly EditorSession[]>>
-  flushAffectedSessions: (sessionIds: readonly string[]) => Promise<void>
   pickDraftDirectory: () => Promise<string | null>
   fileExists: (path: string) => Promise<boolean>
-  saveSession: (sessionId: string, targetPath?: string) => Promise<SessionSaveResult>
   completions: WorkbenchCloseCompletions
 }
 
@@ -59,12 +56,11 @@ export function useWorkbenchCloseCoordinator(options: UseWorkbenchCloseCoordinat
     sessions: options.sessions,
     pickDraftDirectory: options.pickDraftDirectory,
     fileExists: options.fileExists,
-    saveSession: options.saveSession,
     completeClose,
   })
 
   async function request(intent: UnsavedCloseIntent): Promise<CloseOutcome> {
-    await options.flushAffectedSessions(intent.sessionIds)
+    await Promise.all(options.sessions.value.filter(session => intent.sessionIds.includes(session.state.id)).map(session => session.flush()))
     return await guard.requestClose(intent)
   }
 
@@ -78,8 +74,8 @@ export function useWorkbenchCloseCoordinator(options: UseWorkbenchCloseCoordinat
     return await request({
       type: 'project',
       sessionIds: options.sessions.value
-        .filter(session => session.resourceKind === 'workspace')
-        .map(session => session.id),
+        .filter(session => session.state.resourceKind === 'workspace')
+        .map(session => session.state.id),
       projectDestination: destination,
     })
   }
@@ -88,8 +84,8 @@ export function useWorkbenchCloseCoordinator(options: UseWorkbenchCloseCoordinat
     return await request({
       type: 'trash',
       sessionIds: options.sessions.value
-        .filter(session => session.path && isSameOrDescendantPath(session.path, path))
-        .map(session => session.id),
+        .filter(session => session.state.path && isSameOrDescendantPath(session.state.path, path))
+        .map(session => session.state.id),
       path,
     })
   }
@@ -98,15 +94,15 @@ export function useWorkbenchCloseCoordinator(options: UseWorkbenchCloseCoordinat
     return request({
       type: 'discard', perform,
       sessionIds: options.sessions.value
-        .filter(session => session.path && paths.some(path => isSameOrDescendantPath(session.path!, path)))
-        .map(session => session.id),
+        .filter(session => session.state.path && paths.some(path => isSameOrDescendantPath(session.state.path!, path)))
+        .map(session => session.state.id),
     })
   }
 
   async function requestApplicationClose(action: ApplicationCloseAction = 'close'): Promise<CloseOutcome> {
     return await request({
       type: 'app',
-      sessionIds: options.sessions.value.map(session => session.id),
+      sessionIds: options.sessions.value.map(session => session.state.id),
       applicationAction: action,
     })
   }

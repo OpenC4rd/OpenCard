@@ -86,7 +86,7 @@
               size="md"
             />
             <OcIcon v-else
-              :name="'tree.chevron-right'"
+              :name="'circle'"
               size="md"
               class="oc-tree__node-icon"
               :class="{ 'is-expanded': isExpandable(entry.key) && isExpanded(entry.key) }"

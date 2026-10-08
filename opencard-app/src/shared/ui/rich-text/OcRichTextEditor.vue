@@ -1,5 +1,5 @@
 <template>
-  <div class="oc-rich-text-editor">
+  <div class="oc-rich-text-editor" :style="fontVariables">
     <div v-if="editor" class="oc-rich-text-editor__toolbar" role="toolbar" aria-label="Text formatting">
       <div class="oc-rich-text-editor__toolbar-row">
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupHistory', '历史')">
@@ -134,6 +134,7 @@ import type { ParseRule } from '@tiptap/pm/model'
 import { NodeSelection } from '@tiptap/pm/state'
 import Color from '@tiptap/extension-color'
 import FontFamily from '@tiptap/extension-font-family'
+import { fromCssFontFamily, toCssFontFamily } from '../../../features/workspace/model/projectFonts'
 import Highlight from '@tiptap/extension-highlight'
 import TextAlign from '@tiptap/extension-text-align'
 import TextStyle from '@tiptap/extension-text-style'
@@ -314,11 +315,27 @@ const strokeWidthOptions = computed(() => [
   { label: '2 px', value: '2px' },
   { label: '3 px', value: '3px' },
 ] as const)
+const fontVariable = (value: string) => `--oc-rich-font-${Array.from(value, char => char.codePointAt(0)!.toString(16)).join('-')}`
+const fontVariables = computed(() => Object.fromEntries(fontOptions.value.filter(option => option.value).map(option => [fontVariable(option.value), option.cssFamily ?? option.value])))
+const ScopedFontFamily = FontFamily.extend({
+  addGlobalAttributes() {
+    return [{ types: ['textStyle'], attributes: { fontFamily: {
+      default: null,
+      parseHTML: element => element.getAttribute('data-oc-font') ?? fromCssFontFamily(element.style.fontFamily),
+      renderHTML: attributes => attributes.fontFamily ? {
+        'data-oc-font': attributes.fontFamily,
+        style: `font-family: var(${fontVariable(attributes.fontFamily)}, ${toCssFontFamily(attributes.fontFamily)})`,
+      } : {},
+    } } }]
+  },
+})
 const fontSizeSteps = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80, 96] as const
 const defaultFontSize = 16
 const richTextParseOptions = { preserveWhitespace: 'full' as const }
 function canonicalEditorHtml(value: string): string {
-  return value.replace(/\bdata-oc-dynamic-style=("[^"]*"|'[^']*')/g, 'style=$1')
+  const dom = new DOMParser().parseFromString(value, 'text/html')
+  for (const element of dom.body.querySelectorAll<HTMLElement>('[data-oc-font]')) { element.style.fontFamily = toCssFontFamily(element.getAttribute('data-oc-font') ?? ''); element.removeAttribute('data-oc-font') }
+  return dom.body.innerHTML.replace(/\bdata-oc-dynamic-style=("[^"]*"|'[^']*')/g, 'style=$1')
 }
 function visualEditorHtml(value: string): string {
   const parsed = parseRichTextHtml(value)
@@ -549,7 +566,7 @@ const editor = useEditor({
     TextStyle,
     Underline,
     Color,
-    FontFamily,
+    ScopedFontFamily,
     StaticHighlight.configure({ multicolor: true }),
     DynamicStyle,
     TextAlign.configure({ types: ['paragraph'] }),
@@ -608,8 +625,7 @@ watch(() => props.modelValue, (value) => {
 function setFontFamily(value: string): void {
   const chain = editor.value?.chain().focus()
   if (!chain) return
-  const cssFamily = fontOptions.value.find(option => option.value === value)?.cssFamily ?? value
-  if (cssFamily) chain.setFontFamily(cssFamily).run()
+  if (value) chain.setFontFamily(value).run()
   else chain.unsetFontFamily().run()
 }
 

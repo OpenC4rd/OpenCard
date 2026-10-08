@@ -13,8 +13,6 @@
     @focusin="openMenu"
     @focusout="scheduleCloseMenu"
   >
-    <!-- An action with children opens its own labelled menu on hover/focus, so a trigger tooltip
-         would only cover the menu it belongs to. -->
     <OcButton
       :variant="variant"
       :size="size"
@@ -23,7 +21,7 @@
       icon-only
       :icon="action.icon"
       :icon-tone="action.iconTone"
-      :data-tooltip="hasActionChildren(action) ? null : actionTitleText(action) || null"
+      :data-tooltip="isMenuOpen ? null : actionTitleText(action) || null"
       :aria-label="actionAccessibleLabel(inlineMarkupToText(actionTitleText(action) ?? action.key), action.badgeLabel)"
       :aria-haspopup="hasActionChildren(action) ? 'menu' : undefined"
       :aria-expanded="hasActionChildren(action) ? isMenuOpen : undefined"

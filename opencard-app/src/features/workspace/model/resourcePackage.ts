@@ -18,16 +18,16 @@ export type ResourcePackagePublicIconSeries = {
   count: number
 }
 
-export type ResourcePackagePublicBlock = {
+export type ResourcePackagePublicBlockCollection = {
   key: string
   title: string
-  source: string
+  count: number
 }
 
 export type ResourcePackagePublicResources = {
   fonts: readonly ResourcePackagePublicFont[]
   iconSeries: readonly ResourcePackagePublicIconSeries[]
-  blocks?: readonly ResourcePackagePublicBlock[]
+  blockCollections?: readonly ResourcePackagePublicBlockCollection[]
 }
 
 /**
@@ -128,30 +128,30 @@ function normalizePublicIconSeries(
   return result
 }
 
-function normalizePublicBlocks(
+function normalizePublicBlockCollections(
   value: unknown,
   issues: ResourcePackageManifestIssue[],
-): ResourcePackagePublicBlock[] {
+): ResourcePackagePublicBlockCollection[] {
   if (value === undefined) return []
   if (!Array.isArray(value)) {
-    addIssue(issues, 'public.blocks', 'Expected an array; used an empty list')
+    addIssue(issues, 'public.blockCollections', 'Expected an array; used an empty list')
     return []
   }
-  const result: ResourcePackagePublicBlock[] = []
+  const result: ResourcePackagePublicBlockCollection[] = []
   const identities = new Set<string>()
   for (const [index, candidate] of value.entries()) {
-    const path = `public.blocks[${index}]`
+    const path = `public.blockCollections[${index}]`
     if (!isRecord(candidate)) continue
     const key = typeof candidate.key === 'string' ? normalizeKeySlug(candidate.key) : null
     const title = typeof candidate.title === 'string' ? candidate.title.trim() : ''
-    const source = typeof candidate.source === 'string' ? candidate.source.trim() : ''
-    if (!key || !title || !source || !source.toLocaleLowerCase().endsWith('.ocblock')) {
-      addIssue(issues, path, 'Public block key, title, and .ocblock source are required; ignored the entry')
+    const count = candidate.count
+    if (!key || !title || !Number.isInteger(count) || (count as number) < 0) {
+      addIssue(issues, path, 'Public block collection Key, title, and non-negative count are required; ignored the entry')
       continue
     }
     if (identities.has(key)) continue
     identities.add(key)
-    result.push({ key, title, source })
+    result.push({ key, title, count: count as number })
   }
   return result
 }
@@ -198,7 +198,7 @@ export function normalizeResourcePackageManifest(
       public: {
         fonts: normalizePublicFonts(publicSource.fonts, issues),
         iconSeries: normalizePublicIconSeries(publicSource.iconSeries, issues),
-        blocks: normalizePublicBlocks(publicSource.blocks, issues),
+        blockCollections: normalizePublicBlockCollections(publicSource.blockCollections ?? publicSource.blocks, issues),
       },
     },
     issues,

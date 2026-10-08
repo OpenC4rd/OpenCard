@@ -242,7 +242,7 @@ const darkTheme: OcThemeTokens = {
   '--oc-icon-file-css': 'oklch(68% 0.14 245)',
   '--oc-icon-file-image': 'oklch(71% 0.18 305)',
   '--oc-icon-file-config': 'oklch(72% 0.14 170)',
-  '--oc-icon-folder': 'oklch(66% 0.025 255)',
+  '--oc-icon-folder': 'oklch(78% 0.15 85)',
 
   '--oc-icon-block-text': 'oklch(72% 0.14 253)',
   '--oc-icon-block-markdown': 'oklch(71% 0.15 292)',
@@ -319,7 +319,7 @@ const lightTheme: OcThemeTokens = {
   '--oc-icon-file-css': 'oklch(68% 0.13 250)',
   '--oc-icon-file-image': 'oklch(70% 0.185 305)',
   '--oc-icon-file-config': 'oklch(69% 0.093 175)',
-  '--oc-icon-folder': 'oklch(71% 0.028 265)',
+  '--oc-icon-folder': 'oklch(77% 0.14 85)',
 
   '--oc-icon-block-text': 'oklch(70% 0.18 263)',
   '--oc-icon-block-markdown': 'oklch(69% 0.18 290)',

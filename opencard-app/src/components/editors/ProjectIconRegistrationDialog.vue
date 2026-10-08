@@ -1,7 +1,7 @@
 <template>
   <OcDialog class="project-icon-registration-dialog" :open="open"
     :title="appendMode ? t('projectConfig.icons.addIconsToSet', { name: targetSeries?.name ?? '' })
-      : t('projectConfig.icons.createPack')"
+      : t('projectConfig.icons.createCollection')"
     as="form" size="md" close-on-backdrop @request-close="close" @submit="submit">
     <section class="project-icon-registration-dialog__summary">
       <template v-if="hasSelection">
@@ -55,7 +55,7 @@
     <template #footer>
       <OcButton type="button" @click="close">{{ t('projectConfig.icons.cancel') }}</OcButton>
       <OcButton type="submit" variant="solid" :disabled="!canSubmit">
-        {{ appendMode ? t('projectConfig.icons.addIcons') : t('projectConfig.icons.createPack') }}
+        {{ appendMode ? t('projectConfig.icons.addIcons') : t('projectConfig.icons.createCollection') }}
       </OcButton>
     </template>
   </OcDialog>

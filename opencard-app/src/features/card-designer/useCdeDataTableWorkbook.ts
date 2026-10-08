@@ -17,7 +17,6 @@ type UseCdeDataTableWorkbookOptions = {
   columns: Readonly<Ref<readonly CdeDataTableColumn[]>>
   faceGroups: Readonly<Ref<readonly CdeDataTableFaceGroup[]>>
   exportInstanceIds: Readonly<Ref<readonly string[]>>
-  flushPendingChanges: () => Promise<void>
   applyImport: (result: CardDataWorkbookImportResult) => boolean
   openAfterExport: Readonly<Ref<boolean>>
   translate: (key: string, parameters?: Record<string, unknown>) => string
@@ -43,7 +42,6 @@ export function useCdeDataTableWorkbook(options: UseCdeDataTableWorkbookOptions)
         title: options.translate('cardDesigner.dataTable.exportWorkbook'),
       })
       if (!path) return
-      await options.flushPendingChanges()
       const bytes = await exportCardDataWorkbook({
         document,
         columns: options.columns.value,
@@ -81,7 +79,6 @@ export function useCdeDataTableWorkbook(options: UseCdeDataTableWorkbookOptions)
         extensions: ['xlsx'],
       })
       if (!path) return
-      await options.flushPendingChanges()
       const bytes = await fileSystemService.readBinaryFile(path)
       pendingImport.value = await importCardDataWorkbook(bytes, document, options.faceGroups.value)
     } catch (error) {

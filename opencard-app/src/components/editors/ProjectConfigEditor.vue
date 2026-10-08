@@ -100,7 +100,7 @@
         </div>
         <div class="project-profile-editor__source">
           <MonacoEditor
-            :model-value="modelValue ?? ''"
+            :model-value="editorState.draftContent ?? ''"
             language="json"
             :theme-id="themeId"
             :theme-overrides="themeOverrides"
@@ -130,7 +130,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { reportAppError } from '../../features/logging/appErrorCatalog'
-import type { EditorEmits, EditorProps } from '../../features/editor-runtime/registry/editorRegistry'
+import { notifyAppError } from '../../features/notifications/titlebarNotices'
+import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { HistoryOperationMeta } from '../../features/editor-runtime/history/history.types'
 import type { EditorNavigationResult, SessionNavigationToken } from '../../features/editor-runtime/model/editorIssue'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
@@ -159,7 +160,8 @@ import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
 
 const props = defineProps<EditorProps>()
-const emit = defineEmits<EditorEmits>()
+const editorState = computed(() => props.session.state)
+const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
 const projectStore = useProjectStore()
 const settingsStore = useAppSettingsStore()
@@ -187,7 +189,7 @@ const projectProfileSections = [
 const themeId = computed(() => props.themeId ?? 'dark')
 const themeOverrides = computed(() => props.themeOverrides ?? {})
 const projectDirectoryKey = computed(() => {
-  const source = projectStore.projectPath.value || props.filePath || ''
+  const source = projectStore.projectPath.value || filePath.value || ''
   const normalized = source.replace(/\\/g, '/').replace(/\/+$/, '')
   return normalized.endsWith(`/${PROJECT_PROFILE_FILE_NAME}`)
     ? normalized.slice(0, -PROJECT_PROFILE_FILE_NAME.length - 1)
@@ -206,7 +208,7 @@ const remoteResourceModeOptions = computed<readonly OcOption[]>(() => [
 const hasInvalidRemoteHostDraft = computed(() => remoteResourceMode.value === 'allowlist'
   && remoteHostDrafts.value.some(host => !isRemoteHostValid(host)))
 const defaultExportTask = computed(() => profile.value?.exportTask ?? createDefaultProjectExportTask())
-watch(() => props.modelValue, content => {
+watch(() => editorState.value.draftContent, content => {
   const nextProfile = parseProjectMetadataText(content ?? '')
   profile.value = nextProfile
   remoteHostDrafts.value = nextProfile?.remoteResources?.mode === 'allowlist'
@@ -302,7 +304,7 @@ function updateProfile(next: ProjectProfile, history: HistoryOperationMeta = { m
   try {
     const serialized = serializeProjectMetadata(next)
     profile.value = next
-    emit('update:modelValue', serialized, history)
+    props.session.updateContent(serialized, history)
   } catch (error) {
     reportAppError('OC-E3006', error)
   }
@@ -391,14 +393,13 @@ onBeforeUnmount(() => {
 })
 
 function updateRawSource(content: string, history?: HistoryOperationMeta) {
-  emit('update:modelValue', content, history)
+  props.session.updateContent(content, history)
 }
 
-function save() {
-  if (profile.value && !hasInvalidRemoteHostDraft.value) emit('save')
-}
+const canSave = computed(() => Boolean(profile.value) && !hasInvalidRemoteHostDraft.value)
+async function save(): Promise<void> { await props.session.save().catch(error => notifyAppError('OC-E4002', error)) }
 
-defineExpose({ save, navigate, presentation })
+defineExpose({ canSave, navigate, presentation })
 </script>
 
 <style scoped>

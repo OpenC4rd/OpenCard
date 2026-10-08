@@ -1,6 +1,7 @@
 import {
   type ResourcePackagePublicFont,
   type ResourcePackagePublicIconSeries,
+  type ResourcePackagePublicBlockCollection,
 } from '../model/resourcePackage'
 import {
   parseProjectFontRegistryText,
@@ -22,8 +23,7 @@ import { resolveFileType } from '../model/fileTypes'
 import { resolveResourcePath, type PackageScopeRoots } from '../model/scopedResourcePath'
 import type { ProjectIcon } from '../model/projectIcons'
 import { PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME } from '../model/projectStructure'
-import { parseCustomBlockRegistryText, serializeCustomBlockRegistry, type CustomBlockRegistryEntry } from '../model/customBlockRegistry'
-import type { ResourcePackagePublicBlock } from '../model/resourcePackage'
+import { parseCustomBlockRegistryText, serializeCustomBlockRegistry, type CustomBlockCollection } from '../model/customBlockRegistry'
 
 export type ResourcePackageProjectBuildOptions = {
   fs: Pick<FileSystemService, 'readFile' | 'fileExists'>
@@ -87,33 +87,41 @@ export type ResourcePackageProjectBuildResult = {
 }
 
 type ResourcePackageBlockProjection = {
-  document: { blocks: readonly CustomBlockRegistryEntry[] } | null
+  document: { collections: readonly CustomBlockCollection[] } | null
   files: readonly ResourcePackagePlannedFile[]
-  publicBlocks: readonly ResourcePackagePublicBlock[]
+  publicBlockCollections: readonly ResourcePackagePublicBlockCollection[]
 }
 
 async function buildBlockProjection(options: ResourcePackageProjectBuildOptions, root: string): Promise<ResourcePackageBlockProjection> {
   const selected = selectedIdentities(options.blockSelection?.keys ?? [])
-  if (!selected.size) return { document: null, files: [], publicBlocks: [] }
+  if (!selected.size) return { document: null, files: [], publicBlockCollections: [] }
   const registryPath = `${root}/${PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME}`
   if (!await options.fs.fileExists(registryPath)) throw new Error('Project custom block registry is missing')
   const source = parseCustomBlockRegistryText(await options.fs.readFile(registryPath))
   if (!source) throw new Error('Project custom block registry is invalid')
-  const entries = (source.blocks ?? []).filter(entry => selected.has(entry.key.toLocaleLowerCase()))
-  if (entries.length !== selected.size) throw new Error('Selected project custom block is unavailable')
+  const collections = (source.collections ?? []).filter(collection => selected.has(collection.key.toLocaleLowerCase()))
+  if (collections.length !== selected.size) throw new Error('Selected project custom block collection is unavailable')
   const files = new Map<string, ResourcePackagePlannedFile>()
-  const projected: CustomBlockRegistryEntry[] = []
-  for (const entry of entries) {
-    const resolved = resolveBundledResource(options, root, entry.source)
-    if (!resolved.ok) throw new Error(`Project custom block path is invalid: ${entry.source}`)
-    if (!await options.fs.fileExists(resolved.value)) throw new Error(`Project custom block file is missing: ${entry.source}`)
-    const archivePath = archivedReferencePath(entry.source)
-    projected.push({ ...entry, source: archivePath })
-    if (!files.has(archivePath.toLocaleLowerCase())) files.set(archivePath.toLocaleLowerCase(), plannedFile(resolved.value, archivePath))
+  const projected: CustomBlockCollection[] = []
+  for (const collection of collections) {
+    const blocks = []
+    for (const entry of collection.blocks) {
+      const resolved = resolveBundledResource(options, root, entry.source)
+      if (!resolved.ok) throw new Error(`Project custom block path is invalid: ${entry.source}`)
+      if (!await options.fs.fileExists(resolved.value)) throw new Error(`Project custom block file is missing: ${entry.source}`)
+      const archivePath = archivedReferencePath(entry.source)
+      blocks.push({ ...entry, source: archivePath })
+      if (!files.has(archivePath.toLocaleLowerCase())) files.set(archivePath.toLocaleLowerCase(), plannedFile(resolved.value, archivePath))
+    }
+    projected.push({ ...collection, blocks })
   }
   return {
-    document: { blocks: projected }, files: [...files.values()],
-    publicBlocks: projected.map(entry => ({ key: entry.key, title: entry.name, source: entry.source })),
+    document: { collections: projected }, files: [...files.values()],
+    publicBlockCollections: projected.map(collection => ({
+      key: collection.key,
+      title: collection.name,
+      count: collection.blocks.length,
+    })),
   }
 }
 
@@ -128,7 +136,7 @@ export type ResourcePackageBuildRequest = {
   texts: readonly { archivePath: string, text: string }[]
   publicFonts: readonly ResourcePackagePublicFont[]
   publicIconSeries: readonly ResourcePackagePublicIconSeries[]
-  publicBlocks: readonly ResourcePackagePublicBlock[]
+  publicBlockCollections: readonly ResourcePackagePublicBlockCollection[]
 }
 
 /**
@@ -414,7 +422,7 @@ export async function buildResourcePackageFromProject(
     texts,
     publicFonts: fontProjection.publicFonts,
     publicIconSeries: iconProjection.publicIconSeries,
-    publicBlocks: blockProjection.publicBlocks,
+    publicBlockCollections: blockProjection.publicBlockCollections,
   }
   return await invoke<ResourcePackageProjectBuildResult>('build_resource_package', { request })
 }

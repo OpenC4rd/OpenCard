@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectIconRegistryFileEditor from './ProjectIconRegistryFileEditor.vue'
@@ -25,14 +26,14 @@ vi.mock('../../features/workspace/services/projectIconCatalog', async (importOri
 
 function mountEditor(modelValue: unknown) {
   return mount(ProjectIconRegistryFileEditor, {
-    props: { filePath: 'D:/Demo/.opencard/icons/icons.json', modelValue: JSON.stringify(modelValue) },
+    props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify(modelValue) }),  },
     global: { stubs: { Teleport: true } },
   })
 }
 
 function lastRegistry(wrapper: ReturnType<typeof mountEditor>) {
-  const updates = wrapper.emitted('update:modelValue') ?? []
-  return JSON.parse(updates[updates.length - 1]?.[0] as string)
+  const updates = wrapper.props('session').state.draftContent
+  return JSON.parse(updates as string)
 }
 
 function confirmRemoval(wrapper: ReturnType<typeof mountEditor>) {
@@ -48,21 +49,21 @@ describe('ProjectIconRegistryFileEditor', () => {
 
   it('owns icon-series edits', async () => {
     const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: { filePath: 'D:/Demo/.opencard/icons/icons.json', modelValue: '{}' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: '{}' }),  },
     })
     const registrationDialog = wrapper.getComponent(ProjectIconRegistrationDialog)
     expect(registrationDialog.props('defaultOpenPath')).toBe('D:/Demo/.opencard/icons')
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('update:series', [{
       name: 'Status icons', key: 'status',
-      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'theme' }],
+      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'context' }],
     }])
     await wrapper.vm.$nextTick()
 
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(JSON.parse(updates[updates.length - 1]?.[0] as string)).toEqual({
+    const updates = wrapper.props('session').state.draftContent
+    expect(JSON.parse(updates as string)).toEqual({
       iconSeries: [{
         name: 'Status icons', key: 'status',
-        icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'theme' }],
+        icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'context' }],
       }],
     })
   })
@@ -73,15 +74,15 @@ describe('ProjectIconRegistryFileEditor', () => {
         {
           name: 'Status icons', key: 'status',
           icons: [
-            { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'theme' },
-            { iconKey: 'keep', name: 'Keep', source: '.opencard/icons/shared/keep.svg', tint: 'theme' },
+            { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'context' },
+            { iconKey: 'keep', name: 'Keep', source: '.opencard/icons/shared/keep.svg', tint: 'context' },
           ],
         },
         {
           name: 'Shared icons', key: 'shared',
           icons: [
-            { iconKey: 'keep', name: 'Keep', source: '.opencard/icons/shared/keep.svg', tint: 'theme' },
-            { iconKey: 'only', name: 'Only', source: '.opencard/icons/shared/only.svg', tint: 'theme' },
+            { iconKey: 'keep', name: 'Keep', source: '.opencard/icons/shared/keep.svg', tint: 'context' },
+            { iconKey: 'only', name: 'Only', source: '.opencard/icons/shared/only.svg', tint: 'context' },
           ],
         },
       ],
@@ -90,7 +91,7 @@ describe('ProjectIconRegistryFileEditor', () => {
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('remove-series', 'shared')
     await wrapper.vm.$nextTick()
     // The set is still there until the user confirms.
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.props('session').state.isDirty).toBe(false)
     await confirmRemoval(wrapper).trigger('click')
     await flushPromises()
 
@@ -99,16 +100,12 @@ describe('ProjectIconRegistryFileEditor', () => {
       ['D:/Demo/.opencard/icons/shared/only.svg'], undefined, undefined, 'icon',
     )
     expect(lastRegistry(wrapper).iconSeries.map((entry: { key: string }) => entry.key)).toEqual(['status'])
-    const updates = wrapper.emitted('update:modelValue') ?? []
-    expect(updates[updates.length - 1]?.[1]).toMatchObject({
-      mode: 'immediate', structural: true, resource: mocks.historyResource,
-    })
   })
 
   it('keeps every file and skips staging when the user clears the cleanup option', async () => {
     const wrapper = mountEditor({
       iconSeries: [
-        { name: 'Status icons', key: 'status', icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'theme' }] },
+        { name: 'Status icons', key: 'status', icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'context' }] },
       ],
     })
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('remove-series', 'status')
@@ -125,7 +122,7 @@ describe('ProjectIconRegistryFileEditor', () => {
   it('leaves no orphaned files to clean when a set owns only external sources', async () => {
     const wrapper = mountEditor({
       iconSeries: [
-        { name: 'Status icons', key: 'status', icons: [{ iconKey: 'warn', name: 'Warn', source: 'assets/warn.svg', tint: 'theme' }] },
+        { name: 'Status icons', key: 'status', icons: [{ iconKey: 'warn', name: 'Warn', source: 'assets/warn.svg', tint: 'context' }] },
       ],
     })
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('remove-series', 'status')
@@ -144,7 +141,7 @@ describe('ProjectIconRegistryFileEditor', () => {
     mocks.stageProjectAssetFiles.mockRejectedValue(new Error('file is locked'))
     const wrapper = mountEditor({
       iconSeries: [
-        { name: 'Status icons', key: 'status', icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'theme' }] },
+        { name: 'Status icons', key: 'status', icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/status/warn.svg', tint: 'context' }] },
       ],
     })
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('remove-series', 'status')
@@ -153,20 +150,17 @@ describe('ProjectIconRegistryFileEditor', () => {
     await confirmRemoval(wrapper).trigger('click')
     await flushPromises()
 
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.props('session').state.isDirty).toBe(false)
     // The dialog stays open with the reason, and the set is still listed.
     expect(wrapper.text()).toContain('projectConfig.icons.cleanupFailed')
   })
 
   it('reports duplicate keys and blocks save', async () => {
-    const icon = { iconKey: 'same', name: 'Same', source: '.opencard/icons/status/same.svg', tint: 'theme' }
+    const icon = { iconKey: 'same', name: 'Same', source: '.opencard/icons/status/same.svg', tint: 'context' }
     const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: {
-        filePath: 'D:/Demo/.opencard/icons/icons.json',
-        modelValue: JSON.stringify({
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({
           iconSeries: [{ name: 'Status icons', key: 'status', icons: [icon, { ...icon, source: '.opencard/icons/status/same-2.svg' }] }],
-        }),
-      },
+        }) }),  },
     })
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('key-conflicts', [
       { kind: 'icon', seriesIndex: 0, iconIndex: 0, key: 'same' },
@@ -178,29 +172,25 @@ describe('ProjectIconRegistryFileEditor', () => {
     const latest = snapshots[snapshots.length - 1]?.[0] as { issues: Array<{ type: string }> }
     expect(latest.issues).toHaveLength(2)
     expect(latest.issues[0]?.type).toBe('project-icon-registry.icon.duplicate-key')
-    await wrapper.get('.project-registry-shell').trigger('keydown', { ctrlKey: true, key: 's' })
-    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.vm.canSave).toBe(false)
   })
 
   it('uses raw repair mode for invalid JSON', () => {
     const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: { filePath: 'D:/Demo/.opencard/icons/icons.json', modelValue: '{broken' },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: '{broken' }),  },
     })
     expect(wrapper.find('.monaco-stub').exists()).toBe(true)
   })
 
   it('offers creating and importing icon packs from the workspace header', async () => {
     const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: {
-        filePath: 'D:/Demo/.opencard/icons/icons.json',
-        modelValue: JSON.stringify({ iconSeries: [{ name: 'Status icons', key: 'status', source: 'status.png', icons: [] }] }),
-      },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({ iconSeries: [{ name: 'Status icons', key: 'status', source: 'status.png', icons: [] }] }) }),  },
     })
 
     expect(wrapper.vm.presentation).toMatchObject({ title: 'iconRegistry.title', icon: 'file.project-icon' })
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(false)
 
-    await wrapper.vm.onHeaderAction('project-icon-registry.create-pack')
+    await wrapper.vm.onHeaderAction('project-icon-registry.create-collection')
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(true)
   })
 })

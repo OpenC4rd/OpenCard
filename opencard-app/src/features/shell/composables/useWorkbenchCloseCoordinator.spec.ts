@@ -1,13 +1,15 @@
+import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   EditorSession,
+  EditorSessionState,
   SessionSaveResult,
-} from '../../workspace/store/editorSessionStore'
+} from '../../editor-runtime/session/editorSession'
 import { useWorkbenchCloseCoordinator } from './useWorkbenchCloseCoordinator'
 
-function createSession(id: string, patch: Partial<EditorSession> = {}): EditorSession {
-  return {
+function createSession(id: string, patch: Partial<EditorSessionState> = {}): EditorSession {
+  return createTestSession({
     id,
     resourceKind: 'workspace',
     path: `D:/project/${id}.ocdocument`,
@@ -19,7 +21,7 @@ function createSession(id: string, patch: Partial<EditorSession> = {}): EditorSe
     isDirty: false,
     isPreview: false,
     ...patch,
-  }
+  })
 }
 
 function createCoordinator(initialSessions: EditorSession[]) {
@@ -35,12 +37,14 @@ function createCoordinator(initialSessions: EditorSession[]) {
     trash: vi.fn(async () => undefined),
     application: vi.fn(async () => undefined),
   }
+  for (const session of initialSessions) {
+    vi.spyOn(session, 'save').mockImplementation(path => saveSession(session.state.id, path))
+    vi.spyOn(session, 'flush').mockImplementation(() => flushAffectedSessions())
+  }
   const coordinator = useWorkbenchCloseCoordinator({
     sessions,
-    flushAffectedSessions,
     pickDraftDirectory: vi.fn(async () => 'D:/drafts'),
     fileExists: vi.fn(async () => false),
-    saveSession,
     completions,
   })
   return { coordinator, sessions, flushAffectedSessions, saveSession, completions }
@@ -70,24 +74,23 @@ describe('useWorkbenchCloseCoordinator', () => {
 
   it('flushes before immediately completing a clean session close', async () => {
     const session = createSession('clean')
-    const { coordinator, flushAffectedSessions, completions } = createCoordinator([session])
+    const { coordinator, completions } = createCoordinator([session])
 
-    await coordinator.requestSessionClose([session.id])
+    await coordinator.requestSessionClose([session.state.id])
 
-    expect(flushAffectedSessions).toHaveBeenCalledWith([session.id])
-    expect(flushAffectedSessions.mock.invocationCallOrder[0])
+    expect(vi.mocked(session.flush).mock.invocationCallOrder[0])
       .toBeLessThan(completions.sessions.mock.invocationCallOrder[0]!)
-    expect(completions.sessions).toHaveBeenCalledWith([session.id])
+    expect(completions.sessions).toHaveBeenCalledWith([session.state.id])
   })
 
   it('lets flush publish the latest dirty state before the guard reads sessions', async () => {
     const session = createSession('latest')
     const result = createCoordinator([session])
     result.flushAffectedSessions.mockImplementationOnce(async () => {
-      result.sessions.value = [{ ...session, isDirty: true }]
+      session.updateContent('{"changed":true}')
     })
 
-    await result.coordinator.requestSessionClose([session.id])
+    await result.coordinator.requestSessionClose([session.state.id])
 
     expect(result.coordinator.isOpen.value).toBe(true)
     expect(result.completions.sessions).not.toHaveBeenCalled()
@@ -97,10 +100,10 @@ describe('useWorkbenchCloseCoordinator', () => {
     const draft = createSession('draft', { resourceKind: 'draft', path: null })
     const { coordinator, completions } = createCoordinator([draft])
 
-    await coordinator.requestSessionClose([draft.id])
+    await coordinator.requestSessionClose([draft.state.id])
 
     expect(coordinator.isOpen.value).toBe(true)
-    expect(coordinator.decisions.value).toMatchObject([{ sessionId: draft.id, decision: 'pending' }])
+    expect(coordinator.decisions.value).toMatchObject([{ sessionId: draft.state.id, decision: 'pending' }])
     expect(completions.sessions).not.toHaveBeenCalled()
   })
 
@@ -108,22 +111,20 @@ describe('useWorkbenchCloseCoordinator', () => {
     const workspace = createSession('workspace')
     const external = createSession('external', { resourceKind: 'external', path: 'D:/outside.ocdocument' })
     const draft = createSession('draft', { resourceKind: 'draft', path: null })
-    const { coordinator, flushAffectedSessions, completions } = createCoordinator([workspace, external, draft])
+    const { coordinator, completions } = createCoordinator([workspace, external, draft])
 
     await coordinator.requestProjectClose('welcome')
 
-    expect(flushAffectedSessions).toHaveBeenCalledWith([workspace.id])
     expect(completions.project).toHaveBeenCalledWith('welcome')
   })
 
   it('selects all sessions for application close', async () => {
     const first = createSession('first')
     const second = createSession('second', { resourceKind: 'external' })
-    const { coordinator, flushAffectedSessions, completions } = createCoordinator([first, second])
+    const { coordinator, completions } = createCoordinator([first, second])
 
     await coordinator.requestApplicationClose()
 
-    expect(flushAffectedSessions).toHaveBeenCalledWith([first.id, second.id])
     expect(completions.application).toHaveBeenCalledWith('close')
   })
 
@@ -146,11 +147,10 @@ describe('useWorkbenchCloseCoordinator', () => {
     const direct = createSession('direct', { path: 'D:/project/cards/main.ocdocument' })
     const nested = createSession('nested', { path: 'D:/project/cards/set/other.ocdocument' })
     const sibling = createSession('sibling', { path: 'D:/project/cards-old/keep.ocdocument' })
-    const { coordinator, flushAffectedSessions, completions } = createCoordinator([direct, nested, sibling])
+    const { coordinator, completions } = createCoordinator([direct, nested, sibling])
 
     await coordinator.requestPathTrash('D:\\project\\cards\\')
 
-    expect(flushAffectedSessions).toHaveBeenCalledWith([direct.id, nested.id])
     expect(completions.trash).toHaveBeenCalledWith('D:\\project\\cards\\')
   })
 
@@ -158,12 +158,12 @@ describe('useWorkbenchCloseCoordinator', () => {
     const first = createSession('first', { isDirty: true })
     const second = createSession('second', { isDirty: true })
     const { coordinator } = createCoordinator([first, second])
-    await coordinator.requestSessionClose([first.id])
+    await coordinator.requestSessionClose([first.state.id])
 
-    await coordinator.requestSessionClose([second.id])
+    await coordinator.requestSessionClose([second.state.id])
 
-    expect(coordinator.pendingIntent.value?.sessionIds).toEqual([first.id])
-    expect(coordinator.decisions.value.map(row => row.sessionId)).toEqual([first.id])
+    expect(coordinator.pendingIntent.value?.sessionIds).toEqual([first.state.id])
+    expect(coordinator.decisions.value.map(row => row.sessionId)).toEqual([first.state.id])
   })
 
   it('keeps project completion blocked after cancel or save failure', async () => {

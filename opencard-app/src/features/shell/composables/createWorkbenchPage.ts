@@ -3,7 +3,8 @@ import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { projectFontSources } from '../../workspace/model/projectFontRegistry'
-import { createDefaultOpenCardContent, useEditorSessionStore, type EditorSession } from '../../workspace/store/editorSessionStore'
+import { createDefaultOpenCardContent, createEditorSessionManager } from '../../workspace/store/editorSessionManager'
+import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import { useStoredResourcePackageStore } from '../../workspace/store/storedResourcePackageStore'
 import type { AppSettingKey } from '../../settings/model/appSettings'
@@ -11,7 +12,7 @@ import { getPathDirectory } from '../../../shared/model/filePath'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import { notifyAppError, notifyError, notifySuccess } from '../../notifications/titlebarNotices'
 import { editorHistoryManager } from '../../editor-runtime/history/editorHistoryManager'
-import type { EditorIssueSnapshot, SessionIssueNavigationRequest } from '../../editor-runtime/model/editorIssue'
+import type { SessionIssueNavigationRequest } from '../../editor-runtime/model/editorIssue'
 import CardFaceRenderer from '../../card-rendering/components/CardFaceRenderer.vue'
 import { resolveFileType } from '../../workspace/model/fileTypes'
 import { resolveSessionLabel } from '../../workspace/model/sessionLabel'
@@ -96,26 +97,9 @@ export function createWorkbenchPage(options: {
     renameEntry,
   } = projectStore
 
-  const {
-    sessions,
-    activeSession,
-    open: openEditorSession,
-    activateSession,
-    createDraftSession,
-    updateDraftContent,
-    setSessionDirtyState,
-    setSessionPresentation,
-    updateSessionUiState,
-    updateSessionDiffUiState,
-    setSessionMode,
-    closeSession,
-    closeWorkspaceSessions,
-    closeSessionsByPath,
-    saveSession,
-    saveSessionAs,
-    saveDirtySessions,
-    remapSessionPaths,
-  } = useEditorSessionStore()
+  const sessionManager = createEditorSessionManager(id => { void projectStore.releaseComparison(id) })
+  const { sessions, activeSession, open: openEditorSession, activateSession, createDraftSession,
+    closeSession, closeWorkspaceSessions, closeSessionsByPath, remapSessionPaths } = sessionManager
 
   const visibleEditorSession = computed(() => (
     shellPage.value === 'workbench' ? activeSession.value : null
@@ -130,8 +114,10 @@ export function createWorkbenchPage(options: {
     const workspaceSettings = settingsStore.settings.value.workspace
     if (!workspaceSettings.autoSave) return
     autoSaveTimer = window.setInterval(() => {
-      void saveDirtySessions()
-        .then(names => names.forEach(name => notifySuccess(t('app.notifications.saved', { name }), 'action.save')))
+      void Promise.all(sessions.value.filter(session => session.state.isDirty && session.state.path).map(async session => {
+        return await session.save() === 'saved' ? session.state.name : null
+      }))
+        .then(names => names.filter(name => name !== null).forEach(name => notifySuccess(t('app.notifications.saved', { name }), 'action.save')))
         .catch(error => notifyError(error instanceof Error ? error.message : t('app.notifications.autoSaveFailed')))
     }, workspaceSettings.autoSaveIntervalSeconds * 1000)
   }
@@ -207,7 +193,6 @@ export function createWorkbenchPage(options: {
     latestCommitIdForPath,
     handleOpenFile: async path => handleOpenFile(path),
     resolveProjectPath,
-    setSessionMode,
     onChangesExpansionChange: handleChangesExpansionChange,
   })
   const {
@@ -218,7 +203,7 @@ export function createWorkbenchPage(options: {
     loadDocumentSnapshot,
     prepare: prepareProjectExport,
     run: runProjectExport,
-    renderCardImages,
+    renderCardImages, cancelAndWait: cancelExportsAndWait,
   } = useProjectExport({
     sessions,
     exportRendererRef,
@@ -229,53 +214,19 @@ export function createWorkbenchPage(options: {
     translate: t,
   })
   const {
-    editorRef: currentEditorRef,
-    component: currentEditorComponent,
-    key: currentEditorKey,
-    props: currentEditorProps,
-    canUndo: canUndoActiveEditor,
-    canRedo: canRedoActiveEditor,
-    handleViewportTransform: handleViewportTransformUpdate,
-    handleImagePreviewPixelated: handleImagePreviewPixelatedUpdate,
-    handleCardDesignerMode: handleCardDesignerModeUpdate,
-    handleCardDesignerLayout: handleCardDesignerLayoutUpdate,
-    handleCardDesignerView: handleCardDesignerViewUpdate,
-    handleDiffUiState: handleDiffUiStateUpdate,
-    handleModified: handleEditorModified,
-    handleSaveEvent: handleEditorSave,
-    save: triggerCurrentEditorSave,
-    undo: triggerCurrentEditorUndo,
-    redo: triggerCurrentEditorRedo,
-    flushAffectedSessions: flushActiveEditorForClose,
-    dispose: disposeEditorHost,
+    editorRef: currentEditorRef, key: currentEditorKey, mount: currentEditorMount, contribution: editorContribution,
+    canUndo: canUndoActiveEditor, canRedo: canRedoActiveEditor,
+    save: triggerCurrentEditorSave, undo: triggerCurrentEditorUndo, redo: triggerCurrentEditorRedo,
   } = useWorkbenchEditorHost({
-    renderCardImages, imageExportBusy: isProjectExportRunning,
-    activeSession,
-    projectPath,
-    projectProfile,
-    settings: settingsStore.settings,
-    comparison: editorComparison,
-    debugHideCdeOverlays,
-    debugTransparentCdeViewport,
-    debugPassiveCdeViewport,
-    translate: t,
-    sessionActions: {
-      updateDraftContent,
-      setSessionDirtyState,
-      setSessionPresentation,
-      updateSessionUiState,
-      updateSessionDiffUiState,
-      saveSession,
-    },
+    activeSession: visibleEditorSession, comparison: editorComparison,
+    cardProps: computed(() => ({ renderCardImages, imageExportBusy: isProjectExportRunning.value,
+      debugHideCdeOverlays: debugHideCdeOverlays.value, debugTransparentCdeViewport: debugTransparentCdeViewport.value,
+      debugPassiveCdeViewport: debugPassiveCdeViewport.value,
+    })),
+    reportIssues: (id, snapshot) => reportSessionIssueSnapshot(id, snapshot),
+    openFile: path => handleOpenFile(path), trashFile: path => handleEditorTrashFile(path), translate: t,
   })
-
-
-  const isDiffMode = computed(() => isWorkbenchMode.value && activeSession.value?.mode === 'diff')
-  const mountedEditorKey = ref<string | null>(null)
-  function setCurrentEditorRef(value: unknown): void {
-    currentEditorRef.value = value as typeof currentEditorRef.value
-    mountedEditorKey.value = value ? currentEditorKey.value : null
-  }
+  const isDiffMode = computed(() => isWorkbenchMode.value && activeSession.value?.state.mode === 'diff')
   const {
     pendingIntent: pendingCloseIntent,
     decisions: unsavedEditorDecisions,
@@ -305,15 +256,13 @@ export function createWorkbenchPage(options: {
     saveSingle: saveSingleUnsavedEditor,
   } = useWorkbenchCloseCoordinator({
     sessions,
-    flushAffectedSessions: flushActiveEditorForClose,
     pickDraftDirectory: () => fileSystemService.pickDirectory(t('app.unsavedEditors.pickDraftDirectory')),
     fileExists: path => fileSystemService.fileExists(path),
-    saveSession,
     completions: {
       sessions: performSessionClose,
-      project: options.completeProjectClose,
+      project: async destination => { await cancelExportsAndWait(); await options.completeProjectClose(destination) },
       trash: performPathTrash,
-      application: options.completeApplicationClose,
+      application: async action => { await cancelExportsAndWait(); await projectStore.disposeResources(); await options.completeApplicationClose(action) },
     },
   })
 
@@ -329,7 +278,7 @@ export function createWorkbenchPage(options: {
   }
 
   function formatSessionTitle(session: EditorSession): string {
-    return resolveSessionLabel(session, sessionScopeTexts)
+    return resolveSessionLabel(session.state, sessionScopeTexts)
   }
 
   const {
@@ -421,6 +370,7 @@ export function createWorkbenchPage(options: {
       handleOpenedEditorsSelect,
       handleProjectManagementSelect,
       handleFileTreeSelect,
+      selectedProjectEntryKeys,
       setProjectManagementEntryExpanded,
       findProjectEntryByKey,
       setProjectEntryExpanded,
@@ -434,7 +384,7 @@ export function createWorkbenchPage(options: {
       revealEntryInFileManager,
       getRelativeProjectPath,
     },
-    close: { requestSessionClose, requestPathTrash },
+    close: { requestSessionClose, requestPathTrash, requestPathChanges, performPathTrash },
     editor: {
       openFile: async path => { await handleOpenFile(path) },
       remapSessionPaths,
@@ -525,19 +475,15 @@ export function createWorkbenchPage(options: {
   })
   const headerContribution = computed(() => {
     const session = visibleEditorSession.value
-    const instance = currentEditorRef.value
     const editorKey = currentEditorKey.value
     if (!session) return { actions: [], onAction: () => {} }
-    const isCurrent = () => visibleEditorSession.value?.id === session.id
+    const isCurrent = () => visibleEditorSession.value?.state.id === session.state.id
       && currentEditorKey.value === editorKey
-    if (!isDiffMode.value) return {
-      actions: mountedEditorKey.value === editorKey ? instance?.headerActions ?? [] : [],
-      onAction: (key: string) => { if (isCurrent() && currentEditorRef.value === instance && mountedEditorKey.value === editorKey) return instance?.onHeaderAction?.(key) },
-    }
+    if (!isDiffMode.value) return editorContribution.value
     const revisions = timelineRevisionOptions.value
     const actions: PageHeaderAction[] = []
     for (const side of ['before', 'after'] as const) {
-      const id = session.diff?.[`${side}RevisionId`] ?? diffSessionState[side].value?.commitId ?? null
+      const id = session.state.diff?.[`${side}RevisionId`] ?? diffSessionState[side].value?.commitId ?? null
       const selected = revisions.find(option => option.commitId === id)
       const title = t(side === 'before' ? 'sidebar.diffViewer.versionA' : 'sidebar.diffViewer.versionB')
       actions.push(selected?.shortId ?? selected?.label ?? t('sidebar.diffViewer.diskVersion'), {
@@ -552,22 +498,18 @@ export function createWorkbenchPage(options: {
     actions.push({ key: 'diff.exit', icon: 'nav.arrow-left', title: t('sidebar.diffViewer.exitComparison') })
     return { actions, onAction: async (key: string) => {
       if (!isCurrent() || !isDiffMode.value) return
-      if (key === 'diff.exit') { setSessionMode(session.id, 'edit'); return }
+      if (key === 'diff.exit') { session.setMode('edit'); return }
       const match = /^diff\.(before|after):(.+)$/.exec(key)
       if (match) await selectWorkspaceDiff(match[1] as 'before' | 'after', match[2] === 'current' ? null : match[2]!)
     } }
   })
 
-  function handleEditorIssueSnapshot(sessionId: string, snapshot: EditorIssueSnapshot): void {
-    reportSessionIssueSnapshot(sessionId, snapshot)
-  }
-
   async function handleWorkspaceIssueNavigate(request: SessionIssueNavigationRequest): Promise<void> {
     await navigateWorkspaceIssue(request, {
-      hasSession: (sessionId) => sessions.value.some((session) => session.id === sessionId),
+      hasSession: (sessionId) => sessions.value.some((session) => session.state.id === sessionId),
       activateSession,
       waitForEditorMount: nextTick,
-      getActiveSessionId: () => activeSession.value?.id ?? null,
+      getActiveSessionId: () => activeSession.value?.state.id ?? null,
       getEditorNavigator: () => currentEditorRef.value,
     })
   }
@@ -656,7 +598,7 @@ export function createWorkbenchPage(options: {
 
   async function saveAllEditors(): Promise<void> {
     for (const session of sessions.value) {
-      if (session.isDirty) await saveSession(session.id)
+      if (session.state.isDirty) await session.save()
     }
   }
 
@@ -687,7 +629,7 @@ export function createWorkbenchPage(options: {
     switch (key) {
       case 'file.build-package': return openResourcePackageBuilder()
       case 'save-active-editor': return triggerCurrentEditorSave()
-      case 'save-active-editor-as': if (activeSession.value) await saveSessionAs(activeSession.value.id); return
+      case 'save-active-editor-as': if (activeSession.value) await activeSession.value.saveAs(); return
       case 'save-all-editors': return saveAllEditors()
       case 'undo-active-editor': if (!isDiffMode.value) await triggerCurrentEditorUndo(); return
       case 'redo-active-editor': if (!isDiffMode.value) await triggerCurrentEditorRedo(); return
@@ -784,18 +726,7 @@ export function createWorkbenchPage(options: {
       const session = activeSession.value
       return {
         hasActiveEditor: Boolean(session), hasProject: Boolean(projectPath.value), onOpenProject: app.openProject,
-        editor: session ? {
-          component: currentEditorComponent.value, key: currentEditorKey.value, capture: setCurrentEditorRef,
-          props: {
-            ...currentEditorProps.value,
-            onModified: handleEditorModified, onSave: handleEditorSave, onOpenFile: handleOpenFile, onTrashFile: handleEditorTrashFile,
-            onUpdateViewportTransform: handleViewportTransformUpdate,
-            'onUpdate:pixelated': handleImagePreviewPixelatedUpdate, 'onUpdate:cardDesignerMode': handleCardDesignerModeUpdate,
-            onUpdateCardDesignerLayout: handleCardDesignerLayoutUpdate, onUpdateCardDesignerView: handleCardDesignerViewUpdate,
-            onUpdateDiffUiState: handleDiffUiStateUpdate,
-            onIssueSnapshot: (snapshot: EditorIssueSnapshot) => handleEditorIssueSnapshot(session.id, snapshot),
-          },
-        } : undefined,
+        editor: currentEditorMount.value,
       }
     }),
     sidebar: computed(() => workbenchSection.value.map(group => ({ ...group, onAction: runWorkbenchAction,
@@ -804,9 +735,9 @@ export function createWorkbenchPage(options: {
     sidebarLayout: { persistenceKey: computed(() => projectPath.value.replace(/\\/g, '/').replace(/\/+$/, '')) },
     header: computed(() => projectPath.value || activeSession.value ? ({
       title: activeSession.value ? formatSessionTitle(activeSession.value) : projectName.value || t('app.menu.workbench'),
-      titleLoading: Boolean(activeSession.value && activeSession.value.presentation === undefined),
-      icon: activeSession.value?.presentation?.icon, iconTone: activeSession.value?.presentation?.iconTone,
-      subtitle: activeSession.value?.presentation?.description, actions: headerContribution.value.actions, onAction: headerContribution.value.onAction,
+      titleLoading: Boolean(activeSession.value && activeSession.value.state.presentation === undefined),
+      icon: activeSession.value?.state.presentation?.icon, iconTone: activeSession.value?.state.presentation?.iconTone,
+      subtitle: activeSession.value?.state.presentation?.description, actions: headerContribution.value.actions, onAction: headerContribution.value.onAction,
     }) : null),
     bottomPanel: computed<SpacePageProblems>(() => ({
       treeData: issueTreeData.value, count: issueCount.value, severity: highestIssueSeverity.value,
@@ -842,10 +773,10 @@ export function createWorkbenchPage(options: {
     })),
   }
   onMounted(() => window.addEventListener('focus', handleWindowFocus))
-  onUnmounted(() => { window.removeEventListener('focus', handleWindowFocus); disposeEditorHost() })
+  onUnmounted(() => { window.removeEventListener('focus', handleWindowFocus); sessionManager.dispose(); void cancelExportsAndWait().then(() => projectStore.disposeResources()) })
   return {
     page, openFile: openFileFromPicker, open: openEditorSession,
-    closeWorkspaceSessions, requestProjectClose, requestApplicationClose,
+    closeWorkspaceSessions, requestProjectClose, requestApplicationClose, cancelExportsAndWait,
     newDocument: createUntitledOpenCard, addResourcePackageToProject,
     openIconRegistry: async () => { await handleProjectManagementSelect([resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)]) },
     templateTree: { projectTreeData, selectedProjectEntryKeys },

@@ -14,7 +14,7 @@ const series: ProjectIconSeries = {
   name: 'Status icons',
   key: 'status',
   icons: [
-    { iconKey: 'warning', name: 'Warning', source: '.opencard/icons/status/warning.svg', tint: 'theme' },
+    { iconKey: 'warning', name: 'Warning', source: '.opencard/icons/status/warning.svg', tint: 'context' },
     { iconKey: 'success', name: 'Success', source: '.opencard/icons/status/success.svg', tint: 'original' },
   ],
 }
@@ -111,7 +111,7 @@ describe('ProjectIconSetWorkspace', () => {
       ...series,
       icons: [
         ...series.icons,
-        { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'theme' as const },
+        { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'context' as const },
       ],
     }
     const wrapper = mountWorkspace(multiSeries, [0, 2], entries)
@@ -169,7 +169,7 @@ describe('ProjectIconSetWorkspace', () => {
     const icons = [
       series.icons[0]!,
       series.icons[1]!,
-      { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'theme' as const },
+      { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'context' as const },
     ]
     const wrapper = mountWorkspace({ ...series, icons }, [1], entries)
     wrapper.getComponent(OcAlbum).vm.$emit('action', { key: 'icon:1', actionKey: 'delete', source: 'inline' })

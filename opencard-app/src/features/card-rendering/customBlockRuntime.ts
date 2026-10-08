@@ -14,9 +14,9 @@ import {
   type EditorPropertyDefinition,
 } from '../../entities/card/schema'
 import { isRecord } from '../../shared/model/record'
-import { packageScopeRoots, resolveProjectResourcePackage, type ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
+import { packageScopeRoots, projectResourceScopeIdentity, resolveProjectResourcePackage, type ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 import { parseResourceReference } from '../workspace/services/resourceReference'
-import { formatPackageCoordinate, type PackageQualifier } from '../workspace/model/packageCoordinate'
+import { formatPackageCoordinate, parsePackageQualifier, type PackageQualifier } from '../workspace/model/packageCoordinate'
 import { resolveResourcePath } from '../workspace/model/scopedResourcePath'
 
 export const CUSTOM_BLOCK_MAX_DEPTH = 32
@@ -34,6 +34,7 @@ export type CustomBlockSource = {
 }
 
 export type CustomBlockSourceCatalog = {
+  scopes?: ReadonlyMap<string, ProjectResourceEnvironment>
   resolve: (source: string, scope: string) => CustomBlockSource | null
 }
 
@@ -67,7 +68,15 @@ export function createProjectCustomBlockCatalog(
         : reference.scope === 'host'
           ? environment
           : packageEnvironment(reference.qualifier)
-      const entry = target?.customBlockRegistry?.[reference.key]
+      const [collectionKey, blockKey] = reference.key.split('/')
+      const collection = target?.customBlockRegistry
+        ? Object.entries(target.customBlockRegistry)
+          .find(([key]) => key.toLocaleLowerCase() === (collectionKey ?? '').toLocaleLowerCase())?.[1]
+        : undefined
+      const entry = collection
+        ? Object.entries(collection)
+          .find(([key]) => key.toLocaleLowerCase() === (blockKey ?? '').toLocaleLowerCase())?.[1]
+        : undefined
       return target && entry ? resolveInScope(entry.source, target) : null
     }
 
@@ -81,18 +90,16 @@ export function createProjectCustomBlockCatalog(
       packageRoots: packageScopeRoots(environment.packages),
     })
     if (!resolved.ok) return null
-    const target = reference?.scope === 'host'
-      ? environment
-      : reference?.scope === 'package'
-        ? packageEnvironment(reference.qualifier)
-        : current
+    const separator = source.indexOf('#')
+    const target = separator === 0 ? environment : separator > 0 ? packageEnvironment(parsePackageQualifier(source.slice(0, separator)) ?? undefined) : current
     if (!target?.rootPath) return null
     const relative = relativeSourcePath(target.rootPath, resolved.value)
-      const document = relative ? target.customBlockSources?.get(relative) : undefined
+    const document = relative ? (target.customBlockSources?.get(relative) ?? target.readCustomBlockSource?.(relative)) : undefined
     return document ? { scope: target.namespace, document } : null
   }
 
   return {
+    scopes,
     resolve(source, scope) {
       return resolveInScope(source, scopes.get(scope) ?? environment)
     },
@@ -114,6 +121,7 @@ export type MaterializeCustomBlocksOptions = {
 }
 
 export type MaterializeCustomBlocksResult = {
+  resourceScopes: ReadonlyMap<string, ProjectResourceEnvironment>
   document: CardDocument
   descriptors: ReadonlyMap<string, CustomBlockRuntimeDescriptor>
 }
@@ -224,10 +232,19 @@ function fallbackContainer(block: CustomBlock): SimpleContainerBlock {
 
 type MaterializeState = {
   readonly catalog: CustomBlockSourceCatalog
+  readonly hostScope: string
   readonly maxDepth: number
   readonly maxNodes: number
   nodes: number
   descriptors: Map<string, CustomBlockRuntimeDescriptor>
+  resourceScopes: Map<string, ProjectResourceEnvironment>
+}
+
+function bindFields(block: CardBlock, scope: string, state: MaterializeState, fields?: readonly string[]) {
+  const environment = state.catalog.scopes?.get(scope)
+  if (!environment) return
+  if (fields) for (const field of fields) state.resourceScopes.set(projectResourceScopeIdentity(block.id, field), environment)
+  else if (scope !== state.hostScope) state.resourceScopes.set(projectResourceScopeIdentity(block.id, '*'), environment)
 }
 
 function materializeBlock(
@@ -275,11 +292,15 @@ function materializeBlock(
       }
     }
     state.descriptors.set(customId, { id: customId, source: block.source, state: 'ready' })
-    return materializeContainer(next, source.scope, customId, depth + 1, state, false)
+    const result = materializeContainer(next, source.scope, customId, depth + 1, state, false)
+    bindFields(result, scope, state, Object.keys(publicFields).filter(field => Object.prototype.hasOwnProperty.call(sourceValues, field)))
+    return result
   }
 
   if (block.type !== 'simple-container-block' && block.type !== 'flow-container-block') {
-    return prefix ? { ...clone(block), id: runtimeId(prefix, block.id, 'block') } : clone(block)
+    const result = prefix ? { ...clone(block), id: runtimeId(prefix, block.id, 'block') } : clone(block)
+    bindFields(result, scope, state)
+    return result
   }
   return materializeContainer(block, scope, prefix, depth, state, Boolean(prefix))
 }
@@ -294,6 +315,7 @@ function materializeContainer<T extends SimpleContainerBlock | FlowContainerBloc
 ): T {
   const result = clone(block)
   if (rewriteSelf && prefix) result.id = runtimeId(prefix, block.id, 'container')
+  bindFields(result, scope, state)
   result.children = []
   for (const [index, child] of block.children.entries()) {
     if (state.nodes >= state.maxNodes) break
@@ -313,11 +335,11 @@ export function materializeCustomBlocks(
   scope = 'project',
 ): MaterializeCustomBlocksResult {
   const state: MaterializeState = {
-    catalog: options.catalog,
+    catalog: options.catalog, hostScope: scope,
     maxDepth: options.maxDepth ?? CUSTOM_BLOCK_MAX_DEPTH,
     maxNodes: options.maxNodes ?? CUSTOM_BLOCK_MAX_NODES,
     nodes: 0,
-    descriptors: new Map(),
+    descriptors: new Map(), resourceScopes: new Map(),
   }
   const nextDocument = clone(document)
   for (const face of Object.values(nextDocument.faces)) {
@@ -326,5 +348,5 @@ export function materializeCustomBlocks(
       block: materializeBlock(child.block, scope, '', 0, state),
     }))
   }
-  return { document: nextDocument, descriptors: state.descriptors }
+  return { document: nextDocument, descriptors: state.descriptors, resourceScopes: state.resourceScopes }
 }

@@ -1,6 +1,6 @@
 import type { FilePathDirectoryProvider } from '../../../shared/model/filePath'
 import type { FileSystemService } from './fileSystemService'
-import { parsePackageQualifier } from '../model/packageCoordinate'
+import { formatPackageCoordinate, parsePackageQualifier } from '../model/packageCoordinate'
 import { resolveResourcePath } from '../model/scopedResourcePath'
 import { packageScopeRoots, type ProjectResourceEnvironment } from './projectResourceEnvironment'
 
@@ -22,7 +22,7 @@ function isPackageRoot(directory: string): boolean {
 export function createResourceDirectoryProvider(
   rootPath: string,
   environment: ProjectResourceEnvironment,
-  fs: Pick<FileSystemService, 'readDirectoryEntries'>,
+  fs: Pick<FileSystemService, 'readDirectoryEntries' | 'fileExists'>,
   options: { hideDotFiles?: boolean, iconEntryLabel?: string } = {},
 ): FilePathDirectoryProvider {
   const scopeRootPath = environment.rootPath ?? rootPath
@@ -38,7 +38,14 @@ export function createResourceDirectoryProvider(
     const prefix = directory.replace(/\/+$/, '')
     const resolved = resolve(`${prefix ? `${prefix}/` : ''}__oc_browse__`)
     if (!resolved.ok) return []
-    const entries = (await fs.readDirectoryEntries(resolved.value.slice(0, -'/__oc_browse__'.length), 1))
+    const directoryPath = resolved.value.slice(0, -'/__oc_browse__'.length)
+    let directoryEntries: Awaited<ReturnType<FileSystemService['readDirectoryEntries']>>
+    try { directoryEntries = await fs.readDirectoryEntries(directoryPath, 1) }
+    catch (error) {
+      if (await fs.fileExists(directoryPath)) throw error
+      return []
+    }
+    const entries = directoryEntries
       .filter(entry => !options.hideDotFiles || !entry.name.split(/[\\/]/).some(segment => segment.startsWith('.')))
     // Selecting `icon:` writes the prefix without a separator, and the field's icon completion
     // takes over from there.
@@ -55,8 +62,8 @@ export function createResourceDirectoryProvider(
     return [
       ...entries,
       iconEntry,
-      ...[...(current.packages ?? [])].map(([key, pkg]) => ({
-        name: `${key}#`, label: pkg.manifest.title, isDirectory: true, icon: 'file.package' as const,
+      ...[...(current.packages ?? [])].map(([, pkg]) => ({
+        name: `${formatPackageCoordinate(pkg.coordinate)}#`, label: pkg.manifest.title, isDirectory: true, icon: 'file.package' as const,
       })),
     ]
   }

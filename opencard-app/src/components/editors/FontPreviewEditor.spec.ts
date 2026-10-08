@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FontPreviewEditor from './FontPreviewEditor.vue'
@@ -64,11 +65,7 @@ describe('FontPreviewEditor', () => {
 
   it('loads the font for the session and removes it when the preview closes', async () => {
     const wrapper = mount(FontPreviewEditor, {
-      props: {
-        filePath: 'assets/Brand.otf',
-        fileName: 'Brand.otf',
-        resourceRootPath: 'D:/project',
-      },
+      props: { session: createTestSession({ path: 'assets/Brand.otf', name: 'Brand.otf' }), resourceRootPath: 'D:/project' },
     })
     await flushPromises()
 
@@ -84,7 +81,7 @@ describe('FontPreviewEditor', () => {
     await input.setValue('自定义试字 OpenCard')
     expect((input.element as HTMLTextAreaElement).value).toBe('自定义试字 OpenCard')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('modified')).toEqual([[false]])
+    expect(wrapper.props('session').state.isDirty).toBe(false)
 
     const loadedFace = fontSet.add.mock.calls[0]![0]
     wrapper.unmount()
@@ -95,7 +92,7 @@ describe('FontPreviewEditor', () => {
   it('offers repair after loading fails and translates a rejected repaired font', async () => {
     mocks.rejectLoad = true
     const wrapper = mount(FontPreviewEditor, {
-      props: { filePath: 'D:/fonts/Broken.ttf', fileName: 'Broken.ttf' },
+      props: { session: createTestSession({ path: 'D:/fonts/Broken.ttf', name: 'Broken.ttf' }),  },
     })
     await flushPromises()
 

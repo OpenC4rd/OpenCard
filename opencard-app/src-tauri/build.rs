@@ -28,10 +28,8 @@ fn remove_staged_resource_directory(profile: &Path, name: &str) {
 
 fn main() {
     println!("cargo:rerun-if-changed=resources/templates");
-    println!("cargo:rerun-if-changed=resources/icon-packs");
     if let Some(profile) = profile_output_directory() {
         remove_staged_resource_directory(&profile, "templates");
-        remove_staged_resource_directory(&profile, "icon-packs");
     }
     tauri_build::build()
 }

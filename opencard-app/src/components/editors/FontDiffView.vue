@@ -18,7 +18,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EditorComparisonInput } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorComparisonInput } from '../../features/editor-runtime/editorProtocol'
 import { fileSystemService } from '../../features/workspace/services/fileSystemService'
 import OcText from '../base/OcText.vue'
 

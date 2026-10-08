@@ -1,232 +1,107 @@
-import { parseResourceReferenceList } from '../workspace/services/resourceReference'
-import { computed, ref, watch, type Ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-
+import { computed, ref, shallowRef, watch, markRaw, type Ref } from 'vue'
 import { fileSystemService } from '../workspace/services/fileSystemService'
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { materializeRevision, readFileAtRevision } from './gitService'
+import { createResourceEnvironment, type ResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
+import { materializeRevision, readFileAtRevision, releaseRevisionSnapshot } from './gitService'
 import type { DiffRevisionOption, DiffSession, DiffSnapshot } from './diff.types'
 import { compareOcdocuments, type OcdocumentDiffModel } from './ocdocumentDiff'
-import { PROJECT_PROFILE_FILE_NAME, parseProjectMetadataText, toProjectInformation } from '../workspace/model/projectMetadata'
-import { PROJECT_DICTIONARY_FILE_NAME, parseProjectDictionaryText, resolveProjectDictionary } from '../workspace/model/projectDictionary'
-import { PROJECT_ICON_REGISTRY_FILE_NAME, parseProjectIconRegistryText } from '../workspace/model/projectIconRegistry'
-import { PROJECT_FONT_REGISTRY_FILE_NAME, parseProjectFontRegistryText, projectFontFileEntries, projectFontWeightValues } from '../workspace/model/projectFontRegistry'
-import { buildProjectIconCatalog, EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
-import { resolveProjectInternalRelativePath } from '../workspace/model/projectStructure'
 
 export interface OcdocumentDiffSessionOptions {
-  projectRoot: Ref<string | null | undefined>
-  filePath: Ref<string | null | undefined>
-  fileName: Ref<string | null | undefined>
-  revisions: Ref<readonly DiffRevisionOption[]>
+  translate: (key: string) => string
+  projectRoot: Readonly<Ref<string | null | undefined>>
+  environment: Readonly<Ref<ResourceEnvironment | null>>
+  filePath: Readonly<Ref<string | null | undefined>>
+  fileName: Readonly<Ref<string | null | undefined>>
+  revisions: Readonly<Ref<readonly DiffRevisionOption[]>>
 }
-
-function resolveProjectFile(root: string, path: string): string {
-  const normalizedRoot = root.replace(/[\\/]$/, '')
-  return `${normalizedRoot}/${path.replace(/^[\\/]+/, '').replace(/\\/g, '/')}`
-}
-
-const DIFF_RESOURCE_SNAPSHOT_EXTENSIONS = new Set([
-  'woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc',
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
-])
-
+const DIFF_RESOURCE_SNAPSHOT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
 export function isResourceSnapshotDiffPath(path: string): boolean {
   const extension = path.split('.').pop()?.toLocaleLowerCase()
   return Boolean(extension && DIFF_RESOURCE_SNAPSHOT_EXTENSIONS.has(extension))
 }
 
-const snapshotContextCache = new Map<string, Promise<Pick<DiffSnapshot, 'project' | 'dictionary' | 'projectIconCatalog' | 'resolveFontFamily'>>>()
-
-function createSnapshotFontResolver(root: string, fontDocument: NonNullable<ReturnType<typeof parseProjectFontRegistryText>>, namespace: string): (references: string) => string {
-  const families = new Map((fontDocument.families ?? []).map(font => [font.key.toLowerCase(), `OpenCardSnapshot-${namespace}-${font.key}`]))
-  const compositions = new Map((fontDocument.compositions ?? []).map(composition => [composition.key.toLowerCase(), composition.members[0]?.fontKey?.toLowerCase()]))
-  if (typeof document !== 'undefined') {
-    const style = document.createElement('style')
-    style.dataset.opencardDiffFonts = namespace
-    style.textContent = (fontDocument.families ?? []).flatMap(font => projectFontFileEntries(font).map(entry => (
-      `@font-face{font-family:${JSON.stringify(families.get(font.key.toLowerCase()) ?? font.key)};src:url(${JSON.stringify(convertFileSrc(resolveProjectFile(root, resolveProjectInternalRelativePath(entry.source))))});font-weight:${projectFontWeightValues[entry.weight]};font-style:${entry.style === 'italic' ? 'italic' : 'normal'};}`
-    ))).join('')
-    document.head.appendChild(style)
-  }
-  return references => parseResourceReferenceList(references, 'font').map(token => {
-    if (token.diagnostics.length > 0) return ''
-    if (!token.reference) return token.source
-    if (token.reference.scope !== 'current') return ''
-    const key = token.reference.key.toLocaleLowerCase()
-    const family = families.get(key) ?? (compositions.get(key) ? families.get(compositions.get(key)!) : undefined)
-    return family ? JSON.stringify(family) : ''
-  }).filter(Boolean).join(', ')
-}
-
-async function loadSnapshotContext(root: string): Promise<Pick<DiffSnapshot, 'project' | 'dictionary' | 'projectIconCatalog' | 'resolveFontFamily'>> {
-  const readOptional = async (relativePath: string): Promise<string | null> => {
-    const path = resolveProjectFile(root, relativePath)
-    return await fileSystemService.fileExists(path) ? await fileSystemService.readFile(path) : null
-  }
-  let project: DiffSnapshot['project'] = null
-  let dictionary: DiffSnapshot['dictionary']
-  let projectIconCatalog = EMPTY_PROJECT_ICON_CATALOG
-  let resolveFontFamily: DiffSnapshot['resolveFontFamily']
-  const profileText = await readOptional(PROJECT_PROFILE_FILE_NAME)
-  if (profileText) {
-    const profile = parseProjectMetadataText(profileText)
-    if (profile) project = toProjectInformation(profile)
-  }
-  const dictionaryText = await readOptional(PROJECT_DICTIONARY_FILE_NAME)
-  if (dictionaryText) {
-    const document = parseProjectDictionaryText(dictionaryText)
-    if (document) dictionary = resolveProjectDictionary(document).values
-  }
-  const fontText = await readOptional(PROJECT_FONT_REGISTRY_FILE_NAME)
-  if (fontText) {
-    const document = parseProjectFontRegistryText(fontText)
-    if (document) {
-      resolveFontFamily = createSnapshotFontResolver(root, document, root.replace(/[^a-z0-9]+/gi, '-').slice(-24))
-    }
-  }
-  const iconText = await readOptional(PROJECT_ICON_REGISTRY_FILE_NAME)
-  if (iconText) {
-    const document = parseProjectIconRegistryText(iconText)
-    if (document) {
-      projectIconCatalog = buildProjectIconCatalog(
-        document.iconSeries,
-        source => convertFileSrc(resolveProjectFile(root, resolveProjectInternalRelativePath(source))),
-      )
-    }
-  }
-  return { project, dictionary, projectIconCatalog, resolveFontFamily }
-}
 
 export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) {
-  const { t } = useI18n()
-  const before = ref<DiffSnapshot | null>(null)
-  const after = ref<DiffSnapshot | null>(null)
+  const t = options.translate
+  const before = shallowRef<DiffSnapshot | null>(null)
+  const after = shallowRef<DiffSnapshot | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const beforeSnapshotRoot = ref<string | null>(null)
-  const afterSnapshotRoot = ref<string | null>(null)
-  const loadedPath = ref<string | null>(null)
-  let requestRevision = 0
-
-  const diffSession = computed<DiffSession | null>(() => {
-    const path = options.filePath.value
-    const fileName = options.fileName.value
-    if (!path || path !== loadedPath.value || !fileName || !before.value || !after.value) return null
-    return {
-      id: `diff:${path}`,
-      fileTypeId: 'ocdocument',
-      path,
-      name: fileName,
-      before: before.value,
-      after: after.value,
-    }
-  })
-  const diffModel = computed<OcdocumentDiffModel | null>(() => (
-    before.value && after.value ? compareOcdocuments(before.value.content, after.value.content) : null
-  ))
-
-  async function loadSnapshot(root: string, path: string, commitId: string | null, label: string): Promise<DiffSnapshot> {
-    const resourceSnapshot = isResourceSnapshotDiffPath(path)
+  let revision = 0
+  let closed = false
+  let owned: { environment: ResourceEnvironment, root: string }[] = []
+  const requests = new Set<Promise<void>>()
+  const diffSession = computed<DiffSession | null>(() => before.value && after.value && options.filePath.value ? {
+    id: `diff:${options.filePath.value}`, fileTypeId: 'ocdocument', path: options.filePath.value,
+    name: options.fileName.value ?? '', before: before.value, after: after.value,
+  } : null)
+  const diffModel = computed<OcdocumentDiffModel | null>(() => before.value && after.value ? compareOcdocuments(before.value.content, after.value.content) : null)
+  async function release(entries: typeof owned) {
+    const results = await Promise.allSettled(entries.map(async entry => { try { await entry.environment.dispose() } finally { await releaseRevisionSnapshot(entry.root) } }))
+    const failure = results.find(result => result.status === 'rejected')
+    if (failure?.status === 'rejected') throw failure.reason
+  }
+  async function load(root: string, path: string, commitId: string | null, label: string, acquired: typeof owned): Promise<DiffSnapshot> {
     let content = ''
-    let resourceRootPath: string
+    let resourceRootPath = root
+    let environment = options.environment.value
     if (commitId === null) {
-      resourceRootPath = root
-      const filePath = resolveProjectFile(root, path)
-      if (resourceSnapshot) await fileSystemService.readBinaryFile(filePath)
-      else content = await fileSystemService.readFile(filePath)
+      if (!isResourceSnapshotDiffPath(path)) content = await fileSystemService.readFile(`${root}/${path}`)
     } else {
       const result = await readFileAtRevision(root, { revision: commitId, path })
       if (!result.ok || !result.value) throw new Error(result.error?.message ?? t('sidebar.diffViewer.readRevisionFailed'))
-      if (result.value.binary && !resourceSnapshot) throw new Error(t('sidebar.diffViewer.notTextFile'))
-      if (!result.value.binary) content = result.value.content
-      const materialized = await materializeRevision(root, { revision: commitId })
-      if (!materialized.ok || !materialized.value) throw new Error(materialized.error?.message ?? t('sidebar.diffViewer.prepareResourcesFailed'))
-      resourceRootPath = materialized.value.rootPath
+      if (result.value.binary && !isResourceSnapshotDiffPath(path)) throw new Error(t('sidebar.diffViewer.notTextFile'))
+      content = result.value.content
+      const snapshot = await materializeRevision(root, { revision: commitId })
+      if (!snapshot.ok || !snapshot.value) throw new Error(snapshot.error?.message ?? t('sidebar.diffViewer.prepareResourcesFailed'))
+      resourceRootPath = snapshot.value.rootPath
+      try { environment = await createResourceEnvironment(resourceRootPath, { watch: false, cacheIdentity: root }) }
+      catch (error) { await releaseRevisionSnapshot(resourceRootPath); throw error }
+      acquired.push({ environment, root: resourceRootPath })
     }
-    const contextLoad = commitId === null
-      ? loadSnapshotContext(resourceRootPath)
-      : (() => {
-          const cacheKey = `${root.toLowerCase()}|${commitId}`
-          let contextPromise = snapshotContextCache.get(cacheKey)
-          if (!contextPromise) {
-            contextPromise = loadSnapshotContext(resourceRootPath)
-            snapshotContextCache.set(cacheKey, contextPromise)
-          }
-          return contextPromise
-        })()
-    const context = await contextLoad
-    return {
-      commitId,
-      label,
-      content,
-      resourceRootPath,
-      sourceFilePath: resolveProjectFile(resourceRootPath, path),
-      ...context,
-    }
+    return { commitId, label, content, resourceRootPath, sourceFilePath: `${resourceRootPath}/${path}`, resourceEnvironment: environment }
   }
-
-  async function selectComparison(beforeCommitId: string | null, afterCommitId: string | null) {
-    if (beforeCommitId === afterCommitId) {
-      error.value = t('sidebar.diffViewer.sameVersion')
-      return
-    }
+  function selectComparison(beforeId: string | null, afterId: string | null): Promise<void> {
+    if (closed) return Promise.resolve()
+    if (beforeId === afterId) { error.value = t('sidebar.diffViewer.sameVersion'); return Promise.resolve() }
     const root = options.projectRoot.value
     const path = options.filePath.value
-    if (!root || !path) {
-      error.value = t('sidebar.diffViewer.projectUnavailable')
-      return
-    }
-    const revision = ++requestRevision
-    loading.value = true
-    error.value = null
-    loadedPath.value = null
-    const optionById = new Map(options.revisions.value.map(item => [item.commitId, item]))
-    try {
-      const [nextBefore, nextAfter] = await Promise.all([
-        loadSnapshot(root, path, beforeCommitId, optionById.get(beforeCommitId)?.label ?? t('sidebar.diffViewer.versionA')),
-        loadSnapshot(root, path, afterCommitId, optionById.get(afterCommitId)?.label ?? t('sidebar.diffViewer.versionB')),
+    if (!root || !path) { error.value = t('sidebar.diffViewer.projectUnavailable'); return Promise.resolve() }
+    const request = ++revision
+    loading.value = true; error.value = null
+    const acquired: typeof owned = []
+    const labels = new Map(options.revisions.value.map(item => [item.commitId, item.label]))
+    const work = (async () => {
+      const sides = await Promise.allSettled([
+        load(root, path, beforeId, labels.get(beforeId) ?? t('sidebar.diffViewer.versionA'), acquired),
+        load(root, path, afterId, labels.get(afterId) ?? t('sidebar.diffViewer.versionB'), acquired),
       ])
-      if (revision !== requestRevision) return
-      before.value = nextBefore
-      after.value = nextAfter
-      beforeSnapshotRoot.value = nextBefore.resourceRootPath ?? null
-      afterSnapshotRoot.value = nextAfter.resourceRootPath ?? null
-      loadedPath.value = path
-    } catch (cause) {
-      if (revision === requestRevision) error.value = cause instanceof Error ? cause.message : t('sidebar.diffViewer.readFailed')
-    } finally {
-      if (revision === requestRevision) loading.value = false
-    }
+      const failed = sides.find(side => side.status === 'rejected')
+      if (closed || request !== revision || failed) {
+        await release(acquired)
+        if (!closed && request === revision && failed?.status === 'rejected') error.value = String(failed.reason)
+        return
+      }
+      const previous = owned
+      owned = acquired
+      before.value = (sides[0] as PromiseFulfilledResult<DiffSnapshot>).value
+      after.value = (sides[1] as PromiseFulfilledResult<DiffSnapshot>).value
+      await release(previous)
+    })().finally(() => { requests.delete(work); if (!closed && request === revision) loading.value = false })
+    requests.add(work)
+    return work
   }
-
-  async function refresh() {
-    const history = options.revisions.value.filter(item => item.commitId !== null)
-    const beforeId = history[0]?.commitId ?? null
-    await selectComparison(beforeId, null)
-  }
-
-  watch([options.projectRoot, options.filePath], () => {
-    requestRevision += 1
-    before.value = null
-    after.value = null
-    beforeSnapshotRoot.value = null
-    afterSnapshotRoot.value = null
-    loadedPath.value = null
-    loading.value = false
-    error.value = null
+  const stop = watch([options.projectRoot, options.filePath], () => {
+    revision++; before.value = null; after.value = null
+    const previous = owned; owned = []
+    const work = release(previous).catch(cause => { if (!closed) error.value = String(cause) }).finally(() => requests.delete(work))
+    requests.add(work)
   }, { flush: 'sync' })
-
-  return {
-    before,
-    after,
-    diffSession,
-    diffModel,
-    loading,
-    error,
-    beforeSnapshotRoot,
-    afterSnapshotRoot,
-    refresh,
-    selectComparison,
-  }
+  let disposal: Promise<void> | undefined
+  return markRaw({ before, after, diffSession, diffModel, loading, error, selectComparison,
+    beforeSnapshotRoot: computed(() => before.value?.resourceRootPath ?? null),
+    afterSnapshotRoot: computed(() => after.value?.resourceRootPath ?? null),
+    refresh: () => selectComparison(options.revisions.value.find(item => item.commitId !== null)?.commitId ?? null, null),
+    dispose() { return disposal ??= (async () => { closed = true; revision++; stop(); await Promise.allSettled([...requests]); const previous = owned; owned = []; await release(previous); before.value = null; after.value = null })() },
+  })
 }
+export type OcdocumentDiffRuntime = ReturnType<typeof useOcdocumentDiffSession>

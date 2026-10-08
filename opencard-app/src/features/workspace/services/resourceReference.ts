@@ -11,7 +11,8 @@ import {
 } from './projectIconCatalog'
 import { projectFontSources, type ProjectFontRegistryEntry } from '../model/projectFontRegistry'
 import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
-import { toCssFontFamily, type FontCatalogEntry } from '../model/projectFonts'
+import { type FontCatalogEntry } from '../model/projectFonts'
+import type { CustomBlockRegistryEntry } from '../model/customBlockRegistry'
 
 export type ResourceReferenceScope = 'current' | 'host' | 'package'
 export type ResourceReferenceKind = 'font' | 'icon' | 'block'
@@ -80,7 +81,7 @@ function splitReference(source: string): { qualifier: string | null, body: strin
 }
 
 function normalizeKind(value: string): ResourceReferenceKind | null {
-  return value === 'font' || value === 'icon'
+  return value === 'font' || value === 'icon' || value === 'block'
     ? value
     : null
 }
@@ -92,6 +93,13 @@ function normalizeTypedKey(kind: ResourceReferenceKind, value: string): string |
     const seriesKey = normalizeKeySlug(segments[0] ?? '')
     const iconKey = normalizeKeySlug(segments[1] ?? '')
     return seriesKey && iconKey ? `${seriesKey}/${iconKey}` : null
+  }
+  if (kind === 'block') {
+    const segments = value.split('/')
+    if (segments.length !== 2) return null
+    const collectionKey = normalizeKeySlug(segments[0] ?? '')
+    const blockKey = normalizeKeySlug(segments[1] ?? '')
+    return collectionKey && blockKey ? `${collectionKey}/${blockKey}` : null
   }
   return normalizeKeySlug(value)
 }
@@ -202,7 +210,7 @@ function resourceUnavailable<T>(
   }
 }
 
-function resolveResourceReference<T extends string | ProjectFontRegistryEntry | ProjectIconCatalogEntry>(
+function resolveResourceReference<T extends string | ProjectFontRegistryEntry | ProjectIconCatalogEntry | CustomBlockRegistryEntry>(
   reference: ResourceReference,
   options: ResourceReferenceResolutionOptions,
 ): ResolvedResource<T> {
@@ -230,10 +238,21 @@ function resolveResourceReference<T extends string | ProjectFontRegistryEntry | 
       ? { reference, environment, value: icon as T, diagnostics: [] }
       : resourceUnavailable(reference, environment, 'Referenced icon is unavailable')
   }
-  return resourceUnavailable(reference, environment, 'Referenced icon is unavailable')
+  if (reference.kind === 'block') {
+    const [collectionKey, blockKey] = reference.key.split('/')
+    const collection = Object.entries(environment.customBlockRegistry ?? {})
+      .find(([key]) => key.toLocaleLowerCase() === (collectionKey ?? '').toLocaleLowerCase())?.[1]
+    const block = collection
+      ? Object.entries(collection).find(([key]) => key.toLocaleLowerCase() === (blockKey ?? '').toLocaleLowerCase())?.[1]
+      : undefined
+    return block
+      ? { reference, environment, value: block as T, diagnostics: [] }
+      : resourceUnavailable(reference, environment, 'Referenced custom block is unavailable')
+  }
+  return resourceUnavailable(reference, environment, 'Referenced resource is unavailable')
 }
 
-export function resolveResourceReferenceText<T extends string | ProjectFontRegistryEntry | ProjectIconCatalogEntry>(
+export function resolveResourceReferenceText<T extends string | ProjectFontRegistryEntry | ProjectIconCatalogEntry | CustomBlockRegistryEntry>(
   source: string,
   options: ResourceReferenceResolutionOptions,
 ): ResolvedResource<T> {
@@ -278,7 +297,7 @@ export function buildResourceFontCatalog(
   const entries: FontCatalogEntry[] = []
   for (const [key, entry] of Object.entries(environment.fonts)) {
     entries.push({ value: `font:${key}`, label: entry.name, source: 'project', detail: `font:${key}`,
-      cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, environment, toCssFontFamily) })
+      cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, environment) })
   }
   for (const entry of Object.values(environment.fonts)) {
     if (entry.kind !== 'family') continue
@@ -290,7 +309,7 @@ export function buildResourceFontCatalog(
   // 挑中的东西写死版本 —— 用户挑的就是这个长相。坐标里的 `@` 与引用分段符 `#` 不同，
   // 所以坐标可以完整写出来。
   for (const [coordinate, packageEnvironment] of environment.packageEnvironments ?? []) {
-    const pkg = environment.packages?.get(coordinate)
+    const pkg = [...environment.packages?.values() ?? []].find(candidate => formatPackageCoordinate(candidate.coordinate) === coordinate)
     if (!pkg) continue
     const qualifier = formatPackageCoordinate(pkg.coordinate)
     for (const [key, entry] of Object.entries(packageEnvironment.fonts)) {
@@ -299,7 +318,7 @@ export function buildResourceFontCatalog(
         label: entry.name,
         source: 'project',
         detail: `${qualifier}#font:${key}`,
-        cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, packageEnvironment, toCssFontFamily),
+        cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, packageEnvironment),
       })
     }
   }

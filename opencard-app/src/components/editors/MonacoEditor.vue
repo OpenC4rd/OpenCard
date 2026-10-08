@@ -16,9 +16,10 @@ import { useI18n } from 'vue-i18n'
 import OcText from '../base/OcText.vue'
 import type { OcThemeColorOverrides, OcThemeId } from '../../shared/ui/foundation'
 import { registerOcMonacoTheme } from '../../features/editor-runtime/services/monacoTheme'
-import { editorHistoryManager } from '../../features/editor-runtime/history/editorHistoryManager'
+import type { EditorSession } from '../../features/editor-runtime/session/editorSession'
+import { notifyAppError } from '../../features/notifications/titlebarNotices'
 import type { HistoryOperationMeta } from '../../features/editor-runtime/history/history.types'
-import type { EditorComparisonInput } from '../../features/editor-runtime/registry/editorRegistry'
+import type { EditorComparisonInput } from '../../features/editor-runtime/editorProtocol'
 
 type MonacoApi = typeof import('monaco-editor')
 type MonacoEditorInstance = import('monaco-editor').editor.IStandaloneCodeEditor
@@ -26,8 +27,8 @@ type MonacoDiffEditorInstance = import('monaco-editor').editor.IStandaloneDiffEd
 type MonacoTextModel = import('monaco-editor').editor.ITextModel
 
 const props = withDefaults(defineProps<{
-  modelValue: string
-  sessionId?: string
+  modelValue?: string
+  session?: EditorSession
   language?: string
   themeId?: OcThemeId
   themeOverrides?: OcThemeColorOverrides
@@ -63,7 +64,7 @@ async function loadMonacoApi(): Promise<MonacoApi> {
 
 function createEditor(api: MonacoApi, container: HTMLElement): void {
   const appearance = registerOcMonacoTheme(api, props.themeId, props.themeOverrides)
-  if (props.mode === 'diff' && props.comparison) {
+  if ((props.session?.state.mode ?? props.mode) === 'diff' && props.comparison) {
     const before = props.comparison.before
     const after = props.comparison.after
     const beforeModel = api.editor.createModel(before.content, props.language, api.Uri.parse(`inmemory://opencard/diff/${before.revisionId ?? 'current'}/before`))
@@ -83,19 +84,19 @@ function createEditor(api: MonacoApi, container: HTMLElement): void {
     diffEditor.setModel({ original: beforeModel, modified: afterModel })
     return
   }
-  const sessionModel = props.sessionId ? editorHistoryManager.getMonacoModel(props.sessionId) : null
-  const managedModel = sessionModel ?? (props.sessionId
+  const sessionModel = props.session?.textModel.get() ?? null
+  const managedModel = sessionModel ?? (props.session
     ? api.editor.createModel(
-        props.modelValue,
+        props.session.state.draftContent,
         props.language,
-        api.Uri.parse(`inmemory://opencard/${props.sessionId}`),
+        api.Uri.parse(`inmemory://opencard/${props.session.state.id}`),
       )
     : null)
-  if (props.sessionId && managedModel && !sessionModel) {
-    editorHistoryManager.attachMonacoModel(props.sessionId, managedModel)
+  if (props.session && managedModel && !sessionModel) {
+    props.session.textModel.attach(managedModel)
   }
   editor = api.editor.create(container, {
-    ...(managedModel ? { model: managedModel } : { value: props.modelValue }),
+    ...(managedModel ? { model: managedModel } : { value: props.modelValue ?? '' }),
     language: props.language,
     theme: appearance.themeName,
     automaticLayout: true,
@@ -127,14 +128,15 @@ function createEditor(api: MonacoApi, container: HTMLElement): void {
     })
   }
 
-  if (props.sessionId) {
-    const viewState = editorHistoryManager.getMonacoViewState(props.sessionId)
-    if (viewState) editor.restoreViewState(viewState)
+  if (props.session) {
+    const viewState = props.session.state.viewState.monaco as { editor?: import('monaco-editor').editor.ICodeEditorViewState } | undefined
+    if (viewState?.editor) editor.restoreViewState(viewState.editor)
   }
 
   // 监听保存快捷键 (Ctrl+S / Cmd+S)
   editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.KeyS, () => {
-    emit('save')
+    if (props.session) void props.session.save().catch(error => notifyAppError('OC-E4002', error))
+    else emit('save')
   })
 }
 
@@ -178,9 +180,9 @@ watch(() => [props.themeId, props.themeOverrides] as const, ([themeId, themeOver
 
 // 监听外部内容变化
 watch(() => props.modelValue, (newValue) => {
-  if (props.sessionId && editorHistoryManager.getMonacoModel(props.sessionId) === editor?.getModel()) return
+  if (props.session?.textModel.get() === editor?.getModel()) return
   if (editor && newValue !== editor.getValue()) {
-    editor.setValue(newValue)
+    editor.setValue(newValue ?? '')
   }
 })
 
@@ -190,11 +192,11 @@ onUnmounted(() => {
   diffModels.forEach(model => model.dispose())
   diffModels = []
   const model = editor?.getModel()
-  if (props.sessionId) editorHistoryManager.setMonacoViewState(props.sessionId, editor?.saveViewState() ?? null)
+  if (props.session && editor) props.session.updateViewState('monaco', { editor: editor.saveViewState() })
   editor?.dispose()
   editor = null
   diffEditor = null
-  if (!props.sessionId) model?.dispose()
+  if (!props.session) model?.dispose()
 })
 </script>
 

@@ -131,6 +131,7 @@ function handleImageLoad(event: Event): void {
 function handleImageError(event: Event): void {
     if (!isCurrentImageEvent(event)) return
     imageLoadState.value = 'error'
+    editorContext.resources.reportError?.(expectedImageSrc, 'Image could not be decoded')
     readinessTicket?.settle()
 }
 

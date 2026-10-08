@@ -54,11 +54,9 @@ import { useI18n } from 'vue-i18n'
 import {
   findProjectIconKeyConflicts,
   isRasterProjectIconSource,
-  PROJECT_ICON_ROTATIONS,
   PROJECT_ICON_TINTS,
   type ProjectIcon,
   type ProjectIconKeyConflict,
-  type ProjectIconRotation,
   type ProjectIconSeries,
 } from '../../features/workspace/model/projectIcons'
 import {
@@ -88,13 +86,12 @@ const props = withDefaults(defineProps<{
   resolveAssetSrc: (source: string) => string
   defaultOpenPath?: string
   projectIconCatalog?: ProjectIconCatalog
-  /** An icon-pack task owns the global progress bar; pack commands stay disabled until it settles. */
-  packBusy?: boolean
-}>(), { series: () => [], packBusy: false })
+  /** An icon import owns the global progress bar; import commands stay disabled until it settles. */
+  importBusy?: boolean
+}>(), { series: () => [], importBusy: false })
 const emit = defineEmits<{
   'update:series': [series: ProjectIconSeries[]]
   'key-conflicts': [conflicts: readonly ProjectIconKeyConflict[]]
-  'export-pack': [series: ProjectIconSeries]
   /** Asks the owner to confirm and stage the removal; the workbench never drops a set on its own. */
   'remove-series': [seriesKey: string]
   /** Asks the owner to copy new icons into an existing set. */
@@ -163,7 +160,6 @@ const iconPropertyInputs = computed<PropertyEditorInput[]>(() => {
       name: icon.name,
       tint: icon.tint,
       pixelated: String(icon.pixelated ?? false),
-      rotation: `${icon.rotation ?? 0}°`,
     },
     fields: {
       iconKey: { title: t('projectConfig.icons.referenceName'), fieldType: 'string', category: 'identity', order: 1, required: true, commitMode: 'blur' },
@@ -172,7 +168,7 @@ const iconPropertyInputs = computed<PropertyEditorInput[]>(() => {
         title: t('projectConfig.icons.tint'), fieldType: 'string', category: 'appearance', order: 1,
         options: [...PROJECT_ICON_TINTS],
         optionLabels: {
-          theme: t('projectConfig.icons.tintTheme'),
+          context: t('projectConfig.icons.tintContext'),
           original: t('projectConfig.icons.tintOriginal'),
         },
         presentation: 'select',
@@ -181,10 +177,6 @@ const iconPropertyInputs = computed<PropertyEditorInput[]>(() => {
       ...(isRasterProjectIconSource(icon.source)
         ? { pixelated: { title: t('projectConfig.icons.pixelated'), fieldType: 'boolean' as const, category: 'appearance', order: 2 } }
         : {}),
-      rotation: {
-        title: t('projectConfig.icons.rotation'), fieldType: 'string', category: 'appearance', order: 3,
-        options: PROJECT_ICON_ROTATIONS.map(value => `${value}°`), presentation: 'select',
-      },
     },
   }]
 })
@@ -202,13 +194,9 @@ function seriesActions(): OcNodeAction[] {
   return [
     {
       key: 'add-icons', title: t('projectConfig.icons.addIcons'), icon: 'action.add',
-      disabled: Boolean(props.packBusy),
+      disabled: Boolean(props.importBusy),
     },
     { key: 'configure', title: t('projectConfig.icons.configureIconSet'), icon: 'tool.settings' },
-    {
-      key: 'export-pack', title: t('projectConfig.icons.exportPack'), icon: 'action.export',
-      disabled: Boolean(props.packBusy),
-    },
     {
       key: 'remove', title: t('projectConfig.icons.removeSeries'), icon: 'action.delete', iconTone: 'danger',
     },
@@ -271,7 +259,6 @@ function handleSeriesAction(event: OcNodeActionEvent): void {
   if (index < 0) return
   if (event.actionKey === 'add-icons') emit('add-icons', event.key)
   else if (event.actionKey === 'configure') openSettingsDialog(index)
-  else if (event.actionKey === 'export-pack') exportIconPack(index)
   else if (event.actionKey === 'remove') removeSeries(index)
 }
 function setSelectedIconIndexes(indexes: number[]): void {
@@ -298,19 +285,10 @@ function updateIconProperty(mutation: PropertyEditorMutation): void {
   if (mutation.fieldKey === 'iconKey') updateIcon(index, { iconKey: String(mutation.value) })
   else if (mutation.fieldKey === 'name') updateIcon(index, { name: String(mutation.value) })
   else if (mutation.fieldKey === 'tint') {
-    updateIcon(index, { tint: mutation.value === 'original' ? 'original' : 'theme' })
+    updateIcon(index, { tint: mutation.value === 'original' ? 'original' : 'context' })
   } else if (mutation.fieldKey === 'pixelated') {
     updateIcon(index, { pixelated: mutation.value === true || mutation.value === 'true' })
-  } else if (mutation.fieldKey === 'rotation') {
-    const value = Number(String(mutation.value).replace('°', ''))
-    if ((PROJECT_ICON_ROTATIONS as readonly number[]).includes(value)) {
-      updateIcon(index, { rotation: value as ProjectIconRotation })
-    }
   }
-}
-function exportIconPack(index: number): void {
-  const candidate = props.series[index]
-  if (candidate) emit('export-pack', candidate)
 }
 function openSettingsDialog(index: number): void {
   if (props.series[index]) settingsSeriesIndex.value = index

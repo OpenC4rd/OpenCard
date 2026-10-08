@@ -1,3 +1,4 @@
+import { createTestSession } from '../../features/editor-runtime/editorTestSession'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectIconRegistryFileEditor from './ProjectIconRegistryFileEditor.vue'
@@ -11,32 +12,15 @@ const mocks = vi.hoisted(() => ({
   fileExists: vi.fn(),
   createDirectory: vi.fn(),
   readDirectory: vi.fn(),
-  readProjectIconPack: vi.fn(),
   inspectProjectIconFile: vi.fn(),
-  recordContent: vi.fn(),
 }))
 
 const notificationMocks = vi.hoisted(() => ({ notifyAppError: vi.fn(), notifySuccess: vi.fn() }))
-const TASK_KEY = 'project-icon-pack'
+const TASK_KEY = 'project-icon-import'
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('./MonacoEditor.vue', () => ({ default: { template: '<div class="monaco-stub" />' } }))
 vi.mock('../../features/notifications/titlebarNotices', () => notificationMocks)
-vi.mock('../../features/editor-runtime/history/editorHistoryManager', () => ({
-  editorHistoryManager: { recordContent: mocks.recordContent },
-}))
-vi.mock('../../features/workspace/services/projectIconCatalog', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
-  return { ...actual, buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [] })) }
-})
-vi.mock('../../features/workspace/services/projectIconFileFacts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconFileFacts')>()
-  return { ...actual, inspectProjectIconFile: mocks.inspectProjectIconFile }
-})
-vi.mock('../../features/workspace/services/projectIconPack', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconPack')>()
-  return { ...actual, readProjectIconPack: mocks.readProjectIconPack }
-})
 vi.mock('../../features/workspace/services/fileSystemService', () => ({
   fileSystemService: {
     readBinaryFile: mocks.readBinaryFile,
@@ -46,6 +30,14 @@ vi.mock('../../features/workspace/services/fileSystemService', () => ({
     readDirectory: mocks.readDirectory,
   },
 }))
+vi.mock('../../features/workspace/services/projectIconCatalog', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
+  return { ...actual, buildProjectIconCatalog: vi.fn(() => ({ series: [], entries: [] })) }
+})
+vi.mock('../../features/workspace/services/projectIconFileFacts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconFileFacts')>()
+  return { ...actual, inspectProjectIconFile: mocks.inspectProjectIconFile }
+})
 vi.mock('../../features/workspace/store/projectStore', () => ({
   useProjectStore: () => ({
     projectPath: { value: 'D:/Demo' },
@@ -60,13 +52,13 @@ const progress = useShellProgressTasks()
 
 function mountEditor() {
   return mount(ProjectIconRegistryFileEditor, {
-    props: { filePath: 'D:/Demo/.opencard/icons/icons.json', modelValue: '{}' },
+    props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: '{}' }),  },
   })
 }
 
 function lastRegistry(wrapper: ReturnType<typeof mountEditor>) {
-  const updates = wrapper.emitted('update:modelValue') ?? []
-  return JSON.parse(updates[updates.length - 1]?.[0] as string)
+  const updates = wrapper.props('session').state.draftContent
+  return JSON.parse(updates as string)
 }
 
 describe('ProjectIconRegistryFileEditor icon registration', () => {
@@ -77,7 +69,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     mocks.readDirectory.mockResolvedValue([])
     mocks.readBinaryFile.mockResolvedValue(new Uint8Array([1, 2, 3]))
     mocks.inspectProjectIconFile.mockImplementation(async (source: string) => (
-      /\.png$/i.test(source) ? { tint: 'original', pixelated: true } : { tint: 'theme' }
+      /\.png$/i.test(source) ? { tint: 'original', pixelated: true } : { tint: 'context' }
     ))
   })
 
@@ -145,7 +137,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
         name: 'Outline icons',
         key: 'outline',
         icons: [
-          { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' },
+          { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' },
           { iconKey: 'coin', name: 'Coin', source: '.opencard/icons/outline/coin.png', tint: 'original', pixelated: true },
         ],
       }],
@@ -162,7 +154,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     })
     mocks.inspectProjectIconFile.mockImplementation(async (source: string) => {
       order.push(`probe:${source}`)
-      return { tint: 'theme' }
+      return { tint: 'context' }
     })
     mocks.writeBinaryFile.mockImplementation(async (path: string) => {
       order.push(`write:${path}`)
@@ -212,7 +204,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     await flushPromises()
 
     expect(mocks.writeBinaryFile).not.toHaveBeenCalled()
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.props('session').state.isDirty).toBe(false)
     expect(notificationMocks.notifyAppError).toHaveBeenCalledWith('OC-E3011', expect.any(Error))
   })
 
@@ -243,7 +235,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     })
     await flushPromises()
 
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.props('session').state.isDirty).toBe(false)
     expect(notificationMocks.notifyAppError).toHaveBeenCalledWith('OC-E3011', expect.any(Error))
     expect(notificationMocks.notifySuccess).not.toHaveBeenCalled()
     expect(progress.tasks.value.some(task => task.key === TASK_KEY)).toBe(false)
@@ -283,15 +275,12 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     // The set's Key and its folder name need not agree: it may have been renamed, or its folder may
     // carry a suffix from an earlier set. Adding must follow the files, not rebuild the folder name.
     const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: {
-        filePath: 'D:/Demo/.opencard/icons/icons.json',
-        modelValue: JSON.stringify({
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({
           iconSeries: [{
             name: 'Outline', key: 'outline',
-            icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline-2/warn.svg', tint: 'theme' }],
+            icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline-2/warn.svg', tint: 'context' }],
           }],
-        }),
-      },
+        }) }),  },
     })
 
     wrapper.getComponent(ProjectIconRegistryWorkbench).vm.$emit('add-icons', 'outline')
@@ -312,59 +301,6 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     expect(notificationMocks.notifySuccess).toHaveBeenCalledWith('projectConfig.icons.iconsAdded')
   })
 
-  it('unpacks an imported icon pack into a folder named after the set', async () => {
-    mocks.readProjectIconPack.mockResolvedValue({
-      manifest: {
-        name: 'Outline', key: 'outline',
-        icons: [
-          { iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'theme' },
-          { iconKey: 'coin', name: 'Coin', source: 'icons/coin.png', tint: 'original' },
-        ],
-      },
-      iconSources: new Map([
-        ['icons/warn.svg', new Uint8Array([1])],
-        ['icons/coin.png', new Uint8Array([2])],
-      ]),
-    })
-    const wrapper = mountEditor()
-
-    await (wrapper.vm as unknown as {
-      importIconPack(request: { packPath: string; name: string; key: string }): Promise<void>
-    }).importIconPack({ packPath: 'D:/Packs/outline.ociconpack', name: 'Outline', key: 'outline' })
-    await flushPromises()
-
-    expect(mocks.writeBinaryFile.mock.calls.map(call => call[0])).toEqual([
-      'D:/Demo/.opencard/icons/outline/warn.svg',
-      'D:/Demo/.opencard/icons/outline/coin.png',
-    ])
-    // A pack already declares each icon's tint, so no file inspection is needed.
-    expect(mocks.inspectProjectIconFile).not.toHaveBeenCalled()
-    expect(lastRegistry(wrapper)).toEqual({
-      iconSeries: [{
-        name: 'Outline',
-        key: 'outline',
-        icons: [
-          { iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' },
-          { iconKey: 'coin', name: 'Coin', source: '.opencard/icons/outline/coin.png', tint: 'original' },
-        ],
-      }],
-    })
-    expect(notificationMocks.notifySuccess).toHaveBeenCalledWith('projectConfig.icons.packImported')
-  })
-
-  it('reports an unreadable pack as an instant message', async () => {
-    mocks.readProjectIconPack.mockRejectedValue(new Error('bad archive'))
-    const wrapper = mountEditor()
-
-    await (wrapper.vm as unknown as {
-      importIconPack(request: { packPath: string; name: string; key: string }): Promise<void>
-    }).importIconPack({ packPath: 'D:/Packs/broken.ociconpack', name: 'Broken', key: 'broken' })
-    await flushPromises()
-
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(notificationMocks.notifyAppError).toHaveBeenCalledWith('OC-E3013', expect.any(Error))
-  })
-
   it('still delivers the new set when the editor is rebuilt mid-copy', async () => {
     // The shell rebuilds this editor whenever the active file changes, and a vnode listener is not
     // invoked once the emitting component unmounts. The result must therefore reach the session by id,
@@ -374,9 +310,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
       release = () => resolve(new Uint8Array([1]))
     }))
     const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: {
-        filePath: 'D:/Demo/.opencard/icons/icons.json', modelValue: '{}', sessionId: 'session-1',
-      },
+      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: '{}', id: 'session-1' }) },
     })
 
     wrapper.getComponent(ProjectIconRegistrationDialog).vm.$emit('submit', {
@@ -389,16 +323,10 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     release()
     await flushPromises()
 
-    expect(mocks.recordContent).toHaveBeenCalledWith(
-      'session-1',
-      expect.any(String),
-      undefined,
-    )
-    const [sessionId, content] = mocks.recordContent.mock.calls[0]!
-    expect(sessionId).toBe('session-1')
+    const content = wrapper.props('session').state.draftContent
     expect(JSON.parse(content as string).iconSeries).toEqual([{
       name: 'Outline icons', key: 'outline',
-      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'theme' }],
+      icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }],
     }])
   })
 
@@ -410,8 +338,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     })
     await flushPromises()
 
-    // A live editor goes through the host, which also drives auto-save for registry files.
-    expect(wrapper.emitted('update:modelValue')).toBeTruthy()
-    expect(mocks.recordContent).not.toHaveBeenCalled()
+    // A live editor updates its own session directly.
+    expect(wrapper.props('session').state.isDirty).toBe(true)
   })
 })

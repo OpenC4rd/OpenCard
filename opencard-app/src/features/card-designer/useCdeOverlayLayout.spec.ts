@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import type { CardDesignerLayoutState } from '../editor-runtime/model/editorUiState'
+import type { CardDesignerLayoutState } from './cardDesigner.types'
 import { CDE_OVERLAY_GEOMETRY_CONFIG } from './cdeOverlayConfig'
 import { useCdeOverlayLayout } from './useCdeOverlayLayout'
 

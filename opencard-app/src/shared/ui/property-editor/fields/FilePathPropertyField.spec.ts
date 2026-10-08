@@ -11,6 +11,26 @@ vi.mock('vue-i18n', () => ({
 }))
 
 describe('FilePathPropertyField', () => {
+  it('offers parent navigation for a deleted directory but still reports real read failures', async () => {
+    const error = new Error('read directory failed')
+    const fs = { readDirectoryEntries: vi.fn(async () => { throw error }), fileExists: vi.fn(async () => false) }
+    const provider = createResourceDirectoryProvider('/project', {
+      kind: 'project', namespace: 'project', rootPath: '/project',
+      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+    }, fs)
+    const wrapper = mount(FilePathPropertyField, {
+      props: { definition: { title: 'Image', fieldType: 'filePath', directoryProvider: provider }, value: 'Assets/deleted.png' },
+    })
+    try {
+      await wrapper.get('input').trigger('focus')
+      await flushPromises()
+      expect(fs.fileExists).toHaveBeenCalledWith('/project/Assets')
+      expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([expect.objectContaining({ label: '..', insertText: '' })])
+      expect(wrapper.props('value')).toBe('Assets/deleted.png')
+      fs.fileExists.mockResolvedValue(true)
+      await expect(provider('Assets')).rejects.toBe(error)
+    } finally { wrapper.unmount() }
+  })
   it('browses a package from its title, selects a file, and returns from the package root', async () => {
     const readDirectoryEntries = vi.fn(async (path: string) => path === '/project'
       ? [] : [{ name: 'image.png', isDirectory: false, isFile: true, isSymlink: false }])
@@ -28,7 +48,7 @@ describe('FilePathPropertyField', () => {
         fingerprint: 'fp-theme',
         rootPath: '/cache/snapshots/aa11', cover: null,
       }]]),
-    }, { readDirectoryEntries })
+    }, { readDirectoryEntries, fileExists: async () => true })
     const wrapper = mount(FilePathPropertyField, {
       props: { definition: { title: 'Image', fieldType: 'filePath', directoryProvider: provider }, value: '',
         'onUpdate:value': (value: string) => { void wrapper.setProps({ value }) },
@@ -72,8 +92,9 @@ describe('FilePathPropertyField', () => {
       kind: 'project' as const, namespace: 'project', rootPath: '/project',
       fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
-    const hidden = createResourceDirectoryProvider('/project', environment, { readDirectoryEntries }, { hideDotFiles: true })
-    const visible = createResourceDirectoryProvider('/project', environment, { readDirectoryEntries }, { hideDotFiles: false })
+    const fs = { readDirectoryEntries, fileExists: async () => true }
+    const hidden = createResourceDirectoryProvider('/project', environment, fs, { hideDotFiles: true })
+    const visible = createResourceDirectoryProvider('/project', environment, fs, { hideDotFiles: false })
 
     expect((await hidden('')).map(entry => entry.name)).toEqual(['assets', 'icon:'])
     expect((await visible('')).map(entry => entry.name)).toEqual(['.opencard', '.git', 'assets', 'icon:'])

@@ -1,4 +1,4 @@
-import { computed, onUnmounted } from 'vue'
+import { computed, onBeforeUnmount, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SpacePage } from '../spacePage'
 import type { ShellPage } from '../shellLocation'
@@ -31,7 +31,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   const application = useApplicationActions({
     workbench: () => workbench, createProject: () => creation, exportTemplate: () => templateExport, services,
   })
-  const settings = createSettingsPage()
+  const settings = createSettingsPage(() => workbench.cancelExportsAndWait())
   async function completeApplicationClose(action: ApplicationCloseAction): Promise<void> {
     if (action === 'install-update') {
       if (services.availableUpdate.value) await services.installDownloadedUpdate()
@@ -77,7 +77,7 @@ export function initializeAppPages(destroyWindow: () => Promise<void>) {
   if (appPages) return appPages
   const instance = createAppPages(destroyWindow)
   appPages = instance
-  onUnmounted(() => { if (appPages === instance) appPages = undefined })
+  onBeforeUnmount(() => { if (appPages === instance) appPages = undefined })
   return instance
 }
 

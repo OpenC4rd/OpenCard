@@ -28,6 +28,7 @@ export type CdeViewportPort = {
 type UseCdeViewportControllerOptions = {
   faceSize: Readonly<Ref<{ width: number; height: number } | null>>
   viewportPort: Readonly<Ref<CdeViewportPort | null>>
+  initialTransform?: Readonly<Ref<EditorViewportTransform | undefined>>
   commitTransform: (transform: EditorViewportTransform) => void
 }
 
@@ -46,14 +47,14 @@ const TRANSFORM_PREVIEW_VISIBILITY_COVERAGE = 0.7
 export function useCdeViewportController(options: UseCdeViewportControllerOptions) {
   const transformPreviewHostRef = ref<HTMLElement | null>(null)
   const transformPreviewViewportRef = ref<HTMLElement | null>(null)
-  const viewportTransform = ref<EditorViewportTransform>({ ...DEFAULT_VIEWPORT_TRANSFORM })
+  const viewportTransform = ref<EditorViewportTransform>({ ...(options.initialTransform?.value ?? DEFAULT_VIEWPORT_TRANSFORM) })
   const viewportSize = ref({ width: 0, height: 0 })
   const transformPreviewHostSize = ref({
     width: TRANSFORM_PREVIEW_MAX_SIDE,
     height: TRANSFORM_PREVIEW_MAX_SIDE,
   })
   const previewDragState = ref<PreviewDragState | null>(null)
-  let initialFitPending = true
+  let initialFitPending = !options.initialTransform?.value
   let initialFitRequested = false
   let transformPreviewSizeObserver: ResizeObserver | null = null
 
@@ -212,10 +213,10 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
   }
 
   function prepareForFileChange(): void {
-    initialFitPending = true
+    initialFitPending = !options.initialTransform?.value
     initialFitRequested = false
     previewDragState.value = null
-    viewportTransform.value = { ...DEFAULT_VIEWPORT_TRANSFORM }
+    viewportTransform.value = { ...(options.initialTransform?.value ?? DEFAULT_VIEWPORT_TRANSFORM) }
   }
 
   function completeFileLoad(): void {

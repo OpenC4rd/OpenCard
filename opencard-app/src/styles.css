@@ -268,7 +268,7 @@ body {
   mask-position: var(--oc-project-icon-mask-position);
   image-rendering: var(--oc-project-icon-image-rendering);
   pointer-events: none;
-  transform: translate(-50%, -50%) var(--oc-project-icon-transform);
+  transform: translate(-50%, -50%);
   transform-origin: center;
 }
 

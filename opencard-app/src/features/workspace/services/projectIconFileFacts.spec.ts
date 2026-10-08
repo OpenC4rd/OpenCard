@@ -17,14 +17,14 @@ function stubImageSize(width: number, height: number): void {
 
 describe('detectProjectIconTint', () => {
   it('tints vector files that paint through the surrounding color', () => {
-    expect(detectProjectIconTint('icons/warn.svg', '<svg><path stroke="currentColor" fill="none"/></svg>')).toBe('theme')
-    expect(detectProjectIconTint('icons/warn.svg', '<svg><path style="stroke: currentColor"/></svg>')).toBe('theme')
+    expect(detectProjectIconTint('icons/warn.svg', '<svg><path stroke="currentColor" fill="none"/></svg>')).toBe('context')
+    expect(detectProjectIconTint('icons/warn.svg', '<svg><path style="stroke: currentColor"/></svg>')).toBe('context')
   })
 
   it('tints single-color vector files and ignores non-color paints', () => {
-    expect(detectProjectIconTint('icons/warn.svg', '<svg><path fill="#000000"/></svg>')).toBe('theme')
-    expect(detectProjectIconTint('icons/warn.svg', '<svg><path/></svg>')).toBe('theme')
-    expect(detectProjectIconTint('icons/warn.svg', '<svg><style>.a{fill:#fff;stroke:none}</style><path class="a"/></svg>')).toBe('theme')
+    expect(detectProjectIconTint('icons/warn.svg', '<svg><path fill="#000000"/></svg>')).toBe('context')
+    expect(detectProjectIconTint('icons/warn.svg', '<svg><path/></svg>')).toBe('context')
+    expect(detectProjectIconTint('icons/warn.svg', '<svg><style>.a{fill:#fff;stroke:none}</style><path class="a"/></svg>')).toBe('context')
   })
 
   it('keeps multi-color and raster-bearing vector files in their original palette', () => {
@@ -50,7 +50,7 @@ describe('inspectProjectIconFile', () => {
     stubImageSize(16, 16)
     const createObjectURL = vi.spyOn(URL, 'createObjectURL')
     await expect(inspectProjectIconFile('a.svg', bytes('<svg><path fill="#0f0"/></svg>')))
-      .resolves.toEqual({ tint: 'theme' })
+      .resolves.toEqual({ tint: 'context' })
     // A vector never needs nearest-neighbour scaling, so it must not decode an image at all.
     expect(createObjectURL).not.toHaveBeenCalled()
   })

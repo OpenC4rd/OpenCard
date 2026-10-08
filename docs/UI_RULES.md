@@ -362,7 +362,7 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 - 提示只在提供额外信息时存在：控件有常驻可见文字时不得用 tooltip 重复该文字；文字只在收起态或图标态出现时，tooltip 必须跟随该状态条件渲染。
 - 能完整显示的文本不得挂 tooltip；只有可能被截断的文本才使用 `data-tooltip-overflow`（`OcText` 的 `tooltip-on-overflow`、`OcOverflowText` 已封装该行为）。
 - 仅图标控件必须提供 `aria-label`；tooltip 只在能补充解释时添加（步进箭头、加减号这类含义自明的控件不必重复提示），添加时与 `aria-label` 使用同一文案。
-- 带子菜单的 action 不挂 tooltip：它悬停即展开菜单，提示只会盖住自己的菜单。
+- 顶层 action 的子菜单通过点击或聚焦展开，菜单关闭时悬停显示标题提示；菜单展开后停止提供触发按钮的提示。嵌套子菜单保留悬停展开。
 - `scripts/lint-controls.mjs` 守卫方向枚举取值与“仅图标控件必须声明 `aria-label`”两条规则。
 
 **同级连续查看（tooltip group）**：`data-tooltip-group` 标出一个交互区域，区域内相邻控件的提示共用同一个“热窗口”：

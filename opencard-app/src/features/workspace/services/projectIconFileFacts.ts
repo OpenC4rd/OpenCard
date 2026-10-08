@@ -19,14 +19,14 @@ export type ProjectIconFileFacts = {
  * Classifies an imported icon so a set starts from a usable tint instead of a fixed guess.
  *
  * A raster source keeps its own pixels: an artist already chose those colors, and masking a bitmap to
- * one color would discard the art. A vector source is theme-tintable when it paints through
+ * one color would discard the art. A vector source is context-tintable when it paints through
  * `currentColor`, embeds no raster, and uses at most one color: that single color is exactly what the
- * surrounding theme replaces. Two or more distinct colors, an embedded image, or a foreign-object
+ * surrounding context replaces. Two or more distinct colors, an embedded image, or a foreign-object
  * subtree mean the file carries its own palette, so it keeps its original colors.
  */
 export function detectProjectIconTint(source: string, markup: string): ProjectIconTint {
   if (!projectIconVectorSourcePattern.test(source)) return 'original'
-  if (/currentcolor/i.test(markup)) return 'theme'
+  if (/currentcolor/i.test(markup)) return 'context'
   if (/<(?:image|foreignObject)\b/i.test(markup)) return 'original'
 
   const colors = new Set<string>()
@@ -36,7 +36,7 @@ export function detectProjectIconTint(source: string, markup: string): ProjectIc
     colors.add(color)
     if (colors.size > 1) return 'original'
   }
-  return 'theme'
+  return 'context'
 }
 
 /**

@@ -1,3 +1,5 @@
+import { projectResourceScopeIdentity, type ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
+import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import { describe, expect, it } from 'vitest'
 import {
   createCustomBlock,
@@ -64,4 +66,17 @@ describe('customBlockRuntime', () => {
     expect(limited).toBeDefined()
     expect([...result.descriptors.values()].some((descriptor) => descriptor.state === 'source-unavailable')).toBe(false)
   })
+})
+
+it('keeps template defaults in their source scope and public overrides in the caller scope', () => {
+  const scope = (namespace: string): ProjectResourceEnvironment => ({ kind: 'project', namespace, rootPath: `/${namespace}`, fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG })
+  const host = scope('host'), pkg = scope('package')
+  const template = source(createSimpleContainerBlock({ id: 'root', background: '#fff', children: [
+    { block: createTextBlock({ id: 'title', content: '<p>text</p>', fontFamily: 'font:body' }), location: location('title') },
+  ] }), { background: { fieldType: 'color' } })
+  const result = materializeCustomBlocks(documentWith(createCustomBlock({ id: 'panel', source: 'panel.ocblock', background: '#def' } as never)), {
+    catalog: { scopes: new Map([['host', host], ['package', pkg]]), resolve: () => ({ ...template, scope: 'package' }) },
+  }, 'host')
+  expect(result.resourceScopes.get(projectResourceScopeIdentity('panel', 'background'))).toBe(host)
+  expect(result.resourceScopes.get(projectResourceScopeIdentity('panel/title', '*'))).toBe(pkg)
 })

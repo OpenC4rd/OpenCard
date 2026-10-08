@@ -2,7 +2,6 @@ import type { CardBlock, CardDocument, CardFaceKey, CardInstanceRecord } from '.
 import { visitCardBlockTree } from '../../entities/card/tree'
 import { parseRichTextHtml, type RichTextDocument } from '../../shared/rich-text/richTextHtml'
 import type { ProjectInformation } from '../workspace/model/projectMetadata'
-import type { ProjectResourceEnvironment, ProjectResourceScopeMap } from '../workspace/services/projectResourceEnvironment'
 import { createCardPipelineIssue, type CardPipelineIssue } from './cardPipelineIssue'
 import type { RenderReadyCardBlock } from './render.types'
 
@@ -64,9 +63,7 @@ export function prepareRichText(options: {
   currentCard?: CardInstanceRecord | null
   project?: Readonly<ProjectInformation> | null
   dictionary?: Readonly<Record<string, string>> | null
-  hostEnvironment?: ProjectResourceEnvironment
-  resourceScopes?: ProjectResourceScopeMap
-}): { catalog: PreparedRichTextCatalog, issues: CardPipelineIssue[], rootParseCount: number, nestedParseCount: number, batchCount: number } {
+}): { catalog: PreparedRichTextCatalog, issues: CardPipelineIssue[], rootParseCount: number } {
   const prepared = new Map<string, PreparedRichText>()
   const issues: CardPipelineIssue[] = []
   let rootParseCount = 0
@@ -88,5 +85,5 @@ export function prepareRichText(options: {
     })
   }
 
-  return { catalog: prepared, issues, rootParseCount, nestedParseCount: 0, batchCount: 0 }
+  return { catalog: prepared, issues, rootParseCount }
 }
