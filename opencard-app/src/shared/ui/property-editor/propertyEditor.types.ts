@@ -115,6 +115,8 @@ type PropertyEditorFieldBase = {
   required?: boolean
   isHidden?: boolean
   isReadonly?: boolean
+  /** Whether this field may switch to the raw string editor; omitted inherits PropertyEditor. */
+  allowRawStringEditor?: boolean
   commitMode?: 'input' | 'blur'
   resettable?: boolean
   deletable?: boolean
@@ -129,6 +131,9 @@ type PropertyEditorFieldBase = {
     fontFamily?: string
     fontSize?: string
   }
+  richTextImageDirectoryProvider?: FilePathDirectoryProvider
+  richTextImageCompletionProvider?: PropertyCompletionProvider
+  richTextImageResolver?: (reference: string) => string | null
   binding?: {
     provider?: PropertyCompletionProvider
   }

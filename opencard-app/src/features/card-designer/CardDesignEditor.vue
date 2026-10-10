@@ -200,6 +200,7 @@
                 <PropertyEditor v-else ref="propertyEditorRef"
                   :inputs="editorState.mode === 'diff' ? diffPropertyInputs : propertyEditorInputs"
                   :categories="propertyCategories" :sort-mode="propertySortMode"
+                  :allow-raw-string-editor="true"
                   :binding-interpreter="propertyBindingInterpreter" :delete-mode="propertyDeleteMode"
                   :field-warnings="propertyFieldWarnings" @update-property="updateBlockProp"
                   @add-property="addBlockProp" @reset-property="resetBlockProp" @delete-property="deleteProperty" />

@@ -150,7 +150,7 @@ export function enrichCardPropertyFieldDefinition(options: {
     }),
   ]
   // Rich text stores the `[[...]]` token; an image source stores the bare reference.
-  const iconProvider = (options.fieldKey === 'content' || (options.fieldKey === 'source' && options.definition.fieldType === 'filePath'))
+  const iconProvider = (options.fieldKey === 'content' || options.fieldKey === 'source' || options.fieldKey === 'maskSource')
     ? createProjectIconCompletionProvider(iconSources, {
       mode: options.fieldKey === 'content' ? 'rich-text' : 'reference',
     })
@@ -180,15 +180,30 @@ export function enrichCardPropertyFieldDefinition(options: {
           : {}),
       }
     : undefined
+  const richTextImageCompletionProvider = options.definition.fieldType === 'string' && options.definition.richText
+    ? createProjectIconCompletionProvider(iconSources, { mode: 'reference' })
+    : undefined
+  const richTextImageResolver = options.definition.fieldType === 'string' && options.definition.richText
+    ? (reference: string) => {
+        const result = options.resourceEnvironment?.asset?.(reference)
+        return result?.status === 'ready' ? result.src ?? null : null
+      }
+    : undefined
+  const richTextImageDirectoryProvider = options.definition.fieldType === 'string' && options.definition.richText
+    ? options.directoryProvider
+    : undefined
   const directoryProvider = options.definition.fieldType === 'filePath'
     ? options.directoryProvider
     : undefined
 
-  if (!provider && !fontOptions && !richTextBaseStyle) return options.definition
+  if (!provider && !fontOptions && !richTextBaseStyle && !richTextImageDirectoryProvider && !richTextImageCompletionProvider && !richTextImageResolver) return options.definition
   return {
     ...options.definition,
     ...(fontOptions ? { fontOptions } : {}),
     ...(richTextBaseStyle ? { richTextBaseStyle } : {}),
+    ...(richTextImageDirectoryProvider ? { richTextImageDirectoryProvider } : {}),
+    ...(richTextImageCompletionProvider ? { richTextImageCompletionProvider } : {}),
+    ...(richTextImageResolver ? { richTextImageResolver } : {}),
     ...(directoryProvider ? { directoryProvider } : {}),
     ...(bindingProvider || iconProvider ? { autoPairs: [
       ...(bindingProvider ? [{ open: '{{', close: '}}' }] : []),

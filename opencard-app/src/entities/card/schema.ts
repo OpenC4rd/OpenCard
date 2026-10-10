@@ -331,6 +331,10 @@ export const propertyEditorCategoryDefinitions: Record<PropertyEditorCategoryId,
 const textWritingModeOptions = ['horizontal-tb', 'vertical-rl', 'vertical-lr'] as const
 const textFontWeightOptions = ['light', 'normal', 'bold'] as const
 const imageFitOptions = ['cover', 'contain', 'fill'] as const
+const imageSourceField: EditorPropertyDefinition = {
+    fieldType: 'filePath', allowRemote: true, minLength: 0, categoryId: 'content',
+    filter: { target: 'file', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] },
+}
 const qrErrorCorrectionOptions = ['L', 'M', 'Q', 'H'] as const
 const shapeOptions = ['rectangle', 'ellipse', 'line', 'triangle', 'diamond'] as const
 const shapeStrokeStyleOptions = ['solid', 'dashed', 'dotted'] as const
@@ -411,17 +415,10 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
     'markdown-text-block': createTextContentBlockPropertyEditorSchema(false),
     'image-block': {
         ...createBaseBlockPropertyEditorSchema(),
-        source: {
-            fieldType: 'filePath',
-            allowRemote: true,
-            minLength: 0,
-            categoryId: 'content',
-            filter: {
-                target: 'file',
-                extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'],
-            },
-        },
+        source: imageSourceField,
+        maskSource: { ...imageSourceField, required: false },
         fit: { fieldType: 'string', required: true, options: imageFitOptions, categoryId: 'content' },
+        maskFit: { fieldType: 'string', options: imageFitOptions, categoryId: 'content' },
     },
     'qrcode-block': {
         ...createBaseBlockPropertyEditorSchema(),
@@ -546,6 +543,8 @@ const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
         ...BASE_BLOCK_DEFAULTS,
         type: 'image-block',
         source: '',
+        maskSource: '',
+        maskFit: 'contain',
         fit: 'cover',
     },
     'qrcode-block': {

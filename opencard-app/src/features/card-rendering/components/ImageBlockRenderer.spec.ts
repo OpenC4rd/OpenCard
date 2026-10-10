@@ -19,13 +19,46 @@ vi.mock('../../workspace/store/projectStore', () => ({
   useProjectStore: () => ({ resolveAssetSrc: (path: string) => path }),
 }))
 
-function createBlock(source: string, fit: 'cover' | 'contain' | 'fill' = 'contain'): RenderReadyImageBlock {
+function createBlock(source: string, fit: 'cover' | 'contain' | 'fill' = 'contain', maskSource = '', maskFit: 'cover' | 'contain' | 'fill' = 'contain'): RenderReadyImageBlock {
   return parseRenderReadyBlockForTest(createImageBlock({
-    id: 'image-block-test', name: 'Test image', source, fit,
+    id: 'image-block-test', name: 'Test image', source, maskSource, maskFit, fit,
   }))
 }
 
 describe('ImageBlockRenderer', () => {
+  it('applies an alpha mask from an image or icon resource', async () => {
+    const resources = createRendererTestResources()
+    const resolve = vi.fn(({ value }: { value: string }) => value === 'mask.svg'
+      ? { kind: 'url' as const, src: 'asset:///mask.svg' }
+      : { kind: 'url' as const, src: 'asset:///photo.png' })
+    const wrapper = mount(ImageBlockRenderer, {
+      props: { block: createBlock('photo.png', 'contain', 'mask.svg', 'cover'), placement: { kind: 'root' } },
+      global: { provide: { [cardEditorContextKey as symbol]: {
+        transformDisabledBlockIds: computed(() => new Set<string>()), handleBlockClick: () => undefined,
+        resources: { ...resources, resolve },
+      } } },
+    })
+    expect(wrapper.get('img').attributes('style')).toContain('mask-image: url("asset:///mask.svg")')
+    expect(wrapper.get('img').attributes('style')).toContain('mask-mode: alpha')
+    expect(wrapper.get('img').attributes('style')).toContain('mask-size: cover')
+    expect(resolve).toHaveBeenCalledWith(expect.objectContaining({ fieldKey: 'maskSource' }))
+    wrapper.unmount()
+  })
+  it('stretches the mask across the block for fill', async () => {
+    const wrapper = mount(ImageBlockRenderer, {
+      props: { block: createBlock('photo.png', 'contain', 'mask.svg', 'fill'), placement: { kind: 'root' } },
+      global: { provide: { [cardEditorContextKey as symbol]: {
+        transformDisabledBlockIds: computed(() => new Set<string>()), handleBlockClick: () => undefined,
+        resources: { ...createRendererTestResources(), resolve: ({ value }: { value: string }) => ({ kind: 'url' as const, src: `asset:///${value}` }) },
+      } } },
+    })
+    expect(wrapper.get('img').attributes('style')).toContain('mask-size: 100% 100%')
+    await wrapper.get('img').trigger('load')
+    await wrapper.setProps({ block: createBlock('photo.png') })
+    expect(wrapper.get('img').element.style.maskImage).toBe('none')
+    expect(wrapper.get('img').classes()).toContain('is-loaded')
+    wrapper.unmount()
+  })
   it('reloads local images after resource changes and shows a failure if the file was removed', async () => {
     let exists = true
     const environment = await createResourceEnvironment('D:/project', { watch: false, snapshotsRoot: 'D:/cache',

@@ -24,6 +24,9 @@
               :package-icon-sources="definition.projectIcon?.sources"
               :font-options="definition.fontOptions"
               :base-style="definition.richTextBaseStyle"
+              :image-directory-provider="definition.richTextImageDirectoryProvider"
+              :image-completion-provider="definition.richTextImageCompletionProvider"
+              :resolve-image-source="definition.richTextImageResolver"
               @update:model-value="draftValue = $event" />
             <OcFieldInput v-else ref="sourceEditor" as="textarea" variant="plain" full-width mono
               class="rich-text-string-popover__source" :value="sourceValue"

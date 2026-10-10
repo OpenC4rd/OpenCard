@@ -240,9 +240,8 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 function handleBlur(): void {
   if ((props.definition.commitMode ?? 'input') === 'blur') commitDraft()
   window.setTimeout(() => {
-    if (document.activeElement !== activeInput.value) {
-      isMenuOpen.value = false
-    }
+    completionState.value = null
+    isMenuOpen.value = false
   }, 0)
 }
 

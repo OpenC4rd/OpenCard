@@ -85,4 +85,16 @@ describe('card property field enrichment', () => {
       insertText: 'icon:status/warning',
     }))
   })
+
+  it('offers the same resource completions for image masks', async () => {
+    const definition = enrichCardPropertyFieldDefinition({
+      translate, definition: imageSourceDefinition, fieldKey: 'maskSource',
+      record: { type: 'image-block' }, fontCatalog: [],
+      projectIconCatalog: buildProjectIconCatalog(iconSeries, source => `asset://${source}`),
+    })
+    const result = await definition.completion?.provider?.({ value: 'icon:', cursor: 5 })
+    expect(result?.items).toContainEqual(expect.objectContaining({
+      label: 'Status icons', insertText: 'status/',
+    }))
+  })
 })

@@ -9,7 +9,7 @@ const allowedTags = new Set([
 const blockedTags = new Set(['IFRAME', 'OBJECT', 'SCRIPT', 'STYLE', 'TEMPLATE'])
 const allowedStyleProperties = [
   'background-color', 'color', 'font-family', 'font-size', 'text-align',
-  '-webkit-text-stroke', '-webkit-text-stroke-color', '-webkit-text-stroke-width',
+  'text-shadow', '-webkit-text-stroke', '-webkit-text-stroke-color', '-webkit-text-stroke-width',
 ] as const
 const tableStyleProperties = ['min-width', 'width'] as const
 const tableParents: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -114,6 +114,13 @@ export function parseRichTextHtml(source: string): RichTextParseResult {
     if (node.tagName === 'SPAN' && node.hasAttribute('data-oc-binding')) {
       attributes['data-oc-binding'] = node.getAttribute('data-oc-binding') ?? ''
     }
+    for (const name of [
+      'data-oc-fill-type', 'data-oc-fill-source', 'data-oc-shadow-color',
+      'data-oc-shadow-offset-x', 'data-oc-shadow-offset-y', 'data-oc-shadow-blur',
+    ]) {
+      const value = node.getAttribute(name)
+      if (value !== null) attributes[name] = value
+    }
     if (node.tagName === 'TD' || node.tagName === 'TH') {
       attributes.colspan = '1'; attributes.rowspan = '1'
     }
@@ -163,6 +170,12 @@ export function sanitizeRichTextHtml(source: string): string {
     styleValues['font-family'] = normalizeProjectFontFamilyStyle(styleValues['font-family'])
     const bindingExpression = element.tagName === 'SPAN' ? sanitizeBindingExpression(element.getAttribute('data-oc-binding')) : null
     const iconPath = element.tagName === 'SPAN' ? sanitizeIconPath(element.getAttribute('data-oc-icon-path')) : null
+    const fillType = element.tagName === 'SPAN' ? sanitizeFillType(element.getAttribute('data-oc-fill-type')) : null
+    const fillSource = fillType === 'image' ? sanitizeFillSource(element.getAttribute('data-oc-fill-source')) : null
+    const shadowColor = element.tagName === 'SPAN' ? sanitizeCssColor(element.getAttribute('data-oc-shadow-color')) : null
+    const shadowOffsetX = shadowColor ? sanitizeCssLength(element.getAttribute('data-oc-shadow-offset-x')) : null
+    const shadowOffsetY = shadowColor ? sanitizeCssLength(element.getAttribute('data-oc-shadow-offset-y')) : null
+    const shadowBlur = shadowColor ? sanitizeCssLength(element.getAttribute('data-oc-shadow-blur')) : null
     const columnWidth = element.tagName === 'COL' ? (element as HTMLElement).style.width : ''
     for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name)
     for (const property of allowedStyleProperties) {
@@ -171,6 +184,14 @@ export function sanitizeRichTextHtml(source: string): string {
     }
     if (columnWidth) (element as HTMLElement).style.width = columnWidth
     if (bindingExpression !== null) element.setAttribute('data-oc-binding', bindingExpression)
+    if (fillType) element.setAttribute('data-oc-fill-type', fillType)
+    if (fillType === 'image' && fillSource) element.setAttribute('data-oc-fill-source', fillSource)
+    if (shadowColor) {
+      element.setAttribute('data-oc-shadow-color', shadowColor)
+      element.setAttribute('data-oc-shadow-offset-x', shadowOffsetX ?? '0px')
+      element.setAttribute('data-oc-shadow-offset-y', shadowOffsetY ?? '0px')
+      element.setAttribute('data-oc-shadow-blur', shadowBlur ?? '0px')
+    }
     if (iconPath) {
       element.setAttribute('data-oc-icon-path', iconPath)
       element.replaceChildren()
@@ -196,6 +217,22 @@ function sanitizeBindingExpression(value: string | null): string | null {
 function sanitizeIconPath(value: string | null): string | null {
   const path = value?.trim() ?? ''
   return path && (parseProjectIconPath(path) || /^\{\{\s*[^{}]+?\s*\}\}$/.test(path)) ? path : null
+}
+function sanitizeFillType(value: string | null): 'none' | 'solid' | 'image' | null {
+  return value === 'none' || value === 'solid' || value === 'image' ? value : null
+}
+function sanitizeFillSource(value: string | null): string | null {
+  const source = value?.trim() ?? ''
+  return source && !/["'<>\u0000-\u001f\u007f]/.test(source)
+    && !/^(?:javascript|vbscript|data):/i.test(source) ? source : null
+}
+function sanitizeCssColor(value: string | null): string | null {
+  const color = value?.trim() ?? ''
+  return color && /^[#a-z0-9(),.%\s+-]+$/i.test(color) ? color : null
+}
+function sanitizeCssLength(value: string | null): string {
+  const length = value?.trim() ?? ''
+  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|%)$/.test(length) ? length : '0px'
 }
 export function normalizeRichTextHtml(source: string): string {
   if (source === '') return '<p></p>'

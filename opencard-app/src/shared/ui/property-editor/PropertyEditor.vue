@@ -143,14 +143,18 @@ const emit = defineEmits<{
 }>()
 
 // 组件输入协议。
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   inputs: readonly PropertyEditorInput[]
   categories?: ReadonlyMap<string, PropertyEditorCategoryDefinition>
   sortMode: PropertyEditorSortMode
   bindingInterpreter?: PropertyEditorBindingInterpreter
+  /** Global default for field raw-string switching; a field definition may override it. */
+  allowRawStringEditor?: boolean
   deleteMode?: boolean
   fieldWarnings?: ReadonlyMap<string, string>
-}>()
+}>(), {
+  allowRawStringEditor: false,
+})
 
 const { t, te } = useI18n()
 const { openContextMenu } = useFloatingMenu()
@@ -216,6 +220,7 @@ function resolveFieldEditorState(inputKey: string, entry: PropertyEditorEntry) {
     definition: entry.definition,
     value: entry.value,
     bindingInterpreter: props.bindingInterpreter,
+    allowRawStringEditor: props.allowRawStringEditor,
   })
 }
 

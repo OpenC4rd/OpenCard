@@ -8,8 +8,10 @@
     @oc-edit-binding="startEditing"
   >
     <span v-if="editing" class="binding-node__editor binding-node__expression"
-      :style="expressionStyle" @mousedown.stop>
+      @mousedown.stop>
       <span class="binding-node__brace">{{ openBrace }}</span>
+      <span class="binding-node__input-slot">
+      <span class="binding-node__measure" aria-hidden="true">{{ draftExpression || ' ' }}</span>
       <OcFieldInput
         ref="input"
         as="input"
@@ -28,6 +30,7 @@
         @keydown="handleKeydown"
         @blur="handleBlur"
       />
+      </span>
       <span class="binding-node__brace">{{ closeBrace }}</span>
     </span>
     <span
@@ -48,6 +51,8 @@
       :anchor="inputElement"
       :items="suggestions"
       :active-key="activeKey"
+      detail-layout="inline"
+      :match-anchor-width="false"
       @select="acceptSuggestionByKey"
     />
   </NodeViewWrapper>
@@ -246,23 +251,30 @@ function handleKeydown(event: KeyboardEvent): void {
 
 <style scoped>
 .binding-node {
-  display: inline-flex;
+  display: inline;
   max-width: 100%;
-  align-items: center;
-  gap: 2px;
-  margin-inline: 1px;
-  padding: 1px 2px 1px 6px;
-  border: 1px solid var(--oc-border-default);
-  border-radius: 999px;
-  background: var(--oc-bg-active);
+  margin-inline: 0;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px dotted var(--oc-border-strong);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--oc-fg-accent);
   line-height: 1.45;
   vertical-align: baseline;
-  white-space: nowrap;
 }
 
 .binding-node.is-selected {
-  border-color: var(--oc-border-strong);
-  box-shadow: var(--oc-focus-ring);
+  background: var(--oc-accent-glow);
+  outline: 1px solid var(--oc-border-strong);
+  outline-offset: 1px;
+}
+
+.binding-node.is-editing {
+  padding-inline: 0;
+  border-bottom-color: transparent;
+  background: transparent;
+  outline: none;
 }
 
 .binding-node__label {
@@ -278,8 +290,24 @@ function handleKeydown(event: KeyboardEvent): void {
 
 .binding-node__editor {
   display: inline-flex;
-  min-width: 90px;
   align-items: baseline;
+  background: transparent;
+}
+
+.binding-node__input-slot {
+  display: inline-grid;
+  min-width: 1ch;
+}
+
+.binding-node__measure,
+.binding-node__input {
+  grid-area: 1 / 1;
+  font: inherit;
+}
+
+.binding-node__measure {
+  visibility: hidden;
+  white-space: pre;
 }
 
 .binding-node__brace {
@@ -287,8 +315,11 @@ function handleKeydown(event: KeyboardEvent): void {
 }
 
 .binding-node__input {
-  width: clamp(72px, 16em, 240px);
-  min-width: 0;
+  --oc-field-content-padding: 0;
+  --oc-field-surface-border-width: 0;
+  --oc-field-control-height: 0;
+  width: 0;
+  min-width: 100%;
   border: 0;
   outline: none;
   background: transparent;

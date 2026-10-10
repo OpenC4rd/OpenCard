@@ -209,7 +209,8 @@ function handleBlur(): void {
     if (next !== stringOf(props.value)) emit('update:value', next)
   }
   window.setTimeout(() => {
-    if (document.activeElement !== activeInput.value) isMenuOpen.value = false
+    completionState.value = null
+    isMenuOpen.value = false
   }, 0)
 }
 

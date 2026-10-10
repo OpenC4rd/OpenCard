@@ -5,6 +5,7 @@ import type { ShellPage } from '../shellLocation'
 import type { ShellSpaceDefinition } from '../shell.types'
 import type { ApplicationCloseAction } from './useUnsavedSessionGuard'
 import ComingSoonPageContent from '../components/ComingSoonPageContent.vue'
+import ControlShowcasePageContent from '../components/ControlShowcasePageContent.vue'
 import { useShellNavigation } from './useShellNavigation'
 import { useApplicationServices } from './useApplicationServices'
 import { useApplicationActions } from './useApplicationActions'
@@ -52,7 +53,12 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   }
   const pages: Record<ShellPage, SpacePage> = {
     welcome: createWelcomePage(), workbench: workbench.page, settings: settings.page,
-    market: placeholder('market', 'nav.market'), test: placeholder('test', 'nav.test'),
+    market: placeholder('market', 'nav.market'),
+    test: {
+      key: 'test', navigation: { key: 'test', icon: 'nav.test', labelKey: 'app.shell.space.test' },
+      content: ControlShowcasePageContent, contentProps: computed(() => ({})), sidebar: computed(() => []),
+      header: computed(() => ({ title: t('app.shell.space.test'), titleLoading: false, icon: 'nav.test', actions: [] })),
+    },
     'create-project': creation.page, 'export-template': templateExport.page, about: createAboutPage(services),
   }
   const currentPage = computed(() => pages[navigation.page.value])

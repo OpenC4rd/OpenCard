@@ -22,6 +22,7 @@ type ResolvePropertyFieldEditorOptions = {
   definition: PropertyEditorFieldDefinition
   value: unknown
   bindingInterpreter?: PropertyEditorBindingInterpreter
+  allowRawStringEditor?: boolean
 }
 
 type PropertyFieldEditorModeLabels = {
@@ -29,8 +30,13 @@ type PropertyFieldEditorModeLabels = {
   useRawStringEditor: string
 }
 
-function supportsRawStringEditor(definition: PropertyEditorFieldDefinition): boolean {
-  return !definition.isReadonly
+function supportsRawStringEditor(
+  definition: PropertyEditorFieldDefinition,
+  allowRawStringEditor: boolean,
+): boolean {
+  const enabled = definition.allowRawStringEditor ?? allowRawStringEditor
+  return enabled
+    && !definition.isReadonly
     && !isArrayPropertyFieldType(definition.fieldType)
     && definition.fieldType !== 'object'
 }
@@ -39,7 +45,7 @@ export function usePropertyFieldEditorModes() {
   const preferences = reactive(new Map<string, PropertyFieldEditorId>())
 
   function resolve(options: ResolvePropertyFieldEditorOptions): PropertyFieldEditorState {
-    if (!supportsRawStringEditor(options.definition)) {
+    if (!supportsRawStringEditor(options.definition, options.allowRawStringEditor ?? true)) {
       return { editorId: 'field', switchTarget: null }
     }
 

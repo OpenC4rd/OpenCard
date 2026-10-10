@@ -63,6 +63,26 @@ describe('property field editor modes', () => {
       .toBeNull()
   })
 
+  it('lets the PropertyEditor default be overridden per field', () => {
+    const modes = usePropertyFieldEditorModes()
+    const field = { title: 'Value', fieldType: 'string' as const }
+
+    expect(modes.resolve({ identity: 'off', definition: field, value: 'x', allowRawStringEditor: false }).switchTarget)
+      .toBeNull()
+    expect(modes.resolve({
+      identity: 'on',
+      definition: { ...field, allowRawStringEditor: true },
+      value: 'x',
+      allowRawStringEditor: false,
+    }).switchTarget).toBe('raw-string')
+    expect(modes.resolve({
+      identity: 'field-off',
+      definition: { ...field, allowRawStringEditor: false },
+      value: 'x',
+      allowRawStringEditor: true,
+    }).switchTarget).toBeNull()
+  })
+
   it('projects stable Action Definitions and preserves source editing after value changes', () => {
     const modes = usePropertyFieldEditorModes()
     const initial = modes.resolve({ identity: 'width', definition: bindableNumber, value: 10 })

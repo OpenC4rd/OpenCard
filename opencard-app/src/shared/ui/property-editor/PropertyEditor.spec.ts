@@ -213,6 +213,7 @@ describe('PropertyEditor records protocol', () => {
     const wrapper = mount(PropertyEditor, {
       props: {
         sortMode: 'category',
+        allowRawStringEditor: true,
         inputs: [{
           key: 'block',
           record: { opacity: 1 },
@@ -260,6 +261,7 @@ describe('PropertyEditor records protocol', () => {
     const wrapper = mount(PropertyEditor, {
       props: {
         sortMode: 'category',
+        allowRawStringEditor: true,
         bindingInterpreter: {
           isExpression: (value) => typeof value === 'string' && value.startsWith('{{'),
         },
@@ -311,6 +313,7 @@ describe('PropertyEditor records protocol', () => {
     const wrapper = mount(PropertyEditor, {
       props: {
         sortMode: 'category',
+        allowRawStringEditor: true,
         bindingInterpreter: {
           isExpression: (value) => typeof value === 'string' && value.startsWith('{{'),
         },

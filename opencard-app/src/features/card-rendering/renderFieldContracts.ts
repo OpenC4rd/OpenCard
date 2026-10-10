@@ -35,6 +35,9 @@ const verticalAlignOptions = ['top', 'center', 'bottom'] as const
 const flowDirectionOptions = ['lr', 'rl', 'tb', 'bt'] as const
 const borderStyleOptions = ['solid', 'dashed', 'dotted'] as const
 const imageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] as const
+const imageSourceContract: RenderFieldContract = {
+  kind: 'file-path', defaultValue: '', extensions: imageExtensions, allowRemote: true, acceptsReferences: ['icon'],
+}
 
 function baseBlockContracts(type: string): Record<string, RenderFieldContract> {
   return {
@@ -102,14 +105,10 @@ const contractsByType: Readonly<Record<string, Readonly<Record<string, RenderFie
   'markdown-text-block': textContracts('markdown-text-block'),
   'image-block': {
     ...baseBlockContracts('image-block'),
-    source: {
-      kind: 'file-path',
-      defaultValue: '',
-      extensions: imageExtensions,
-      allowRemote: true,
-      acceptsReferences: ['icon'],
-    },
+    source: imageSourceContract,
+    maskSource: { ...imageSourceContract, required: false },
     fit: { kind: 'option', defaultValue: 'cover', required: true, options: ['cover', 'contain', 'fill'] },
+    maskFit: { kind: 'option', defaultValue: 'contain', options: ['cover', 'contain', 'fill'] },
   },
   'qrcode-block': {
     ...baseBlockContracts('qrcode-block'),

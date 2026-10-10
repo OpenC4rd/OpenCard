@@ -205,7 +205,7 @@ function handleBlur(): void {
   isFocused.value = false
   requestId += 1
   window.setTimeout(() => {
-    if (!isFocused.value) isMenuOpen.value = false
+    isMenuOpen.value = false
   }, 0)
 }
 

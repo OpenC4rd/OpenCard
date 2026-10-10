@@ -5,7 +5,10 @@
     :placement="placement"
     :max-height="maxHeight"
     :match-anchor-width="matchAnchorWidth"
-    class="oc-autocomplete-popover oc-floating-layer--surface"
+    :class="[
+      'oc-autocomplete-popover oc-floating-layer--surface',
+      { 'oc-autocomplete-popover--inline-details': detailLayout === 'inline' },
+    ]"
     role="listbox"
     :id="id"
   >
@@ -69,10 +72,12 @@ const props = withDefaults(defineProps<{
   placement?: Placement
   maxHeight?: number
   matchAnchorWidth?: boolean
+  detailLayout?: 'stacked' | 'inline'
 }>(), {
   placement: 'bottom-start',
   maxHeight: 220,
   matchAnchorWidth: true,
+  detailLayout: 'stacked',
 })
 
 const emit = defineEmits<{
@@ -124,5 +129,17 @@ watch(
   font-size: var(--oc-size-sm);
   background-repeat: no-repeat;
   vertical-align: text-bottom;
+}
+
+.oc-autocomplete-popover--inline-details :deep(.oc-row__body) {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--oc-space-3);
+}
+
+.oc-autocomplete-popover--inline-details :deep(.oc-row__subtitle) {
+  flex: 0 1 auto;
+  margin-inline-start: auto;
+  text-align: end;
 }
 </style>

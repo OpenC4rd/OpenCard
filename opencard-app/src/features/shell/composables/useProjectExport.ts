@@ -66,6 +66,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 /** Paint properties a project icon can carry; a mask icon has no background image and vice versa. */
 const PROJECT_ICON_PAINT_PROPERTIES = ['--oc-project-icon-background-image', '--oc-project-icon-mask-image'] as const
+const MASK_PROPERTIES = ['mask-image', '-webkit-mask-image'] as const
 
 /**
  * Collects every icon source the rendered DOM actually paints, which keeps export correct without
@@ -78,6 +79,9 @@ function projectIconPaintSources(root: HTMLElement): string[] {
       const source = extractCssUrl(element.style.getPropertyValue(property))
       if (source) sources.add(source)
     }
+  }
+  for (const element of root.querySelectorAll<HTMLElement>('*')) for (const property of MASK_PROPERTIES) {
+    const source = extractCssUrl(element.style.getPropertyValue(property)); if (source) sources.add(source)
   }
   return [...sources]
 }
@@ -100,6 +104,11 @@ export async function inlineProjectIconSources(root: HTMLElement): Promise<() =>
       element.style.setProperty(property, `url(${JSON.stringify(replacement)})`)
       restorations.push(() => element.style.setProperty(property, original))
     }
+  }
+  for (const element of root.querySelectorAll<HTMLElement>('*')) for (const property of MASK_PROPERTIES) {
+    const original = element.style.getPropertyValue(property); const source = extractCssUrl(original); const replacement = source ? replacements.get(source) : undefined
+    if (!replacement) continue
+    element.style.setProperty(property, `url(${JSON.stringify(replacement)})`); restorations.push(() => element.style.setProperty(property, original))
   }
   return () => restorations.forEach(restore => restore())
 }

@@ -171,4 +171,21 @@ describe('TextBlockRenderer', () => {
     expect(icon.style.getPropertyValue('--oc-project-icon-background-size')).toBe('100% 100%')
     expect(icon.style.getPropertyValue('--oc-project-icon-image-rendering')).toBe('pixelated')
   })
+
+  it('resolves a rich-text image fill through the card resource resolver', () => {
+    const block = parseRenderReadyBlockForTest({
+      id: 'image-fill-rich-text-block',
+      type: 'text-block',
+      content: '<p><span data-oc-fill-type="image" data-oc-fill-source="assets/paper.png">Text</span></p>',
+    })
+    const wrapper = mount(TextBlockRenderer, {
+      props: { block, placement: { kind: 'root' } },
+      global: richTextRendererTestGlobal(block),
+    })
+
+    const text = wrapper.get('span').element as HTMLSpanElement
+    expect(text.style.backgroundImage).toBe('url("asset://assets/paper.png")')
+    expect(text.style.webkitBackgroundClip).toBe('text')
+    expect(text.style.color).toBe('transparent')
+  })
 })

@@ -38,7 +38,7 @@
             :class="{ 'is-loaded': imageLoadState === 'loaded' }"
             :src="resolvedSource.src"
             :alt="block.name"
-            :style="imgStyle"
+            :style="[imgStyle, maskStyle]"
             @load="handleImageLoad($event)"
             @error="handleImageError($event)"
         />
@@ -101,6 +101,23 @@ const resolvedSource = computed<ImageSourceView>(() => {
     fieldKey: 'source',
   })
   return resolved.kind === 'url' ? { kind: 'image', src: resolved.src } : resolved
+})
+
+const resolvedMaskSource = computed<ImageSourceView>(() => {
+  if (!props.block.maskSource.trim()) return { kind: 'empty' }
+  const resolved = editorContext.resources.resolve({ value: props.block.maskSource, expect: 'asset', blockId: props.block.id, fieldKey: 'maskSource' })
+  return resolved.kind === 'url' ? { kind: 'image', src: resolved.src } : resolved
+})
+
+const maskStyle = computed(() => {
+  const source = resolvedMaskSource.value
+  const url = source.kind === 'image' ? source.src : source.kind === 'icon' ? source.entry.src : ''
+  const size = props.block.maskFit === 'fill' ? '100% 100%' : props.block.maskFit
+  return url ? {
+    maskImage: `url("${url.replace(/"/g, '%22')}")`, WebkitMaskImage: `url("${url.replace(/"/g, '%22')}")`,
+    maskMode: 'alpha', WebkitMaskMode: 'alpha', maskSize: size, WebkitMaskSize: size,
+    maskPosition: 'center', WebkitMaskPosition: 'center', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
+  } : { maskImage: 'none', WebkitMaskImage: 'none' }
 })
 
 function resolvedSourceIdentity(source: ImageSourceView): string {

@@ -9,10 +9,10 @@
             :disabled="!editor.can().chain().focus().redo().run()" @mousedown.prevent @click="editor.chain().focus().redo().run()" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.font', '字体')">
-          <OcSelect class="oc-rich-text-editor__font" :data-tooltip="tr('propertyEditor.richText.font', '字体')" :aria-label="tr('propertyEditor.richText.font', '字体')"
-            :model-value="activeFontFamily" :options="fontOptions" @update:model-value="setFontFamily" />
-          <OcSelect class="oc-rich-text-editor__font-size" :data-tooltip="tr('propertyEditor.richText.fontSize', '字号')" :aria-label="tr('propertyEditor.richText.fontSize', '字号')"
-            :model-value="activeFontSize" :options="fontSizeOptions" @update:model-value="setFontSize" />
+          <ReferenceStringPropertyField class="oc-rich-text-editor__font" :definition="fontFieldDefinition"
+            :value="activeFontFamily" @update:value="setFontFamily" />
+          <ReferenceStringPropertyField class="oc-rich-text-editor__font-size" :definition="fontSizeFieldDefinition"
+            :value="activeFontSize" @update:value="setFontSize" />
           <OcButton size="md" icon-only icon="format.font-size-decrease" :data-tooltip="tr('propertyEditor.richText.decreaseFontSize', '减小字号')" :aria-label="tr('propertyEditor.richText.decreaseFontSize', '减小字号')"
             @mousedown.prevent @click="adjustFontSize(-1)" />
           <OcButton size="md" icon-only icon="format.font-size-increase" :data-tooltip="tr('propertyEditor.richText.increaseFontSize', '增大字号')" :aria-label="tr('propertyEditor.richText.increaseFontSize', '增大字号')"
@@ -70,14 +70,6 @@
               <OcIcon name="format.color-highlight" size="md" /><span :style="{ backgroundColor: color }" />
             </span></template>
           </OcColorPicker>
-          <OcColorPicker :label="tr('propertyEditor.richText.strokeColor', '描边颜色')" :model-value="strokeColor"
-            @open-change="captureColorSnapshot('stroke', $event)"
-            @preview="setStrokeColor" @cancel="restoreColorSnapshot('stroke')">
-            <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command oc-rich-text-editor__color-command--stroke"
-              :style="{ WebkitTextStrokeColor: color }">A</span></template>
-          </OcColorPicker>
-          <OcSelect class="oc-rich-text-editor__stroke-width" :data-tooltip="tr('propertyEditor.richText.strokeWidth', '描边宽度')" :aria-label="tr('propertyEditor.richText.strokeWidth', '描边宽度')"
-            :model-value="strokeWidth" :options="strokeWidthOptions" @update:model-value="setStrokeWidth" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupAlignment', '段落对齐')">
           <OcButton v-for="alignment in alignments" :key="alignment.value" size="md" icon-only
@@ -92,28 +84,17 @@
       </div>
     </div>
 
-    <OcFloatingLayer v-if="selectedNodeAnchor && selectedNodeKind" :open="nodeEditOpen"
+    <OcFloatingLayer v-if="selectedNodeAnchor && selectedNodeKind === 'projectIcon'" :open="nodeEditOpen"
       :anchor="selectedNodeAnchor" :owner="editor?.view.dom" placement="top-start">
       <div class="oc-rich-text-editor__node-edit-layer">
-        <OcActionButton v-if="selectedNodeKind === 'projectIcon'" :action="projectIconAction"
+        <OcActionButton :action="projectIconAction"
           size="sm" variant="ghost" @mousedown.prevent @select="handleProjectIconAction" />
-        <OcButton v-else size="sm" icon-only icon="action.edit" :data-tooltip="tr('propertyEditor.richText.editSelected', '编辑选中内容')"
-          :aria-label="tr('propertyEditor.richText.editSelected', '编辑选中内容')" data-test="rich-text-node-edit"
-          @mousedown.prevent @click="openSelectedNodeEditor" />
       </div>
     </OcFloatingLayer>
 
     <OcDialog :open="selectedNodeEditorOpen" :title="selectedNodeDialogTitle"
       size="md" close-on-backdrop @request-close="cancelSelectedNodeEditor">
-      <div v-if="dialogNodeTarget?.kind === 'binding'" class="oc-rich-text-editor__node-dialog-content">
-        <label class="oc-rich-text-editor__dialog-field oc-rich-text-editor__dialog-binding-field">
-          <span>{{ tr('propertyEditor.richText.bindingExpression', 'Binding 表达式') }}</span>
-          <OcFieldInput :value="dialogBindingExpression" variant="plain" full-width
-            aria-label="Binding expression"
-            @input="updateDialogBindingExpression" />
-        </label>
-      </div>
-      <div v-else-if="dialogNodeTarget?.kind === 'projectIcon'" class="oc-rich-text-editor__node-dialog-content">
+      <div v-if="dialogNodeTarget?.kind === 'projectIcon'" class="oc-rich-text-editor__node-dialog-content">
         <OcActionButton :action="dialogProjectIconAction" size="md" variant="ghost"
           @select="selectDialogProjectIcon" />
       </div>
@@ -123,7 +104,18 @@
       </template>
     </OcDialog>
 
-    <EditorContent :editor="editor" class="oc-rich-text-editor__surface" :style="baseStyle" />
+    <div class="oc-rich-text-editor__workspace">
+      <EditorContent :editor="editor" class="oc-rich-text-editor__surface" :style="baseStyle" />
+      <aside v-if="editor" class="oc-rich-text-editor__properties" aria-label="Text properties"
+        @mousedown.capture="capturePropertySelection">
+        <PropertyEditor
+          :inputs="propertyInputs"
+          :categories="propertyCategories"
+          sort-mode="category"
+          @update-property="handlePropertyUpdate"
+        />
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -146,13 +138,20 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import OcButton from '../../../components/base/OcButton.vue'
-import OcFieldInput from '../../../components/base/OcFieldInput.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
-import OcSelect from '../../../components/standard/OcSelect.vue'
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
 import type { OcActionDefinition, OcActionSelectPayload } from '../action/action.types'
+import ReferenceStringPropertyField from '../property-editor/fields/ReferenceStringPropertyField.vue'
+import PropertyEditor from '../property-editor/PropertyEditor.vue'
+import type { FilePathDirectoryProvider } from '../../model/filePath'
+import type {
+  PropertyCompletionItem,
+  PropertyCompletionProvider,
+  PropertyEditorFieldDefinition,
+  PropertyEditorMutation,
+} from '../property-editor/propertyEditor.types'
 import OcFloatingLayer from '../../../components/standard/OcFloatingLayer.vue'
 import { normalizeRichTextHtml, parseRichTextHtml } from '../../rich-text/richTextHtml'
 import type { IconToken } from '../icon/iconRegistry'
@@ -174,6 +173,10 @@ import {
   recentProjectIconIdentities,
   rememberRecentProjectIcon,
 } from './recentProjectIcons'
+import {
+  createRichTextFormatInput,
+  richTextFormatCategories,
+} from './richTextFormat'
 
 type RichTextFontOption = {
   label: string
@@ -182,6 +185,7 @@ type RichTextFontOption = {
 }
 
 type RichTextFontSelectOption = RichTextFontOption & {
+  key: string
   labelStyle?: Readonly<Record<string, string>>
 }
 
@@ -201,6 +205,9 @@ const props = defineProps<{
     fontFamily?: string
     fontSize?: string
   }
+  imageDirectoryProvider?: FilePathDirectoryProvider
+  imageCompletionProvider?: PropertyCompletionProvider
+  resolveImageSource?: (reference: string) => string | null
 }>()
 
 const emit = defineEmits<{
@@ -214,8 +221,8 @@ const tr = (key: string, fallback: string, parameters?: Record<string, unknown>)
 
 const lastEmittedValue = ref<string | null>(null)
 const toolbarRevision = ref(0)
+const propertySelection = ref<{ from: number, to: number } | null>(null)
 const selectedNodeEditorOpen = ref(false)
-const dialogBindingExpression = ref('')
 const dialogIconPath = ref<string | null>(null)
 const dialogNodeTarget = ref<{ position: number, nodeType: string, kind: 'binding' | 'projectIcon' } | null>(null)
 type ColorCommand = 'foreground' | 'background' | 'stroke'
@@ -250,6 +257,56 @@ const TextStyleAttributes = Extension.create({
           parseHTML: element => element.style.webkitTextStrokeWidth || null,
           renderHTML: attributes => attributes.textStrokeWidth && attributes.textStrokeWidth !== '0px'
             ? { style: `-webkit-text-stroke-width: ${attributes.textStrokeWidth}` }
+            : {},
+        },
+        textFillType: {
+          default: null,
+          parseHTML: element => element.getAttribute('data-oc-fill-type') || null,
+          renderHTML: attributes => attributes.textFillType
+            ? { 'data-oc-fill-type': attributes.textFillType }
+            : {},
+        },
+        textFillSource: {
+          default: null,
+          parseHTML: element => element.getAttribute('data-oc-fill-source') || null,
+          renderHTML: attributes => attributes.textFillSource
+            ? {
+                'data-oc-fill-source': attributes.textFillSource,
+                ...(props.resolveImageSource?.(String(attributes.textFillSource))
+                  ? { style: `background-image: url(${JSON.stringify(props.resolveImageSource(String(attributes.textFillSource)))}); -webkit-background-clip: text; color: transparent` }
+                  : {}),
+              }
+            : {},
+        },
+        textShadowColor: {
+          default: null,
+          parseHTML: element => element.getAttribute('data-oc-shadow-color') || null,
+          renderHTML: attributes => attributes.textShadowColor
+            ? {
+                'data-oc-shadow-color': attributes.textShadowColor,
+                style: `text-shadow: ${attributes.textShadowOffsetX || '0px'} ${attributes.textShadowOffsetY || '0px'} ${attributes.textShadowBlur || '0px'} ${attributes.textShadowColor}`,
+              }
+            : {},
+        },
+        textShadowOffsetX: {
+          default: '0px',
+          parseHTML: element => element.getAttribute('data-oc-shadow-offset-x') || '0px',
+          renderHTML: attributes => attributes.textShadowColor
+            ? { 'data-oc-shadow-offset-x': attributes.textShadowOffsetX || '0px' }
+            : {},
+        },
+        textShadowOffsetY: {
+          default: '0px',
+          parseHTML: element => element.getAttribute('data-oc-shadow-offset-y') || '0px',
+          renderHTML: attributes => attributes.textShadowColor
+            ? { 'data-oc-shadow-offset-y': attributes.textShadowOffsetY || '0px' }
+            : {},
+        },
+        textShadowBlur: {
+          default: '0px',
+          parseHTML: element => element.getAttribute('data-oc-shadow-blur') || '0px',
+          renderHTML: attributes => attributes.textShadowColor
+            ? { 'data-oc-shadow-blur': attributes.textShadowBlur || '0px' }
             : {},
         },
       },
@@ -301,19 +358,20 @@ const StaticHighlight = Highlight.extend({
 })
 
 const fontOptions = computed<readonly RichTextFontSelectOption[]>(() => [
-  { label: tr('propertyEditor.richText.defaultFont', '默认字体'), value: '' },
+  { key: '', label: tr('propertyEditor.richText.defaultFont', '默认字体'), value: '' },
   ...(props.fontOptions ?? []).map(option => ({
     ...option,
+    key: option.value,
     labelStyle: { fontFamily: option.cssFamily ?? option.value },
   })),
 ])
 const strokeWidthOptions = computed(() => [
-  { label: tr('propertyEditor.richText.noStroke', '无描边'), value: '0px' },
-  { label: '0.5 px', value: '0.5px' },
-  { label: '1 px', value: '1px' },
-  { label: '1.5 px', value: '1.5px' },
-  { label: '2 px', value: '2px' },
-  { label: '3 px', value: '3px' },
+  { key: '0px', label: tr('propertyEditor.richText.noStroke', '无描边'), value: '0px' },
+  { key: '0.5px', label: '0.5 px', value: '0.5px' },
+  { key: '1px', label: '1 px', value: '1px' },
+  { key: '1.5px', label: '1.5 px', value: '1.5px' },
+  { key: '2px', label: '2 px', value: '2px' },
+  { key: '3px', label: '3 px', value: '3px' },
 ] as const)
 const fontVariable = (value: string) => `--oc-rich-font-${Array.from(value, char => char.codePointAt(0)!.toString(16)).join('-')}`
 const fontVariables = computed(() => Object.fromEntries(fontOptions.value.filter(option => option.value).map(option => [fontVariable(option.value), option.cssFamily ?? option.value])))
@@ -365,6 +423,7 @@ const foregroundColor = computed(() => editor.value?.getAttributes('textStyle').
 const backgroundColor = computed(() => editor.value?.getAttributes('highlight').color || '#fff59d')
 const strokeColor = computed(() => editor.value?.getAttributes('textStyle').textStrokeColor || '#000000')
 const strokeWidth = computed(() => editor.value?.getAttributes('textStyle').textStrokeWidth || '0px')
+const fillSource = computed(() => editor.value?.getAttributes('textStyle').textFillSource || '')
 const activeFontFamily = computed(() => {
   toolbarRevision.value
   const activeValue = editor.value?.getAttributes('textStyle').fontFamily || ''
@@ -379,7 +438,58 @@ const fontSizeOptions = computed(() => {
   toolbarRevision.value
   const activeSize = resolveActiveFontSize()
   const sizes = [...new Set<number>([...fontSizeSteps, activeSize])].sort((left, right) => left - right)
-  return sizes.map(size => ({ label: `${size} px`, value: String(size) }))
+  return sizes.map(size => ({ key: String(size), label: `${size} px`, value: String(size) }))
+})
+function createToolbarCompletion(items: readonly { key: string, label: string, labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
+  return ({ value }) => {
+    const query = value.trim().toLocaleLowerCase()
+    const filterQuery = items.some(item => item.key.toLocaleLowerCase() === query) ? '' : query
+    const suggestions: PropertyCompletionItem[] = items
+      .filter(item => !filterQuery || `${item.label} ${item.key}`.toLocaleLowerCase().includes(filterQuery))
+      .map(item => ({ ...item, insertText: item.key }))
+    return { replaceStart: 0, replaceEnd: value.length, items: suggestions }
+  }
+}
+type StringFieldDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
+const fontFieldDefinition = computed<StringFieldDefinition>(() => ({
+  title: tr('propertyEditor.richText.font', '字体'), fieldType: 'string',
+  completion: { provider: createToolbarCompletion(fontOptions.value) },
+}))
+const fontSizeFieldDefinition = computed<StringFieldDefinition>(() => ({
+  title: tr('propertyEditor.richText.fontSize', '字号'), fieldType: 'string',
+  completion: { provider: createToolbarCompletion(fontSizeOptions.value) },
+}))
+const strokeWidthFieldDefinition = computed<StringFieldDefinition>(() => ({
+  title: tr('propertyEditor.richText.strokeWidth', '描边宽度'), fieldType: 'string',
+  completion: { provider: createToolbarCompletion(strokeWidthOptions.value) },
+}))
+const lengthCompletionProvider = computed(() => createToolbarCompletion([
+  { key: '0px', label: '0 px' },
+  { key: '1px', label: '1 px' },
+  { key: '2px', label: '2 px' },
+  { key: '4px', label: '4 px' },
+  { key: '8px', label: '8 px' },
+  { key: '12px', label: '12 px' },
+]))
+const propertyCategories = computed(() => richTextFormatCategories(tr))
+const propertyInputs = computed(() => {
+  toolbarRevision.value
+  const currentEditor = editor.value
+  const textStyle = currentEditor?.getAttributes('textStyle') ?? {}
+  const highlight = currentEditor?.getAttributes('highlight') ?? {}
+  return [createRichTextFormatInput({
+    labels: tr,
+    textStyle,
+    highlight,
+    fields: {
+      fontField: fontFieldDefinition.value,
+      fontSizeField: fontSizeFieldDefinition.value,
+      strokeWidthField: strokeWidthFieldDefinition.value,
+      imageDirectoryProvider: props.imageDirectoryProvider,
+      imageCompletionProvider: props.imageCompletionProvider,
+      lengthCompletionProvider: lengthCompletionProvider.value,
+    },
+  })]
 })
 const iconCatalogs = computed(() => {
   const catalogs = new Map<string, ProjectIconCatalog>()
@@ -490,11 +600,9 @@ const selectedNodeAnchor = computed<DOMRect | null>(() => {
   }
 })
 const nodeEditOpen = computed(() => Boolean(selectedNodeAnchor.value))
-const selectedNodeDialogTitle = computed(() => dialogNodeTarget.value?.kind === 'binding'
-  ? tr('propertyEditor.richText.editBinding', '编辑 Binding')
-  : dialogNodeTarget.value?.kind === 'projectIcon'
-    ? tr('propertyEditor.richText.editProjectIcon', '编辑项目图标')
-    : '')
+const selectedNodeDialogTitle = computed(() => dialogNodeTarget.value?.kind === 'projectIcon'
+  ? tr('propertyEditor.richText.editProjectIcon', '编辑项目图标')
+  : '')
 const dialogProjectIconAction = computed<OcActionDefinition>(() => ({
   ...projectIconAction.value,
   title: tr('propertyEditor.richText.chooseProjectIcon', '选择项目图标'),
@@ -505,19 +613,10 @@ function openSelectedNodeEditor(): void {
   const selection = currentEditor?.state.selection
   if (!currentEditor || !(selection instanceof NodeSelection)) return
   const kind = selectedNodeKind.value
-  if (!kind) return
+  if (kind !== 'projectIcon') return
   dialogNodeTarget.value = { position: selection.from, nodeType: selection.node.type.name, kind }
-  if (selectedNodeKind.value === 'binding') {
-    dialogBindingExpression.value = String(selection.node.attrs.expression ?? '')
-  } else if (selectedNodeKind.value === 'projectIcon') {
-    dialogIconPath.value = String(selection.node.attrs.iconPath ?? '')
-  }
+  dialogIconPath.value = String(selection.node.attrs.iconPath ?? '')
   selectedNodeEditorOpen.value = true
-}
-
-function updateDialogBindingExpression(event: Event): void {
-  const target = event.target
-  if (target instanceof HTMLInputElement) dialogBindingExpression.value = target.value
 }
 
 function selectDialogProjectIcon(payload: OcActionSelectPayload): void {
@@ -531,12 +630,7 @@ function confirmSelectedNodeEditor(): void {
   if (!currentEditor || !target) return
   const node = currentEditor.state.doc.nodeAt(target.position)
   if (!node || node.type.name !== target.nodeType) return cancelSelectedNodeEditor()
-  if (target.kind === 'binding') {
-    const expression = dialogBindingExpression.value.trim()
-    if (!expression) currentEditor.chain().focus().setNodeSelection(target.position).deleteSelection().run()
-    else currentEditor.chain().focus().setNodeSelection(target.position)
-      .updateAttributes(target.nodeType, { expression }).run()
-  } else if (target.kind === 'projectIcon' && dialogIconPath.value) {
+  if (target.kind === 'projectIcon' && dialogIconPath.value) {
     currentEditor.chain().focus().setNodeSelection(target.position)
       .updateAttributes(target.nodeType, { iconPath: dialogIconPath.value }).run()
   }
@@ -667,6 +761,70 @@ function setFontSize(value: string): void {
   const size = parsePositiveNumber(value)
   if (size === null) return
   editor.value?.chain().focus().setMark('textStyle', { fontSize: `${size}px` }).run()
+}
+
+function handlePropertyUpdate(mutation: PropertyEditorMutation): void {
+  if (mutation.key !== 'rich-text-selection') return
+  restorePropertySelection()
+  if (mutation.fieldKey === 'fontFamily') setFontFamily(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'fontSize') setFontSize(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'color') setForegroundColor(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'fillType') setFillType(String(mutation.value ?? 'none'))
+  else if (mutation.fieldKey === 'backgroundColor') setBackgroundColor(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'fillSource') setFillSource(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'strokeColor') setStrokeColor(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'strokeWidth') setStrokeWidth(String(mutation.value ?? ''))
+  else if (mutation.fieldKey === 'shadowColor') setShadow({ textShadowColor: String(mutation.value ?? '') })
+  else if (mutation.fieldKey === 'shadowOffsetX') setShadow({ textShadowOffsetX: normalizeCssLength(mutation.value) })
+  else if (mutation.fieldKey === 'shadowOffsetY') setShadow({ textShadowOffsetY: normalizeCssLength(mutation.value) })
+  else if (mutation.fieldKey === 'shadowBlur') setShadow({ textShadowBlur: normalizeCssLength(mutation.value) })
+}
+
+function setFillType(value: string): void {
+  const currentEditor = editor.value
+  if (!currentEditor) return
+  if (value === 'none') {
+    currentEditor.chain().focus().unsetHighlight().setMark('textStyle', {
+      textFillType: 'none', textFillSource: null,
+    }).run()
+  } else if (value === 'solid') {
+    currentEditor.chain().focus().setMark('textStyle', {
+      textFillType: 'solid', textFillSource: null,
+    }).setHighlight({ color: backgroundColor.value }).run()
+  } else if (value === 'image') {
+    currentEditor.chain().focus().unsetHighlight().setMark('textStyle', {
+      textFillType: 'image', textFillSource: fillSource.value,
+    }).run()
+  }
+}
+
+function setFillSource(value: string): void {
+  editor.value?.chain().focus().unsetHighlight().setMark('textStyle', {
+    textFillType: 'image', textFillSource: value.trim() || null,
+  }).run()
+}
+
+function normalizeCssLength(value: unknown): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return '0px'
+  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|%)$/.test(raw) ? raw : '0px'
+}
+
+function setShadow(attributes: Record<string, string>): void {
+  editor.value?.chain().focus().setMark('textStyle', attributes).run()
+}
+
+function capturePropertySelection(): void {
+  const selection = editor.value?.state.selection
+  if (!selection) return
+  propertySelection.value = { from: selection.from, to: selection.to }
+}
+
+function restorePropertySelection(): void {
+  const currentEditor = editor.value
+  const selection = propertySelection.value
+  if (!currentEditor || !selection) return
+  currentEditor.chain().focus().setTextSelection(selection).run()
 }
 
 function adjustFontSize(direction: -1 | 1): void {
@@ -880,8 +1038,18 @@ defineExpose({
   width: 82px;
 }
 
-.oc-rich-text-editor__stroke-width {
-  width: 84px;
+.oc-rich-text-editor__workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.oc-rich-text-editor__properties {
+  width: 248px;
+  min-width: 0;
+  overflow: auto;
+  border-inline-start: var(--oc-border-width) solid var(--oc-border-default);
+  background: var(--oc-bg-raised);
 }
 
 .oc-rich-text-editor__color-command {
@@ -901,11 +1069,6 @@ defineExpose({
   left: 1px;
   height: 3px;
   border-radius: 1px;
-}
-
-.oc-rich-text-editor__color-command--stroke {
-  color: var(--oc-bg-input);
-  -webkit-text-stroke-width: 1px;
 }
 
 .oc-rich-text-editor__surface {

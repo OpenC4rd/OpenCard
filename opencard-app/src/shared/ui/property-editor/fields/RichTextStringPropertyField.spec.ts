@@ -18,6 +18,7 @@ describe('RichTextStringPropertyField', () => {
     const sourceHtml = '<p><mark style="background-color: {{parent.color}}; color: inherit;">Text</mark></p>'
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: sourceHtml },
     })
     await wrapper.get('.rich-text-string-field__preview').trigger('click')
@@ -35,6 +36,7 @@ describe('RichTextStringPropertyField', () => {
   it('writes a local draft only when the user saves', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p>Original</p>',
@@ -70,6 +72,7 @@ describe('RichTextStringPropertyField', () => {
     }]
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true, fontOptions },
         value: '<p>Original</p>',
@@ -95,6 +98,7 @@ describe('RichTextStringPropertyField', () => {
     }]
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: {
         definition: {
           title: 'Content',
@@ -115,9 +119,10 @@ describe('RichTextStringPropertyField', () => {
     wrapper.unmount()
   })
 
-  it('keeps the rich-text draft open when binding editing consumes Escape', async () => {
+  it('edits bindings inline on double click without opening a dialog', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p><span data-oc-binding="self:name">{{self:name}}</span></p>',
@@ -128,17 +133,11 @@ describe('RichTextStringPropertyField', () => {
     await nextTick()
     await nextTick()
     const editor = (wrapper.findComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor
-    editor.view.dom.querySelector<HTMLElement>('.binding-node__label')!.click()
-    ;(wrapper.findComponent(OcRichTextEditor).vm as unknown as { openSelectedNodeEditor: () => void }).openSelectedNodeEditor()
+    editor.view.dom.querySelector<HTMLElement>('.binding-node__label')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     await nextTick()
 
-    ;(wrapper.findComponent(OcRichTextEditor).vm as unknown as { cancelSelectedNodeEditor: () => void })
-      .cancelSelectedNodeEditor()
-    await new Promise(resolve => window.setTimeout(resolve, 0))
-
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
-    expect(dialog).not.toBeNull()
-    expect(document.getElementById(dialog!.getAttribute('aria-labelledby')!)?.textContent).toBe('Content')
+    expect(document.querySelector<HTMLElement>('.binding-node__input')).not.toBeNull()
+    expect(document.querySelector<HTMLElement>('.oc-rich-text-editor [role="dialog"]')).toBeNull()
     expect(editor.getHTML()).toContain('data-oc-binding="self:name"')
     expect(wrapper.emitted('update:value')).toBeUndefined()
     wrapper.unmount()
@@ -147,6 +146,7 @@ describe('RichTextStringPropertyField', () => {
   it('edits sanitized HTML source inside the same draft transaction', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p>Original</p>',
@@ -184,6 +184,7 @@ describe('RichTextStringPropertyField', () => {
   it('formats rich-text blocks when opening the source view', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p>First</p><p><strong>Second</strong></p>',
@@ -204,6 +205,7 @@ describe('RichTextStringPropertyField', () => {
     const source = '<p>Before</p><script>bad()</script><p>After</p>'
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { stubs: { PropertyEditor: true } },
       props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: source },
     })
     await wrapper.get('.rich-text-string-field__preview').trigger('click')
@@ -224,8 +226,8 @@ describe('RichTextStringPropertyField', () => {
     setAppLocale('en-US')
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
+      global: { plugins: [i18n], stubs: { PropertyEditor: true } },
       props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: '<p>Original</p>' },
-      global: { plugins: [i18n] },
     })
 
     await wrapper.get('.rich-text-string-field__preview').trigger('click')

@@ -244,7 +244,9 @@ function parseBlock(
         ...base,
         type,
         source: fields.string('source'),
+        maskSource: fields.string('maskSource'),
         fit: fields.option('fit'),
+        maskFit: fields.option('maskFit'),
       }
     case 'qrcode-block':
       return {

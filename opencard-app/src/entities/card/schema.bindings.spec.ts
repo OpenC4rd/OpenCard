@@ -148,7 +148,7 @@ describe('property binding schema policy', () => {
         textStyle: ['fontFamily', 'fontSize', 'fontWeight', 'color'],
         textLayout: ['lineHeight', 'textAlign', 'verticalAlign', 'writingMode'],
       },
-      'image-block': { ...commonBlock, content: ['source', 'fit'] },
+      'image-block': { ...commonBlock, content: ['source', 'maskSource', 'fit', 'maskFit'] },
       'qrcode-block': {
         ...commonBlock,
         content: ['content', 'errorCorrection', 'quietZone'],

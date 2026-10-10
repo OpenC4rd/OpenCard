@@ -88,6 +88,10 @@ function validateBlock(
     validatePackageAssetReference(block.source, resources, block.id, 'source', {
       documentId, instanceId, faceKey, blockPath, issues,
     })
+    if (block.maskSource) {
+      const mask = resolveCardResource({ value: block.maskSource, expect: 'asset', blockId: block.id, fieldKey: 'maskSource' }, resources)
+      if (mask.kind === 'unavailable') pushPackageResourceIssue('card-designer.resource.file-missing', block.maskSource, { code: 'resource-unavailable', reference: block.maskSource, message: mask.message }, { documentId, instanceId, faceKey, blockId: block.id, blockPath, fieldKey: 'maskSource', issues })
+    }
   }
   if (block.type === 'text-block' || block.type === 'markdown-text-block') {
     for (const fontName of systemFontFamilies(block.fontFamily)) {

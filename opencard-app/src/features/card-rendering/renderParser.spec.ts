@@ -96,6 +96,15 @@ describe('renderParser', () => {
       type: 'card-designer.render-parse.required',
       location: expect.objectContaining({ blockId: 'image', fieldKey: 'source' }),
     }))
+    expect(result.issues).not.toContainEqual(expect.objectContaining({
+      location: expect.objectContaining({ blockId: 'image', fieldKey: 'maskSource' }),
+    }))
+    delete (document.faces.front.children[0]!.block as unknown as Record<string, unknown>).maskSource
+    const withoutMask = parseRenderDocument(document)
+    expect(withoutMask.document.faces.front.children[0]!.block).toMatchObject({ maskSource: '' })
+    expect(withoutMask.issues).not.toContainEqual(expect.objectContaining({
+      location: expect.objectContaining({ blockId: 'image', fieldKey: 'maskSource' }),
+    }))
   })
 
   it('accepts every image source form: path, package path, remote url, and icon reference', () => {
