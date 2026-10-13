@@ -12,8 +12,6 @@ const props = {
   expandDragThreshold: 28,
   collapseDragThreshold: 70,
   floatingGap: 6,
-  topExpanded: true,
-  bottomExpanded: true,
   topSize: 240,
   topMinHeight: 160,
   bottomMinHeight: 220,
@@ -166,15 +164,6 @@ describe('CdeOverlayDock', () => {
     expect(wrapper.emitted('update:top-size')).toContainEqual([250])
   })
 
-  it('renders collapsed panels without a split handle', () => {
-    const wrapper = mount(CdeOverlayDock, {
-      props: { ...props, topExpanded: false, bottomExpanded: false },
-      slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
-    })
-
-    expect(wrapper.find('[aria-label="Resize panels"]').exists()).toBe(false)
-    expect(wrapper.find('[aria-label="Resize sidebar"]').exists()).toBe(true)
-  })
 
   it('auto-collapses in a narrow stage without hiding the resize entry point', () => {
     const wrapper = mount(CdeOverlayDock, {

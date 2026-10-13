@@ -157,7 +157,7 @@ html.oc-theme-transitioning {
 * {
   /* Firefox 等走标准属性。 */
   scrollbar-width: thin;
-  scrollbar-color: var(--oc-scrollbar-thumb, rgba(156, 156, 156, 0.32)) transparent;
+  scrollbar-color: var(--oc-scrollbar-thumb) transparent;
   scrollbar-gutter: auto;
 }
 
@@ -169,8 +169,8 @@ html.oc-theme-transitioning {
   }
 
   *::-webkit-scrollbar {
-    width: var(--oc-scrollbar-size, 8px);
-    height: var(--oc-scrollbar-size, 8px);
+    width: var(--oc-scrollbar-size);
+    height: var(--oc-scrollbar-size);
     background: transparent;
   }
 
@@ -179,38 +179,41 @@ html.oc-theme-transitioning {
   }
 
   *::-webkit-scrollbar-thumb {
-    background: var(--oc-scrollbar-thumb, rgba(156, 156, 156, 0.32));
-    border-radius: 999px;
+    background: var(--oc-scrollbar-thumb);
+    border-radius: var(--oc-radius-full);
     border: 1px solid transparent;
     background-clip: padding-box;
   }
 
-  *::-webkit-scrollbar-thumb:hover {
-    background: var(--oc-scrollbar-thumb-hover, rgba(186, 186, 186, 0.48));
-  }
-
+  *::-webkit-scrollbar-thumb:hover,
   *::-webkit-scrollbar-thumb:active {
-    background: var(--oc-scrollbar-thumb-hover, rgba(186, 186, 186, 0.48));
+    background: var(--oc-scrollbar-thumb-hover);
   }
 
   *::-webkit-scrollbar-corner {
     background: transparent;
   }
 
-  /* Tab 条在部分 WebKit/Blink 环境会回退默认横向粗细，这里显式锁定。 */
-  .oc-tab .oc-panel[role='tablist']::-webkit-scrollbar:horizontal {
-    height: var(--oc-scrollbar-size, 8px) !important;
-  }
-
-  .oc-tab .oc-panel[role='tablist']::-webkit-scrollbar:vertical {
-    width: var(--oc-scrollbar-size, 8px) !important;
-  }
 }
 
 body {
   background: var(--oc-bg-window, var(--oc-bg-base));
   color: var(--oc-fg-default);
   font-family: var(--oc-font-sans);
+}
+
+.oc-release-notes {
+  color: var(--oc-fg-muted);
+  font-size: var(--oc-text-base);
+  line-height: 1.65;
+}
+
+.oc-release-notes > :first-child { margin-top: 0; }
+.oc-release-notes > :last-child { margin-bottom: 0; }
+.oc-release-notes :is(ul, ol) { padding-inline-start: var(--oc-space-5); }
+.oc-release-notes :is(h1, h2, h3) {
+  color: var(--oc-fg-default);
+  font-size: var(--oc-text-base);
 }
 
 .oc-number-badge {

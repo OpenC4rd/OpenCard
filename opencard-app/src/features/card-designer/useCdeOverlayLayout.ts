@@ -15,7 +15,6 @@ import {
   type CdeOverlaySide,
 } from './cdeOverlayGeometry'
 
-type OverlayPanel = 'instance' | 'preview' | 'structure' | 'property'
 type CommittedDockLayout = {
   leftExtent: number
   rightExtent: number
@@ -30,10 +29,6 @@ type UseCdeOverlayLayoutOptions = {
 }
 
 export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
-  const isInstancePanelExpanded = ref(true)
-  const isPreviewPanelExpanded = ref(true)
-  const isStructureTreePanelExpanded = ref(true)
-  const isPropertyPanelExpanded = ref(true)
   const leftDockExtent = ref(options.geometryConfig.minExtent)
   const rightDockExtent = ref(options.geometryConfig.minExtent)
   const leftExpandedDockExtent = ref(options.geometryConfig.minExtent)
@@ -64,12 +59,6 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
 
   function createLayoutState(): CardDesignerLayoutState {
     return {
-      panels: {
-        instanceExpanded: isInstancePanelExpanded.value,
-        previewExpanded: isPreviewPanelExpanded.value,
-        structureExpanded: isStructureTreePanelExpanded.value,
-        propertyExpanded: isPropertyPanelExpanded.value,
-      },
       leftTopHeight: leftSidebarTopHeight.value,
       rightTopHeight: rightSidebarTopHeight.value,
       leftDockExtent: committedDockLayout.leftExtent,
@@ -141,45 +130,9 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
     }
   }
 
-  function togglePanel(panel: OverlayPanel): void {
-    const target = panel === 'instance'
-      ? isInstancePanelExpanded
-      : panel === 'preview'
-        ? isPreviewPanelExpanded
-        : panel === 'structure'
-          ? isStructureTreePanelExpanded
-          : isPropertyPanelExpanded
-    target.value = !target.value
-    commitLayoutState()
-  }
-
-  function ensurePanelsExpanded(panels: readonly OverlayPanel[]): boolean {
-    let changed = false
-    for (const panel of panels) {
-      const target = panel === 'instance'
-        ? isInstancePanelExpanded
-        : panel === 'preview'
-          ? isPreviewPanelExpanded
-          : panel === 'structure'
-            ? isStructureTreePanelExpanded
-            : isPropertyPanelExpanded
-      if (!target.value) {
-        target.value = true
-        changed = true
-      }
-    }
-    if (changed) commitLayoutState()
-    return changed
-  }
-
   watch(
     options.layout,
     layout => {
-      const panels = layout?.panels
-      isInstancePanelExpanded.value = panels?.instanceExpanded ?? true
-      isPreviewPanelExpanded.value = panels?.previewExpanded ?? true
-      isStructureTreePanelExpanded.value = panels?.structureExpanded ?? true
-      isPropertyPanelExpanded.value = panels?.propertyExpanded ?? true
       leftSidebarTopHeight.value = normalizeStoredTopHeight(layout?.leftTopHeight, options.topMinHeight)
       rightSidebarTopHeight.value = normalizeStoredTopHeight(layout?.rightTopHeight, options.topMinHeight)
       const leftExtent = normalizeStoredDockExtent(layout?.leftDockExtent, options.geometryConfig)
@@ -208,20 +161,14 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
 
   return {
     editorShellStyle,
-    ensurePanelsExpanded,
     commitDockExtent,
     commitLayout: commitLayoutState,
-    isInstancePanelExpanded,
-    isPreviewPanelExpanded,
-    isPropertyPanelExpanded,
-    isStructureTreePanelExpanded,
     leftDockExtent,
     leftSidebarTopHeight,
     rightDockExtent,
     rightSidebarTopHeight,
     settleDockExtent,
     toggleDockCollapsed,
-    togglePanel,
     updateDockExtent,
     updateDockTopSize,
     viewportInsets,

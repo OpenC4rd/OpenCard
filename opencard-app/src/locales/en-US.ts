@@ -47,6 +47,9 @@ export default {
       },
       expandSidebar: 'Expand sidebar',
       collapseSidebar: 'Collapse sidebar',
+      resizeSidebar: 'Resize sidebar',
+      resizeSidebarLists: 'Resize sidebar lists',
+      resizeBottomPanel: 'Resize bottom panel',
       back: 'Back',
       expandBottomPanel: 'Expand bottom panel',
       collapseBottomPanel: 'Collapse bottom panel',
@@ -965,10 +968,6 @@ export default {
       preview: 'Preview',
       structureTree: 'Structure',
       properties: 'Properties',
-    },
-    panelActions: {
-      expand: 'Expand',
-      collapse: 'Collapse',
     },
     canvas: {
       controls: 'Card canvas controls',

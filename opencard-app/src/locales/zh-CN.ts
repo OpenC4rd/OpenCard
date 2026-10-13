@@ -47,6 +47,9 @@ export default {
       },
       expandSidebar: '展开侧边栏',
       collapseSidebar: '收起侧边栏',
+      resizeSidebar: '调整侧边栏宽度',
+      resizeSidebarLists: '调整侧栏列表高度',
+      resizeBottomPanel: '调整下方面板高度',
       back: '返回',
       expandBottomPanel: '展开下方面板',
       collapseBottomPanel: '收起下方面板',
@@ -965,10 +968,6 @@ export default {
       preview: '预览',
       structureTree: '结构树',
       properties: '属性',
-    },
-    panelActions: {
-      expand: '展开',
-      collapse: '收起',
     },
     canvas: {
       controls: '卡牌画布控制',

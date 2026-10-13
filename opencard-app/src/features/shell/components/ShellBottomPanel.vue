@@ -1,7 +1,8 @@
 <template>
-  <section class="shell-bottom-panel" :class="{ 'is-expanded': expanded }"
+  <section ref="panelElement" class="shell-bottom-panel" :class="{ 'is-expanded': expanded }"
     @mouseleave="scheduleCollapse"
     @focusin="requestExpansion" @focusout="handlePanelFocusOut">
+    <slot name="leading" />
     <button
       ref="toggleRef"
       class="shell-bottom-panel__toggle"
@@ -195,6 +196,7 @@ const emit = defineEmits<{
 }>()
 
 const HOVER_COLLAPSE_DELAY_MS = 180
+const panelElement = ref<HTMLElement | null>(null)
 const pinned = ref(false)
 const toggleRef = ref<HTMLButtonElement | null>(null)
 const isToggleHovered = ref(false)
@@ -243,10 +245,10 @@ function togglePinned(): void {
 }
 function scheduleCollapse(): void {
   clearCollapseTimer()
-  if (props.resizing || pinned.value || !props.expanded) return
+  if (props.resizing || pinned.value || !props.expanded || panelElement.value?.contains(document.activeElement)) return
   collapseTimer = setTimeout(() => {
     collapseTimer = null
-    if (props.resizing) return
+    if (props.resizing || panelElement.value?.contains(document.activeElement)) return
     emit('expanded-change', false)
   }, HOVER_COLLAPSE_DELAY_MS)
 }
@@ -317,7 +319,7 @@ async function scrollOutputToEnd(): Promise<void> {
 }
 
 watch(() => props.expanded, (expanded) => {
-  if (!expanded && contentRef.value?.contains(document.activeElement)) toggleRef.value?.focus()
+  if (!expanded && panelElement.value?.contains(document.activeElement)) toggleRef.value?.focus()
 }, { flush: 'sync' })
 watch(() => props.resizing, (resizing) => {
   if (!resizing && props.expanded) scheduleCollapse()

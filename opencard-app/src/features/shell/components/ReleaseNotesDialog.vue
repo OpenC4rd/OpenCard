@@ -6,10 +6,10 @@
     <template v-if="release">
         <div
           v-if="release.body"
-          class="release-notes-dialog__body"
+          class="release-notes-dialog__body oc-release-notes"
           v-html="renderedBody"
         />
-        <p v-else class="release-notes-dialog__empty">{{ t('app.updater.releaseNotesEmpty') }}</p>
+        <p v-else class="release-notes-dialog__empty oc-release-notes">{{ t('app.updater.releaseNotesEmpty') }}</p>
 
     </template>
     <template v-if="release" #footer>
@@ -65,29 +65,6 @@ function handleClose(): void {
 .release-notes-dialog__body,
 .release-notes-dialog__empty {
   overflow: auto;
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-base);
-  line-height: 1.65;
-}
-
-.release-notes-dialog__body :deep(:first-child) {
-  margin-top: 0;
-}
-
-.release-notes-dialog__body :deep(:last-child) {
-  margin-bottom: 0;
-}
-
-.release-notes-dialog__body :deep(ul),
-.release-notes-dialog__body :deep(ol) {
-  padding-inline-start: var(--oc-space-5);
-}
-
-.release-notes-dialog__body :deep(h1),
-.release-notes-dialog__body :deep(h2),
-.release-notes-dialog__body :deep(h3) {
-  color: var(--oc-fg-default);
-  font-size: var(--oc-text-base);
 }
 
 </style>

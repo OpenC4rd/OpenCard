@@ -1,9 +1,66 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { createI18n } from 'vue-i18n'
 import { afterEach, describe, expect, it } from 'vitest'
 import ReferenceStringPropertyField from './ReferenceStringPropertyField.vue'
+import StringPropertyField from './StringPropertyField.vue'
 
 describe('ReferenceStringPropertyField', () => {
+  it.each([StringPropertyField, ReferenceStringPropertyField])('accepts the shortest trailing ghost completion', async (component) => {
+    const wrapper = mount(component, { props: {
+      value: '12p', definition: { title: 'Width', fieldType: 'string',
+        completion: { static: { values: ['percent', 'PX'] } } },
+    } })
+    await wrapper.get('input').trigger('keydown', { key: 'Tab' })
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['12PX'])
+    wrapper.unmount()
+  })
+
+  it('preserves the full-string completion range while editing the last token', async () => {
+    const wrapper = mount(ReferenceStringPropertyField, {
+      props: { value: 'first; se', definition: { title: 'Sources', fieldType: 'string', listSeparator: 'semicolon',
+        completion: { provider: ({ value }) => ({ replaceStart: value.lastIndexOf('se'), replaceEnd: value.length,
+          items: [{ key: 'second', label: 'Second', insertText: 'second' }] }) } } },
+      global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] },
+    })
+    const input = wrapper.get('input')
+    await input.trigger('focus')
+    await flushPromises()
+    await input.trigger('keydown', { key: 'Tab' })
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['first;second'])
+    wrapper.unmount()
+  })
+
+  it('discards stale completion results and pending results after blur', async () => {
+    const pending: Array<(result: { replaceStart: number; replaceEnd: number; items: Array<{ key: string; label: string; insertText: string }> }) => void> = []
+    const wrapper = mount(ReferenceStringPropertyField, {
+      props: {
+        value: '',
+        definition: { title: 'Reference', fieldType: 'string', completion: {
+          provider: () => new Promise(resolve => pending.push(resolve)),
+        } },
+      },
+    })
+    const result = (label: string) => ({ replaceStart: 0, replaceEnd: 1,
+      items: [{ key: label, label, insertText: label }] })
+    const input = wrapper.get('input')
+    await input.setValue('a')
+    await input.setValue('b')
+    pending[1]!(result('Latest'))
+    await flushPromises()
+    pending[0]!(result('Stale'))
+    await flushPromises()
+    expect(input.attributes('aria-expanded')).toBe('true')
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['Latest'])
+    await input.setValue('c')
+    await input.trigger('blur')
+    pending[2]!(result('After blur'))
+    await flushPromises()
+    expect(input.attributes('aria-expanded')).toBe('false')
+    wrapper.unmount()
+  })
+
   afterEach(() => {
     document.body.innerHTML = ''
   })

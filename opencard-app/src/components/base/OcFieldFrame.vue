@@ -125,6 +125,10 @@ defineOptions({ name: 'OcFieldFrame' })
   min-width: 0;
 }
 
+.oc-field-frame:not(.oc-field-frame--wrap) .oc-field-frame__control > :deep(.oc-field-input) {
+  min-height: 0;
+}
+
 /* 换行模式：子项按内容取宽，行断在子项之间（对齐用文字基线，标签与输入框的文字落在同一条线上）。 */
 .oc-field-frame--wrap .oc-field-frame__control {
   flex-wrap: wrap;
@@ -136,5 +140,10 @@ defineOptions({ name: 'OcFieldFrame' })
 .oc-field-frame--wrap .oc-field-frame__control > :deep(*) {
   flex: 0 1 auto;
   width: auto;
+}
+
+/* 输入框占用剩余空间；不足一个控件宽度时换到下一行。 */
+.oc-field-frame--wrap .oc-field-frame__control > :deep(.oc-field-input) {
+  flex: 1 1 var(--oc-size-lg);
 }
 </style>

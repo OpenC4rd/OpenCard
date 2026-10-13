@@ -4,6 +4,7 @@
     class="oc-resize-handle"
     :class="[
       `oc-resize-handle--${props.orientation}`,
+      `oc-resize-handle--${props.appearance}`,
       { 'is-resizing': isResizing, 'is-disabled': props.disabled },
       attrs.class,
     ]"
@@ -51,14 +52,20 @@ const props = withDefaults(defineProps<{
   label: string
   tooltip?: string
   orientation?: ResizeOrientation
+  /** 可见握柄、两端渐隐细线，或仅保留拖动区域。 */
+  appearance?: 'grip' | 'gradient' | 'invisible'
   direction?: ResizeDirection
   step?: number
+  /** 每像素对应的值增量；比例布局可在拖动开始时按可用空间换算。 */
+  unitsPerPixel?: number
   disabled?: boolean
 }>(), {
   orientation: 'horizontal',
+  appearance: 'grip',
   direction: 'normal',
   tooltip: undefined,
   step: KEYBOARD_STEP,
+  unitsPerPixel: 1,
   disabled: false,
 })
 
@@ -135,7 +142,7 @@ function continueResize(event: PointerEvent): void {
   const state = resizeState.value
   if (!state || state.pointerId !== event.pointerId) return
   const coordinateDelta = getCoordinate(event) - state.startCoordinate
-  const value = normalizeValue(state.startValue + coordinateDelta * getDirectionSign())
+  const value = normalizeValue(state.startValue + coordinateDelta * getDirectionSign() * props.unitsPerPixel)
   updateValue(value, event, value - state.startValue)
   event.preventDefault()
 }
@@ -144,7 +151,7 @@ function finishResize(event: PointerEvent): void {
   const state = resizeState.value
   if (!state || state.pointerId !== event.pointerId) return
   const coordinateDelta = getCoordinate(event) - state.startCoordinate
-  const value = normalizeValue(state.startValue + coordinateDelta * getDirectionSign())
+  const value = normalizeValue(state.startValue + coordinateDelta * getDirectionSign() * props.unitsPerPixel)
   updateValue(value, event, value - state.startValue)
   releasePointer(state.pointerId)
   emit('resize-end', event)
@@ -252,7 +259,7 @@ onBeforeUnmount(() => {
 }
 
 .oc-resize-handle--vertical {
-  width: var(--oc-space-3);
+  width: var(--oc-resize-track-size, var(--oc-space-3));
   height: 100%;
   cursor: col-resize;
 }
@@ -275,6 +282,46 @@ onBeforeUnmount(() => {
 .oc-resize-handle--vertical::after {
   width: var(--oc-space-1);
   height: var(--oc-size-md);
+}
+
+.oc-resize-handle--invisible::after {
+  display: none;
+}
+
+.oc-resize-handle--invisible:focus-visible {
+  box-shadow: var(--oc-control-focus-shadow, var(--oc-focus-ring));
+}
+
+.oc-resize-handle--gradient::after {
+  position: absolute;
+  border-radius: 0;
+  background: linear-gradient(
+    var(--oc-resize-gradient-direction),
+    transparent 0,
+    currentColor calc(2 * var(--oc-space-8)),
+    currentColor calc(100% - 2 * var(--oc-space-8)),
+    transparent 100%
+  );
+}
+
+.oc-resize-handle--gradient.oc-resize-handle--vertical::after {
+  --oc-resize-gradient-direction: to bottom;
+  top: var(--oc-space-4);
+  bottom: 0;
+  left: 50%;
+  width: var(--oc-border-width, 1px);
+  height: auto;
+  transform: translateX(-50%);
+}
+
+.oc-resize-handle--gradient.oc-resize-handle--horizontal::after {
+  --oc-resize-gradient-direction: to right;
+  right: 0;
+  left: 0;
+  top: 50%;
+  width: auto;
+  height: var(--oc-border-width, 1px);
+  transform: translateY(-50%);
 }
 
 .oc-resize-handle:hover,

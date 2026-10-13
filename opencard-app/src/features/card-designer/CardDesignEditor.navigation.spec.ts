@@ -146,6 +146,7 @@ describe('CardDesignEditor issue navigation', () => {
   it('shows a centered summary and hides single-block viewport controls for multiple selection', async () => {
     const wrapper = mountCde({
       stubs: {
+        OcCard: false,
         OcTree: cdeStub('OcTree', {
           props: { role: String, selectedKeys: Array, selectionMode: String },
           emits: ['selection-change'],
@@ -170,7 +171,7 @@ describe('CardDesignEditor issue navigation', () => {
     expect(wrapper.findAllComponents({ name: 'OcCard' }).map(card => card.props('title')).filter(Boolean))
       .toEqual(['Cards', 'Preview', 'Structure', 'Properties'])
     const propertyCard = wrapper.findAllComponents({ name: 'OcCard' }).find(card => card.props('title') === 'Properties')!
-    expect(propertyCard.props('actions')).toMatchObject([{ key: 'toggle-property-panel' }])
+    expect(propertyCard.props('actions')).toEqual([])
 
     viewport.vm.$emit('block-click', 'text-1', new MouseEvent('click'))
     await nextTick()
@@ -1010,18 +1011,12 @@ describe('CardDesignEditor issue navigation', () => {
     expect(flow.children[0]!.location.align).toBe('center')
   })
 
-  it('keeps face tools visible and right-aligned when both right panels are collapsed', async () => {
+  it('keeps face tools visible and right-aligned with expanded docks', async () => {
     const wrapper = mountCde({
       props: {
         filePath: heroFilePath,
         fileName: heroFileName,
         cardDesignerLayout: {
-          panels: {
-            instanceExpanded: true,
-            previewExpanded: true,
-            structureExpanded: false,
-            propertyExpanded: false,
-          },
           leftTopHeight: null,
           rightTopHeight: null,
           leftDockExtent: 280,
@@ -1150,10 +1145,6 @@ describe('CardDesignEditor issue navigation', () => {
       ))).toBe(true)
     expect(getAction('toggle-property-delete-mode').disabled).toBeUndefined()
 
-    propertyCard.vm.$emit('action', { key: 'toggle-property-panel' })
-    await nextTick()
-    expect(propertyCard.props('collapsed')).toBe(true)
-    expect(getAction('toggle-property-panel').icon).toBe('nav.chevron-up')
   })
 
   it('creates a custom field for the explicit table Block and persists it in the document', async () => {

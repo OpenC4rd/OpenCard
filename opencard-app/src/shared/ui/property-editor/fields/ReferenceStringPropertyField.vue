@@ -77,16 +77,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type {
   PropertyCompletionItem,
-  PropertyCompletionResult,
   PropertyEditorFieldDefinition,
 } from '../propertyEditor.types'
 import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 import ReferenceStringTokenField from './ReferenceStringTokenField.vue'
+
+import { usePropertyCompletion, matchStaticCompletion } from './usePropertyCompletion'
 
 type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
 type TextControl = HTMLInputElement | HTMLTextAreaElement
@@ -102,38 +103,12 @@ const emit = defineEmits<{
 
 const draftValue = ref(props.value == null ? '' : String(props.value))
 const activeInput = ref<TextControl | null>(null)
-const completionState = ref<PropertyCompletionResult | null>(null)
-const isMenuOpen = ref(false)
-const activeKey = ref<string | null>(null)
-const autocompleteId = useId()
+const completion = usePropertyCompletion()
+const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId } = completion
 
-const suggestions = computed(() => {
-  const result = completionState.value
-  return result
-    ? [...result.items, ...(result.parent ? [result.parent] : [])]
-    : []
-})
-const activeDescendantId = computed(() => {
-  if (!activeKey.value) return undefined
-  return autocompleteId + '-option-' + activeKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')
-})
-
-const autocompleteMatch = computed(() => {
-  const current = draftValue.value
-  const values = props.definition.completion?.static?.values ?? []
-  if (!current) return ''
-
-  const trailingMatch = current.match(/([a-z%]+)$/i)
-  const fragment = trailingMatch?.[1] ?? current
-  const prefix = trailingMatch ? current.slice(0, -fragment.length) : ''
-
-  return [...values]
-    .filter((suggestion) => suggestion.length > fragment.length
-      && suggestion.toLowerCase().startsWith(fragment.toLowerCase()))
-    .sort((left, right) => left.length - right.length
-      || left.localeCompare(right, undefined, { sensitivity: 'base' }))
-    .map((suggestion) => `${prefix}${suggestion}`)[0] ?? ''
-})
+const autocompleteMatch = computed(() => matchStaticCompletion(
+  draftValue.value, props.definition.completion?.static?.values ?? [],
+))
 
 const ghostSuffix = computed(() => {
   const suggestion = autocompleteMatch.value
@@ -148,19 +123,10 @@ watch(() => props.value, (value) => {
   }
 })
 
-watch(suggestions, (items) => {
-  if (items.some((item) => item.key === activeKey.value)) {
-    return
-  }
-  activeKey.value = items[0]?.key ?? null
-})
-
 watch(() => props.definition.completion, () => {
   const control = activeInput.value
   if (control && document.activeElement === control) void refreshCompletion(control)
 })
-
-let completionRequestId = 0
 
 async function refreshCompletion(
   control: TextControl,
@@ -168,19 +134,9 @@ async function refreshCompletion(
   cursor = control.selectionStart ?? value.length,
 ): Promise<void> {
   activeInput.value = control
-  const completion = props.definition.completion
-  if (!completion?.provider) {
-    completionState.value = null
-    isMenuOpen.value = false
-    return
-  }
-
-  const requestId = ++completionRequestId
-  const result = await completion.provider({ value, cursor })
-  if (requestId !== completionRequestId) return
-  completionState.value = result
-  isMenuOpen.value = suggestions.value.length > 0
-  activeKey.value = suggestions.value[0]?.key ?? null
+  const provider = props.definition.completion?.provider
+  if (!provider) return completion.clear()
+  await completion.refresh(() => provider({ value, cursor }))
 }
 
 function emitValue(value: string): void {
@@ -239,10 +195,7 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 
 function handleBlur(): void {
   if ((props.definition.commitMode ?? 'input') === 'blur') commitDraft()
-  window.setTimeout(() => {
-    completionState.value = null
-    isMenuOpen.value = false
-  }, 0)
+  completion.closeAfterBlur()
 }
 
 function acceptSuggestionByKey(key: string): void {
@@ -267,45 +220,12 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
   if (suggestion.keepOpen) {
     void refreshCompletion(control, value, cursor)
   } else {
-    completionState.value = null
-    isMenuOpen.value = false
+    completion.clear()
   }
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (isMenuOpen.value && suggestions.value.length > 0) {
-    if (event.key === 'Tab' && event.shiftKey) {
-      const parent = completionState.value?.parent
-      if (!parent) return
-      event.preventDefault()
-      acceptSuggestion(parent)
-      return
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      const currentIndex = Math.max(0, suggestions.value.findIndex((item) => item.key === activeKey.value))
-      activeKey.value = suggestions.value[(currentIndex + 1) % suggestions.value.length]?.key ?? null
-      return
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      const currentIndex = Math.max(0, suggestions.value.findIndex((item) => item.key === activeKey.value))
-      activeKey.value = suggestions.value[
-        (currentIndex - 1 + suggestions.value.length) % suggestions.value.length
-      ]?.key ?? null
-      return
-    }
-    if (event.key === 'Tab' || event.key === 'Enter') {
-      event.preventDefault()
-      if (activeKey.value) acceptSuggestionByKey(activeKey.value)
-      return
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      isMenuOpen.value = false
-      return
-    }
-  }
+  if (completion.handleKeydown(event, acceptSuggestion)) return
 
   if (event.key === 'Tab' && !event.shiftKey && autocompleteMatch.value) {
     event.preventDefault()
@@ -334,19 +254,6 @@ function handleKeydown(event: KeyboardEvent): void {
     --oc-field-control-expanded-height,
     var(--oc-property-row-expanded-height)
   );
-}
-
-.reference-string-field__input {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
-  background: transparent;
-}
-
-.reference-string-field__multiline :deep(.reference-string-field__input) {
-  padding: var(--oc-field-content-padding, var(--oc-space-2));
-  overflow-y: auto;
 }
 
 .reference-string-field__ghost {

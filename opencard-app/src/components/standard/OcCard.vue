@@ -10,22 +10,9 @@
         </OcBar>
       </div>
       <!-- Content -->
-      <Transition
-        @before-enter="beforeContentEnter"
-        @enter="enterContent"
-        @after-enter="clearContentTransition"
-        @enter-cancelled="clearContentTransition"
-        @before-leave="beforeContentLeave"
-        @leave="leaveContent"
-        @after-leave="clearContentTransition"
-        @leave-cancelled="clearContentTransition"
-      >
-        <div v-if="!collapsed" class="oc-card__content-shell">
-          <div class="oc-card__content">
-            <slot />
-          </div>
-        </div>
-      </Transition>
+      <div class="oc-card__content">
+        <slot />
+      </div>
   </section>
 </template>
 
@@ -38,7 +25,6 @@ export type OcCardAction = OcActionDefinition
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
-import { prefersReducedMotion } from '../../shared/ui/foundation'
 import OcActionRail from './OcActionRail.vue'
 import OcBar from './OcBar.vue'
 
@@ -51,8 +37,6 @@ interface OcCardProps {
   variant?: 'plain' | 'surface' | 'glass'
   /** 头部操作按钮定义 */
   actions?: OcCardAction[]
-  /** 是否折叠内容。默认 false */
-  collapsed?: boolean
   /** 占满容器。默认 false */
   fill?: boolean
 }
@@ -72,7 +56,6 @@ const props = withDefaults(defineProps<OcCardProps>(), {
   icon: undefined,
   variant: 'surface',
   actions: () => [],
-  collapsed: false,
   fill: false,
 })
 
@@ -87,7 +70,7 @@ const forwardedAttrs = computed(() => {
 const hasHeader = computed(() => Boolean(props.title || props.icon || props.actions?.length))
 const cardClasses = computed(() => [
   `oc-card--variant-${props.variant}`,
-  { 'oc-card--fill': props.fill, 'oc-card--collapsed': props.collapsed },
+  { 'oc-card--fill': props.fill },
   attrs.class,
 ])
 
@@ -95,74 +78,6 @@ function handleActionSelect(payload: OcActionSelectPayload): void {
   emit('action', { key: payload.key })
 }
 
-function asContentElement(element: Element): HTMLElement | null {
-  return element instanceof HTMLElement ? element : null
-}
-
-function setContentTransition(element: HTMLElement): void {
-  element.style.transition = prefersReducedMotion()
-    ? 'none'
-    : 'height var(--oc-duration-slow) var(--oc-ease), opacity var(--oc-duration-normal) var(--oc-ease)'
-}
-
-function clearContentTransition(element: Element): void {
-  const content = asContentElement(element)
-  if (!content) return
-
-  content.style.height = ''
-  content.style.opacity = ''
-  content.style.overflow = ''
-  content.style.transition = ''
-}
-
-function beforeContentEnter(element: Element): void {
-  const content = asContentElement(element)
-  if (!content) return
-
-  content.style.height = '0'
-  content.style.opacity = '0'
-  content.style.overflow = 'hidden'
-}
-
-function enterContent(element: Element, done: () => void): void {
-  const content = asContentElement(element)
-  if (!content || prefersReducedMotion()) {
-    done()
-    return
-  }
-
-  setContentTransition(content)
-  requestAnimationFrame(() => {
-    content.style.height = `${content.scrollHeight}px`
-    content.style.opacity = '1'
-  })
-  window.setTimeout(done, 250)
-}
-
-function beforeContentLeave(element: Element): void {
-  const content = asContentElement(element)
-  if (!content) return
-
-  content.style.height = `${content.getBoundingClientRect().height}px`
-  content.style.opacity = '1'
-  content.style.overflow = 'hidden'
-}
-
-function leaveContent(element: Element, done: () => void): void {
-  const content = asContentElement(element)
-  if (!content || prefersReducedMotion()) {
-    done()
-    return
-  }
-
-  setContentTransition(content)
-  content.getBoundingClientRect()
-  requestAnimationFrame(() => {
-    content.style.height = '0'
-    content.style.opacity = '0'
-  })
-  window.setTimeout(done, 250)
-}
 </script>
 
 <style scoped>
@@ -206,26 +121,8 @@ function leaveContent(element: Element, done: () => void): void {
   height: 100%;
 }
 
-.oc-card--collapsed.oc-card--fill {
-  height: auto;
-  flex: 0 0 auto;
-}
-
 .oc-card__header {
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
-}
-
-.oc-card--collapsed .oc-card__header,
-.oc-card__header:last-child {
-  border-bottom: none;
-}
-
-.oc-card__content-shell {
-  min-height: 0;
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
 }
 
 .oc-card__content {

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import OcResizeHandle, { type OcResizeHandleChange } from '../../../components/standard/OcResizeHandle.vue';
+import OcResizeTrack from '../../../components/standard/OcResizeTrack.vue';
 import OcIcon from '../../../components/base/OcIcon.vue';
 import OcText from '../../../components/base/OcText.vue';
 import OcActionRail from '../../../components/standard/OcActionRail.vue';
@@ -20,6 +22,8 @@ const props = defineProps<{
   compactGroupWidth?: number;
   persistedLayout?: ProjectWorkspaceSidebarState;
   resizeToggleAnimating?: boolean;
+  resizeLabel?: string;
+  listResizeLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -32,6 +36,7 @@ const emit = defineEmits<{
 
 defineSlots<{ 'list-content': (props: { list: ShellList }) => unknown }>();
 
+const listResizeScale = ref(1);
 const sidebarElement = ref<HTMLElement | null>(null);
 const resizing = ref(false);
 const activeGroupKey = ref<string | null>(null);
@@ -111,59 +116,44 @@ function listSectionStyle(list: ShellList): { flexGrow: string; flexShrink: stri
 function findNextExpandedList(index: number): ShellList | null { return activeLists.value.slice(index + 1).find(list => !isListCollapsed(list.key)) ?? null; }
 function canResizeAfter(index: number): boolean { return !isListCollapsed(activeLists.value[index]?.key ?? '') && findNextExpandedList(index) !== null; }
 
-function onListResizePointerDown(event: PointerEvent, index: number): void {
+function prepareListResize(index: number): void {
   const current = activeLists.value[index];
   const next = findNextExpandedList(index);
-  const body = sidebarElement.value?.querySelector<HTMLElement>('.shell-sidebar-body');
-  if (!current || !next || !body) return;
-  const startY = event.clientY;
-  const sections = [...body.querySelectorAll<HTMLElement>('.shell-sidebar-list')];
-  const currentElement = sections[index];
-  const nextElement = sections[activeLists.value.indexOf(next)];
-  if (!currentElement || !nextElement) return;
-  resizingListPair.value = true;
-  const currentHeight = currentElement.getBoundingClientRect().height;
-  const nextHeight = nextElement.getBoundingClientRect().height;
+  const sections = sidebarElement.value?.querySelectorAll<HTMLElement>('.shell-sidebar-list');
+  if (!current || !next || !sections) return;
+  const currentHeight = sections[index]?.getBoundingClientRect().height ?? 0;
+  const nextHeight = sections[activeLists.value.indexOf(next)]?.getBoundingClientRect().height ?? 0;
   const minimum = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--oc-sidebar-tree-min-height')) || 0;
-  const total = Math.max(0, currentHeight + nextHeight - minimum * 2);
-  const pairWeight = (listWeights.value[current.key] ?? 1) + (listWeights.value[next.key] ?? 1);
-  const move = (moveEvent: PointerEvent): void => {
-    const height = Math.max(minimum, Math.min(currentHeight + moveEvent.clientY - startY, currentHeight + nextHeight - minimum));
-    const share = total > 0 ? (height - minimum) / total : 0.5;
-    listWeights.value = { ...listWeights.value, [current.key]: pairWeight * share, [next.key]: pairWeight * (1 - share) };
-    emitLayoutChange();
-  };
-  const stop = (): void => { resizingListPair.value = false; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', stop);
+  const available = Math.max(0, currentHeight + nextHeight - minimum * 2);
+  listResizeScale.value = available > 0 ? listPairWeight(index) / available : 0;
+  resizingListPair.value = true;
 }
 
-function onResizePointerDown(event: PointerEvent): void {
-  if (props.collapsed) return;
-  resizing.value = true;
-  emit('resize-start');
-  const pointerId = event.pointerId;
-  const startLeft = sidebarElement.value?.getBoundingClientRect().left ?? 0;
-  const minWidth = props.minResizeWidth ?? 78;
-  const maxWidth = Math.max(minWidth, props.maxResizeWidth ?? Number.POSITIVE_INFINITY);
-  const move = (moveEvent: PointerEvent): void => {
-    if (!resizing.value) return;
-    const width = Math.round(moveEvent.clientX - startLeft);
-    emit('resize', Math.min(maxWidth, Math.max(minWidth, width)));
-  };
-  const stop = (): void => {
-    if (!resizing.value) return;
-    resizing.value = false;
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', stop);
-    window.removeEventListener('pointercancel', stop);
-    if (sidebarElement.value?.hasPointerCapture(pointerId)) sidebarElement.value.releasePointerCapture(pointerId);
-    emit('resize-end');
-  };
-  sidebarElement.value?.setPointerCapture(pointerId);
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', stop);
-  window.addEventListener('pointercancel', stop);
+function listPairWeight(index: number): number {
+  const current = activeLists.value[index];
+  const next = findNextExpandedList(index);
+  return (listWeights.value[current?.key ?? ''] ?? 1) + (listWeights.value[next?.key ?? ''] ?? 1);
+}
+
+function resizeList(index: number, weight: number): void {
+  const current = activeLists.value[index];
+  const next = findNextExpandedList(index);
+  if (!current || !next) return;
+  const pairWeight = listPairWeight(index);
+  listWeights.value = { ...listWeights.value, [current.key]: weight, [next.key]: pairWeight - weight };
+  emitLayoutChange();
+}
+
+function resizeSidebar(change: OcResizeHandleChange): void {
+  const keyboard = change.event instanceof KeyboardEvent;
+  if (keyboard) emit('resize-start');
+  emit('resize', change.value);
+  if (keyboard) emit('resize-end');
+}
+
+function finishResize(): void {
+  resizing.value = false;
+  emit('resize-end');
 }
 </script>
 
@@ -203,11 +193,20 @@ function onResizePointerDown(event: PointerEvent): void {
               <OcActionRail :actions="actionDefinitionsByList.get(list.key) ?? []" @select="list.onAction?.($event.key)" />
             </div>
             <div class="shell-sidebar-list-content-wrap" :class="{ collapsed: isListCollapsed(list.key) }"><div class="shell-sidebar-list-content"><slot name="list-content" :list="list"><ShellSidebarContent :list="list" /></slot></div></div>
-            <div v-if="canResizeAfter(index)" class="shell-sidebar-list-resizer" @pointerdown.prevent="onListResizePointerDown($event, index)" />
+            <OcResizeHandle v-if="canResizeAfter(index)" class="shell-sidebar-list-resizer" appearance="invisible"
+              :value="listWeights[list.key] ?? 1" :minimum="0" :maximum="listPairWeight(index)"
+              :units-per-pixel="listResizeScale" :step="listPairWeight(index) / 20"
+              :label="listResizeLabel ?? ''"
+              @resize-start="prepareListResize(index)" @update:value="resizeList(index, $event)"
+              @resize-end="resizingListPair = false" @resize-cancel="resizingListPair = false" />
           </section>
         </div>
       </div>
     </Transition>
-    <div v-if="!collapsed" class="shell-sidebar-resizer" @pointerdown.prevent="onResizePointerDown" />
+    <OcResizeTrack v-if="!collapsed || resizing" class="shell-sidebar-resizer" orientation="vertical" edge="right" appearance="gradient"
+      :value="width" :minimum="minResizeWidth ?? 78" :maximum="Math.max(minResizeWidth ?? 78, maxResizeWidth ?? Number.POSITIVE_INFINITY)"
+      :label="resizeLabel ?? ''"
+      @resize-start="resizing = true; emit('resize-start')" @resize="resizeSidebar"
+      @resize-end="finishResize" @resize-cancel="finishResize" />
   </aside>
 </template>

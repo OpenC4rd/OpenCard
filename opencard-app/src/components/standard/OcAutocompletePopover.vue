@@ -5,10 +5,7 @@
     :placement="placement"
     :max-height="maxHeight"
     :match-anchor-width="matchAnchorWidth"
-    :class="[
-      'oc-autocomplete-popover oc-floating-layer--surface',
-      { 'oc-autocomplete-popover--inline-details': detailLayout === 'inline' },
-    ]"
+    class="oc-autocomplete-popover oc-floating-layer--surface"
     role="listbox"
     :id="id"
   >
@@ -31,10 +28,15 @@
             :style="item.thumbnailStyle" role="img" :aria-label="item.thumbnailLabel ?? item.label" />
         </template>
         <template #title>
-          <OcOverflowText class="oc-autocomplete-popover__label" :text="item.label"
-            :active="item.key === activeKey" :content-style="item.labelStyle" />
+          <span class="oc-autocomplete-popover__title">
+            <OcOverflowText class="oc-autocomplete-popover__label" :text="item.label"
+              :active="item.key === activeKey" :content-style="item.labelStyle" />
+            <OcOverflowText v-if="item.detail && detailLayout === 'inline'"
+              class="oc-autocomplete-popover__detail oc-autocomplete-popover__detail--inline"
+              :text="item.detail" :active="item.key === activeKey" align="right" />
+          </span>
         </template>
-        <template v-if="item.detail" #subtitle>
+        <template v-if="item.detail && detailLayout === 'stacked'" #subtitle>
           <OcOverflowText class="oc-autocomplete-popover__detail"
             :text="item.detail" :active="item.key === activeKey" align="right" />
         </template>
@@ -131,15 +133,19 @@ watch(
   vertical-align: text-bottom;
 }
 
-.oc-autocomplete-popover--inline-details :deep(.oc-row__body) {
-  flex-direction: row;
+.oc-autocomplete-popover__title {
+  display: flex;
   align-items: baseline;
   gap: var(--oc-space-3);
 }
 
-.oc-autocomplete-popover--inline-details :deep(.oc-row__subtitle) {
+.oc-autocomplete-popover__label {
+  flex: 1 1 auto;
+}
+
+.oc-autocomplete-popover__detail--inline {
   flex: 0 1 auto;
-  margin-inline-start: auto;
-  text-align: end;
+  color: var(--oc-fg-muted);
+  font-size: var(--oc-text-sm);
 }
 </style>

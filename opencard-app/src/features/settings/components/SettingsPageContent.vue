@@ -429,10 +429,6 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
 .settings-content__card { --oc-card-content-padding: 0 var(--oc-space-3); }
 .settings-content__card :deep(.page-property-editor-item__row:last-child) { border-bottom: 0; }
 
-.settings-content__fields {
-  display: grid;
-}
-
 .settings-content__preview-stage {
   --settings-preview-scale: 1;
   --settings-preview-glass-opacity: 0;

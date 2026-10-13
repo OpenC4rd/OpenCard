@@ -3,14 +3,7 @@ import type { PreparedCardRender } from '../card-rendering/renderPipeline'
 import type { EditorProps } from '../editor-runtime/editorProtocol'
 import type { EditorViewportTransform } from '../editor-runtime/model/editorUiState'
 
-export interface CardDesignerPanelState {
-  instanceExpanded: boolean
-  previewExpanded: boolean
-  structureExpanded: boolean
-  propertyExpanded: boolean
-}
 export interface CardDesignerLayoutState {
-  panels: CardDesignerPanelState
   leftTopHeight: number | null
   rightTopHeight: number | null
   leftDockExtent: number

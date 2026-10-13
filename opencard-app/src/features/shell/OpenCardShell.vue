@@ -44,6 +44,8 @@
         :compact-group-width="MIN_SIDEBAR_WIDTH"
         :persisted-layout="sidebarPersistedLayout"
         :resize-toggle-animating="sidebarResizeToggleAnimating"
+        :resize-label="t('app.shell.resizeSidebar')"
+        :list-resize-label="t('app.shell.resizeSidebarLists')"
         @body-group-changed="key => currentPage.selectSidebarGroup?.(key)"
         @resize-start="handleSidebarResizeStart"
         @resize="handleSidebarResize"
@@ -64,11 +66,6 @@
           <div class="open-card-shell__page-content">
             <component :is="currentPage.content" :key="currentPage.key" v-bind="currentPage.contentProps.value" />
           </div>
-          <div
-            v-if="isBottomPanelExpanded"
-            class="open-card-shell__bottom-panel-resizer"
-            @pointerdown.prevent="handleBottomPanelResizeStart"
-          />
           <div
             v-if="isBottomPanelResizing"
             class="open-card-shell__bottom-panel-resize-preview"
@@ -112,7 +109,15 @@
             @issue-navigate="problems.activate"
             @issue-copy="problems.copy"
             @output-clear="clearAppOutputEntries"
-          />
+          >
+            <template #leading>
+              <OcResizeTrack v-if="isBottomPanelExpanded" class="open-card-shell__bottom-panel-resizer" edge="top" placement="inside"
+                direction="reverse" :value="bottomPanelHeight" :minimum="bottomPanelMinimum" :maximum="bottomPanelMaximum"
+                :label="t('app.shell.resizeBottomPanel')" @focusin="measureBottomPanel"
+                @resize-start="handleBottomPanelResizeStart" @update:value="resizeBottomPanel"
+                @resize-end="finishBottomPanelResize(true)" @resize-cancel="finishBottomPanelResize(false)" />
+            </template>
+          </ShellBottomPanel>
         </div>
       </ShellPageFrame>
     </div>
@@ -125,6 +130,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import OcResizeTrack from '../../components/standard/OcResizeTrack.vue'
 import { useI18n } from 'vue-i18n'
 import { appLocaleLanguageTag } from '../../i18n/appLocale'
 import { notifyError, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
@@ -181,6 +187,8 @@ watch(locale, value => { document.documentElement.lang = appLocaleLanguageTag(va
 const pageStackRef = ref<HTMLElement | null>(null)
 const { isExpanded: isBottomPanelExpanded, height: bottomPanelHeight, previewHeight: bottomPanelPreviewHeight,
   isResizing: isBottomPanelResizing, previewPercentage: bottomPanelPreviewPercentage, startResize: handleBottomPanelResizeStart,
+  minimum: bottomPanelMinimum, maximum: bottomPanelMaximum, measure: measureBottomPanel,
+  resize: resizeBottomPanel, finishResize: finishBottomPanelResize,
 } = useShellBottomPanelLayout(pageStackRef)
 const activeBottomTab = ref<ShellBottomPanelTab>('issues')
 const {

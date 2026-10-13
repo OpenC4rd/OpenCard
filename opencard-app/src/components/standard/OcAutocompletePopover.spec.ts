@@ -46,7 +46,24 @@ describe('OcAutocompletePopover', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest' })
     wrapper.unmount()
   })
-
-
-
+  it('keeps details selectable when switching between stacked and inline layouts', async () => {
+    const anchor = document.createElement('input')
+    document.body.appendChild(anchor)
+    const wrapper = mount(OcAutocompletePopover, {
+      attachTo: document.body,
+      props: {
+        id: 'details-autocomplete', open: true, anchor, activeKey: 'first',
+        items: [{ key: 'first', label: 'Name', detail: 'Path' }],
+      },
+    })
+    const option = () => document.querySelector<HTMLElement>('#details-autocomplete [role="option"]')!
+    expect(option().textContent).toContain('Name')
+    expect(option().textContent).toContain('Path')
+    await wrapper.setProps({ detailLayout: 'inline' })
+    expect(option().textContent).toContain('Name')
+    expect(option().textContent).toContain('Path')
+    option().dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }))
+    expect(wrapper.emitted('select')).toEqual([['first']])
+    wrapper.unmount()
+  })
 })

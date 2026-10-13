@@ -28,5 +28,5 @@
 - 普通输入直接使用 `OcFieldInput variant="filled"`。
 - 颜色、数字步进、自动补全等复合输入使用 `OcFieldFrame`，内部输入使用 `variant="plain"`。
 - 表格 Cell 等宿主通过 Field appearance context 覆盖 `--oc-field-*` / `--oc-control-*` 变量吸收输入表面；该 context 必须同时控制边框宽度、颜色、圆角、背景、padding 与 focus shadow，基础控件不得反向依赖具体表格组件。
-- title/actions/collapse 属于 `standard/OcCard`，不能加入 `OcPanel`。
+- title/actions 属于 `standard/OcCard`，不能加入 `OcPanel`。
 - 菜单、树、选项组等交互协议属于 standard。

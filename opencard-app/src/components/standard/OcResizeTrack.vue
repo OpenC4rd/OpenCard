@@ -19,6 +19,7 @@
       :label="props.label"
       :tooltip="props.tooltip"
       :orientation="props.orientation"
+      :appearance="props.appearance"
       :direction="props.direction"
       :step="props.step"
       :disabled="props.disabled"
@@ -49,6 +50,7 @@ const props = withDefaults(defineProps<{
   label: string
   tooltip?: string
   orientation?: ResizeOrientation
+  appearance?: 'grip' | 'gradient' | 'invisible'
   direction?: ResizeDirection
   edge?: ResizeEdge
   placement?: ResizePlacement
@@ -56,6 +58,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   orientation: 'horizontal',
+  appearance: 'grip',
   direction: 'normal',
   edge: undefined,
   placement: 'center',

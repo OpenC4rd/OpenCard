@@ -117,7 +117,7 @@ function slotStub(name: string, props: string[]): Component {
 /** The children this suite replaces in nearly every test; see the module comment. */
 export const CdeDefaultStubs: Record<string, CdeStub> = {
   CardViewport: CdeCardViewportStub,
-  OcCard: slotStub('OcCard', ['title', 'actions', 'collapsed', 'variant', 'icon']),
+  OcCard: slotStub('OcCard', ['title', 'actions', 'variant', 'icon']),
   OcPanel: slotStub('OcPanel', ['fill', 'tone', 'border', 'padding', 'overflow', 'align']),
   Teleport: true,
 }

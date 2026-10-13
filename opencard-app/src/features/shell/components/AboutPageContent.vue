@@ -55,7 +55,7 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
 
       <section v-if="currentReleaseNotes?.body" class="about-content__release-notes">
         <h2>{{ t('app.about.releaseNotes') }}</h2>
-        <div v-html="renderedReleaseNotes" />
+        <div class="oc-release-notes" v-html="renderedReleaseNotes" />
       </section>
 
       <footer>
@@ -146,35 +146,12 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
 
 .about-content__release-notes {
   padding: 0 0 var(--oc-space-6);
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-base);
-  line-height: 1.65;
 }
 
 .about-content__release-notes h2 {
   margin: 0 0 var(--oc-space-3);
   color: var(--oc-fg-default);
   font-size: var(--oc-text-lg);
-}
-
-.about-content__release-notes :deep(:first-child) {
-  margin-top: 0;
-}
-
-.about-content__release-notes :deep(:last-child) {
-  margin-bottom: 0;
-}
-
-.about-content__release-notes :deep(ul),
-.about-content__release-notes :deep(ol) {
-  padding-inline-start: var(--oc-space-5);
-}
-
-.about-content__release-notes :deep(h1),
-.about-content__release-notes :deep(h2),
-.about-content__release-notes :deep(h3) {
-  color: var(--oc-fg-default);
-  font-size: var(--oc-text-base);
 }
 
 .about-content footer {

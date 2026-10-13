@@ -31,23 +31,18 @@
         </div>
         <div v-else class="feedback-history__body">
           <nav :aria-label="t('app.feedback.history.listLabel')">
-            <button
-              v-for="record in records"
-              :key="record.reportId"
-              type="button"
-              class="feedback-history__item"
-              :class="{ 'is-active': record.reportId === selectedReportId }"
+            <OcRow v-for="record in records" :key="record.reportId" as="button" type="button"
+              class="feedback-history__item" :class="{ 'is-selected': record.reportId === selectedReportId }"
               :aria-current="record.reportId === selectedReportId ? 'true' : undefined"
-              @click="selectRecord(record.reportId)"
-            >
-              <span class="feedback-history__item-heading">
-                <strong>{{ record.summary }}</strong>
+              :subtitle="`${t(`app.feedback.kind.${record.kind}`)} ${formatDate(record.submittedAt)}`"
+              @click="selectRecord(record.reportId)">
+              <template #title>{{ record.summary }}</template>
+              <template #append>
                 <span class="feedback-history__status" :data-status="record.status">
                   {{ t(`app.feedback.history.status.${record.status}`) }}
                 </span>
-              </span>
-              <span>{{ t(`app.feedback.kind.${record.kind}`) }} {{ formatDate(record.submittedAt) }}</span>
-            </button>
+              </template>
+            </OcRow>
           </nav>
 
           <article v-if="selectedRecord" class="feedback-history__detail">
@@ -122,6 +117,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
+import OcRow from '../../../components/standard/OcRow.vue'
 import type { FeedbackPage } from '../model/feedback'
 import { useFeedbackInbox } from '../composables/useFeedbackInbox'
 import FeedbackPageTabs from './FeedbackPageTabs.vue'
@@ -265,42 +261,6 @@ function formatDate(value: string): string {
   overflow-y: auto;
   border-right: 1px solid var(--oc-border-muted);
   background: var(--oc-bg-base);
-}
-
-.feedback-history__item {
-  display: grid;
-  width: 100%;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-4);
-  border: 0;
-  border-bottom: 1px solid var(--oc-border-muted);
-  background: transparent;
-  color: var(--oc-fg-muted);
-  text-align: left;
-  cursor: pointer;
-}
-
-.feedback-history__item:hover { background: var(--oc-bg-hover); }
-.feedback-history__item.is-active {
-  background: var(--oc-bg-selected);
-  box-shadow: inset 2px 0 0 var(--oc-fg-accent);
-}
-
-.feedback-history__item-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--oc-space-2);
-  min-width: 0;
-}
-
-.feedback-history__item strong {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-  color: var(--oc-fg-default);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .feedback-history__status {

@@ -31,6 +31,15 @@ afterEach(() => {
 })
 
 describe('OcResizeHandle', () => {
+  it('converts pixel movement to layout weights and restores them on cancel', () => {
+    const { element, wrapper } = mountHandle({ minimum: 0, maximum: 2, value: 1, unitsPerPixel: 0.005 })
+    dispatchPointer(element, 'pointerdown', { button: 0, pointerId: 2, clientY: 200 })
+    dispatchPointer(element, 'pointermove', { pointerId: 2, clientY: 250 })
+    dispatchPointer(element, 'pointercancel', { pointerId: 2, clientY: 250 })
+    expect(wrapper.emitted('update:value')).toEqual([[1.25], [1]])
+    wrapper.unmount()
+  })
+
   it('exposes separator orientation and value boundaries', () => {
     const { element } = mountHandle({
       orientation: 'vertical',

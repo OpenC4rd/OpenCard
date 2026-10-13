@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
+import { h, type VNode } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcTree from '../../../components/standard/OcTree.vue'
+import OcResizeTrack from '../../../components/standard/OcResizeTrack.vue'
 import type {
   OcNodeActivateEvent,
   OcNodeCollection,
@@ -31,8 +33,10 @@ function mountPanel(
   expanded = true,
   output: readonly AppOutputEntry[] = [],
   activeTab: 'issues' | 'output' = 'issues',
+  leading?: () => VNode,
 ) {
   return mount(ShellBottomPanel, {
+    slots: leading ? { leading } : {},
     props: {
       expanded,
       activeTab,
@@ -126,6 +130,25 @@ describe('ShellBottomPanel', () => {
       expect(wrapper.get('.shell-bottom-panel').classes()).toContain('is-expanded')
       expect(wrapper.get('#shell-bottom-tab-issues').attributes('aria-selected')).toBe('true')
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the panel open while its resize handle has keyboard focus', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountPanel(true, [], 'issues', () => h(OcResizeTrack, {
+      label: 'Resize panel', minimum: 120, maximum: 300, value: 180,
+    }))
+    document.body.appendChild(wrapper.element)
+    try {
+      ;(wrapper.get('[role=separator]').element as HTMLElement).focus()
+      await wrapper.get('.shell-bottom-panel').trigger('mouseleave')
+      vi.advanceTimersByTime(180)
+      expect(wrapper.emitted('expanded-change')).toBeUndefined()
+      await wrapper.get('[role=separator]').trigger('keydown', { key: 'ArrowUp' })
+      expect(wrapper.getComponent(OcResizeTrack).emitted('update:value')).toEqual([[164]])
+    } finally {
+      wrapper.unmount()
       vi.useRealTimers()
     }
   })

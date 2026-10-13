@@ -43,6 +43,7 @@ import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 import OcSelect from '../../../../components/standard/OcSelect.vue'
 import OcEnumStepper from '../../../../components/standard/OcEnumStepper.vue'
 import OcOptionGroup from '../../../../components/standard/OcOptionGroup.vue'
+import { matchStaticCompletion } from './usePropertyCompletion'
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 
 const props = defineProps<{
@@ -73,28 +74,9 @@ const enumOptions = computed(() => (
   props.definition.options?.map(option => ({ value: option, label: optionLabel(option) })) ?? []
 ))
 
-const autocompleteMatch = computed(() => {
-  const current = draftValue.value
-  const suggestions = props.definition.completion?.static?.values ?? []
-  if (!current) return ''
-
-  const trailingMatch = current.match(/([a-z%]+)$/i)
-  const fragment = trailingMatch?.[1] ?? current
-  const prefix = trailingMatch ? current.slice(0, -fragment.length) : ''
-
-  return [...suggestions]
-    .filter((suggestion) =>
-      suggestion.length > fragment.length &&
-      suggestion.toLowerCase().startsWith(fragment.toLowerCase())
-    )
-    .sort((left, right) => {
-      if (left.length !== right.length) {
-        return left.length - right.length
-      }
-      return left.localeCompare(right, undefined, { sensitivity: 'base' })
-    })
-    .map((suggestion) => `${prefix}${suggestion}`)[0] ?? ''
-})
+const autocompleteMatch = computed(() => matchStaticCompletion(
+  draftValue.value, props.definition.completion?.static?.values ?? [],
+))
 
 const ghostSuffix = computed(() => {
   const suggestion = autocompleteMatch.value
@@ -160,35 +142,13 @@ function handleKeydown(event: KeyboardEvent): void {
   );
 }
 
-.multiline-field :deep(.multiline-field__input) {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: var(--oc-field-content-padding, var(--oc-space-2));
-  overflow-y: auto;
-  border: 0;
-  line-height: 1.45;
-}
-
-.multiline-field :deep(.multiline-field__input:focus),
-.multiline-field :deep(.multiline-field__input:focus-visible) {
-  border-color: transparent;
-}
-
 .autocomplete-field {
   flex: 1 1 auto;
 }
 
-.autocomplete-field :deep(.autocomplete-input) {
-  width: 100%;
-  height: 100%;
-  align-self: stretch;
-  box-sizing: border-box;
+.autocomplete-input {
   position: relative;
   z-index: 1;
-  background: transparent;
-  border: 0;
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
   line-height: normal;
 }
 

@@ -112,8 +112,8 @@
           :min-extent="overlayGeometryConfig.minExtent" :max-extent="overlayGeometryConfig.maxExtent"
           :expand-drag-threshold="overlayGeometryConfig.expandDragThreshold"
           :collapse-drag-threshold="overlayGeometryConfig.collapseDragThreshold"
-          :floating-gap="overlayGeometryConfig.floatingGap" :top-expanded="isInstancePanelExpanded"
-          :bottom-expanded="isPreviewPanelExpanded" :top-size="leftSidebarTopHeight"
+          :floating-gap="overlayGeometryConfig.floatingGap"
+          :top-size="leftSidebarTopHeight"
           :top-min-height="overlayTopMinHeight" :bottom-min-height="overlayBottomMinHeight"
           :responsive-min-stage-width="overlayResponsiveWidth" :split-gap="overlaySplitGap"
           :width-label="t('cardDesigner.layout.resizeLeftSidebar')" :width-tooltip="t('cardDesigner.layout.resizeSidebarTooltip', {
@@ -123,9 +123,9 @@
           @resize-start="handleDockResizeStart" @resize-end="handleDockResizeEnd('left', $event)">
           <template #top>
             <OcCard fill variant="glass" :title="t('cardDesigner.panels.cardTree')" :actions="editorState.mode === 'diff' ? [] : instanceCardActions"
-              :collapsed="!isInstancePanelExpanded" @action="handleInstanceCardAction">
+              @action="handleInstanceCardAction">
               <OcPanel fill tone="transparent" border="none" padding="none" overflow="auto" align="stretch">
-                <OcTree v-if="isInstancePanelExpanded" ref="instanceTreeRef" fill role="listbox"
+                <OcTree ref="instanceTreeRef" fill role="listbox"
                   data-cde-shortcut-scope="instance-tree" tab-navigation="none"
                   :data="editorState.mode === 'diff' ? diffInstanceTreeData : instanceTreeData"
                   :selected-keys="editorState.mode === 'diff' ? diffSelectedInstanceKeys : selectedCardKeys" selection-mode="multiple"
@@ -135,8 +135,7 @@
             </OcCard>
           </template>
           <template #bottom>
-            <OcCard fill variant="glass" :title="t('cardDesigner.panels.preview')" :actions="previewCardActions" :collapsed="!isPreviewPanelExpanded"
-              @action="handlePreviewCardAction">
+            <OcCard fill variant="glass" :title="t('cardDesigner.panels.preview')">
               <OcPanel align="stretch" fill radius="none" tone="transparent" border="none" shadow="lg" padding="none">
                 <div ref="transformPreviewHostRef" class="card-design-editor__transform-preview-host"
                   @wheel.prevent.stop="handlePreviewViewportWheel">
@@ -163,8 +162,8 @@
           :min-extent="overlayGeometryConfig.minExtent" :max-extent="overlayGeometryConfig.maxExtent"
           :expand-drag-threshold="overlayGeometryConfig.expandDragThreshold"
           :collapse-drag-threshold="overlayGeometryConfig.collapseDragThreshold"
-          :floating-gap="overlayGeometryConfig.floatingGap" :top-expanded="isStructureTreePanelExpanded"
-          :bottom-expanded="isPropertyPanelExpanded" :top-size="rightSidebarTopHeight"
+          :floating-gap="overlayGeometryConfig.floatingGap"
+          :top-size="rightSidebarTopHeight"
           :top-min-height="overlayTopMinHeight" :bottom-min-height="overlayBottomMinHeight"
           :responsive-min-stage-width="overlayResponsiveWidth" :split-gap="overlaySplitGap"
           :width-label="t('cardDesigner.layout.resizeRightSidebar')" :width-tooltip="t('cardDesigner.layout.resizeSidebarTooltip', {
@@ -174,7 +173,7 @@
           @resize-start="handleDockResizeStart" @resize-end="handleDockResizeEnd('right', $event)">
           <template #top>
             <OcCard fill variant="glass" :title="t('cardDesigner.panels.structureTree')" :actions="editorState.mode === 'diff' ? [] : structureTreeCardActions"
-              :collapsed="!isStructureTreePanelExpanded" @action="handleStructureTreeCardAction">
+              @action="handleRootAction($event.key)">
               <OcPanel align="stretch" fill tone="transparent" border="none" padding="none" overflow="auto">
                 <OcTree ref="structureTreeRef" fill data-cde-shortcut-scope="structure-tree" tab-navigation="none"
                   :data="editorState.mode === 'diff' ? diffBlockTreeData : blockTreeData"
@@ -192,7 +191,7 @@
           </template>
           <template #bottom>
             <OcCard fill variant="glass" :title="t('cardDesigner.panels.properties')" :actions="editorState.mode === 'diff' ? [] : propertyCardActions"
-              :collapsed="!isPropertyPanelExpanded" @action="handlePropertyCardAction">
+              @action="handlePropertyCardAction">
               <OcPanel fill tone="transparent" border="none" padding="none" overflow="auto">
                 <OcEmpty v-if="isMultiBlockSelection" class="card-design-editor__multi-selection-summary">
                   {{ t('cardDesigner.selectionSummary.multipleBlocks', { count: effectiveSelectedBlockKeys.length }) }}
@@ -374,19 +373,13 @@ const overlayResponsiveWidth = CDE_OVERLAY_RESPONSIVE_WIDTH
 const overlaySplitGap = CDE_OVERLAY_SPLIT_GAP
 const {
   editorShellStyle,
-  ensurePanelsExpanded,
   commitDockExtent,
   commitLayout: commitOverlayLayout,
-  isInstancePanelExpanded,
-  isPreviewPanelExpanded,
-  isPropertyPanelExpanded,
-  isStructureTreePanelExpanded,
   leftDockExtent,
   leftSidebarTopHeight,
   rightDockExtent,
   rightSidebarTopHeight,
   toggleDockCollapsed,
-  togglePanel,
   updateDockExtent,
   updateDockTopSize,
   viewportInsets,
@@ -624,14 +617,6 @@ const cardDataTableRef = ref<CardDataTableHandle | null>(null)
 const instanceTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
 const structureTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
 const loadedFilePath = ref<string | null>(null)
-
-function createPanelToggleAction(key: string, expanded: boolean): OcCardAction {
-  return {
-    key,
-    icon: expanded ? 'nav.chevron-down' : 'nav.chevron-up',
-    title: expanded ? t('cardDesigner.panelActions.collapse') : t('cardDesigner.panelActions.expand'),
-  }
-}
 
 // 当前选择状态
 const selectedBlockIdsByFace = ref<Record<CardFaceKey, string[]>>({
@@ -875,16 +860,10 @@ const instanceCardActions = computed<OcCardAction[]>(() => [
     title: t('cardDesigner.dataTable.deleteInstance'),
     disabled: !canMutateSelectedInstance.value,
   },
-  createPanelToggleAction('toggle-instance-panel', isInstancePanelExpanded.value),
-])
-
-const previewCardActions = computed<OcCardAction[]>(() => [
-  createPanelToggleAction('toggle-preview-panel', isPreviewPanelExpanded.value),
 ])
 
 const propertyCardActions = computed<OcCardAction[]>(() => {
-  const panelToggle = createPanelToggleAction('toggle-property-panel', isPropertyPanelExpanded.value)
-  if (isMultiBlockSelection.value) return [panelToggle]
+  if (isMultiBlockSelection.value) return []
   return [
     ...(canCreateAdditionalField.value
       ? [{
@@ -908,7 +887,6 @@ const propertyCardActions = computed<OcCardAction[]>(() => {
         ? t('propertyEditor.actions.switchToAlphabetical')
         : t('propertyEditor.actions.switchToCategory'),
     },
-    panelToggle,
   ]
 })
 
@@ -920,11 +898,6 @@ function triggerInstanceAction(actionKey: 'add-instance' | 'duplicate-instance' 
 }
 
 function handleInstanceCardAction(payload: { key: string }) {
-  if (payload.key === 'toggle-instance-panel') {
-    togglePanel('instance')
-    return
-  }
-
   if (
     payload.key !== 'add-instance' &&
     payload.key !== 'duplicate-instance' &&
@@ -936,20 +909,9 @@ function handleInstanceCardAction(payload: { key: string }) {
   triggerInstanceAction(payload.key)
 }
 
-function handlePreviewCardAction(payload: { key: string }) {
-  if (payload.key === 'toggle-preview-panel') {
-    togglePanel('preview')
-  }
-}
-
 function handlePropertyCardAction(payload: { key: string }) {
   if (payload.key === 'additional-field.create') {
     openAdditionalFieldCreateDialog()
-    return
-  }
-
-  if (payload.key === 'toggle-property-panel') {
-    togglePanel('property')
     return
   }
 
@@ -1090,17 +1052,7 @@ const structureTreeCardActions = computed<OcCardAction[]>(() => [
     shortcut: getCdeShortcutParts('block.delete'),
     disabled: selectedBlockKeys.value.length === 0,
   },
-  createPanelToggleAction('toggle-structure-tree-panel', isStructureTreePanelExpanded.value),
 ])
-
-async function handleStructureTreeCardAction(payload: { key: string }): Promise<void> {
-  if (payload.key === 'toggle-structure-tree-panel') {
-    togglePanel('structure')
-    return
-  }
-
-  handleRootAction(payload.key)
-}
 
 // 当前选择派生信息
 const {
@@ -1281,7 +1233,6 @@ async function handleSelectionCommand(intent: CardViewportSelectionCommand): Pro
 
   if (intent.key !== EDIT_RICH_TEXT_ACTION_KEY) return
 
-  ensurePanelsExpanded(['property'])
   await nextTick()
   await propertyEditorRef.value?.activateField(block.id, 'content')
 }
@@ -1816,7 +1767,6 @@ async function navigate(token: SessionNavigationToken): Promise<CardDesignerNavi
   }
   commitViewState()
 
-  ensurePanelsExpanded(target.blockId ? ['property', 'structure'] : ['property'])
 
   await nextTick()
   await nextTick()

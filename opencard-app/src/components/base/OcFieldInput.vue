@@ -178,6 +178,12 @@ defineExpose({
   outline: none;
 }
 
+textarea.oc-field-input--plain {
+  padding: var(--oc-field-content-padding, var(--oc-space-2));
+  overflow-y: auto;
+  line-height: 1.45;
+}
+
 .oc-field-input--underline {
   background: transparent;
   border: 0;

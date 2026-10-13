@@ -1129,9 +1129,4 @@ defineExpose({
   overflow: auto;
 }
 
-.oc-rich-text-editor__node-dialog-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
 </style>

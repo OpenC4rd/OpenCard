@@ -54,7 +54,7 @@ tone?: string
 | 层级 | Props 上限 | 当前组件 |
 |------|-----------|---------|
 | base 原子组件 | ≤ 12 | `OcPanel` 12、`OcButton` 12、`OcText` 7、`OcIcon` 6 |
-| standard 组合组件 | ≤ 18 | `OcTree` 15、`OcCard` 7、`OcRow` 2、`OcBar` |
+| standard 组合组件 | ≤ 18 | `OcTree` 15、`OcCard` 5、`OcRow` 2、`OcBar` |
 
 超过上限必须拆分。
 
@@ -120,6 +120,7 @@ emit('selection-change', selectionEvent)
 | `tone`（文本） | `OcText.tone` | `OcTextTone` |
 | `icon` / `icon-tone` | `OcIcon.name` / `OcIcon.tone` | `shared/ui/icon/iconRegistry.ts` → `IconToken`、`IconTone` |
 | 主题色值 | — | `shared/ui/foundation/themes.ts` → `OC_THEME_REGISTRY`、`OC_SHARED_THEME_TOKENS` |
+| 壳层固定几何 | — | `shared/ui/foundation/themeTokens.ts` → `OC_THEME_TOKEN_KEYS`；值在 `themes.ts` → `OC_SHARED_THEME_TOKENS` |
 
 Agent 新增 token 时，必须在该组件的枚举常量中定义，并同步更新上表的「定义位置」列；**不得在本文档里另抄一份取值清单**。
 

@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { reportAppError } from '../../../../features/logging/appErrorCatalog'
 import type {
@@ -56,6 +56,8 @@ import type {
 } from '../../../model/filePath'
 import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+
+import { usePropertyCompletion } from './usePropertyCompletion'
 
 type FilePathDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'filePath' }>
 type FilePathSessionState = 'idle' | 'filtering' | 'browsing-directory' | 'committed'
@@ -79,27 +81,14 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const activeInput = ref<HTMLInputElement | null>(null)
-const completionResult = ref<PropertyCompletionResult | null>(null)
-const items = ref<readonly PropertyCompletionItem[]>([])
+const completion = usePropertyCompletion()
+const { completionState: completionResult, suggestions: items, isMenuOpen, activeKey,
+  autocompleteId, activeDescendantId } = completion
 const isFocused = ref(false)
-const isMenuOpen = ref(false)
-const activeKey = ref<string | null>(null)
 const sessionState = ref<FilePathSessionState>('idle')
-const autocompleteId = useId()
-let requestId = 0
 let suppressDefinitionInvalidation = false
 
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)).replace(/\\/g, '/'))
-const activeDescendantId = computed(() => activeKey.value
-  ? `${autocompleteId}-option-${activeKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-  : undefined)
-
-watch(items, (nextItems) => {
-  if (!nextItems.some((item) => item.key === activeKey.value)) {
-    activeKey.value = nextItems[0]?.key ?? null
-  }
-})
-
 watch(
   () => [
     props.definition.completion?.provider,
@@ -109,7 +98,6 @@ watch(
   () => {
     if (sessionState.value === 'committed') return
     if (suppressDefinitionInvalidation) return
-    requestId += 1
     clearCompletion()
   },
   { deep: true },
@@ -120,54 +108,29 @@ async function refreshCompletion(
   cursor: number,
 ): Promise<void> {
   if (props.definition.isReadonly) return clearCompletion()
-  const currentRequest = ++requestId
-  const completionProvider = props.definition.completion?.provider
-
+  let state: FilePathSessionState = 'filtering'
   try {
-    const genericResult = completionProvider
-      ? await completionProvider({ value, cursor })
-      : null
-    if (currentRequest !== requestId) return
-    if (genericResult) return applyCompletionResult(genericResult, 'filtering')
-
-    const directoryProvider = props.definition.directoryProvider
-    const browseContext = resolveBrowseContext(value)
-    if (!directoryProvider || !browseContext) return clearCompletion()
-
-    const entries = await directoryProvider(browseContext.directory)
-    if (currentRequest !== requestId) return
-    const resolution = createPathCompletionResult(
-      value,
-      browseContext,
-      entries,
-      props.definition.filter,
-    )
-    applyCompletionResult(resolution.result, resolution.state)
+    const applied = await completion.refresh(async () => {
+      const genericResult = await props.definition.completion?.provider?.({ value, cursor })
+      if (genericResult) return genericResult
+      const directoryProvider = props.definition.directoryProvider
+      const context = resolveBrowseContext(value)
+      if (!directoryProvider || !context) { state = 'idle'; return null }
+      const entries = await directoryProvider(context.directory)
+      const resolution = createPathCompletionResult(value, context, entries, props.definition.filter)
+      state = resolution.state
+      return resolution.result
+    }, () => isFocused.value)
+    if (applied) sessionState.value = state
   } catch (error) {
-    if (currentRequest !== requestId) return
     reportAppError('OC-E4005', error)
     clearCompletion()
   }
 }
 
-function applyCompletionResult(
-  result: PropertyCompletionResult | null,
-  state: FilePathSessionState,
-): void {
-  sessionState.value = state
-  completionResult.value = result
-  items.value = result
-    ? [...result.items, ...(result.parent ? [result.parent] : [])]
-    : []
-  isMenuOpen.value = isFocused.value && items.value.length > 0
-}
-
 function clearCompletion(state: FilePathSessionState = 'idle'): void {
   sessionState.value = state
-  completionResult.value = null
-  items.value = []
-  activeKey.value = null
-  isMenuOpen.value = false
+  completion.clear()
 }
 
 function handleInput(event: Event): void {
@@ -203,10 +166,7 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 
 function handleBlur(): void {
   isFocused.value = false
-  requestId += 1
-  window.setTimeout(() => {
-    isMenuOpen.value = false
-  }, 0)
+  completion.closeAfterBlur(false)
 }
 
 function applySuggestionByKey(key: string): void {
@@ -245,41 +205,20 @@ function applySuggestionByKey(key: string): void {
       void refreshCompletion(nextValue, nextCursor)
     })
   } else {
-    requestId += 1
     clearCompletion('committed')
   }
 }
 
 function handleKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
-    requestId += 1
     clearCompletion()
     return
   }
   if (items.value.length === 0) return
-
-  if (event.key === 'Tab' && event.shiftKey) {
-    const parent = completionResult.value?.parent
-    if (!parent) return
-    event.preventDefault()
-    applySuggestionByKey(parent.key)
-    return
-  }
-
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault()
-    const currentIndex = Math.max(0, items.value.findIndex((item) => item.key === activeKey.value))
-    const delta = event.key === 'ArrowDown' ? 1 : -1
-    activeKey.value = items.value[(currentIndex + delta + items.value.length) % items.value.length]?.key ?? null
-    isMenuOpen.value = true
-    return
-  }
-
-  if (event.key === 'Tab' || event.key === 'Enter') {
-    if (!activeKey.value) return
-    event.preventDefault()
-    applySuggestionByKey(activeKey.value)
-  }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') isMenuOpen.value = true
+  // 路径字段保留关闭菜单后以 Tab / Enter 确认当前项的行为。
+  if (event.key === 'Tab' || event.key === 'Enter') isMenuOpen.value = true
+  completion.handleKeydown(event, item => applySuggestionByKey(item.key))
 }
 
 function resolveBrowseContext(
@@ -411,9 +350,6 @@ function getPathBasename(path: string): string {
   return path.slice(separatorIndex + 1)
 }
 
-onBeforeUnmount(() => {
-  requestId += 1
-})
 </script>
 
 <style scoped>

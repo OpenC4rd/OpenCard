@@ -4,6 +4,8 @@
 import type { OcThemeId, OcThemeTokens } from './themeTokens'
 
 export const OC_SHARED_THEME_TOKENS = {
+  '--oc-shell-titlebar-height': '40px',
+  '--oc-shell-page-header-height': '32px',
   '--oc-scrollbar-size': '8px',
   '--oc-opacity-disabled': '0.5',
   '--oc-bg-accent': '#9045F9',

@@ -14,7 +14,6 @@
       </div>
 
       <div
-        v-if="canResizeStack"
         class="cde-overlay-dock__split-handle"
         :style="splitHandleStyle"
       >
@@ -80,8 +79,6 @@ const props = withDefaults(defineProps<{
   expandDragThreshold: number
   collapseDragThreshold: number
   floatingGap: number
-  topExpanded: boolean
-  bottomExpanded: boolean
   topSize: number | null
   topMinHeight: number
   bottomMinHeight: number
@@ -128,8 +125,6 @@ const geometry = computed(() => resolveCdeOverlayDockGeometry(
   props.extent,
   geometryConfig.value,
 ))
-const hasExpandedPanel = computed(() => props.topExpanded || props.bottomExpanded)
-const canResizeStack = computed(() => props.topExpanded && props.bottomExpanded)
 const splitMaximum = computed(() => {
   return Math.max(
     props.topMinHeight,
@@ -150,16 +145,11 @@ const dockStyle = computed<CSSProperties>(() => ({
   width: `${geometry.value.contentWidth}px`,
   transform: `translateX(${geometry.value.translationX}px)`,
   top: props.floatingGap,
-  bottom: hasExpandedPanel.value ? `${props.floatingGap}px` : 'auto',
-  height: hasExpandedPanel.value ? `calc(100% - ${props.floatingGap * 2}px)` : 'auto',
+  bottom: `${props.floatingGap}px`,
+  height: `calc(100% - ${props.floatingGap * 2}px)`,
 }))
 const stackStyle = computed<CSSProperties>(() => {
   const style: CSSProperties = { gap: `${props.splitGap}px` }
-  if (!props.topExpanded && !props.bottomExpanded) {
-    return { ...style, gridTemplateRows: 'auto auto' }
-  }
-  if (!props.topExpanded) return { ...style, gridTemplateRows: 'auto minmax(0, 1fr)' }
-  if (!props.bottomExpanded) return { ...style, gridTemplateRows: 'minmax(0, 1fr) auto' }
   if (props.topSize === null) {
     return { ...style, gridTemplateRows: `minmax(${props.topMinHeight}px, 1fr) minmax(0, 1fr)` }
   }

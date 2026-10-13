@@ -483,10 +483,6 @@ defineExpose({ canSave, navigate, presentation })
   justify-self: start;
 }
 
-.project-profile-editor__linked-file > div {
-  min-width: 0;
-}
-
 .project-profile-editor__outline {
   position: sticky;
   top: var(--oc-space-6);
@@ -601,9 +597,5 @@ defineExpose({ canSave, navigate, presentation })
     padding-inline: var(--oc-space-3);
   }
 
-  .project-profile-editor__linked-file {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 }
 </style>

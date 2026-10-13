@@ -67,11 +67,11 @@ describe('ShellSidebar', () => {
 
     wrapper.find('.shell-sidebar-list-resizer').element.dispatchEvent(new PointerEvent('pointerdown', { clientY: 200, bubbles: true }))
     await wrapper.vm.$nextTick()
-    window.dispatchEvent(new PointerEvent('pointermove', { clientY: 250 }))
+    wrapper.get('.shell-sidebar-list-resizer').element.dispatchEvent(new PointerEvent('pointermove', { clientY: 250 }))
     await wrapper.vm.$nextTick()
     const resizedGrow = sections[0]!.attributes('style')
     expect(resizedGrow).not.toContain('flex-grow: 1;')
-    window.dispatchEvent(new PointerEvent('pointerup'))
+    wrapper.get('.shell-sidebar-list-resizer').element.dispatchEvent(new PointerEvent('pointerup', { clientY: 250 }))
     await wrapper.findAll('.shell-sidebar-list-toggle')[0]!.trigger('click')
     await wrapper.findAll('.shell-sidebar-list-toggle')[0]!.trigger('click')
     expect(sections[0]!.attributes('style')).toBe(resizedGrow)
@@ -261,7 +261,8 @@ describe('ShellSidebar', () => {
       releasePointerCapture: { value: () => undefined },
     })
 
-    wrapper.get('.shell-sidebar-resizer').element.dispatchEvent(new PointerEvent('pointerdown', {
+    const handle = wrapper.get('.shell-sidebar-resizer [role=separator]')
+    handle.element.dispatchEvent(new PointerEvent('pointerdown', {
       bubbles: true,
       clientX: 260,
       pointerId: 4,
@@ -274,10 +275,12 @@ describe('ShellSidebar', () => {
     expect(wrapper.get('.shell-sidebar').classes()).not.toContain('is-resizing')
     await wrapper.setProps({ resizeToggleAnimating: false })
     expect(wrapper.get('.shell-sidebar').classes()).toContain('is-resizing')
-    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 300, pointerId: 4 }))
-    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 900, pointerId: 4 }))
+    handle.element.dispatchEvent(new PointerEvent('pointermove', { clientX: 300, pointerId: 4 }))
+    await wrapper.setProps({ collapsed: true })
+    expect(wrapper.find('.shell-sidebar-resizer [role=separator]').exists()).toBe(true)
+    handle.element.dispatchEvent(new PointerEvent('pointermove', { clientX: 900, pointerId: 4 }))
     expect(wrapper.emitted('resize')).toEqual([[300], [420]])
-    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 4 }))
+    handle.element.dispatchEvent(new PointerEvent('pointerup', { pointerId: 4, clientX: 900 }))
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('resize-end')).toHaveLength(1)

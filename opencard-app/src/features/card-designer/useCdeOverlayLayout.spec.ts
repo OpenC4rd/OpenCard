@@ -6,12 +6,6 @@ import { useCdeOverlayLayout } from './useCdeOverlayLayout'
 
 function createLayout(overrides: Partial<CardDesignerLayoutState> = {}): CardDesignerLayoutState {
   return {
-    panels: {
-      instanceExpanded: true,
-      previewExpanded: true,
-      structureExpanded: true,
-      propertyExpanded: true,
-    },
     leftTopHeight: null,
     rightTopHeight: null,
     leftDockExtent: 280,
@@ -35,34 +29,6 @@ function createController(initialLayout = createLayout()) {
 }
 
 describe('useCdeOverlayLayout', () => {
-  it('syncs session panel state and commits semantic panel commands', () => {
-    const { commits, controller } = createController(createLayout({
-      panels: {
-        instanceExpanded: false,
-        previewExpanded: true,
-        structureExpanded: false,
-        propertyExpanded: false,
-      },
-      leftTopHeight: 100,
-      rightTopHeight: 260,
-    }))
-
-    expect(controller.isInstancePanelExpanded.value).toBe(false)
-    expect(controller.leftSidebarTopHeight.value).toBe(160)
-    controller.togglePanel('instance')
-
-    expect(commits[commits.length - 1]).toEqual(createLayout({
-      panels: {
-        instanceExpanded: true,
-        previewExpanded: true,
-        structureExpanded: false,
-        propertyExpanded: false,
-      },
-      leftTopHeight: 160,
-      rightTopHeight: 260,
-    }))
-  })
-
   it('derives mirrored dock geometry and viewport insets from one extent per side', () => {
     const { controller } = createController()
 
@@ -139,26 +105,9 @@ describe('useCdeOverlayLayout', () => {
     expect(controller.rightSidebarTopHeight.value).toBe(320)
     expect(commits).toHaveLength(0)
 
-    controller.togglePanel('property')
+    controller.commitLayout()
     expect(commits).toHaveLength(1)
     expect(commits[0]?.rightTopHeight).toBe(320)
   })
 
-  it('ensures requested panels are expanded without changing transient dock extents', () => {
-    const { commits, controller } = createController(createLayout({
-      panels: {
-        instanceExpanded: false,
-        previewExpanded: true,
-        structureExpanded: false,
-        propertyExpanded: false,
-      },
-    }))
-    controller.updateDockExtent('left', 140)
-
-    expect(controller.ensurePanelsExpanded(['instance', 'structure', 'property'])).toBe(true)
-    expect(controller.leftDockExtent.value).toBe(140)
-    expect(controller.isStructureTreePanelExpanded.value).toBe(true)
-    expect(controller.isPropertyPanelExpanded.value).toBe(true)
-    expect(commits[0]?.leftDockExtent).toBe(280)
-  })
 })

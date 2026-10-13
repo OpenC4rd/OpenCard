@@ -43,11 +43,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
   PropertyCompletionItem,
-  PropertyCompletionResult,
   PropertyEditorFieldDefinition,
 } from '../propertyEditor.types'
 import {
@@ -62,6 +61,8 @@ import OcAutocompletePopover from '../../../../components/standard/OcAutocomplet
 import OcButton from '../../../../components/base/OcButton.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+
+import { usePropertyCompletion } from './usePropertyCompletion'
 
 type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
 type TextControl = HTMLInputElement | HTMLTextAreaElement
@@ -86,19 +87,9 @@ const draft = ref(initial.draft)
 /** 自己发出去的值回传时不重新解析，否则正在输入的那一项会被规范化（去空白）打断。 */
 let lastEmitted = ''
 const activeInput = ref<TextControl | null>(null)
-const completionState = ref<PropertyCompletionResult | null>(null)
-const isMenuOpen = ref(false)
-const activeKey = ref<string | null>(null)
-const autocompleteId = useId()
+const completion = usePropertyCompletion()
+const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId } = completion
 
-const suggestions = computed(() => {
-  const result = completionState.value
-  return result ? [...result.items, ...(result.parent ? [result.parent] : [])] : []
-})
-const activeDescendantId = computed(() => {
-  if (!activeKey.value) return undefined
-  return `${autocompleteId}-option-${activeKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-})
 /** 补全 provider 拿到的是整串 + 整串光标，所以尾巴要补回已提交项的前缀。 */
 const editedValue = computed(() => `${referenceStringTokenPrefix(tokens.value, separator.value)}${draft.value}`)
 const hasInvalidToken = computed(() => [...tokens.value, draft.value]
@@ -139,8 +130,7 @@ function commitDraft(): void {
   tokens.value = [...tokens.value, token]
   draft.value = ''
   emitTokens()
-  completionState.value = null
-  isMenuOpen.value = false
+  completion.clear()
   void focusInput()
 }
 
@@ -157,27 +147,15 @@ function setCursor(control: TextControl, cursor: number): void {
   })
 }
 
-let completionRequestId = 0
-
 async function refreshCompletion(
   control: TextControl,
   value = editedValue.value,
   cursor = control.selectionStart ?? value.length,
 ): Promise<void> {
   activeInput.value = control
-  const completion = props.definition.completion
-  if (!completion?.provider) {
-    completionState.value = null
-    isMenuOpen.value = false
-    return
-  }
-
-  const requestId = ++completionRequestId
-  const result = await completion.provider({ value, cursor })
-  if (requestId !== completionRequestId) return
-  completionState.value = result
-  isMenuOpen.value = suggestions.value.length > 0
-  activeKey.value = suggestions.value[0]?.key ?? null
+  const provider = props.definition.completion?.provider
+  if (!provider) return completion.clear()
+  await completion.refresh(() => provider({ value, cursor }))
 }
 
 function handleInput(event: Event): void {
@@ -208,10 +186,7 @@ function handleBlur(): void {
     const next = joinReferenceStringTokens(tokens.value, draft.value, separator.value)
     if (next !== stringOf(props.value)) emit('update:value', next)
   }
-  window.setTimeout(() => {
-    completionState.value = null
-    isMenuOpen.value = false
-  }, 0)
+  completion.closeAfterBlur()
 }
 
 /** 粘贴一整列来源时按分隔符/换行拆成多项，一次成标签。 */
@@ -252,40 +227,13 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
 
   if (suggestion.keepOpen) void refreshCompletion(control, nextValue, cursor)
   else {
-    completionState.value = null
-    isMenuOpen.value = false
+    completion.clear()
     setCursor(control, draft.value.length)
   }
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (isMenuOpen.value && suggestions.value.length > 0) {
-    if (event.key === 'Tab' && event.shiftKey) {
-      const parent = completionState.value?.parent
-      if (!parent) return
-      event.preventDefault()
-      acceptSuggestion(parent)
-      return
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      const offset = event.key === 'ArrowDown' ? 1 : -1
-      const currentIndex = Math.max(0, suggestions.value.findIndex((item) => item.key === activeKey.value))
-      const nextIndex = (currentIndex + offset + suggestions.value.length) % suggestions.value.length
-      activeKey.value = suggestions.value[nextIndex]?.key ?? null
-      return
-    }
-    if (event.key === 'Tab' || event.key === 'Enter') {
-      event.preventDefault()
-      if (activeKey.value) acceptSuggestionByKey(activeKey.value)
-      return
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      isMenuOpen.value = false
-      return
-    }
-  }
+  if (completion.handleKeydown(event, acceptSuggestion)) return
 
   if (props.definition.isReadonly) return
   if (event.key === 'Enter' && !event.isComposing) {
@@ -344,17 +292,7 @@ function handleKeydown(event: KeyboardEvent): void {
   white-space: nowrap;
 }
 
-.reference-string-token-field :deep(.reference-string-token-field__token-remove) {
-  min-width: var(--oc-size-sm);
-  height: var(--oc-size-sm);
-}
-
-.reference-string-token-field :deep(.reference-string-token-field__input) {
-  /* 基准宽取一个尺寸 token：剩余空间不足这个宽度时输入框换到下一行，够的话紧跟最后一个标签。 */
-  flex: 1 1 var(--oc-size-lg);
-  min-width: 0;
-  border: 0;
-  padding: 0 var(--oc-space-1);
-  background: transparent;
+.reference-string-token-field__input {
+  --oc-field-content-padding: 0 var(--oc-space-1);
 }
 </style>

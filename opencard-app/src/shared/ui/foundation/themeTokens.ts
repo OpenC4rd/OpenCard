@@ -5,6 +5,10 @@
 export type OcThemeId = 'dark' | 'light'
 
 export const OC_THEME_TOKEN_KEYS = [
+  // 壳层固定几何
+  '--oc-shell-titlebar-height',
+  '--oc-shell-page-header-height',
+
   // 滚动条
   '--oc-scrollbar-size',
   '--oc-scrollbar-thumb',
