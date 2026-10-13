@@ -792,7 +792,7 @@ export default {
     timelineNoCommits: '当前文件还没有提交记录',
     timelineFailed: '读取时间线失败',
     diffViewer: { versionA: '版本 A', versionB: '版本 B', diskVersion: '磁盘版本', loading: '正在加载差异版本…', parseFailedGeneric: '无法解析 .ocdocument 差异版本', sameVersion: '不能比较相同版本', added: '新增', removed: '删除', changed: '修改', divider: '调整版本分视位置 [key]A[/key] 左 [key]S[/key] 中 [key]D[/key] 右', switchToSideBySide: '切换到双视图', switchToSplit: '切换到分裂视图', exitComparison: '退出对比', readRevisionFailed: '无法读取历史版本', notTextFile: '该版本不是文本文件', prepareResourcesFailed: '无法准备历史资源', projectUnavailable: '项目或文件不可用', readFailed: '差异版本读取失败' },
-    openProject: '打开项目文件夹',
+    openProject: '打开项目文件夹', collaborationEmpty: '打开项目后，这里会显示文件变更和版本记录',
     fileActions: {
       more: '更多操作',
       rename: '重命名',

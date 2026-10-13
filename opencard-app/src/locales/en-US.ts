@@ -792,7 +792,7 @@ export default {
     timelineNoCommits: 'No commits for this file yet',
     timelineFailed: 'Unable to read timeline',
     diffViewer: { versionA: 'Version A', versionB: 'Version B', diskVersion: 'Disk version', loading: 'Loading versions…', parseFailedGeneric: 'Unable to parse the .ocdocument versions', sameVersion: 'The same version cannot be compared', added: 'Added', removed: 'Removed', changed: 'Changed', divider: 'Adjust version divider [key]A[/key] left [key]S[/key] center [key]D[/key] right', switchToSideBySide: 'Switch to side-by-side view', switchToSplit: 'Switch to split view', exitComparison: 'Exit comparison', readRevisionFailed: 'Could not read the historical version', notTextFile: 'That version is not a text file', prepareResourcesFailed: 'Could not prepare the historical resources', projectUnavailable: 'The project or file is unavailable', readFailed: 'Could not read the versions to compare' },
-    openProject: 'Open Project Folder',
+    openProject: 'Open Project Folder', collaborationEmpty: 'Open a project to see changes and version history',
     fileActions: {
       more: 'More Actions',
       rename: 'Rename',

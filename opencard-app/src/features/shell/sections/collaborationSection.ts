@@ -33,7 +33,29 @@ export interface CollaborationSectionOptions {
 
 export function createCollaborationSection(options: CollaborationSectionOptions): ComputedRef<ShellListGroup[]> {
   return computed(() => {
-    if (!options.projectOpen.value) return []
+    if (!options.projectOpen.value) {
+      return [{
+        key: 'version-control',
+        title: options.translate('sidebar.versionControlGroup', 'Version Control'),
+        icon: 'nav.collaboration',
+        onAction: options.onAction,
+        headButtons: [{
+          key: 'open-project',
+          icon: 'status.folder-open',
+          title: options.translate('sidebar.openProject', 'Open Project Folder'),
+        }],
+        lists: [{
+          key: 'collaboration-empty',
+          title: options.translate('sidebar.versionControlGroup', 'Version Control'),
+          placeholder: options.translate('sidebar.collaborationEmpty', 'Open a project to see changes and version history'),
+          actions: [],
+          content: {
+            type: 'empty' as const,
+            text: options.translate('sidebar.collaborationEmpty', 'Open a project to see changes and version history'),
+          },
+        }],
+      }]
+    }
     return [
       {
         key: 'version-control',

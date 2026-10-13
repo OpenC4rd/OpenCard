@@ -57,6 +57,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
       workbench: { content: workbench.page.content, contentProps: workbench.page.contentProps,
         header: workbench.page.header, bottomPanel: workbench.page.bottomPanel, handleKeydown: workbench.page.handleKeydown },
       version: workbench.versionControl, activateChange: workbench.handleChangesNodeActivate,
+      openProject: workbench.openProject,
     }),
     market: placeholder('market', 'nav.market'),
     test: placeholder('test', 'nav.test'),

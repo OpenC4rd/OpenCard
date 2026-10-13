@@ -723,7 +723,7 @@ export function createWorkbenchPage(options: {
   }
   onUnmounted(() => { sessionManager.dispose(); void cancelExportsAndWait().then(() => projectStore.disposeResources()) })
   return {
-    page, versionControl, handleChangesNodeActivate,
+    page, versionControl, handleChangesNodeActivate, openProject: app.openProject,
     openFile: openFileFromPicker, open: openEditorSession,
     closeWorkspaceSessions, requestProjectClose, requestApplicationClose, cancelExportsAndWait,
     newDocument: createUntitledOpenCard, addResourcePackageToProject,

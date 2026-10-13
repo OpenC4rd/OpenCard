@@ -13,6 +13,7 @@ export function createCollaborationPage(options: {
   workbench: Pick<SpacePage, 'content' | 'contentProps' | 'header' | 'bottomPanel' | 'handleKeydown'>
   version: ReturnType<typeof useWorkbenchVersionControl>
   activateChange: (event: OcNodeActivateEvent) => Promise<void>
+  openProject: () => Promise<unknown>
 }) {
   const { t } = useI18n()
   const navigation = useShellNavigation()
@@ -20,6 +21,10 @@ export function createCollaborationPage(options: {
   const version = options.version
   const active = computed(() => navigation.page.value === 'collaboration')
   async function onAction(key: string): Promise<void> {
+    if (key === 'open-project') {
+      await options.openProject()
+      return
+    }
     if (!project.projectPath.value) return
     if (key === 'initialize-repository' && version.repositoryNeedsInitialization.value) {
       await version.initializeProjectRepository()
