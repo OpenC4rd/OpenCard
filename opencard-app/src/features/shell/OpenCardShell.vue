@@ -38,7 +38,7 @@
       <ShellSidebar
         :collapsed="effectiveSidebarCollapsed"
         :width="sidebarWidth"
-        :body-groups="currentPage.sidebar.value"
+        :body-group="currentPage.sidebar.value[0]"
         :min-resize-width="SHELL_SIDEBAR_COLLAPSE_THRESHOLD"
         :max-resize-width="MAX_SIDEBAR_WIDTH"
         :compact-group-width="MIN_SIDEBAR_WIDTH"
@@ -46,7 +46,6 @@
         :resize-toggle-animating="sidebarResizeToggleAnimating"
         :resize-label="t('app.shell.resizeSidebar')"
         :list-resize-label="t('app.shell.resizeSidebarLists')"
-        @body-group-changed="key => currentPage.selectSidebarGroup?.(key)"
         @resize-start="handleSidebarResizeStart"
         @resize="handleSidebarResize"
         @resize-end="handleSidebarResizeEnd"
@@ -64,7 +63,7 @@
           :class="{ 'is-bottom-panel-expanded': isBottomPanelExpanded }"
         >
           <div class="open-card-shell__page-content">
-            <component :is="currentPage.content" :key="currentPage.key" v-bind="currentPage.contentProps.value" />
+            <component :is="currentPage.content" :key="currentPage.contentKey ?? currentPage.key" v-bind="currentPage.contentProps.value" />
           </div>
           <div
             v-if="isBottomPanelResizing"

@@ -5,13 +5,13 @@ import type { ShellPage } from '../shellLocation'
 import type { ShellSpaceDefinition } from '../shell.types'
 import type { ApplicationCloseAction } from './useUnsavedSessionGuard'
 import ComingSoonPageContent from '../components/ComingSoonPageContent.vue'
-import ControlShowcasePageContent from '../components/ControlShowcasePageContent.vue'
 import { useShellNavigation } from './useShellNavigation'
 import { useApplicationServices } from './useApplicationServices'
 import { useApplicationActions } from './useApplicationActions'
 import { createWelcomePage } from './createWelcomePage'
 import { createSettingsPage } from './createSettingsPage'
 import { createWorkbenchPage } from './createWorkbenchPage'
+import { createCollaborationPage } from './createCollaborationPage'
 import { createCreateProjectPage } from './createCreateProjectPage'
 import { createExportTemplatePage } from './createExportTemplatePage'
 import { createAboutPage } from './createAboutPage'
@@ -53,12 +53,13 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   }
   const pages: Record<ShellPage, SpacePage> = {
     welcome: createWelcomePage(), workbench: workbench.page, settings: settings.page,
+    collaboration: createCollaborationPage({
+      workbench: { content: workbench.page.content, contentProps: workbench.page.contentProps,
+        header: workbench.page.header, bottomPanel: workbench.page.bottomPanel, handleKeydown: workbench.page.handleKeydown },
+      version: workbench.versionControl, activateChange: workbench.handleChangesNodeActivate,
+    }),
     market: placeholder('market', 'nav.market'),
-    test: {
-      key: 'test', navigation: { key: 'test', icon: 'nav.test', labelKey: 'app.shell.space.test' },
-      content: ControlShowcasePageContent, contentProps: computed(() => ({})), sidebar: computed(() => []),
-      header: computed(() => ({ title: t('app.shell.space.test'), titleLoading: false, icon: 'nav.test', actions: [] })),
-    },
+    test: placeholder('test', 'nav.test'),
     'create-project': creation.page, 'export-template': templateExport.page, about: createAboutPage(services),
   }
   const currentPage = computed(() => pages[navigation.page.value])

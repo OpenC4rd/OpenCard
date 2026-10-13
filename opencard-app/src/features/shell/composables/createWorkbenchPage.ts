@@ -1,4 +1,4 @@
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../../workspace/store/projectStore'
@@ -57,7 +57,8 @@ export function createWorkbenchPage(options: {
   const BUILD_RESOURCE_PACKAGE_ACTION_KEY = 'file.build-package'
   const settingsStore = useAppSettingsStore()
   const app = useAppProjectActions()
-  const { page: shellPage, isWorkbench: isWorkbenchMode, showPrimarySpace: showPrimarySpacePage } = useShellNavigation()
+  const { page: shellPage, showPrimarySpace: showPrimarySpacePage } = useShellNavigation()
+  const isWorkbenchMode = computed(() => shellPage.value === 'workbench' || shellPage.value === 'collaboration')
   const openSettingsAt = options.openSetting
   const resourcePackageStore = useStoredResourcePackageStore()
   const resourcePackageBuilderOpen = ref(false)
@@ -102,7 +103,7 @@ export function createWorkbenchPage(options: {
     closeSession, closeWorkspaceSessions, closeSessionsByPath, remapSessionPaths } = sessionManager
 
   const visibleEditorSession = computed(() => (
-    shellPage.value === 'workbench' ? activeSession.value : null
+    isWorkbenchMode.value ? activeSession.value : null
   ))
 
   let autoSaveTimer: number | null = null
@@ -133,49 +134,26 @@ export function createWorkbenchPage(options: {
     if (autoSaveTimer !== null) window.clearInterval(autoSaveTimer)
   })
 
+  const versionControl = useWorkbenchVersionControl({
+    projectPath, activeSession, locale, translate: t, fileChangeRevision, getRelativeProjectPath,
+    moveProjectEntryToTrash: trashFile,
+    requestPathChanges: (paths, perform) => requestPathChanges(paths.map(resolveProjectPath), perform),
+    openSetting: openSettingsAt, settings: settingsStore.settings, requestConfirmation,
+  })
   const {
-    commitVersionDialogOpen,
-    isCommittingVersion,
-    commitVersionError,
-    isInitializingRepository,
     timelineFilePath,
     timelineFileName,
     timelineTreeData,
-    timelineProjectTreeData,
-    changesTreeData,
-    selectedChangeCount,
     statusEntries,
     timelineLoading,
     timelineRevisionOptions,
     latestCommitIdForPath,
     refreshTimeline,
-    refreshTimelineStatus,
     timelinePlaceholder,
-    versionGraphExpandedKeys,
     changesExpandedKeys,
     repositoryReady,
-    repositoryNeedsInitialization,
-    handleVersionGraphExpansionChange,
-    handleVersionGraphExpansionSync,
     handleChangesExpansionChange,
-    handleChangesExpansionSync,
-    handleChangesAction,
-    closeCommitVersionDialog,
-    initializeProjectRepository,
-    commitVersion,
-  } = useWorkbenchVersionControl({
-    projectPath,
-    activeSession,
-    locale,
-    translate: t,
-    fileChangeRevision,
-    getRelativeProjectPath,
-    moveProjectEntryToTrash: trashFile,
-    requestPathChanges: (paths, perform) => requestPathChanges(paths.map(resolveProjectPath), perform),
-    openSetting: openSettingsAt,
-    settings: settingsStore.settings,
-    requestConfirmation,
-  })
+  } = versionControl
   const {
     diffSessionState,
     editorComparison,
@@ -446,30 +424,12 @@ export function createWorkbenchPage(options: {
     },
     version: {
       ready: repositoryReady,
-      needsInitialization: repositoryNeedsInitialization,
-      initializing: isInitializingRepository,
-      committing: isCommittingVersion,
-      selectedChangeCount,
       timeline: {
         placeholder: timelinePlaceholder,
         filePath: timelineFilePath,
         loading: timelineLoading,
         data: timelineTreeData,
         onAction: handleTimelineAction,
-      },
-      changes: {
-        data: changesTreeData,
-        expandedKeys: changesExpandedKeys,
-        onExpansionChange: handleChangesExpansionChange,
-        onExpansionSync: handleChangesExpansionSync,
-        onNodeActivate: handleChangesNodeActivate,
-        onAction: handleChangesAction,
-      },
-      graph: {
-        data: timelineProjectTreeData,
-        expandedKeys: versionGraphExpandedKeys,
-        onExpansionChange: handleVersionGraphExpansionChange,
-        onExpansionSync: handleVersionGraphExpansionSync,
       },
     },
   })
@@ -512,14 +472,6 @@ export function createWorkbenchPage(options: {
       getActiveSessionId: () => activeSession.value?.state.id ?? null,
       getEditorNavigator: () => currentEditorRef.value,
     })
-  }
-
-  function handleSidebarBodyGroupChanged(groupKey: string): void {
-    if (groupKey === 'version-control' && repositoryReady.value) void refreshTimelineStatus()
-  }
-
-  function handleWindowFocus(): void {
-    if (isWorkbenchMode.value && projectPath.value && repositoryReady.value) void refreshTimelineStatus()
   }
 
   async function createProjectEntry(kind: 'folder' | 'opencard'): Promise<void> {
@@ -638,8 +590,6 @@ export function createWorkbenchPage(options: {
       case 'open-project': await app.openProject(); return
       case 'export-project-template': return app.exportTemplate()
       case 'export-card-documents': if (projectPath.value) await openProjectExportDialog(); return
-      case 'publish-version': if (projectPath.value && changesTreeData.value.rootKeys.length) { commitVersionError.value = ''; commitVersionDialogOpen.value = true }; return
-      case 'initialize-repository': if (projectPath.value && repositoryNeedsInitialization.value) await initializeProjectRepository(); return
       case 'toggle-debug-hide-cde-overlays': debugHideCdeOverlays.value = !debugHideCdeOverlays.value; return
       case 'toggle-debug-transparent-cde-viewport': debugTransparentCdeViewport.value = !debugTransparentCdeViewport.value; return
       case 'toggle-debug-passive-cde-viewport': debugPassiveCdeViewport.value = !debugPassiveCdeViewport.value; return
@@ -750,7 +700,7 @@ export function createWorkbenchPage(options: {
         catch (error) { notifyAppError('OC-E1002', { source: 'issue-entry', issueId: issue.id, error }, locale.value) }
       },
     })),
-    selectSidebarGroup: handleSidebarBodyGroupChanged, handleKeydown,
+    handleKeydown,
     overlays: WorkbenchOverlays,
     overlayProps: computed(() => ({
       showExportRenderer: showExportRenderer.value, exportCardFace: exportCardFace.value, exportResourceContext: exportResourceContext.value, setExportRendererRef,
@@ -758,7 +708,6 @@ export function createWorkbenchPage(options: {
       projectExportDocumentCandidates: projectExportDocumentCandidates.value, isExportPreparing: isExportPreparing.value, isProjectExportRunning: isProjectExportRunning.value,
       exportPreparationIssues: exportPreparationIssues.value, resourcePackageBuilderOpen: resourcePackageBuilderOpen.value, projectPath: projectPath.value,
       projectName: projectName.value, resourcePackageBuilderEntries: indexedEntries.value.filter(entry => entry.isFile).map(entry => entry.name.replace(/\\/g, '/')),
-      commitVersionDialogOpen: commitVersionDialogOpen.value, isCommittingVersion: isCommittingVersion.value, commitVersionError: commitVersionError.value,
       isUnsavedEditorsDialogOpen: isUnsavedEditorsDialogOpen.value, pendingCloseIntent: pendingCloseIntent.value,
       unsavedEditorDecisions: unsavedEditorDecisions.value, isUnsavedCloseBusy: isUnsavedCloseBusy.value, unsavedCloseError: unsavedCloseError.value,
       unsavedSelectedCount: unsavedSelectedCount.value, unsavedPendingCount: unsavedPendingCount.value, unsavedSaveCount: unsavedSaveCount.value,
@@ -766,16 +715,16 @@ export function createWorkbenchPage(options: {
       canConfirmUnsavedClose: canConfirmUnsavedClose.value,
       'onUpdate:projectExportDialogTask': (value: ProjectExportTask) => { projectExportDialogTask.value = value },
       onCloseProjectExport: closeProjectExportDialog, onSubmitProjectExport: startProjectExport,
-      onCloseResourcePackageBuilder: () => { resourcePackageBuilderOpen.value = false }, onCloseCommitVersion: closeCommitVersionDialog, onSubmitCommitVersion: commitVersion,
+      onCloseResourcePackageBuilder: () => { resourcePackageBuilderOpen.value = false },
       onSelectAllUnsaved: setAllUnsavedPendingSelected, onSelectUnsavedRow: setUnsavedRowSelected, onMarkUnsavedDiscard: markSelectedUnsavedDiscard,
       onMarkUnsavedSave: markSelectedUnsavedSave, onResetUnsavedDecision: resetUnsavedDecision, onCancelUnsavedClose: cancelUnsavedCloseRequest,
       onConfirmUnsavedClose: confirmUnsavedClose, onDiscardSingleUnsaved: discardSingleUnsavedEditor, onSaveSingleUnsaved: saveSingleUnsavedEditor,
     })),
   }
-  onMounted(() => window.addEventListener('focus', handleWindowFocus))
-  onUnmounted(() => { window.removeEventListener('focus', handleWindowFocus); sessionManager.dispose(); void cancelExportsAndWait().then(() => projectStore.disposeResources()) })
+  onUnmounted(() => { sessionManager.dispose(); void cancelExportsAndWait().then(() => projectStore.disposeResources()) })
   return {
-    page, openFile: openFileFromPicker, open: openEditorSession,
+    page, versionControl, handleChangesNodeActivate,
+    openFile: openFileFromPicker, open: openEditorSession,
     closeWorkspaceSessions, requestProjectClose, requestApplicationClose, cancelExportsAndWait,
     newDocument: createUntitledOpenCard, addResourcePackageToProject,
     openIconRegistry: async () => { await handleProjectManagementSelect([resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)]) },

@@ -5,7 +5,6 @@ import OcResizeTrack from '../../../components/standard/OcResizeTrack.vue';
 import OcIcon from '../../../components/base/OcIcon.vue';
 import OcText from '../../../components/base/OcText.vue';
 import OcActionRail from '../../../components/standard/OcActionRail.vue';
-import OcOptionGroup, { type OcOption } from '../../../components/standard/OcOptionGroup.vue';
 import type { OcActionDefinition } from '../../../shared/ui/action/action.types';
 import type { ShellList, ShellListGroup } from '../shell.types';
 import type { ProjectWorkspaceSidebarState } from '../../settings/model/appSettings';
@@ -14,7 +13,7 @@ import ShellSidebarContent from './ShellSidebarContent.vue';
 const props = defineProps<{
   collapsed: boolean;
   width: number;
-  bodyGroups: ShellListGroup[];
+  bodyGroup?: ShellListGroup;
   collapseListTooltip?: string;
   expandListTooltip?: string;
   minResizeWidth?: number;
@@ -27,7 +26,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'body-group-changed': [groupKey: string];
   resize: [width: number];
   'resize-start': [];
   'resize-end': [];
@@ -39,23 +37,13 @@ defineSlots<{ 'list-content': (props: { list: ShellList }) => unknown }>();
 const listResizeScale = ref(1);
 const sidebarElement = ref<HTMLElement | null>(null);
 const resizing = ref(false);
-const activeGroupKey = ref<string | null>(null);
-const transitionDirection = ref<'forward' | 'backward'>('forward');
 const collapsedLists = ref<Record<string, boolean>>({});
 const listWeights = ref<Record<string, number>>({});
 const resizingListPair = ref(false);
 
-const listGroups = computed<ShellListGroup[]>(() => props.bodyGroups);
-const activeGroup = computed(() => listGroups.value.find(group => group.key === activeGroupKey.value) ?? listGroups.value[0]);
-const activeTransitionKey = computed(() => activeGroup.value?.transitionKey ?? activeGroup.value?.key ?? 'empty');
+const activeGroup = computed(() => props.bodyGroup);
 const activeHeadButtons = computed(() => activeGroup.value?.headButtons ?? []);
 const activeLists = computed(() => activeGroup.value?.lists ?? []);
-const groupOptions = computed<readonly OcOption[]>(() => listGroups.value.map(group => ({
-  value: group.key,
-  label: group.title,
-  icon: group.icon,
-})));
-const groupTitlesHidden = computed(() => props.collapsed || props.width < (props.compactGroupWidth ?? 0));
 const actionDefinitionsByList = computed(() => new Map(activeLists.value.map(list => [
   list.key,
   list.actions.map<OcActionDefinition>(action => ({
@@ -81,19 +69,9 @@ function ensureListState(lists: ShellList[]): void {
   listWeights.value = weights;
 }
 
-watch([listGroups, () => props.persistedLayout], ([groups]) => {
-  if (!activeGroupKey.value || !groups.some(group => group.key === activeGroupKey.value)) activeGroupKey.value = groups[0]?.key ?? null;
-  groups.forEach(group => ensureListState(group.lists));
+watch([activeLists, () => props.persistedLayout], ([lists]) => {
+  ensureListState(lists);
 }, { immediate: true });
-
-function selectGroup(key: string): void {
-  if (key === activeGroupKey.value) return;
-  const current = listGroups.value.findIndex(group => group.key === activeGroupKey.value);
-  const next = listGroups.value.findIndex(group => group.key === key);
-  transitionDirection.value = next >= current ? 'forward' : 'backward';
-  activeGroupKey.value = key;
-  emit('body-group-changed', key);
-}
 
 function emitLayoutChange(): void {
   emit('layout-change', {
@@ -167,20 +145,7 @@ function finishResize(): void {
     }"
     :style="{ width: `${width}px` }"
   >
-    <OcOptionGroup
-      v-if="listGroups.length > 1"
-      class="shell-sidebar-group-switcher"
-      :model-value="activeGroup?.key"
-      :options="groupOptions"
-      :icon-only="groupTitlesHidden"
-      appearance="sliding-outline"
-      semantics="tabs"
-      size="md"
-      fill
-      @update:model-value="selectGroup"
-    />
-    <Transition :name="`shell-sidebar-group-slide-${transitionDirection}`" mode="out-in">
-      <div :key="activeTransitionKey" class="shell-sidebar-active-group" :data-transition-key="activeTransitionKey">
+      <div class="shell-sidebar-active-group">
         <div class="shell-sidebar-group shell-sidebar-group-top" data-tooltip-placement="right" data-tooltip-group>
           <button v-for="button in activeHeadButtons" :key="button.key" class="shell-sidebar-button" type="button" :disabled="button.disabled" :data-tooltip="collapsed ? button.hoverTip || button.title : null" @click="activeGroup?.onAction?.(button.key)">
             <OcIcon v-if="button.icon" :name="button.icon" size="md" /><span v-if="!collapsed">{{ button.title }}</span><span v-if="!collapsed && button.badge" class="oc-number-badge oc-number-badge--neutral">{{ button.badge }}</span>
@@ -202,7 +167,6 @@ function finishResize(): void {
           </section>
         </div>
       </div>
-    </Transition>
     <OcResizeTrack v-if="!collapsed || resizing" class="shell-sidebar-resizer" orientation="vertical" edge="right" appearance="gradient"
       :value="width" :minimum="minResizeWidth ?? 78" :maximum="Math.max(minResizeWidth ?? 78, maxResizeWidth ?? Number.POSITIVE_INFINITY)"
       :label="resizeLabel ?? ''"

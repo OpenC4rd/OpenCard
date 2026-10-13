@@ -10,8 +10,6 @@
     @close="emit('close-project-export')" @submit="emit('submit-project-export')" />
   <ResourcePackageBuilderDialog :open="resourcePackageBuilderOpen" :project-root-path="projectPath ?? ''"
     :project-name="projectName" :entries="resourcePackageBuilderEntries" @close="emit('close-resource-package-builder')" />
-  <CommitVersionDialog :open="commitVersionDialogOpen" :busy="isCommittingVersion" :error="commitVersionError"
-    @close="emit('close-commit-version')" @submit="emit('submit-commit-version', $event)" />
 
   <UnsavedEditorsDialog :open="isUnsavedEditorsDialogOpen" :intent-type="pendingCloseIntent?.type"
     :rows="unsavedEditorDecisions" :busy="isUnsavedCloseBusy" :global-error="unsavedCloseError"
@@ -32,7 +30,6 @@ import type { ComponentPublicInstance } from 'vue'
 import CardFaceRenderer from '../../card-rendering/components/CardFaceRenderer.vue'
 import ProjectExportDialog from '../../exporting/components/ProjectExportDialog.vue'
 import ResourcePackageBuilderDialog from '../../workspace/components/ResourcePackageBuilderDialog.vue'
-import CommitVersionDialog from '../../version-control/components/CommitVersionDialog.vue'
 import UnsavedEditorsDialog from './UnsavedEditorsDialog.vue'
 import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
 import type { ExportDocumentCandidate } from '../../../components/editors/ProjectExportTaskEditor.vue'
@@ -56,9 +53,6 @@ defineProps<{
   projectPath: string | null
   projectName: string
   resourcePackageBuilderEntries: readonly string[]
-  commitVersionDialogOpen: boolean
-  isCommittingVersion: boolean
-  commitVersionError: string
   isUnsavedEditorsDialogOpen: boolean
   pendingCloseIntent: UnsavedCloseIntent | null
   unsavedEditorDecisions: readonly UnsavedEditorDecision[]
@@ -78,8 +72,6 @@ const emit = defineEmits<{
   'close-project-export': []
   'submit-project-export': []
   'close-resource-package-builder': []
-  'close-commit-version': []
-  'submit-commit-version': [value: { summary: string; description: string }]
   'select-all-unsaved': [selected: boolean]
   'select-unsaved-row': [sessionId: string, selected: boolean]
   'mark-unsaved-discard': []

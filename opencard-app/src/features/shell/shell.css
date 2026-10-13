@@ -514,12 +514,6 @@
   flex: 1 1 auto;
 }
 
-.shell-sidebar-group-switcher {
-  grid-row: 1;
-  min-width: 0;
-  margin-bottom: var(--oc-space-2);
-}
-
 .shell-sidebar-active-group {
   grid-row: 2;
   min-height: 0;

@@ -40,6 +40,7 @@ export default {
         navigation: 'Spaces',
         welcome: 'Welcome',
         workbench: 'Workbench',
+        collaboration: 'Collaboration',
         market: 'Market',
         test: 'Playtest',
         settings: 'Settings',

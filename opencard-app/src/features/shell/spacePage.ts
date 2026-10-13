@@ -8,13 +8,14 @@ export interface SpacePage {
   key: ShellPage
   navigation?: ShellSpaceDefinition
   content: Component
+  /** Shared content retains its mounted editor when only the space sidebar changes. */
+  contentKey?: ShellPage
   contentProps: Readonly<Ref<Record<string, unknown>>>
   sidebar: Readonly<Ref<ShellListGroup[]>>
   sidebarLayout?: { persistenceKey: Readonly<Ref<string>>; expandOnNarrowViewport?: boolean }
   header: Readonly<Ref<ShellHeaderModel | null>>
   bottomPanel?: Readonly<Ref<SpacePageProblems>>
   menuContribution?: Readonly<Ref<Partial<Record<'file' | 'edit' | 'view' | 'help', ShellMenuContribution>>>>
-  selectSidebarGroup?: (key: string) => void
   handleKeydown?: (event: KeyboardEvent) => Promise<void> | void
   overlays?: Component
   overlayProps?: Readonly<Ref<Record<string, unknown>>>

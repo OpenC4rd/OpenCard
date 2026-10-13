@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import ShellSidebar from './ShellSidebar.vue'
 import type { ShellButton, ShellList, ShellListGroup } from '../shell.types'
 
-function primaryGroup(lists: ShellList[], headButtons: ShellButton[] = []): ShellListGroup[] {
-  return [{ key: 'primary', title: '', headButtons, lists }]
+function primaryGroup(lists: ShellList[], headButtons: ShellButton[] = []): ShellListGroup {
+  return { key: 'primary', title: '', headButtons, lists }
 }
 
 describe('ShellSidebar', () => {
@@ -19,7 +19,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([{
+        bodyGroup: primaryGroup([{
           onAction, key: 'project-files',
           title: 'Files',
           placeholder: 'Empty',
@@ -55,7 +55,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([
+        bodyGroup: primaryGroup([
           { key: 'files', title: 'Files', placeholder: 'Empty', actions: [] },
           { key: 'timeline', title: 'Timeline', placeholder: 'Empty', actions: [] },
         ]),
@@ -82,7 +82,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([
+        bodyGroup: primaryGroup([
           { key: 'files', title: 'Files', placeholder: 'Empty', actions: [] },
           { key: 'timeline', title: 'Timeline', placeholder: 'Empty', actions: [] },
         ]),
@@ -96,62 +96,13 @@ describe('ShellSidebar', () => {
     expect(firstSection.find('.shell-sidebar-list-content-wrap').classes()).toContain('collapsed')
   })
 
-  it('switches configured groups, animates the whole active group, and emits the selected key', async () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 260,
-        bodyGroups: [
-          {
-            key: 'workspace', title: 'Workspace', icon: 'status.folder-open',
-            headButtons: [{ key: 'new', title: 'New OpenCard', icon: 'action.file-plus' }],
-            lists: [{ key: 'files', title: 'Files', placeholder: 'Empty', actions: [] }],
-          },
-          {
-            key: 'history', title: 'History', icon: 'file.git',
-            headButtons: [{ key: 'commit', title: 'Commit', icon: 'action.publish' }],
-            lists: [{ key: 'timeline', title: 'Timeline', placeholder: 'No history', actions: [] }],
-          },
-        ],
-      },
-    })
-
-    const tabs = wrapper.findAll('[role="tab"]')
-    expect(tabs).toHaveLength(2)
-    expect(tabs.map(button => button.attributes('data-tooltip'))).toEqual([undefined, undefined])
-    expect(tabs.map(button => button.attributes('aria-selected'))).toEqual(['true', 'false'])
-    expect(wrapper.get('.shell-sidebar-group-top .shell-sidebar-button').text()).toBe('New OpenCard')
-    await tabs[1]!.trigger('click')
-    expect(wrapper.get('.shell-sidebar-group-top .shell-sidebar-button').text()).toBe('Commit')
-    expect(wrapper.get('.shell-sidebar-list-title').text()).toBe('Timeline')
-    expect(wrapper.emitted('body-group-changed')).toEqual([['history']])
-  })
-
-  it('uses tooltips only when compact width hides group titles', () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 200,
-        compactGroupWidth: 220,
-        bodyGroups: [
-          { key: 'workspace', title: 'Workspace', icon: 'status.folder-open', lists: [] },
-          { key: 'history', title: 'History', icon: 'file.git', lists: [] },
-        ],
-      },
-    })
-
-    const switches = wrapper.findAll('[role="tab"]')
-    expect(wrapper.get('.shell-sidebar-group-switcher').classes()).toContain('oc-option-group--icon-only')
-    expect(switches.map(button => button.attributes('data-tooltip'))).toEqual(['Workspace', 'History'])
-  })
-
   it('renders declarative tree content and forwards its intent handler', async () => {
     const intents: unknown[] = []
     const wrapper = mount(ShellSidebar, {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([{
+        bodyGroup: primaryGroup([{
           key: 'files',
           title: 'Files',
           placeholder: 'Empty',
@@ -185,7 +136,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([{
+        bodyGroup: primaryGroup([{
           key: 'editors',
           title: 'Open Editors',
           placeholder: 'Opened files appear here',
@@ -211,7 +162,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([{
+        bodyGroup: primaryGroup([{
           key: 'files',
           title: 'Files',
           placeholder: 'No files',
@@ -230,7 +181,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([{
+        bodyGroup: primaryGroup([{
           key: 'files',
           title: 'Files',
           placeholder: 'No files',
@@ -251,7 +202,7 @@ describe('ShellSidebar', () => {
         collapsed: false,
         width: 260,
         maxResizeWidth: 420,
-        bodyGroups: primaryGroup([]),
+        bodyGroup: primaryGroup([]),
       },
     })
     const sidebar = wrapper.get('.shell-sidebar').element as HTMLElement
@@ -292,7 +243,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroups: primaryGroup([], [{ key: 'open', title: 'Open', icon: 'status.folder-open' }]),
+        bodyGroup: primaryGroup([], [{ key: 'open', title: 'Open', icon: 'status.folder-open' }]),
       },
     })
 

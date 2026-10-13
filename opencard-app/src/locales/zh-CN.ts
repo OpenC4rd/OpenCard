@@ -40,6 +40,7 @@ export default {
         navigation: '空间',
         welcome: '首页',
         workbench: '工作台',
+        collaboration: '协作',
         market: '集市',
         test: '测试',
         settings: '设置',
