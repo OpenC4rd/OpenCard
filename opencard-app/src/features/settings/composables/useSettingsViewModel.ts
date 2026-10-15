@@ -141,7 +141,7 @@ export function useSettingsViewModel(
       ['general', { label: categoryLabels.value.general, visual: { type: 'icon', icon: 'tool.settings' } }],
       ['appearance', { label: categoryLabels.value.appearance, visual: { type: 'icon', icon: 'data.symbol-color' } }],
       ['workspace', { label: categoryLabels.value.workspace, visual: { type: 'icon', icon: 'tool.workspace' } }],
-      ['versionControl', { label: categoryLabels.value.versionControl, visual: { type: 'icon', icon: 'nav.collaboration' } }],
+      ['versionControl', { label: categoryLabels.value.versionControl, visual: { type: 'icon', icon: 'tool.collaboration' } }],
     ]),
     children: new Map(),
   }))

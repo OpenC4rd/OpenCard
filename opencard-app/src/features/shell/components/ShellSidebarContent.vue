@@ -9,7 +9,7 @@ const props = defineProps<{
 
 <template>
   <OcTree
-    v-if="props.list.content?.type === 'tree'"
+    v-if="props.list.content"
     fill
     :ref="props.list.content.captureInstance"
     class="open-card-shell__sidebar-tree"
@@ -36,7 +36,4 @@ const props = defineProps<{
     @external-drop="props.list.content.onExternalDrop"
     @auxclick="props.list.content.onAuxclick"
   />
-  <div v-else-if="!props.list.content || props.list.content.type === 'empty'" class="shell-sidebar-empty">
-    <span>{{ props.list.content?.type === 'empty' ? props.list.content.text ?? props.list.placeholder : props.list.placeholder }}</span>
-  </div>
 </template>

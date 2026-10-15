@@ -25,7 +25,7 @@ export function createSettingsPage(cancelExportsAndWait: () => Promise<void>) {
   })
   const page: SpacePage = {
     key: 'settings',
-    navigation: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'tool.settings', railGroup: 'secondary' },
+    navigation: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'nav.settings', railGroup: 'secondary' },
     content: SettingsPageContent,
     contentProps: computed(() => ({
       viewModel: feature.activeCategory.value,

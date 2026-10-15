@@ -41,6 +41,7 @@ export default {
         welcome: 'Welcome',
         workbench: 'Workbench',
         collaboration: 'Collaboration',
+        export: 'Export',
         market: 'Market',
         test: 'Playtest',
         settings: 'Settings',

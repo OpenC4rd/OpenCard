@@ -44,7 +44,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   })
   creation = createCreateProjectPage(application.lifecycle)
   templateExport = createExportTemplatePage(workbench.templateTree)
-  function placeholder(key: 'market' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
+  function placeholder(key: 'export' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
     return {
       key, navigation: { key, icon, labelKey: `app.shell.space.${key}` }, content: ComingSoonPageContent,
       contentProps: computed(() => ({ title: t(`app.shell.space.${key}`), icon })), sidebar: computed(() => []),
@@ -52,14 +52,16 @@ function createAppPages(destroyWindow: () => Promise<void>) {
     }
   }
   const pages: Record<ShellPage, SpacePage> = {
-    welcome: createWelcomePage(), workbench: workbench.page, settings: settings.page,
+    welcome: createWelcomePage(), workbench: workbench.page,
     collaboration: createCollaborationPage({
       workbench: { content: workbench.page.content, contentProps: workbench.page.contentProps,
         header: workbench.page.header, bottomPanel: workbench.page.bottomPanel, handleKeydown: workbench.page.handleKeydown },
       version: workbench.versionControl, activateChange: workbench.handleChangesNodeActivate,
       openProject: workbench.openProject,
     }),
-    market: placeholder('market', 'nav.market'),
+    export: placeholder('export', 'nav.export'),
+    market: { ...placeholder('market', 'nav.market'), navigation: { key: 'market', icon: 'nav.market', labelKey: 'app.shell.space.market', railGroup: 'secondary' } },
+    settings: settings.page,
     test: placeholder('test', 'nav.test'),
     'create-project': creation.page, 'export-template': templateExport.page, about: createAboutPage(services),
   }

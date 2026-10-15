@@ -47,7 +47,7 @@ describe('useSettingsViewModel', () => {
       { type: 'icon', icon: 'tool.settings' },
       { type: 'icon', icon: 'data.symbol-color' },
       { type: 'icon', icon: 'tool.workspace' },
-      { type: 'icon', icon: 'nav.collaboration' },
+      { type: 'icon', icon: 'tool.collaboration' },
     ])
     expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting', 'rendering', 'cache'])
     expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([

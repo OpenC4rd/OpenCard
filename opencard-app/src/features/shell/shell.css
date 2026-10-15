@@ -494,8 +494,7 @@
 }
 
 .shell-sidebar.collapsed .shell-sidebar-button span,
-.shell-sidebar.collapsed .shell-sidebar-list-title,
-.shell-sidebar.collapsed .shell-sidebar-empty span {
+.shell-sidebar.collapsed .shell-sidebar-list-title {
   opacity: 0;
   transform: translateX(-10px);
   pointer-events: none;
@@ -667,18 +666,6 @@
   .shell-sidebar-group-slide-backward-leave-active {
     transition-duration: 0.01ms;
   }
-}
-
-.shell-sidebar-empty {
-  height: var(--oc-size-md);
-  min-height: var(--oc-size-md);
-  padding: 0 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--oc-fg-subtle);
-  font-size: var(--oc-text-base);
 }
 
 .shell-sidebar-resizer {

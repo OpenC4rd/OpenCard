@@ -65,17 +65,6 @@ export interface ShellTreeContent {
   captureInstance?: (instance: unknown) => void;
 }
 
-export interface ShellEmptyContent {
-  type: 'empty';
-  text?: string;
-}
-
-export interface ShellNoneContent {
-  type: 'none';
-}
-
-export type ShellListContent = ShellTreeContent | ShellEmptyContent | ShellNoneContent
-
 export type ShellActionHandler = (key: string) => void | Promise<void>
 
 export interface ShellMenuContribution {
@@ -89,7 +78,7 @@ export interface ShellList {
   placeholder: string;
   key: string;
   actions: ShellAction[];
-  content?: ShellListContent;
+  content?: ShellTreeContent;
 }
 
 export interface ShellListGroup {

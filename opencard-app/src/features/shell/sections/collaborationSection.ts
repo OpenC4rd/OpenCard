@@ -31,6 +31,9 @@ export interface CollaborationSectionOptions {
   }
 }
 
+/** 未打开项目时的协作侧栏空状态：走空树，与其它侧栏列表共用同一套空状态渲染。 */
+const EMPTY_TREE_DATA: OcNodeCollection = { rootKeys: [], items: new Map(), children: new Map() }
+
 export function createCollaborationSection(options: CollaborationSectionOptions): ComputedRef<ShellListGroup[]> {
   return computed(() => {
     if (!options.projectOpen.value) {
@@ -50,8 +53,11 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
           placeholder: options.translate('sidebar.collaborationEmpty', 'Open a project to see changes and version history'),
           actions: [],
           content: {
-            type: 'empty' as const,
-            text: options.translate('sidebar.collaborationEmpty', 'Open a project to see changes and version history'),
+            type: 'tree' as const,
+            data: EMPTY_TREE_DATA,
+            role: 'tree' as const,
+            selectionMode: 'none' as const,
+            activationMode: 'none' as const,
           },
         }],
       }]

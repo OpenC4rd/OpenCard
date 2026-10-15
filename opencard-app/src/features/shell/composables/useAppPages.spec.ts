@@ -63,7 +63,7 @@ describe('application page ownership', () => {
       publishAppOutput({ severity: 'info', message: 'background output' })
       useShellProgressTasks().setTask({ key: 'page-test', title: 'Background task', progress: 0.5 })
 
-      for (const space of ['welcome', 'settings', 'market', 'test'] as const) {
+      for (const space of ['welcome', 'settings', 'export', 'market', 'test'] as const) {
         navigation.selectSpace(space)
         await nextTick()
         expect(app.currentPage.value).toBe(app.pages[space])

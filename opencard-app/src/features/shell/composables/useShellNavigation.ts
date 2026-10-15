@@ -23,6 +23,7 @@ export interface ShellNavigationModel {
   isAbout: ComputedRef<boolean>
   isWelcome: ComputedRef<boolean>
   isWorkbench: ComputedRef<boolean>
+  isExport: ComputedRef<boolean>
   isMarket: ComputedRef<boolean>
   isTest: ComputedRef<boolean>
   isAuxiliary: ComputedRef<boolean>
@@ -44,6 +45,7 @@ export function useShellNavigation(): ShellNavigationModel {
   const isAbout = computed(() => page.value === 'about')
   const isWelcome = computed(() => page.value === 'welcome')
   const isWorkbench = computed(() => page.value === 'workbench')
+  const isExport = computed(() => page.value === 'export')
   const isMarket = computed(() => page.value === 'market')
   const isTest = computed(() => page.value === 'test')
   const isAuxiliary = computed(() => (
@@ -83,6 +85,7 @@ export function useShellNavigation(): ShellNavigationModel {
     isAbout,
     isWelcome,
     isWorkbench,
+    isExport,
     isMarket,
     isTest,
     isAuxiliary,

@@ -154,45 +154,6 @@ describe('ShellSidebar', () => {
 
     expect(wrapper.find('.open-card-shell__sidebar-tree').exists()).toBe(true)
     expect(wrapper.get('.oc-tree__placeholder').text()).toBe('Opened files appear here')
-    expect(wrapper.find('.shell-sidebar-empty').exists()).toBe(false)
-  })
-
-  it('renders declarative empty content without mounting a tree', () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 260,
-        bodyGroup: primaryGroup([{
-          key: 'files',
-          title: 'Files',
-          placeholder: 'No files',
-          actions: [],
-          content: { type: 'empty' },
-        }]),
-      },
-    })
-
-    expect(wrapper.find('.open-card-shell__sidebar-tree').exists()).toBe(false)
-    expect(wrapper.get('.shell-sidebar-empty').text()).toBe('No files')
-  })
-
-  it('renders no fallback element for declarative none content', () => {
-    const wrapper = mount(ShellSidebar, {
-      props: {
-        collapsed: false,
-        width: 260,
-        bodyGroup: primaryGroup([{
-          key: 'files',
-          title: 'Files',
-          placeholder: 'No files',
-          actions: [],
-          content: { type: 'none' },
-        }]),
-      },
-    })
-
-    expect(wrapper.find('.open-card-shell__sidebar-tree').exists()).toBe(false)
-    expect(wrapper.find('.shell-sidebar-empty').exists()).toBe(false)
   })
 
   it('reports the horizontal resize lifecycle', async () => {
