@@ -22,6 +22,12 @@
     <div v-if="item.content?.length" class="page-property-editor-item__content">
       <template v-for="(part, index) in item.content" :key="partKey(part, index)">
         <OcText v-if="typeof part === 'string'" as="span" size="sm">{{ part }}</OcText>
+        <span v-else-if="part.type === 'meter'" class="page-property-editor-item__meter"
+          role="progressbar" aria-valuemin="0" :aria-valuemax="part.max ?? undefined"
+          :aria-valuenow="part.value" :aria-valuetext="part.text">
+          <span class="page-property-editor-item__meter-fill" :style="{ width: meterWidth(part) }" />
+          <span class="page-property-editor-item__meter-text">{{ part.text }}</span>
+        </span>
         <PropertyFieldRenderer
           v-else-if="part.type === 'editor'"
           class="page-property-editor-item__editor"
@@ -77,6 +83,7 @@ import type {
   EditorItemActionIntent,
   EditorItemCancelIntent,
   EditorItemEditorPart,
+  EditorItemMeterPart,
   EditorItemPart,
   EditorItemValueIntent,
 } from './propertyEditor.types'
@@ -103,6 +110,12 @@ const rowStyle = computed<CSSProperties>(() => ({
 
 function partKey(part: EditorItemPart, index: number): string {
   return typeof part === 'string' ? `text:${index}` : `${part.type}:${part.key}`
+}
+
+/** 无上限（max 为 null）或上限为 0 时不画填充。 */
+function meterWidth(part: EditorItemMeterPart): string {
+  if (part.max == null || part.max <= 0) return '0%'
+  return `${Math.min(100, Math.max(0, (part.value / part.max) * 100))}%`
 }
 
 function encodeValue(part: EditorItemEditorPart): unknown {
@@ -171,6 +184,34 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
   justify-content: flex-end;
   justify-self: end;
   gap: var(--oc-space-xs);
+}
+
+/* 只读用量条：轨道铺满值区，填充按上限比例，文字居中叠在轨道上。 */
+.page-property-editor-item__meter {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--oc-size-sm);
+  min-width: 0;
+  max-width: var(--oc-page-editor-value-width);
+  overflow: hidden;
+  border-radius: var(--oc-radius-pill);
+  background: var(--oc-bg-raised);
+}
+
+.page-property-editor-item__meter-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background-image: var(--oc-overlay-accent);
+}
+
+.page-property-editor-item__meter-text {
+  position: relative;
+  color: var(--oc-fg-default);
+  font-size: var(--oc-text-xs);
 }
 
 /* 所有编辑器统一占满同一个宽度：值区宽度由 --oc-page-editor-value-width 决定，

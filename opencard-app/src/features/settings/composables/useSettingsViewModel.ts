@@ -100,6 +100,22 @@ function fieldItem(
   }
 }
 
+/** 只读用量行：用量条 + 文字，不参与编辑。 */
+function meterItem(
+  key: string,
+  title: string,
+  subtitle: string,
+  value: number,
+  max: number | null,
+): EditorItem {
+  return {
+    key,
+    title,
+    subtitle: subtitle || undefined,
+    content: [{ type: 'meter', key: 'meter', value, max, text: formatCacheUsage(value, max ?? undefined) }],
+  }
+}
+
 function cardAction(
   key: string,
   title: string,
@@ -235,21 +251,18 @@ export function useSettingsViewModel(
             }, settings.rendering.customBlockMaxNodes),
           ], { icon: 'entity.block-custom' }),
           card('cache', options.translate('settings.cards.cache', 'Cache'), [
-            fieldItem('cache.snapshots', {
-              title: options.translate('settings.fields.cachePackages', 'Unpacked packages'),
-              fieldType: 'string', isReadonly: true,
-            }, formatCacheUsage(options.cacheUsage.value.snapshots, settings.cache.packageLimitGb * CACHE_GIB_BYTES),
-            options.translate('settings.descriptions.cachePackages', 'Cleared on the next start once it is over the limit.')),
-            fieldItem('cache.network', {
-              title: options.translate('settings.fields.cacheNetwork', 'Downloaded images'),
-              fieldType: 'string', isReadonly: true,
-            }, formatCacheUsage(options.cacheUsage.value.network, settings.cache.networkLimitGb * CACHE_GIB_BYTES),
-            options.translate('settings.descriptions.cacheNetwork', 'Cleared on the next start once it is over the limit.')),
-            fieldItem('cache.staged', {
-              title: options.translate('settings.fields.cacheStaged', 'Undo staging'),
-              fieldType: 'string', isReadonly: true,
-            }, formatCacheUsage(options.cacheUsage.value.staged),
-            options.translate('settings.descriptions.cacheStaged', 'Undo bytes; cleared on the next start anyway.')),
+            meterItem('cache.snapshots',
+              options.translate('settings.fields.cachePackages', 'Unpacked packages'),
+              options.translate('settings.descriptions.cachePackages', 'Cleared on the next start once it is over the limit.'),
+              options.cacheUsage.value.snapshots, settings.cache.packageLimitGb * CACHE_GIB_BYTES),
+            meterItem('cache.network',
+              options.translate('settings.fields.cacheNetwork', 'Downloaded images'),
+              options.translate('settings.descriptions.cacheNetwork', 'Cleared on the next start once it is over the limit.'),
+              options.cacheUsage.value.network, settings.cache.networkLimitGb * CACHE_GIB_BYTES),
+            meterItem('cache.staged',
+              options.translate('settings.fields.cacheStaged', 'Undo staging'),
+              options.translate('settings.descriptions.cacheStaged', 'Undo bytes; cleared on the next start anyway.'),
+              options.cacheUsage.value.staged, null),
             fieldItem('cache.packageLimitGb', {
               title: options.translate('settings.fields.cachePackageLimit', 'Package cache limit'),
               fieldType: 'number', presentation: 'slider',

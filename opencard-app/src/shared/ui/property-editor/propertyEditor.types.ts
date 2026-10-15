@@ -216,7 +216,16 @@ export type EditorItemActionPart = OcActionDefinition & {
   size?: 'sm' | 'md' | 'lg'
 }
 
-export type EditorItemPart = string | EditorItemEditorPart | EditorItemActionPart
+/** 只读用量展示：value/max 决定填充比例，max 为 null 表示无上限（不画填充）。 */
+export type EditorItemMeterPart = {
+  type: 'meter'
+  key: string
+  value: number
+  max: number | null
+  text: string
+}
+
+export type EditorItemPart = string | EditorItemEditorPart | EditorItemActionPart | EditorItemMeterPart
 
 export interface EditorItem {
   key: string

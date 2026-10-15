@@ -1,13 +1,19 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import type { AppLocaleOption } from '../../../i18n/appLocale'
-import type { EditorItem, EditorItemEditorPart } from '../../../shared/ui/property-editor/propertyEditor.types'
+import type { EditorItem, EditorItemEditorPart, EditorItemMeterPart } from '../../../shared/ui/property-editor/propertyEditor.types'
 import { createDefaultAppSettings, type SettingsCategoryKey } from '../model/appSettings'
 import { useSettingsViewModel, type SettingsCategoryViewModel } from './useSettingsViewModel'
 
 function editor(item: EditorItem, key = 'value'): EditorItemEditorPart {
   return item.content?.find((part): part is EditorItemEditorPart => (
     typeof part !== 'string' && part.type === 'editor' && part.key === key
+  ))!
+}
+
+function meter(item: EditorItem): EditorItemMeterPart {
+  return item.content?.find((part): part is EditorItemMeterPart => (
+    typeof part !== 'string' && part.type === 'meter'
   ))!
 }
 
@@ -67,10 +73,10 @@ describe('useSettingsViewModel', () => {
     expect(cache.items.map(item => item.key)).toEqual([
       'cache.snapshots', 'cache.network', 'cache.staged', 'cache.packageLimitGb', 'cache.networkLimitGb',
     ])
-    // 三行占用是只读展示，体积写成「已用 / 上限」；后面两个上限是可调的滑块。
+    // 三行占用是只读用量条：体积写成「已用 / 上限」，撤销暂存没有上限（不画填充）。
     const usageRows = cache.items.slice(0, 3)
-    expect(usageRows.map(item => editor(item).value)).toEqual(['1.5GB / 2GB', '2KB / 1GB', '0B'])
-    expect(usageRows.every(item => editor(item).definition.isReadonly)).toBe(true)
+    expect(usageRows.map(item => meter(item).text)).toEqual(['1.5GB / 2GB', '2KB / 1GB', '0B'])
+    expect(usageRows.map(item => meter(item).max)).toEqual([2 * 1024 ** 3, 1024 ** 3, null])
     expect(editor(cache.items[3]!)).toMatchObject({
       value: 2,
       definition: { presentation: 'slider', min: 1, max: 32, step: 1, suffix: 'GB' },
