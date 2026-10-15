@@ -100,6 +100,6 @@ function submit(): void {
 .project-icon-set-dialog__field {
   display: grid;
   min-width: 0;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 </style>

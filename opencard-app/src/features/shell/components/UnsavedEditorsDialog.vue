@@ -252,14 +252,14 @@ function handleCancel(): void {
 
 .unsaved-editors-dialog__selection-bar,
 .unsaved-editors-dialog__batch-actions {
-  padding-inline: var(--oc-space-5);
+  padding: var(--oc-action-padding);
 }
 
 .unsaved-editors-dialog__header-content {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
 }
 
 .unsaved-editors-dialog__header-content h2,
@@ -273,7 +273,7 @@ function handleCancel(): void {
 }
 
 .unsaved-editors-dialog__header-content p {
-  margin-top: var(--oc-space-2);
+  margin-top: var(--oc-space-xs);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
 }
@@ -293,17 +293,17 @@ function handleCancel(): void {
   min-height: 0;
   flex: 1 1 auto;
   overflow: auto;
-  padding: var(--oc-space-2) var(--oc-space-3);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
 }
 
 .unsaved-editors-dialog__row {
   display: grid;
   grid-template-columns: 24px 28px minmax(140px, 0.85fr) minmax(180px, 1.15fr) auto;
   align-items: center;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
   min-height: 58px;
-  padding: var(--oc-space-2) var(--oc-space-3);
-  border-radius: var(--oc-radius-md);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
+  border-radius: var(--oc-radius-control);
 }
 
 .unsaved-editors-dialog__row + .unsaved-editors-dialog__row {
@@ -337,7 +337,7 @@ function handleCancel(): void {
 .unsaved-editors-dialog__identity,
 .unsaved-editors-dialog__decision {
   display: grid;
-  gap: 2px;
+  gap: var(--oc-space-2xs);
 }
 
 .unsaved-editors-dialog__identity strong,
@@ -383,8 +383,7 @@ function handleCancel(): void {
   display: grid;
   grid-auto-flow: column;
   justify-content: end;
-  gap: var(--oc-space-2);
-  padding-block: var(--oc-space-3);
+  gap: var(--oc-space-xs);
   border-top: 1px solid var(--oc-border-muted);
 }
 
@@ -397,18 +396,18 @@ function handleCancel(): void {
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
 }
 
 .unsaved-editors-dialog__summary {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .unsaved-editors-dialog__footer-actions {
   display: flex;
   flex: 0 0 auto;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 @media (max-width: 680px) {

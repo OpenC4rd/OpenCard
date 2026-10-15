@@ -248,15 +248,15 @@ function moveIcons(indexes: readonly number[], direction: 'top' | 'up' | 'down' 
   overflow: hidden;
 }
 
-.project-icon-set-workspace.is-empty { border: var(--oc-border-width) dashed var(--oc-border-muted); border-radius: var(--oc-radius-md); }
+.project-icon-set-workspace.is-empty { border: var(--oc-border-width) dashed var(--oc-border-muted); border-radius: var(--oc-radius-control); }
 
 .project-icon-set-workspace__empty {
   display: grid;
   min-width: 0;
   place-content: center;
   justify-items: center;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-6);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-lg);
   text-align: center;
 }
 
@@ -269,7 +269,7 @@ function moveIcons(indexes: readonly number[], direction: 'top' | 'up' | 'down' 
 }
 
 .project-icon-set-workspace__filter {
-  margin: var(--oc-space-2);
+  margin: var(--oc-space-xs);
   width: auto;
 }
 

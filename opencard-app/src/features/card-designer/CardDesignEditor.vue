@@ -135,7 +135,7 @@
             </OcCard>
           </template>
           <template #bottom>
-            <OcCard fill variant="glass" :title="t('cardDesigner.panels.preview')">
+            <OcCard fill variant="glass" :padding="false" :title="t('cardDesigner.panels.preview')">
               <OcPanel align="stretch" fill radius="none" tone="transparent" border="none" shadow="lg" padding="none">
                 <div ref="transformPreviewHostRef" class="card-design-editor__transform-preview-host"
                   @wheel.prevent.stop="handlePreviewViewportWheel">
@@ -1921,7 +1921,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   position: relative;
   isolation: isolate;
   opacity: 1;
-  transition: opacity var(--oc-duration-normal) var(--oc-ease);
+  transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
 .card-design-editor.is-content-pending {
@@ -1945,7 +1945,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 .card-design-editor__card-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--oc-space-2xs);
   overflow: hidden;
   color: var(--oc-fg-default);
   font-size: var(--oc-text-sm);
@@ -1972,7 +1972,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 }
 
 .card-design-editor__card-info>span.is-group-separated {
-  margin-top: var(--oc-space-4);
+  margin-top: var(--oc-space-md);
 }
 
 .card-design-editor__dimension-info {
@@ -2021,7 +2021,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 .card-designer-view-fade-enter-active,
 .card-designer-view-fade-leave-active {
-  transition: opacity var(--oc-duration-normal) var(--oc-ease);
+  transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
 .card-designer-view-fade-leave-active {
@@ -2045,7 +2045,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 .card-designer-diff-status-enter-active,
 .card-designer-diff-status-leave-active {
-  transition: opacity var(--oc-duration-normal) var(--oc-ease);
+  transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
 .card-designer-diff-status-enter-from,
@@ -2119,7 +2119,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   pointer-events: none;
   z-index: 7;
   opacity: 1;
-  transition: opacity var(--oc-duration-normal) var(--oc-ease);
+  transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
 .card-design-editor__viewport.is-debug-transparent {
@@ -2151,7 +2151,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   right: var(--oc-floating-surface-gap);
   bottom: var(--oc-floating-surface-gap);
   z-index: 3;
-  transition: right var(--oc-duration-normal) var(--oc-ease);
+  transition: right var(--oc-duration) var(--oc-ease);
 }
 
 .card-design-editor__face-tools.is-resizing {
@@ -2198,9 +2198,9 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity var(--oc-duration-fast) var(--oc-ease),
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    box-shadow var(--oc-duration-fast) var(--oc-ease);
+    opacity var(--oc-duration-quick) var(--oc-ease),
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    box-shadow var(--oc-duration-quick) var(--oc-ease);
 }
 
 .card-design-editor__transform-preview-frame.is-visible {

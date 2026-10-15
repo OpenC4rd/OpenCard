@@ -87,7 +87,7 @@
             <tr class="card-data-table__block-row">
               <th class="oc-data-grid__sticky-column" scope="rowgroup">
                 <span class="card-data-table__block-heading" tabindex="0"
-                  :style="{ paddingInlineStart: 'var(--oc-tree-indent)' }"
+                  :style="{ paddingInlineStart: 'var(--oc-indent-step)' }"
                   @contextmenu="openBlockContextMenu($event, block)"
                   @keydown="openBlockKeyboardMenu($event, block)">
                   <OcIcon :name="getBlockPresentation(block.type).icon" size="md"
@@ -106,7 +106,7 @@
               :data-block-id="block.key" :data-field-key="field.key">
               <th class="oc-data-grid__sticky-column" scope="row">
                 <span class="card-data-table__field-heading" tabindex="0"
-                  :style="{ paddingInlineStart: 'calc(var(--oc-tree-indent) * 2)' }"
+                  :style="{ paddingInlineStart: 'calc(var(--oc-indent-step) * 2)' }"
                   @contextmenu="openFieldContextMenu($event, block, field)"
                   @keydown="openFieldKeyboardMenu($event, block, field)">
                   <OcIcon :name="getPropertyFieldIcon(field.definition.fieldType)" size="sm" tone="muted" />
@@ -627,7 +627,7 @@ onBeforeUnmount(() => {
 .card-data-table__field-heading {
   display: flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   min-width: 0;
 }
 
@@ -678,7 +678,7 @@ onBeforeUnmount(() => {
 
 .card-data-table__cell.is-selected,
 .card-data-table__cell.is-revealed {
-  background: var(--oc-bg-selected);
+  background-color: var(--oc-bg-selected);
   outline: 2px solid var(--oc-fg-accent);
   outline-offset: -2px;
 }

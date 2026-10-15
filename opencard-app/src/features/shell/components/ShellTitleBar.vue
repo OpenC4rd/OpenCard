@@ -76,7 +76,7 @@ function openNoticePanel(): void {
     const anchor = noticeAnchor.value;
     if (anchor) {
       const rect = anchor.getBoundingClientRect();
-      const topSpace = Number.parseFloat(getComputedStyle(anchor).getPropertyValue('--oc-space-2')) || 0;
+      const topSpace = Number.parseFloat(getComputedStyle(anchor).getPropertyValue('--oc-space-xs')) || 0;
       noticePanelAnchor.value = new DOMRect(rect.left, rect.top - topSpace, rect.width, rect.height);
     }
     noticePanelOpen.value = true;

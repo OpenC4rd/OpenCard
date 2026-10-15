@@ -91,15 +91,15 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
   width: 100%;
   max-width: var(--oc-content-width-md);
   margin-inline: auto;
-  padding: 48px var(--oc-space-5);
-  animation: about-content-enter var(--oc-duration-normal, 180ms) var(--oc-ease, ease) both;
+  padding: 48px var(--oc-space-lg);
+  animation: about-content-enter var(--oc-duration) var(--oc-ease) both;
 }
 
 .about-content__brand {
   display: flex;
   align-items: center;
-  gap: var(--oc-space-5);
-  padding-bottom: var(--oc-space-5);
+  gap: var(--oc-space-lg);
+  padding-bottom: var(--oc-space-lg);
   border-bottom: 1px solid var(--oc-border-muted);
 }
 
@@ -130,26 +130,26 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
 .about-content__version-row {
   display: flex;
   align-items: center;
-  gap: var(--oc-space-1);
-  margin-top: var(--oc-space-2);
+  gap: var(--oc-space-2xs);
+  margin-top: var(--oc-space-xs);
 }
 
 .about-content__copy {
   display: grid;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
   max-width: 560px;
-  padding: var(--oc-space-6) 0;
+  padding: var(--oc-space-lg) 0;
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-base);
   line-height: 1.7;
 }
 
 .about-content__release-notes {
-  padding: 0 0 var(--oc-space-6);
+  padding: 0 0 var(--oc-space-lg);
 }
 
 .about-content__release-notes h2 {
-  margin: 0 0 var(--oc-space-3);
+  margin: 0 0 var(--oc-space-sm);
   color: var(--oc-fg-default);
   font-size: var(--oc-text-lg);
 }
@@ -158,8 +158,8 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--oc-space-4);
-  padding-top: var(--oc-space-4);
+  gap: var(--oc-space-md);
+  padding-top: var(--oc-space-md);
   border-top: 1px solid var(--oc-border-muted);
   color: var(--oc-fg-subtle);
   font-size: var(--oc-text-sm);
@@ -167,7 +167,7 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
 
 .about-content__footer-actions {
   display: flex;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 @keyframes about-content-enter {
@@ -179,7 +179,7 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
 
 @media (max-width: 640px) {
   .about-content__content {
-    padding: 32px var(--oc-space-4);
+    padding: 32px var(--oc-space-md);
   }
 
   .about-content__brand {

@@ -131,8 +131,8 @@ function handleKeydown(event: KeyboardEvent): void {
     var(--oc-field-control-height, var(--oc-property-row-height))
   );
   transition:
-    height var(--oc-duration-normal) var(--oc-ease),
-    border-color var(--oc-duration-fast) var(--oc-ease);
+    height var(--oc-duration) var(--oc-ease),
+    border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .multiline-field:focus-within {
@@ -157,7 +157,7 @@ function handleKeydown(event: KeyboardEvent): void {
   inset: 0;
   display: flex;
   align-items: center;
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
+  padding: var(--oc-field-content-padding, var(--oc-space-2xs) var(--oc-space-xs));
   font-size: var(--oc-text-base);
   line-height: normal;
   color: var(--oc-fg-disabled);
@@ -173,7 +173,7 @@ function handleKeydown(event: KeyboardEvent): void {
 .readonly-value {
   flex: 1;
   min-width: 0;
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
+  padding: var(--oc-field-content-padding, var(--oc-space-2xs) var(--oc-space-xs));
   font-size: var(--oc-text-base);
   line-height: 1.4;
   color: var(--oc-fg-default);

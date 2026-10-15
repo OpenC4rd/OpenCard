@@ -1,4 +1,4 @@
-import { fromCssFontFamily } from '../../workspace/model/projectFonts'
+import { resolveRichTextStyle } from '../../../shared/rich-text/richTextResourceStyle'
 import { defineComponent, h, type PropType, type VNodeChild } from 'vue'
 import type { RichTextNode } from '../../../shared/rich-text/richTextHtml'
 import { formatProjectIconPath } from '../../../shared/rich-text/projectIconReference'
@@ -41,31 +41,13 @@ export default defineComponent({
       }
       const attributes = { ...node.attributes }
       if (attributes.style || attributes['data-oc-fill-type'] === 'image') {
-        const style = document.createElement('span').style
-        style.cssText = attributes.style
-        if (style.fontFamily) {
-          const resource = context.resources.resolve({ value: fromCssFontFamily(style.fontFamily), expect: 'font', blockId: props.ownerBlock.id, fieldKey: 'content' })
-          style.fontFamily = resource.kind === 'font' ? resource.cssFamily : ''
-        }
-        const fillType = attributes['data-oc-fill-type']
-        const fillSource = attributes['data-oc-fill-source']
-        if (fillType === 'image' && fillSource) {
-          const resource = context.resources.resolve({
-            value: fillSource,
-            expect: 'asset',
-            blockId: props.ownerBlock.id,
-            fieldKey: 'content',
-          })
-          const src = resource.kind === 'url'
-            ? resource.src
-            : resource.kind === 'icon' ? resource.entry.src : null
-          if (src) {
-            style.backgroundImage = `url(${JSON.stringify(src)})`
-            style.webkitBackgroundClip = 'text'
-            style.color = 'transparent'
-          }
-        }
-        attributes.style = style.cssText
+        attributes.style = resolveRichTextStyle(attributes, reference => {
+          const resource = context.resources.resolve({ value: reference, expect: 'font', blockId: props.ownerBlock.id, fieldKey: 'content' })
+          return resource.kind === 'font' ? resource.cssFamily : null
+        }, reference => {
+          const resource = context.resources.resolve({ value: reference, expect: 'asset', blockId: props.ownerBlock.id, fieldKey: 'content' })
+          return resource.kind === 'url' ? resource.src : resource.kind === 'icon' ? resource.entry.src : null
+        })
       }
       return h(node.tag, attributes, node.children.map(renderNode))
     }

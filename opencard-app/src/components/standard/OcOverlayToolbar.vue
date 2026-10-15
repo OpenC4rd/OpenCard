@@ -73,7 +73,7 @@ const emit = defineEmits<{
 .oc-overlay-toolbar__items {
   display: flex;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-overlay-toolbar--horizontal .oc-overlay-toolbar__items {

@@ -1,44 +1,48 @@
+<!-- Standard 模态弹窗外壳：统一承担模态语义、预设尺寸、焦点、滚动布局与外置侧栏。 -->
 <template>
   <Teleport to="body">
     <Transition name="oc-dialog" @after-leave="finishClose">
       <div v-if="open" ref="backdropRef" class="oc-dialog__backdrop" @pointerdown.self="handleBackdropPointerDown" @keydown="handleKeydown">
-        <component
-          :is="as"
-          ref="dialogRef"
-          class="oc-dialog"
-          :class="[
-            `oc-dialog--${size}`,
-            `oc-dialog--height-mode-${heightMode}`,
-            heightMode === 'fixed' && height ? `oc-dialog--height-${height}` : null,
-            heightMode === 'content' && minHeight ? `oc-dialog--min-height-${minHeight}` : null,
-            maxHeight && maxHeight !== 'viewport' ? `oc-dialog--max-height-${maxHeight}` : null,
-            { 'oc-dialog--flush': !padded, 'oc-dialog--scroll-locked': !scrollable },
-          ]"
-          role="dialog"
-          aria-modal="true"
-          :aria-labelledby="titleId"
-          :aria-describedby="description ? descriptionId : undefined"
-          tabindex="-1"
-          v-bind="$attrs"
-          @submit.prevent="emit('submit', $event)"
-        >
-          <header class="oc-dialog__header">
-            <slot name="header" :title-id="titleId" :description-id="descriptionId">
-              <div class="oc-dialog__heading">
-                <h2 :id="titleId">{{ title }}</h2>
-                <p v-if="description" :id="descriptionId">{{ description }}</p>
+        <OcDialogLayout :size="size" :sidebar="sidebar" :label="sidebarTitle || title" :tooltip="sidebarTooltip"
+          role="dialog" aria-modal="true" :aria-labelledby="titleId"
+          :aria-describedby="description ? descriptionId : undefined">
+          <template #default>
+            <component
+              :is="as"
+              ref="dialogRef"
+              class="oc-dialog"
+              :class="[
+                `oc-dialog--height-mode-${heightMode}`,
+                heightMode === 'fixed' && height ? `oc-dialog--height-${height}` : null,
+                heightMode === 'content' && minHeight ? `oc-dialog--min-height-${minHeight}` : null,
+                maxHeight && maxHeight !== 'viewport' ? `oc-dialog--max-height-${maxHeight}` : null,
+                { 'oc-dialog--flush': !padded, 'oc-dialog--scroll-locked': !scrollable },
+              ]"
+              tabindex="-1"
+              v-bind="$attrs"
+              @submit.prevent="emit('submit', $event)"
+            >
+              <header class="oc-dialog__header">
+                <slot name="header" :title-id="titleId" :description-id="descriptionId">
+                  <div class="oc-dialog__heading">
+                    <h2 :id="titleId">{{ title }}</h2>
+                    <p v-if="description" :id="descriptionId">{{ description }}</p>
+                  </div>
+                </slot>
+              </header>
+
+              <div class="oc-dialog__body">
+                <slot />
               </div>
-            </slot>
-          </header>
 
-          <div class="oc-dialog__body">
-            <slot />
-          </div>
-
-          <footer v-if="$slots.footer" class="oc-dialog__footer">
-            <slot name="footer" />
-          </footer>
-        </component>
+              <footer v-if="$slots.footer || $slots['footer-start']" class="oc-dialog__footer">
+                <div v-if="$slots['footer-start']" class="oc-dialog__footer-start"><slot name="footer-start" /></div>
+                <slot name="footer" />
+              </footer>
+            </component>
+          </template>
+          <template v-if="$slots.sidebar" #sidebar><slot name="sidebar" /></template>
+        </OcDialogLayout>
       </div>
     </Transition>
   </Teleport>
@@ -47,6 +51,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch, watchEffect } from 'vue'
 import { activeDialogRoot, registerDialogRoot } from '../../shared/ui/overlayScope'
+import OcDialogLayout from './OcDialogLayout.vue'
 
 defineOptions({ name: 'OcDialog', inheritAttrs: false })
 
@@ -68,6 +73,12 @@ const props = withDefaults(defineProps<{
   dismissible?: boolean
   closeOnBackdrop?: boolean
   closeOnEscape?: boolean
+  /** 有 sidebar 插槽时显示外置侧栏及把手；侧栏自己记住收起状态。 */
+  sidebar?: boolean
+  /** 外置侧栏标题，同时作为把手的无障碍名称。 */
+  sidebarTitle?: string
+  /** 侧栏把手的操作说明。 */
+  sidebarTooltip?: string
 }>(), {
   description: '',
   as: 'section',
@@ -81,10 +92,14 @@ const props = withDefaults(defineProps<{
   dismissible: true,
   closeOnBackdrop: false,
   closeOnEscape: true,
+  sidebar: true,
+  sidebarTitle: '',
+  sidebarTooltip: undefined,
 })
 
 const emit = defineEmits<{
   'request-close': [reason: OcDialogCloseReason]
+  'update:open': [value: boolean]
   submit: [event: Event]
 }>()
 const dialogRef = ref<HTMLElement | null>(null)
@@ -158,7 +173,7 @@ function restoreFocus(): void {
 }
 
 function requestClose(reason: OcDialogCloseReason): void {
-  if (props.dismissible) emit('request-close', reason)
+  if (props.dismissible) { emit('request-close', reason); emit('update:open', false) }
 }
 
 function handleBackdropPointerDown(): void {
@@ -166,7 +181,7 @@ function handleBackdropPointerDown(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (activeDialogRoot.value !== backdropRef.value) return
+  if (event.defaultPrevented || activeDialogRoot.value !== backdropRef.value) return
   if (event.key === 'Escape' && props.closeOnEscape && props.dismissible) {
     event.preventDefault()
     event.stopPropagation()
@@ -200,31 +215,30 @@ function handleKeydown(event: KeyboardEvent): void {
   z-index: var(--oc-z-modal);
   display: grid;
   place-items: center;
-  padding: var(--oc-space-6);
+  padding: var(--oc-space-lg);
   background: var(--oc-bg-modal-backdrop);
 }
 
 .oc-dialog {
-  --oc-dialog-available-height: min(var(--oc-dialog-max-height), calc(100dvh - var(--oc-space-6) * 2));
+  --oc-dialog-available-height: min(var(--oc-dialog-max-height), calc(100dvh - var(--oc-space-lg) * 2));
   display: flex;
+  box-sizing: border-box;
+  width: 100%;
   max-height: var(--oc-dialog-available-height);
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-default);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
   outline: none;
   background: var(--oc-bg-surface);
   box-shadow: var(--oc-shadow-lg);
   color: var(--oc-fg-default);
-}
-
- .oc-dialog {
   user-select: none;
   -webkit-user-select: none;
 }
 
- .oc-dialog input,
+.oc-dialog input,
  .oc-dialog textarea,
  .oc-dialog select,
  .oc-dialog [contenteditable='true'],
@@ -233,11 +247,6 @@ function handleKeydown(event: KeyboardEvent): void {
   user-select: text;
   -webkit-user-select: text;
 }
-
-.oc-dialog--sm { width: min(100%, var(--oc-dialog-width-sm)); }
-.oc-dialog--md { width: min(100%, var(--oc-dialog-width-md)); }
-.oc-dialog--lg { width: min(100%, var(--oc-dialog-width-lg)); }
-.oc-dialog--xl { width: min(100%, var(--oc-dialog-width-xl)); }
 
 .oc-dialog--height-mode-fixed.oc-dialog--height-sm { height: min(var(--oc-dialog-height-sm), var(--oc-dialog-available-height)); }
 .oc-dialog--height-mode-fixed.oc-dialog--height-md { height: min(var(--oc-dialog-height-md), var(--oc-dialog-available-height)); }
@@ -261,13 +270,9 @@ function handleKeydown(event: KeyboardEvent): void {
   flex: 0 0 auto;
 }
 .oc-dialog__header {
-  padding: var(--oc-dialog-header-padding-block) var(--oc-dialog-header-padding-inline);
+  padding: var(--oc-space-sm) var(--oc-space-md);
+  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
-.oc-dialog__footer {
-  padding: var(--oc-dialog-footer-padding-block) var(--oc-dialog-footer-padding-inline);
-}
-
-.oc-dialog__header { border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
 
 .oc-dialog__heading h2,
 .oc-dialog__heading p { margin: 0; }
@@ -277,7 +282,7 @@ function handleKeydown(event: KeyboardEvent): void {
   letter-spacing: 0;
 }
 .oc-dialog__heading p {
-  margin-top: var(--oc-space-1);
+  margin-top: var(--oc-space-2xs);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
 }
@@ -287,36 +292,38 @@ function handleKeydown(event: KeyboardEvent): void {
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--oc-dialog-body-gap);
+  gap: var(--oc-space-sm);
   overflow: auto;
-  padding: var(--oc-dialog-body-padding);
+  padding: var(--oc-space-md);
 }
 .oc-dialog--flush > .oc-dialog__body { gap: 0; padding: 0; }
 .oc-dialog--scroll-locked > .oc-dialog__body { overflow: hidden; }
 
 .oc-dialog__footer {
   display: flex;
+  padding: var(--oc-action-padding);
   align-items: center;
   justify-content: flex-end;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   border-top: var(--oc-border-width) solid var(--oc-border-default);
   background: var(--oc-bg-raised);
 }
+.oc-dialog__footer-start { display: flex; align-items: center; gap: var(--oc-space-xs); margin-inline-end: auto; }
 
 .oc-dialog-enter-active,
-.oc-dialog-leave-active { transition: opacity var(--oc-duration-normal) var(--oc-ease); }
+.oc-dialog-leave-active { transition: opacity var(--oc-duration) var(--oc-ease); }
 .oc-dialog-enter-active .oc-dialog,
 .oc-dialog-leave-active .oc-dialog {
   transition:
-    opacity var(--oc-duration-normal) var(--oc-ease),
-    transform var(--oc-duration-normal) var(--oc-ease);
+    opacity var(--oc-duration) var(--oc-ease),
+    transform var(--oc-duration) var(--oc-ease);
 }
 .oc-dialog-enter-from,
 .oc-dialog-leave-to { opacity: 0; }
 .oc-dialog-enter-from .oc-dialog,
 .oc-dialog-leave-to .oc-dialog {
   opacity: 0;
-  transform: translateY(var(--oc-space-1));
+  transform: translateY(var(--oc-space-2xs));
 }
 
 @media (prefers-reduced-motion: reduce) {

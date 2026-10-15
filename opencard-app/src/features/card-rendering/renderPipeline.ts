@@ -63,8 +63,6 @@ export function prepareCardRender(request: CardRenderRequest): PreparedCardRende
   const richText = prepareRichText({
     document: resolved.document,
     currentCard: request.instance,
-    project: request.environment.project,
-    dictionary: request.environment.dictionary,
   })
   const parsed = parseRenderDocument(resolved.document, {
     instanceId: request.instance?.id ?? null,

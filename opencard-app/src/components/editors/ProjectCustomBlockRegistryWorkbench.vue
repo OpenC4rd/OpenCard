@@ -190,11 +190,10 @@ function updateProperty(mutation: PropertyEditorMutation): void {
 
 <style scoped>
 .custom-block-registry-workbench { display: grid; grid-template-columns: minmax(12rem, .8fr) minmax(14rem, 1fr) minmax(16rem, 1.4fr); width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: var(--oc-bg-base); }
-.custom-block-registry-workbench__collections, .custom-block-registry-workbench__blocks { min-width: 0; min-height: 0; overflow: hidden; padding: var(--oc-space-2) var(--oc-space-3); border-right: var(--oc-border-width) solid var(--oc-border-muted); }
-.custom-block-registry-workbench__inspector { min-width: 0; min-height: 0; overflow: auto; padding: var(--oc-space-3); }
-.custom-block-registry-workbench__preview { display: grid; justify-items: center; gap: var(--oc-space-2); padding: var(--oc-space-5); margin-bottom: var(--oc-space-3); border: var(--oc-border-width) solid var(--oc-border-muted); border-radius: var(--oc-radius-md); background: var(--oc-bg-inset); text-align: center; }
-.custom-block-registry-workbench__preview { min-width: 0; overflow: hidden; }
+.custom-block-registry-workbench__collections, .custom-block-registry-workbench__blocks { min-width: 0; min-height: 0; overflow: hidden; padding: var(--oc-space-xs) var(--oc-space-sm); border-right: var(--oc-border-width) solid var(--oc-border-muted); }
+.custom-block-registry-workbench__inspector { min-width: 0; min-height: 0; overflow: auto; padding: var(--oc-space-sm); }
+.custom-block-registry-workbench__preview { display: grid; justify-items: center; gap: var(--oc-space-xs); padding: var(--oc-space-lg); margin-bottom: var(--oc-space-sm); border: var(--oc-border-width) solid var(--oc-border-muted); border-radius: var(--oc-radius-control); background: var(--oc-bg-inset); text-align: center; min-width: 0; overflow: hidden; }
 .custom-block-registry-workbench__preview > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .custom-block-registry-workbench__viewport { width: 100%; height: 20rem; overflow: hidden; }
-.custom-block-registry-workbench__empty { display: grid; place-content: center; justify-items: center; gap: var(--oc-space-3); height: 100%; padding: var(--oc-space-6); text-align: center; }
+.custom-block-registry-workbench__empty { display: grid; place-content: center; justify-items: center; gap: var(--oc-space-sm); height: 100%; padding: var(--oc-space-lg); text-align: center; }
 </style>

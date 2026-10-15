@@ -47,7 +47,7 @@ const { t } = useI18n()
   min-width: 0;
   min-height: 0;
   /* 编辑器舞台自己收圆角：调用方要的那圈角曾经挂在一层多余的 OcPanel 上，现在归这个盒子所有。 */
-  border-radius: var(--oc-radius-lg);
+  border-radius: var(--oc-radius-surface);
   overflow: hidden;
 }
 
@@ -60,14 +60,14 @@ const { t } = useI18n()
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-5);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-lg);
   color: var(--oc-fg-default);
   text-align: center;
 }
 
 .page-empty-state__icon {
-  margin-bottom: var(--oc-space-2);
+  margin-bottom: var(--oc-space-xs);
   color: var(--oc-fg-subtle);
 }
 

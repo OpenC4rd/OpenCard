@@ -85,14 +85,14 @@ const hasChanges = computed(() => Boolean(
 .workbook-import-dialog__summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .workbook-import-dialog__summary > div,
 .workbook-import-dialog__details section {
-  padding: var(--oc-space-3);
+  padding: var(--oc-space-sm);
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-raised);
 }
 
@@ -102,18 +102,18 @@ const hasChanges = computed(() => Boolean(
 }
 
 .workbook-import-dialog__summary dd {
-  margin: var(--oc-space-1) 0 0;
+  margin: var(--oc-space-2xs) 0 0;
   font-size: var(--oc-text-lg);
 }
 
 .workbook-import-dialog__details {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .workbook-import-dialog__details ul,
 .workbook-import-dialog__warnings {
-  padding-left: var(--oc-space-5);
+  padding-left: var(--oc-space-lg);
 }
 
 .workbook-import-dialog__warnings {

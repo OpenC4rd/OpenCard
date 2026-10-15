@@ -135,7 +135,7 @@ function moveItem(index: number, offset: -1 | 1): void {
   flex-direction: column;
   width: 100%;
   min-width: 0;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .array-property-field__item {
@@ -143,7 +143,7 @@ function moveItem(index: number, offset: -1 | 1): void {
   align-items: flex-start;
   width: 100%;
   min-width: 0;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .array-property-field__control {

@@ -68,7 +68,7 @@ const handleChange = (event: Event) => {
 .oc-checkbox {
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   cursor: pointer;
   color: var(--oc-fg-default);
   font-size: var(--oc-text-base);
@@ -88,9 +88,9 @@ const handleChange = (event: Event) => {
   width: 14px;
   height: 14px;
   border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background-color: transparent;
-  transition: all var(--oc-duration-fast) var(--oc-ease);
+  transition: all var(--oc-duration-quick) var(--oc-ease);
   position: relative;
 }
 

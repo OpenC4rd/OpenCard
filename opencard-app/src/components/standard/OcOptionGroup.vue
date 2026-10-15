@@ -50,7 +50,7 @@ const containerStyle = computed<CSSProperties>(() => {
   const selectionStyle = {
     '--oc-option-count': props.options.length,
     '--oc-option-index': selectedIndex.value,
-    '--oc-option-gap': 'var(--oc-space-1)',
+    '--oc-option-gap': 'var(--oc-space-2xs)',
   }
   const columns = props.columns ?? props.options.length
   /*
@@ -184,10 +184,10 @@ function handleKeydown(event: KeyboardEvent, index: number): void {
   inset-inline-start: 0;
   width: calc((100% - (var(--oc-option-count) - 1) * var(--oc-option-gap)) / var(--oc-option-count));
   border: 1px solid var(--oc-border-accent);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   pointer-events: none;
   transform: translateX(calc(var(--oc-option-index) * (100% + var(--oc-option-gap))));
-  transition: transform var(--oc-duration-normal) var(--oc-ease);
+  transition: transform var(--oc-duration) var(--oc-ease);
 }
 
 /* 描边滑块在选项下面：把整组抬到它上面，不必逐个选项去改层级。 */

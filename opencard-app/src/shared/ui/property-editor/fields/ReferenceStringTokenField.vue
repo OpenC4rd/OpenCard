@@ -266,7 +266,7 @@ function handleKeydown(event: KeyboardEvent): void {
 .reference-string-token-field {
   height: auto;
   min-height: var(--oc-field-control-height, var(--oc-size-md));
-  padding: var(--oc-space-1);
+  padding: var(--oc-space-2xs);
 }
 
 .reference-string-token-field__token {
@@ -274,10 +274,10 @@ function handleKeydown(event: KeyboardEvent): void {
   align-items: center;
   max-width: 100%;
   min-width: 0;
-  gap: var(--oc-space-1);
-  padding-inline-start: var(--oc-space-2);
-  border-radius: var(--oc-radius-sm);
-  background: var(--oc-bg-hover);
+  gap: var(--oc-space-2xs);
+  padding-inline-start: var(--oc-space-xs);
+  border-radius: var(--oc-radius-control);
+  background-image: var(--oc-overlay-hover);
   color: var(--oc-fg-default);
 }
 
@@ -293,6 +293,6 @@ function handleKeydown(event: KeyboardEvent): void {
 }
 
 .reference-string-token-field__input {
-  --oc-field-content-padding: 0 var(--oc-space-1);
+  --oc-field-content-padding: 0 var(--oc-space-2xs);
 }
 </style>

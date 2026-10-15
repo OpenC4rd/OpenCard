@@ -296,29 +296,29 @@ function handleActionKeydown(event: KeyboardEvent, action: OcActionDefinition): 
 
 .oc-action-menu__divider {
   height: 1px;
-  margin: 3px var(--oc-space-2);
+  margin: 3px var(--oc-space-xs);
   background: var(--oc-border-muted);
 }
 
 .oc-action-menu__button {
   width: 100%;
   height: var(--oc-size-md);
-  padding: 0 var(--oc-space-3);
+  padding: 0 var(--oc-space-sm);
   border: 0;
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: transparent;
   color: var(--oc-fg-default);
   font: inherit;
   display: flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   cursor: pointer;
   text-align: left;
 }
 
 .oc-action-menu__button:hover:not(:disabled),
 .oc-action-menu__button:focus-visible {
-  background: var(--oc-bg-hover);
+  background-image: var(--oc-overlay-hover);
   outline: none;
 }
 

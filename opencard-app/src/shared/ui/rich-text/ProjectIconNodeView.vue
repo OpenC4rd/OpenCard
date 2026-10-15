@@ -49,7 +49,7 @@ function selectIconNode(): void {
 .project-icon-node {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   vertical-align: text-bottom;
   cursor: default;
 }

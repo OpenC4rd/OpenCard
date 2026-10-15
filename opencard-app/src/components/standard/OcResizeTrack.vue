@@ -99,11 +99,11 @@ function handleDoubleClick(event: MouseEvent): void {
 
 .oc-resize-track--horizontal {
   width: 100%;
-  height: var(--oc-resize-track-size, var(--oc-space-3));
+  height: var(--oc-resize-track-size, var(--oc-space-sm));
 }
 
 .oc-resize-track--vertical {
-  width: var(--oc-resize-track-size, var(--oc-space-3));
+  width: var(--oc-resize-track-size, var(--oc-space-sm));
   height: 100%;
 }
 

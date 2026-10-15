@@ -62,8 +62,8 @@ type ButtonSize = 'sm' | 'md' | 'lg'
 
 /**
  * 按钮圆角。
- * - sm: --oc-radius-sm
- * - md: --oc-radius-md
+ * - sm: --oc-radius-control
+ * - md: --oc-radius-control
  * - full: 50%
  */
 type ButtonRadius = 'sm' | 'md' | 'full'
@@ -193,9 +193,9 @@ const stateClasses = computed(() => ({
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    border-color var(--oc-duration-fast) var(--oc-ease),
-    color var(--oc-duration-fast) var(--oc-ease);
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-button:focus-visible {
@@ -219,32 +219,32 @@ const stateClasses = computed(() => ({
 /* Size variants：高度可用 `--oc-control-height` 由上下文覆盖（选项组的方形格子就是这么撑满格子的）。 */
 .oc-button--size-sm {
   height: var(--oc-control-height, var(--oc-size-sm));
-  padding: 0 var(--oc-space-3);
+  padding: 0 var(--oc-space-sm);
   font-size: var(--oc-text-sm);
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .oc-button--size-md {
   height: var(--oc-control-height, var(--oc-size-md));
-  padding: 0 var(--oc-space-4);
+  padding: 0 var(--oc-space-md);
   font-size: var(--oc-text-base);
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .oc-button--size-lg {
   height: var(--oc-control-height, var(--oc-size-lg));
-  padding: 0 var(--oc-space-4);
+  padding: 0 var(--oc-space-md);
   font-size: var(--oc-text-lg);
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 /* Radius variants */
 .oc-button--radius-sm {
-  border-radius: var(--oc-control-border-radius, var(--oc-radius-sm));
+  border-radius: var(--oc-control-border-radius, var(--oc-radius-control));
 }
 
 .oc-button--radius-md {
-  border-radius: var(--oc-control-border-radius, var(--oc-radius-md));
+  border-radius: var(--oc-control-border-radius, var(--oc-radius-control));
 }
 
 .oc-button--radius-full {

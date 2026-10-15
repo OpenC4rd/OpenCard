@@ -66,18 +66,18 @@ const hasChanges = computed(() => Boolean(
 .dictionary-workbook-dialog dl,
 .dictionary-workbook-dialog ul { margin: 0; }
 .dictionary-workbook-dialog__empty { color: var(--oc-fg-muted); }
-.dictionary-workbook-dialog__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--oc-space-2); }
+.dictionary-workbook-dialog__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--oc-space-xs); }
 .dictionary-workbook-dialog__summary > div,
 .dictionary-workbook-dialog__details section {
   display: grid;
-  gap: var(--oc-space-1);
-  padding: var(--oc-space-3);
+  gap: var(--oc-space-2xs);
+  padding: var(--oc-space-sm);
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-raised);
 }
 .dictionary-workbook-dialog__summary dt { color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
 .dictionary-workbook-dialog__summary dd { margin: 0; font-size: var(--oc-text-lg); }
-.dictionary-workbook-dialog__details { display: grid; gap: var(--oc-space-2); }
-.dictionary-workbook-dialog__details ul { padding-left: var(--oc-space-5); }
+.dictionary-workbook-dialog__details { display: grid; gap: var(--oc-space-xs); }
+.dictionary-workbook-dialog__details ul { padding-left: var(--oc-space-lg); }
 </style>

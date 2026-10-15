@@ -150,10 +150,10 @@ defineExpose({
 .oc-field-input--filled {
   background: var(--oc-field-surface-background, var(--oc-bg-input));
   border: var(--oc-field-surface-border-width, 1px) solid var(--oc-field-surface-border-color, var(--oc-border-default));
-  border-radius: var(--oc-field-surface-border-radius, var(--oc-radius-sm));
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
+  border-radius: var(--oc-field-surface-border-radius, var(--oc-radius-control));
+  padding: var(--oc-field-content-padding, var(--oc-space-2xs) var(--oc-space-xs));
   color: var(--oc-fg-default);
-  transition: border-color var(--oc-duration-fast) var(--oc-ease);
+  transition: border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-field-input--filled:focus:not(:disabled):not(:read-only),
@@ -167,9 +167,9 @@ defineExpose({
   border: var(--oc-field-surface-border-width, 1px) solid transparent;
   /* `plain` 不画自己的表面，但内缩仍是它自己的：字段边框归 frame，内容内缩归这里。
      上下文可用 `--oc-field-content-padding` 归零（属性面板用它把内边距交给整行）。 */
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
+  padding: var(--oc-field-content-padding, var(--oc-space-2xs) var(--oc-space-xs));
   color: var(--oc-fg-default);
-  transition: border-color var(--oc-duration-fast) var(--oc-ease);
+  transition: border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-field-input--plain:focus:not(:disabled):not(:read-only),
@@ -179,7 +179,7 @@ defineExpose({
 }
 
 textarea.oc-field-input--plain {
-  padding: var(--oc-field-content-padding, var(--oc-space-2));
+  padding: var(--oc-field-content-padding, var(--oc-space-xs));
   overflow-y: auto;
   line-height: 1.45;
 }
@@ -189,9 +189,9 @@ textarea.oc-field-input--plain {
   border: 0;
   border-bottom: 1px solid var(--oc-border-default);
   border-radius: 0;
-  padding: var(--oc-space-1) 0;
+  padding: var(--oc-space-2xs) 0;
   color: var(--oc-fg-default);
-  transition: border-color var(--oc-duration-fast) var(--oc-ease);
+  transition: border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-field-input--underline:focus:not(:disabled):not(:read-only),

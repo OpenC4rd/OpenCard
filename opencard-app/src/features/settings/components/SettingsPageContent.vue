@@ -398,22 +398,22 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   width: 100%;
   max-width: var(--oc-content-width-md);
   margin-inline: auto;
-  padding: var(--oc-space-6) var(--oc-space-5);
+  padding: var(--oc-space-lg) var(--oc-space-lg);
 }
 
 .settings-content__content.has-preview { padding-top: 0; }
 
 .settings-content__cards {
   display: grid;
-  gap: var(--oc-space-5);
+  gap: var(--oc-space-lg);
 }
 
 /* 跳转落点：短暂勾一圈主题色，提示"就是这一行"。 */
 .settings-content :deep(.is-settings-focus) {
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   outline: 2px solid var(--oc-accent);
   outline-offset: 2px;
-  animation: settings-focus-pulse var(--oc-duration-slow) var(--oc-ease) 1;
+  animation: settings-focus-pulse var(--oc-duration) var(--oc-ease) 1;
 }
 
 @keyframes settings-focus-pulse {
@@ -424,10 +424,6 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
 @media (prefers-reduced-motion: reduce) {
   .settings-content :deep(.is-settings-focus) { animation: none; }
 }
-
-/* 卡片只负责包裹与分组：行的左右留白由卡片给，最后一行不再重复底边框。 */
-.settings-content__card { --oc-card-content-padding: 0 var(--oc-space-3); }
-.settings-content__card :deep(.page-property-editor-item__row:last-child) { border-bottom: 0; }
 
 .settings-content__preview-stage {
   --settings-preview-scale: 1;
@@ -451,7 +447,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   align-items: start;
   justify-items: center;
   width: 100%;
-  border-radius: 0 0 var(--oc-radius-lg) var(--oc-radius-lg);
+  border-radius: 0 0 var(--oc-radius-surface) var(--oc-radius-surface);
   transform: scale(var(--settings-preview-scale));
   transform-origin: top center;
   will-change: transform;
@@ -464,7 +460,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   inset-inline-start: 0;
   width: 100%;
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: 0 0 var(--oc-radius-lg) var(--oc-radius-lg);
+  border-radius: 0 0 var(--oc-radius-surface) var(--oc-radius-surface);
   background: var(--oc-bg-glass);
   box-shadow: var(--oc-shadow-md);
   opacity: var(--settings-preview-glass-opacity);
@@ -474,7 +470,14 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   will-change: transform, opacity;
 }
 
-.settings-content__preview-spacer { margin-bottom: var(--oc-space-5); }
+/*
+ * 这一层不是"项与项之间的间距"，而是 sticky 预览的**占位块**：预览舞台自身 height: 0，
+ * 由它在正常流里撑出预览的高度（脚本按预览高度写 height），margin-bottom 就是它与下方卡片的间距。
+ * 舞台必须留在流外的 0 高度，所以这段间距没法交给上级容器的 gap。
+ */
+.settings-content__preview-spacer {
+  margin-bottom: var(--oc-space-lg);
+}
 
 .settings-content__preview {
   position: relative;
@@ -483,7 +486,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   width: 100%;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--oc-border-muted);
-  border-radius: 0 0 var(--oc-radius-lg) var(--oc-radius-lg);
+  border-radius: 0 0 var(--oc-radius-surface) var(--oc-radius-surface);
   background: var(--oc-bg-base);
   box-shadow: var(--oc-shadow-md);
 }
@@ -496,7 +499,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   align-items: center;
   justify-content: space-between;
   height: 34px;
-  padding: 0 var(--oc-space-3);
+  padding: 0 var(--oc-space-sm);
   background: var(--oc-bg-base);
 }
 
@@ -505,25 +508,22 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   z-index: 1;
   width: 54px;
   height: 5px;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-subtle);
   opacity: 0.7;
 }
 
 .settings-content__preview-window-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.settings-content__preview-window-dots {
   position: relative;
   z-index: 1;
+  display: flex;
+  gap: 6px;
 }
 
 .settings-content__preview-window-dots i {
   width: 7px;
   height: 7px;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-default);
   opacity: 0.82;
 }
@@ -537,8 +537,8 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
 .settings-content__preview-sidebar {
   display: flex;
   flex-direction: column;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-4) var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-md) var(--oc-space-sm);
   border-right: 1px solid var(--oc-border-muted);
   background: var(--oc-bg-base);
 }
@@ -555,8 +555,8 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   display: block;
   width: 42%;
   height: 4px;
-  margin: var(--oc-space-1) var(--oc-space-2) var(--oc-space-2);
-  border-radius: var(--oc-radius-full);
+  margin: var(--oc-space-2xs) var(--oc-space-xs) var(--oc-space-xs);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-subtle);
   opacity: 0.65;
 }
@@ -564,10 +564,10 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
 .settings-content__preview-row {
   display: flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   height: var(--oc-size-sm);
-  padding: 0 var(--oc-space-2);
-  border-radius: var(--oc-radius-sm);
+  padding: 0 var(--oc-space-xs);
+  border-radius: var(--oc-radius-control);
 }
 
 .settings-content__preview-row i,
@@ -575,23 +575,23 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   flex: 0 0 auto;
   width: 7px;
   height: 7px;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-muted);
 }
 
 .settings-content__preview-row b {
   width: 62%;
   height: 4px;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-muted);
   opacity: 0.72;
 }
 
 .settings-content__preview-row.is-short b { width: 38%; }
-.settings-content__preview-row.is-indented { margin-left: var(--oc-space-3); }
+.settings-content__preview-row.is-indented { margin-left: var(--oc-space-sm); }
 
 .settings-content__preview-row.is-selected {
-  background: var(--oc-bg-selected);
+  background-color: var(--oc-bg-selected);
 }
 
 .settings-content__preview-workspace {
@@ -606,8 +606,8 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--oc-space-2);
-  padding: 0 var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  padding: 0 var(--oc-space-sm);
   border-bottom: 1px solid var(--oc-border-muted);
   background: color-mix(in srgb, var(--oc-bg-surface) 94%, var(--oc-bg-raised));
 }
@@ -616,7 +616,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   width: 48px;
   height: 4px;
   margin-right: auto;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-muted);
 }
 
@@ -627,7 +627,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   min-height: 0;
   display: grid;
   grid-template-columns: 22% minmax(0, 1fr) 28%;
-  gap: 1px;
+  gap: var(--oc-space-2xs);
   background: var(--oc-bg-base);
 }
 
@@ -637,8 +637,8 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-3) var(--oc-space-2);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-sm) var(--oc-space-xs);
   background: var(--oc-bg-glass);
   backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
 }
@@ -659,7 +659,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   aspect-ratio: 5 / 7;
   overflow: hidden;
   border: 1px solid var(--oc-border-strong);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-raised);
   box-shadow: var(--oc-shadow-md);
 }
@@ -714,13 +714,13 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
 
 .settings-content__preview-property {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .settings-content__preview-property i,
 .settings-content__preview-property b {
   display: block;
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-fg-muted);
   opacity: 0.55;
 }
@@ -736,7 +736,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
 
 @media (max-width: 680px) {
   .settings-content__content {
-    padding: var(--oc-space-4);
+    padding: var(--oc-space-md);
   }
 }
 </style>

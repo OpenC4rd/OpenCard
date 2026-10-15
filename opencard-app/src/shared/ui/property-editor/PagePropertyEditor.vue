@@ -45,4 +45,9 @@ const emit = defineEmits<{
   width: 100%;
   min-width: 0;
 }
+
+/* 行距归容器：行自己的 min-height 之外不再有上下留白。 */
+.page-property-editor__items {
+  gap: var(--oc-space-2xs);
+}
 </style>

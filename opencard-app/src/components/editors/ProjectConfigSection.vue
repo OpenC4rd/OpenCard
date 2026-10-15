@@ -65,20 +65,20 @@ const contentId = computed(() => `${props.sectionId}-content`)
 
 <style scoped>
 .project-config-section {
-  scroll-margin-block-start: var(--oc-space-5);
-  padding-block: var(--oc-space-5);
+  scroll-margin-block-start: var(--oc-space-lg);
+  padding-block: var(--oc-space-lg);
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
 .project-config-section--indent-single {
-  margin-inline-start: calc(var(--oc-size-sm) + var(--oc-space-2));
+  margin-inline-start: calc(var(--oc-size-sm) + var(--oc-space-xs));
 }
 
 .project-config-section__header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: flex-start;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .project-config-section__toggle {
@@ -88,7 +88,7 @@ const contentId = computed(() => `${props.sectionId}-content`)
 /* 折叠箭头是这里自己的内容（走按钮的插槽），旋转也归这里，不必去改按钮的内部结构。 */
 .project-config-section__chevron {
   transform: rotate(0deg);
-  transition: transform var(--oc-duration-normal) var(--oc-ease);
+  transition: transform var(--oc-duration) var(--oc-ease);
 }
 
 .project-config-section__toggle.is-expanded .project-config-section__chevron {
@@ -98,7 +98,7 @@ const contentId = computed(() => `${props.sectionId}-content`)
 .project-config-section__heading {
   display: grid;
   min-width: 0;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-config-section__title {
@@ -114,7 +114,7 @@ const contentId = computed(() => `${props.sectionId}-content`)
 
 .project-config-section__title-row {
   min-width: 0;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-config-section__heading-actions { flex: 0 0 auto; }
@@ -123,7 +123,7 @@ const contentId = computed(() => `${props.sectionId}-content`)
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-config-section__content {
@@ -131,8 +131,8 @@ const contentId = computed(() => `${props.sectionId}-content`)
   grid-template-rows: 0fr;
   opacity: 0;
   transition:
-    grid-template-rows var(--oc-duration-normal) var(--oc-ease),
-    opacity var(--oc-duration-fast) var(--oc-ease);
+    grid-template-rows var(--oc-duration) var(--oc-ease),
+    opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .project-config-section__content.is-expanded {
@@ -146,11 +146,11 @@ const contentId = computed(() => `${props.sectionId}-content`)
 }
 
 .project-config-section__content-body {
-  padding-top: var(--oc-space-4);
+  padding-top: var(--oc-space-md);
 }
 
 .project-config-section__content-body--indent-single {
-  padding-inline-start: calc(var(--oc-size-sm) + var(--oc-space-2));
+  padding-inline-start: calc(var(--oc-size-sm) + var(--oc-space-xs));
 }
 
 @media (prefers-reduced-motion: reduce) {

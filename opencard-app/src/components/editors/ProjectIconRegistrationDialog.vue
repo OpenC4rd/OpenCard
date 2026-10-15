@@ -243,21 +243,21 @@ function fileStem(path: string): string {
 </script>
 
 <style scoped>
-.project-icon-registration-dialog__summary { display: grid; gap: var(--oc-space-1); }
-.project-icon-registration-dialog__summary-actions { display: flex; flex-wrap: wrap; gap: var(--oc-space-2); margin-top: var(--oc-space-2); }
+.project-icon-registration-dialog__summary { display: grid; gap: var(--oc-space-2xs); }
+.project-icon-registration-dialog__summary-actions { display: flex; flex-wrap: wrap; gap: var(--oc-space-xs); margin-top: var(--oc-space-xs); }
 .project-icon-registration-dialog__preview {
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-inset);
   display: grid;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-sm);
 }
-.project-icon-registration-dialog__preview-heading { display: flex; justify-content: space-between; gap: var(--oc-space-2); }
+.project-icon-registration-dialog__preview-heading { display: flex; justify-content: space-between; gap: var(--oc-space-xs); }
 .project-icon-registration-dialog__icon-list {
   max-height: var(--oc-list-max-height-sm);
   margin: 0;
-  padding-left: var(--oc-space-4);
+  padding-left: var(--oc-space-md);
   overflow: auto;
   color: var(--oc-fg-subtle);
   font-size: var(--oc-text-xs);
@@ -266,13 +266,13 @@ function fileStem(path: string): string {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .project-icon-registration-dialog__field {
   display: grid;
   min-width: 0;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
 }

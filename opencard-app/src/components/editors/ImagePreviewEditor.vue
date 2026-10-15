@@ -541,7 +541,7 @@ defineExpose({ resetView, presentation })
   top: 0;
   right: 0;
   left: 0;
-  padding: var(--oc-space-2) var(--oc-space-3);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-raised);
   color: var(--oc-fg-muted);
@@ -555,7 +555,7 @@ defineExpose({ resetView, presentation })
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .image-preview-editor__controls {

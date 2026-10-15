@@ -129,7 +129,7 @@ function clear(): void {
 <style scoped>
 .project-cover-field {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .project-cover-field__stage {
@@ -145,10 +145,10 @@ function clear(): void {
   padding: 0;
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
   cursor: pointer;
-  transition: border-color var(--oc-duration-fast) var(--oc-ease);
+  transition: border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 /* 与相册卡片同一套边框语言：悬停加深边框，键盘聚焦才用主题色。 */
@@ -164,7 +164,7 @@ function clear(): void {
 .project-cover-field__placeholder {
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 /* 相册卡片的信息条语言：路径是标题、移除是尾部操作，悬停整幅横幅才出现。 */
@@ -177,12 +177,12 @@ function clear(): void {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   /* 全局 border-box 下 min-height 包含纵向 padding，直接写按钮高度会被 padding 吞掉而撑开。 */
-  min-height: calc(var(--oc-size-sm) + var(--oc-space-1) * 2);
-  padding: var(--oc-space-1) var(--oc-space-3);
-  border-end-start-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
-  border-end-end-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
+  min-height: calc(var(--oc-size-sm) + var(--oc-space-2xs) * 2);
+  padding: var(--oc-space-2xs) var(--oc-space-sm);
+  border-end-start-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
+  border-end-end-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   background: var(--oc-bg-glass);
   -webkit-backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
   backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
@@ -193,7 +193,7 @@ function clear(): void {
   min-width: 0;
   flex: 1 1 auto;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-cover-field__path {

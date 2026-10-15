@@ -419,11 +419,11 @@ defineExpose({ canSave, navigate, presentation })
   display: grid;
   grid-template-columns: minmax(0, var(--oc-content-width-md)) var(--oc-project-outline-width);
   width: 100%;
-  max-width: calc(var(--oc-content-width-md) + var(--oc-project-outline-width) + var(--oc-space-6));
+  max-width: calc(var(--oc-content-width-md) + var(--oc-project-outline-width) + var(--oc-space-lg));
   min-height: 100%;
   margin-inline: auto;
-  gap: var(--oc-space-6);
-  padding: var(--oc-space-5);
+  gap: var(--oc-space-lg);
+  padding: var(--oc-space-lg);
 }
 
 .project-profile-editor__layout--single {
@@ -438,19 +438,19 @@ defineExpose({ canSave, navigate, presentation })
 
 .project-profile-editor__diagnostic {
   display: flex;
-  align-items: center;
-  gap: var(--oc-space-3);
+  align-items: flex-start;
+  gap: var(--oc-space-sm);
 }
 
 .project-profile-editor__form {
   display: grid;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .project-profile-editor__field,
 .project-profile-editor__host-list {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-profile-editor__field textarea {
@@ -459,7 +459,7 @@ defineExpose({ canSave, navigate, presentation })
 
 .project-profile-editor__remote-resources {
   display: grid;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .project-profile-editor__remote-mode {
@@ -470,13 +470,13 @@ defineExpose({ canSave, navigate, presentation })
 .project-profile-editor__host-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-profile-editor__field-caption {
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-profile-editor__add-host {
@@ -485,10 +485,10 @@ defineExpose({ canSave, navigate, presentation })
 
 .project-profile-editor__outline {
   position: sticky;
-  top: var(--oc-space-6);
+  top: var(--oc-space-lg);
   display: grid;
   align-self: start;
-  padding-block: var(--oc-space-2);
+  padding-block: var(--oc-space-xs);
 }
 
 .project-profile-editor__outline::before {
@@ -508,7 +508,7 @@ defineExpose({ canSave, navigate, presentation })
   height: var(--oc-size-md);
   min-width: 0;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   padding: 0;
   border: 0;
   background: transparent;
@@ -522,7 +522,7 @@ defineExpose({ canSave, navigate, presentation })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color var(--oc-duration-fast) var(--oc-ease);
+  transition: color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .project-profile-editor__outline-node {
@@ -530,12 +530,12 @@ defineExpose({ canSave, navigate, presentation })
   width: var(--oc-icon-size-sm);
   height: var(--oc-icon-size-sm);
   border: var(--oc-border-width) solid var(--oc-border-strong);
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-bg-base);
   transition:
-    border-color var(--oc-duration-fast) var(--oc-ease),
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    box-shadow var(--oc-duration-fast) var(--oc-ease);
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    box-shadow var(--oc-duration-quick) var(--oc-ease);
 }
 
 .project-profile-editor__outline-item:hover,
@@ -572,18 +572,14 @@ defineExpose({ canSave, navigate, presentation })
 .project-profile-editor__repair {
   display: grid;
   grid-template-rows: auto minmax(360px, 1fr);
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
   min-height: 560px;
-  padding-top: var(--oc-space-5);
-}
-
-.project-profile-editor__diagnostic {
-  align-items: flex-start;
+  padding-top: var(--oc-space-lg);
 }
 
 .project-profile-editor__diagnostic div {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .project-profile-editor__source {
@@ -594,7 +590,7 @@ defineExpose({ canSave, navigate, presentation })
 
 @media (max-width: 640px) {
   .project-profile-editor__layout {
-    padding-inline: var(--oc-space-3);
+    padding-inline: var(--oc-space-sm);
   }
 
 }

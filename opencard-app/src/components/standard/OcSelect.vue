@@ -304,8 +304,8 @@ function handleDocumentPointerDown(event: PointerEvent): void {
   min-width: 0;
   height: 100%;
   align-items: center;
-  gap: var(--oc-space-2);
-  padding: var(--oc-field-content-padding, 0 var(--oc-space-2));
+  gap: var(--oc-space-xs);
+  padding: var(--oc-field-content-padding, 0 var(--oc-space-xs));
   border: 0;
   outline: 0;
   background: transparent;
@@ -332,7 +332,7 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 }
 
 .oc-select__chevron {
-  transition: transform var(--oc-duration-fast) var(--oc-ease);
+  transition: transform var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-select__chevron.is-open {
@@ -348,12 +348,12 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 .oc-select__listbox {
   box-sizing: border-box;
   max-height: inherit;
-  padding: var(--oc-space-1);
+  padding: var(--oc-space-2xs);
   overflow-y: auto;
 }
 
 .oc-select__empty {
-  padding: var(--oc-space-3);
+  padding: var(--oc-space-sm);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
   text-align: center;

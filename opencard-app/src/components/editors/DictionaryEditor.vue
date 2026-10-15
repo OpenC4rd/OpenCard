@@ -673,8 +673,8 @@ defineExpose({ canSave, presentation, headerActions, onHeaderAction })
 }
 
 .dictionary-editor__notice {
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-2) var(--oc-space-6);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-xs) var(--oc-space-lg);
   color: var(--oc-icon-warning);
 }
 
@@ -691,7 +691,7 @@ defineExpose({ canSave, presentation, headerActions, onHeaderAction })
 .dictionary-editor__record-heading {
   align-items: center;
   justify-content: space-between;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   min-width: 0;
 }
 
@@ -705,7 +705,7 @@ defineExpose({ canSave, presentation, headerActions, onHeaderAction })
 
 .dictionary-editor__column-actions {
   flex: 0 0 auto;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .dictionary-editor__cell-action-slot {
@@ -739,19 +739,19 @@ defineExpose({ canSave, presentation, headerActions, onHeaderAction })
   flex: 1 1 auto;
   display: grid;
   grid-template-rows: auto minmax(var(--oc-list-max-height-lg), 1fr);
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
   min-height: 0;
-  padding-top: var(--oc-space-5);
+  padding-top: var(--oc-space-lg);
 }
 
 .dictionary-editor__diagnostic {
   align-items: flex-start;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .dictionary-editor__diagnostic div {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .dictionary-editor__source {

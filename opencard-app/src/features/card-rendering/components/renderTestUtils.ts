@@ -61,7 +61,6 @@ export function richTextRendererTestGlobal(block: RenderReadyTextBlock, projectI
   const parsed = parseRichTextHtml(block.content)
   const prepared: PreparedRichTextCatalog = new Map([[block.id, {
     document: parsed.document,
-    embeddedBlocks: new Map(),
     diagnostics: [],
     valid: parsed.canEnterVisualMode,
   }]])

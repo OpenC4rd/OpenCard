@@ -56,7 +56,8 @@ const forwardedAttrs = computed(() => {
   return restAttrs
 })
 
-const sizeClass = computed(() => `oc-icon--${props.size}`)
+/** `action` 是控件里的图标位，尺寸与 `md` 相同，直接复用它的类。 */
+const sizeClass = computed(() => `oc-icon--${props.size === 'action' ? 'md' : props.size}`)
 
 const iconStyle = computed(() => ({
   color: `var(--oc-icon-${props.tone})`,
@@ -92,12 +93,6 @@ const iconStyle = computed(() => ({
   font-size: var(--oc-icon-size-lg);
   width: var(--oc-icon-size-lg);
   height: var(--oc-icon-size-lg);
-}
-
-.oc-icon--action {
-  font-size: var(--oc-icon-size-action);
-  width: var(--oc-icon-size-action);
-  height: var(--oc-icon-size-action);
 }
 
 .oc-icon--display {

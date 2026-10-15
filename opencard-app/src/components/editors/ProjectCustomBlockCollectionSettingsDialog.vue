@@ -94,6 +94,6 @@ function submit(): void {
 </script>
 
 <style scoped>
-.collection-settings__field { display: grid; gap: var(--oc-space-1); margin-bottom: var(--oc-space-3); }
-.collection-settings__sources { display: flex; flex-wrap: wrap; align-items: center; gap: var(--oc-space-2); margin-bottom: var(--oc-space-3); }
+.collection-settings__field { display: grid; gap: var(--oc-space-2xs); margin-bottom: var(--oc-space-sm); }
+.collection-settings__sources { display: flex; flex-wrap: wrap; align-items: center; gap: var(--oc-space-xs); margin-bottom: var(--oc-space-sm); }
 </style>

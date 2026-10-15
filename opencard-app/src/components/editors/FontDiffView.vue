@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
 }
 
 .font-diff-view__panel header {
-  padding: var(--oc-space-2) var(--oc-space-3);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-raised);
   color: var(--oc-fg-muted);
@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   place-items: center;
   margin: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
   overflow: auto;
 }
 

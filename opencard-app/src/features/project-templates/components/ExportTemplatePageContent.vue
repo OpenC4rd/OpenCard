@@ -132,7 +132,7 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
   isolation: isolate;
   min-width: 0;
   min-height: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
   overflow: hidden;
   border-right: 1px solid var(--oc-border-muted);
   background: var(--oc-bg-base);
@@ -176,10 +176,10 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 }
 
 .export-template__details {
-  margin-top: var(--oc-space-4);
-  padding: var(--oc-space-4) 0;
+  margin-top: var(--oc-space-md);
+  padding: var(--oc-space-md) 0;
   display: grid;
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
   border-bottom: 1px solid var(--oc-border-muted);
 }
 
@@ -187,13 +187,13 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
   min-width: 0;
   display: flex;
   align-items: flex-start;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .export-template__details-heading > div {
   min-width: 0;
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .export-template__details-heading strong {
@@ -215,13 +215,13 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 
 .export-template__details dl {
   display: grid;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .export-template__details dl > div,
 .export-template__details dd {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .export-template__details dt {
@@ -239,8 +239,8 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 
 .export-template__overlay-status {
   position: absolute;
-  right: var(--oc-space-4);
-  bottom: var(--oc-space-4);
+  right: var(--oc-space-md);
+  bottom: var(--oc-space-md);
   z-index: 2;
   margin: 0;
   color: var(--oc-fg-muted);
@@ -250,17 +250,17 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 .export-template__form {
   min-width: 0;
   min-height: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
   overflow-y: auto;
   background: var(--oc-bg-surface);
 }
 
 .export-template__field {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
 }
@@ -284,9 +284,8 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 
 .export-template__footer {
   margin-top: auto;
-  padding-top: var(--oc-space-4);
+  padding-top: var(--oc-action-padding);
   display: grid;
-  gap: var(--oc-space-4);
   border-top: 1px solid var(--oc-border-muted);
 }
 
@@ -330,7 +329,7 @@ onUnmounted(() => { if (coverTimer) clearInterval(coverTimer) })
 
   .export-template__preview,
   .export-template__form {
-    padding: var(--oc-space-4);
+    padding: var(--oc-space-md);
   }
 }
 </style>

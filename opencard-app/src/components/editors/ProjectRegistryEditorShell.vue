@@ -30,7 +30,7 @@ withDefaults(defineProps<{
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--oc-space-5) var(--oc-space-6);
+  padding: var(--oc-space-lg) var(--oc-space-lg);
   scrollbar-gutter: stable;
 }
 

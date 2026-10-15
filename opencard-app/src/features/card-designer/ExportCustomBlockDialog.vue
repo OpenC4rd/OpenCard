@@ -94,24 +94,24 @@ function handleTreeAction(event: OcNodeActionEvent): void {
 
 <style scoped>
 .custom-block-export-dialog__description {
-  margin: 0 0 var(--oc-space-3);
+  margin: 0 0 var(--oc-space-sm);
   color: var(--oc-fg-muted);
 }
 
 .custom-block-export-dialog__toolbar {
   display: flex;
-  gap: var(--oc-space-2);
-  margin-bottom: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  margin-bottom: var(--oc-space-sm);
 }
 
 .custom-block-export-dialog__fields {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   max-height: 20rem;
   overflow: auto;
-  padding: var(--oc-space-2);
+  padding: var(--oc-space-xs);
   border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
 }
 
 </style>

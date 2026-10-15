@@ -25,6 +25,11 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-bg-active',
   '--oc-bg-selected',
 
+  // 状态叠层（background-image 用，叠在底色之上，不替换底色）
+  '--oc-overlay-hover',
+  '--oc-overlay-selected',
+  '--oc-overlay-accent',
+
   // 背景 — 输入
   '--oc-bg-input',
 
@@ -94,7 +99,6 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-icon-size-sm',
   '--oc-icon-size-md',
   '--oc-icon-size-lg',
-  '--oc-icon-size-action',
   '--oc-icon-size-display',
 
   // 数字角标
@@ -145,16 +149,12 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-font-preview-size',
 
   // 间距
-  '--oc-space-1',
-  '--oc-space-2',
-  '--oc-space-3',
-  '--oc-space-4',
-  '--oc-space-5',
-  '--oc-space-6',
-  '--oc-space-8',
-  '--oc-tree-indent',
-  '--oc-page-editor-indent',
-  '--oc-page-editor-column-gap',
+  '--oc-space-2xs',
+  '--oc-space-xs',
+  '--oc-space-sm',
+  '--oc-space-md',
+  '--oc-space-lg',
+  '--oc-indent-step',
   '--oc-page-editor-row-min-height',
   '--oc-page-editor-title-min-width',
   '--oc-page-editor-content-min-width',
@@ -253,12 +253,11 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-dialog-height-lg',
   '--oc-dialog-height-workspace',
   '--oc-dialog-max-height',
-  '--oc-dialog-header-padding-block',
-  '--oc-dialog-header-padding-inline',
-  '--oc-dialog-body-padding',
-  '--oc-dialog-body-gap',
-  '--oc-dialog-footer-padding-block',
-  '--oc-dialog-footer-padding-inline',
+  '--oc-dialog-sidebar-width',
+  '--oc-dialog-sidebar-handle-width',
+  '--oc-dialog-sidebar-expand-threshold',
+  '--oc-dialog-sidebar-collapse-threshold',
+  '--oc-action-padding',
   '--oc-z-modal',
   '--oc-z-overlay-toolbar',
   '--oc-viewport-dot-pattern',
@@ -290,10 +289,9 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-data-grid-z-corner',
 
   // 圆角
-  '--oc-radius-sm',
-  '--oc-radius-md',
-  '--oc-radius-lg',
-  '--oc-radius-full',
+  '--oc-radius-control',
+  '--oc-radius-surface',
+  '--oc-radius-pill',
 
   // 阴影
   '--oc-shadow-sm',
@@ -301,9 +299,9 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-shadow-lg',
 
   // 动效
-  '--oc-duration-fast',
-  '--oc-duration-normal',
-  '--oc-duration-slow',
+  '--oc-duration-quick',
+  '--oc-duration',
+  '--oc-duration-layout',
   '--oc-duration-theme',
   '--oc-viewport-status-duration',
   '--oc-overflow-text-duration',

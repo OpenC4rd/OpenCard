@@ -31,7 +31,7 @@ defineProps<{
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-shortcut__separator {

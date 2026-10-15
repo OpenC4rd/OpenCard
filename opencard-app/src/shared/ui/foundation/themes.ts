@@ -25,7 +25,6 @@ export const OC_SHARED_THEME_TOKENS = {
   '--oc-icon-size-sm': '12px',
   '--oc-icon-size-md': '16px',
   '--oc-icon-size-lg': '20px',
-  '--oc-icon-size-action': '16px',
   '--oc-icon-size-display': '40px',
   '--oc-number-badge-size': '11px',
   '--oc-number-badge-padding-inline': '2px',
@@ -38,22 +37,28 @@ export const OC_SHARED_THEME_TOKENS = {
   '--oc-inline-key-shadow-offset': '3px',
   '--oc-font-sans': '"Segoe UI Variable Text", "SF Pro Text", "Inter", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif',
   '--oc-font-mono': '"Cascadia Code", "JetBrains Mono", "SF Mono", "Consolas", "Fira Code", monospace',
+  /* 字号阶梯由「设置 → 基础字号」生成（见 foundation/theme.ts），保持五档相对步进。 */
   '--oc-text-xs': '10px',
   '--oc-text-sm': '11px',
   '--oc-text-base': '12px',
   '--oc-text-lg': '13px',
   '--oc-text-xl': '16px',
   '--oc-font-preview-size': '48px',
-  '--oc-space-1': '4px',
-  '--oc-space-2': '6px',
-  '--oc-space-3': '8px',
-  '--oc-space-4': '12px',
-  '--oc-space-5': '16px',
-  '--oc-space-6': '20px',
-  '--oc-space-8': '32px',
-  '--oc-tree-indent': '14px',
-  '--oc-page-editor-indent': '12px',
-  '--oc-page-editor-column-gap': '16px',
+  /*
+   * 间距五档：padding 与 gap 都只取这五档。
+   * 2xs 4px 行内紧贴（图标与文字、前缀与输入、点阵）
+   * xs  6px 控件之间（同一行的按钮、动作区四边）
+   * sm  8px 行与行、字段之间
+   * md  12px 区块之间、容器内容区
+   * lg  16px 区段之间、页面内容
+   */
+  '--oc-space-2xs': '4px',
+  '--oc-space-xs': '6px',
+  '--oc-space-sm': '8px',
+  '--oc-space-md': '12px',
+  '--oc-space-lg': '16px',
+  /* 层级缩进步进：树的每层缩进、属性编辑器的三级缩进、数据表首列缩进共用。 */
+  '--oc-indent-step': '12px',
   '--oc-page-editor-row-min-height': '54px',
   '--oc-page-editor-title-min-width': '180px',
   '--oc-page-editor-content-min-width': '220px',
@@ -142,12 +147,12 @@ export const OC_SHARED_THEME_TOKENS = {
   '--oc-dialog-height-lg': '560px',
   '--oc-dialog-height-workspace': '720px',
   '--oc-dialog-max-height': '720px',
-  '--oc-dialog-header-padding-block': '8px',
-  '--oc-dialog-header-padding-inline': '12px',
-  '--oc-dialog-body-padding': '12px',
-  '--oc-dialog-body-gap': '8px',
-  '--oc-dialog-footer-padding-block': '8px',
-  '--oc-dialog-footer-padding-inline': '12px',
+  '--oc-dialog-sidebar-width': '320px',
+  '--oc-dialog-sidebar-handle-width': '8px',
+  '--oc-dialog-sidebar-expand-threshold': '28px',
+  '--oc-dialog-sidebar-collapse-threshold': '70px',
+  /* 直接包住按钮的动作区（弹窗页脚、工具栏、操作条）四边相同的紧凑内边距。 */
+  '--oc-action-padding': 'var(--oc-space-xs)',
   '--oc-z-modal': '1000',
   '--oc-z-overlay-toolbar': '3',
   '--oc-viewport-dot-pattern': 'radial-gradient(circle at center, color-mix(in srgb, var(--oc-fg-subtle) 38%, transparent) 1px, transparent 1.25px)',
@@ -170,14 +175,14 @@ export const OC_SHARED_THEME_TOKENS = {
   '--oc-data-grid-z-sticky-column': '3',
   '--oc-data-grid-z-sticky-header': '4',
   '--oc-data-grid-z-corner': '5',
-  '--oc-radius-sm': '3px',
-  '--oc-radius-md': '6px',
-  '--oc-radius-lg': '12px',
-  '--oc-radius-full': '999px',
+  '--oc-radius-control': '6px',
+  '--oc-radius-surface': '12px',
+  '--oc-radius-pill': '999px',
   '--oc-border-width': '1px',
-  '--oc-duration-fast': '100ms',
-  '--oc-duration-normal': '150ms',
-  '--oc-duration-slow': '250ms',
+  '--oc-duration-quick': '100ms',
+  '--oc-duration': '150ms',
+  /* 布局位移（侧栏/面板滑动、圆角变化）用的更慢一档。 */
+  '--oc-duration-layout': '220ms',
   '--oc-duration-theme': '1200ms',
   '--oc-viewport-status-duration': '1200ms',
   '--oc-overflow-text-duration': '4s',
@@ -196,6 +201,13 @@ const darkTheme: OcThemeTokens = {
   '--oc-bg-raised': '#2d2d2d',
 
   '--oc-bg-hover': 'rgba(255, 255, 255, 0.04)',
+  /*
+   * 状态叠层：高光/提示一律用 `background-image` 叠在原有底色之上，只有选中/当前才改 `background-color`。
+   * `background` 简写会连底色一起替换，选中与高光就会互相覆盖；叠层写法两者可以同时成立。
+   */
+  '--oc-overlay-hover': 'linear-gradient(var(--oc-bg-hover), var(--oc-bg-hover))',
+  '--oc-overlay-selected': 'linear-gradient(var(--oc-bg-selected), var(--oc-bg-selected))',
+  '--oc-overlay-accent': 'linear-gradient(var(--oc-bg-accent-subtle), var(--oc-bg-accent-subtle))',
   '--oc-bg-active': 'rgba(162, 96, 255, 0.22)',
   '--oc-bg-selected': 'rgba(162, 96, 255, 0.16)',
 

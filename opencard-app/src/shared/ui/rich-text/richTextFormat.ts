@@ -6,8 +6,6 @@ import type {
   PropertyEditorInput,
 } from '../property-editor/propertyEditor.types'
 
-export type RichTextFillType = 'none' | 'solid' | 'image'
-
 export type RichTextFormatLabels = (key: string, fallback: string) => string
 
 export type RichTextFormatOptions = {
@@ -26,24 +24,14 @@ export const richTextFormatCategories = (labels: RichTextFormatLabels): Map<stri
   ['shadow', { title: labels('propertyEditor.richText.groupShadow', '阴影') }],
 ])
 
-export function resolveRichTextFillType(
-  textStyle: Readonly<Record<string, unknown>>,
-  highlight: Readonly<Record<string, unknown>>,
-): RichTextFillType {
-  const explicit = textStyle.textFillType
-  if (explicit === 'image' || explicit === 'solid' || explicit === 'none') return explicit
-  return highlight.color ? 'solid' : 'none'
-}
-
 export function createRichTextFormatInput(options: {
   labels: RichTextFormatLabels
-  textStyle: Readonly<Record<string, unknown>>
-  highlight: Readonly<Record<string, unknown>>
+  record: Readonly<Record<string, string>>
   fields: RichTextFormatOptions
 }): PropertyEditorInput {
-  const { labels, textStyle, highlight } = options
+  const { labels, record } = options
   const format = options.fields
-  const fillType = resolveRichTextFillType(textStyle, highlight)
+  const fillType = record.fillType
   const fields: Record<string, PropertyEditorFieldDefinition> = {
     fontFamily: { ...format.fontField, category: 'typography' },
     fontSize: { ...format.fontSizeField, category: 'typography' },
@@ -103,20 +91,7 @@ export function createRichTextFormatInput(options: {
   return {
     key: 'rich-text-selection',
     title: labels('propertyEditor.richText.selectionProperties', '选中文本'),
-    record: {
-      fontFamily: textStyle.fontFamily ?? '',
-      fontSize: textStyle.fontSize ?? '',
-      color: textStyle.color ?? '#24292f',
-      fillType,
-      ...(fillType === 'solid' ? { backgroundColor: highlight.color ?? '#fff59d' } : {}),
-      ...(fillType === 'image' ? { fillSource: textStyle.textFillSource ?? '' } : {}),
-      strokeWidth: textStyle.textStrokeWidth ?? '0px',
-      strokeColor: textStyle.textStrokeColor ?? '#000000',
-      shadowColor: textStyle.textShadowColor ?? '#00000000',
-      shadowOffsetX: textStyle.textShadowOffsetX ?? '0px',
-      shadowOffsetY: textStyle.textShadowOffsetY ?? '0px',
-      shadowBlur: textStyle.textShadowBlur ?? '0px',
-    },
+    record,
     fields,
   }
 }

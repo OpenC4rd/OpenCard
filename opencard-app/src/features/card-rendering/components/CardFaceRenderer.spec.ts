@@ -37,7 +37,7 @@ describe('CardFaceRenderer resources', () => {
     const resourceContext = createCardRenderResourceContext({
       hostEnvironment: environment,
       richText: new Map([['native-text', {
-        document: nativeRichText.document, embeddedBlocks: new Map(), diagnostics: [], valid: true,
+        document: nativeRichText.document, diagnostics: [], valid: true,
       }]]),
     })
 
@@ -99,7 +99,6 @@ describe('CardFaceRenderer resources', () => {
       const parsed = parseRichTextHtml(html)
       return new Map([['text', {
         document: parsed.document,
-        embeddedBlocks: new Map(),
         diagnostics: [],
         valid: true,
       }]])

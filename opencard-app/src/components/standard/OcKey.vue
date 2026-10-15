@@ -17,7 +17,7 @@ defineOptions({ name: 'OcKey' })
   min-height: var(--oc-inline-key-height);
   padding: 0 var(--oc-inline-key-padding-inline);
   border: var(--oc-border-width) solid var(--oc-border-default);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
   color: var(--oc-fg-default);
   font-family: var(--oc-font-mono);

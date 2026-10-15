@@ -5,22 +5,26 @@
         :aria-expanded="open" @click="openEditor">
         <RichTextPreview v-if="stringValue" class="rich-text-string-field__content"
           :html="stringValue" :project-icon-catalog="definition.projectIcon?.catalog"
-          :package-icon-sources="definition.projectIcon?.sources" />
+          :package-icon-sources="definition.projectIcon?.sources" :font-options="definition.fontOptions"
+          :resolve-image-source="definition.richTextImageResolver" />
         <span v-else class="rich-text-string-field__empty">-</span>
       </button>
       <div v-else class="rich-text-string-field__preview rich-text-string-field__preview--readonly">
         <RichTextPreview v-if="stringValue" class="rich-text-string-field__content"
           :html="stringValue" :project-icon-catalog="definition.projectIcon?.catalog"
-          :package-icon-sources="definition.projectIcon?.sources" />
+          :package-icon-sources="definition.projectIcon?.sources" :font-options="definition.fontOptions"
+          :resolve-image-source="definition.richTextImageResolver" />
         <span v-else class="rich-text-string-field__empty">-</span>
       </div>
     </OcFieldFrame>
 
-  <OcDialog class="rich-text-string-popover" :open="open" :title="definition.title" size="lg"
+  <OcDialog class="rich-text-string-popover" :open="open" :title="definition.title" size="xl"
+      :sidebar="editorMode === 'rich'" :sidebar-title="tr('propertyEditor.richText.properties', '文字属性')"
+      :sidebar-tooltip="tr('propertyEditor.richText.toggleProperties', '拖动或双击收起或展开文字属性')"
       :padded="false" :scrollable="false" height-mode="fixed" height="workspace"
       close-on-backdrop @request-close="cancelEditor">
 	          <div class="rich-text-string-popover__editor">
-            <OcRichTextEditor v-if="editorMode === 'rich'" ref="richTextEditor" :model-value="draftValue"
+            <OcRichTextEditor v-if="open" v-show="editorMode === 'rich'" ref="richTextEditor" :initial-html="initialHtml"
               :binding-completion="definition.binding?.provider"
 		              :project-icon-catalog="definition.projectIcon?.catalog"
               :package-icon-sources="definition.projectIcon?.sources"
@@ -29,8 +33,8 @@
               :image-directory-provider="definition.richTextImageDirectoryProvider"
               :image-completion-provider="definition.richTextImageCompletionProvider"
               :resolve-image-source="definition.richTextImageResolver"
-              @update:model-value="draftValue = $event" />
-            <OcFieldInput v-else ref="sourceEditor" as="textarea" variant="plain" full-width mono
+              />
+            <OcFieldInput v-if="editorMode === 'source'" ref="sourceEditor" as="textarea" variant="plain" full-width mono
               class="rich-text-string-popover__source" :value="sourceValue"
               resize="none" autocomplete="off" spellcheck="false"
               :aria-label="tr('propertyEditor.richText.htmlSource', 'HTML 源码')"
@@ -39,35 +43,42 @@
 	          <p v-if="sourceDiagnostics.length" class="rich-text-string-popover__diagnostics" role="alert">
 	            {{ sourceDiagnostics[0]?.path }}: {{ sourceDiagnostics[0]?.message }}
 	          </p>
+      <template #footer-start>
+        <OcOptionGroup :model-value="editorMode" :options="editorModeOptions"
+          size="md" icon-only appearance="sliding-outline" :aria-label="tr('propertyEditor.richText.editorView', '编辑视图')"
+          @update:model-value="setEditorMode" />
+      </template>
       <template #footer>
-          <div class="rich-text-string-popover__footer-content">
-            <OcOptionGroup :model-value="editorMode" :options="editorModeOptions"
-              size="md" icon-only appearance="sliding-outline" :aria-label="tr('propertyEditor.richText.editorView', '编辑视图')"
-              @update:model-value="setEditorMode" />
-            <span class="rich-text-string-popover__actions">
-              <OcButton size="md" icon-only icon="action.close" icon-tone="danger"
-                :data-tooltip="tr('propertyEditor.richText.cancel', '取消')" :aria-label="tr('propertyEditor.richText.cancelEdit', '取消富文本编辑')" @click="cancelEditor" />
-	              <OcButton size="md" icon-only icon="action.check" icon-tone="success" variant="soft"
-	                :disabled="editorMode === 'source' && sourceDiagnostics.length > 0"
-                :data-tooltip="tr('propertyEditor.richText.save', '保存')" :aria-label="tr('propertyEditor.richText.saveEdit', '保存富文本编辑')" @click="saveEditor" />
-            </span>
-          </div>
+        <OcButton size="md" icon-only icon="action.close" icon-tone="danger"
+          :data-tooltip="tr('propertyEditor.richText.cancel', '取消')" :aria-label="tr('propertyEditor.richText.cancelEdit', '取消富文本编辑')" @click="cancelEditor" />
+        <OcButton size="md" icon-only icon="action.check" icon-tone="success" variant="soft" :disabled="saveBlocked"
+          :data-tooltip="tr('propertyEditor.richText.save', '保存')" :aria-label="tr('propertyEditor.richText.saveEdit', '保存富文本编辑')" @click="saveEditor" />
+      </template>
+      <template #sidebar>
+        <div v-if="richTextEditor" class="oc-rich-text-editor__properties"
+          @pointerdown.capture="richTextEditor.properties.capture" @focusin.capture="richTextEditor.properties.capture">
+          <PropertyEditor :inputs="richTextEditor.properties.inputs" :categories="richTextEditor.properties.categories"
+            sort-mode="category" @update-property="richTextEditor.properties.update"
+            @preview-property="richTextEditor.properties.preview" @cancel-property="richTextEditor.properties.cancel" />
+        </div>
       </template>
     </OcDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, ref, type ComponentPublicInstance } from 'vue'
+import { computed, getCurrentInstance, ref, type ComponentPublicInstance } from 'vue'
 import OcButton from '../../../../components/base/OcButton.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 import OcDialog from '../../../../components/standard/OcDialog.vue'
 import OcOptionGroup, { type OcOption } from '../../../../components/standard/OcOptionGroup.vue'
-import { formatRichTextHtmlSource, parseRichTextHtml } from '../../../rich-text/richTextHtml'
+import { parseRichTextHtml } from '../../../rich-text/richTextHtml'
+import { useRichTextSession } from '../../rich-text/useRichTextSession'
 import OcRichTextEditor from '../../rich-text/OcRichTextEditor.vue'
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 import RichTextPreview from '../../rich-text/RichTextPreview.vue'
+import PropertyEditor from '../PropertyEditor.vue'
 
 const props = defineProps<{
   definition: Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
@@ -85,70 +96,32 @@ const emit = defineEmits<{
 }>()
 
 const anchor = ref<HTMLElement | null>(null)
-const richTextEditor = ref<{ focus: () => void } | null>(null)
+const richTextEditor = ref<InstanceType<typeof OcRichTextEditor> | null>(null)
 const sourceEditor = ref<{ focus: () => void } | null>(null)
-const open = ref(false)
-const editorMode = ref<'rich' | 'source'>('rich')
-const stringValue = computed(() => (props.value == null ? '' : String(props.value)))
-const draftValue = ref('')
-const sourceValue = ref('')
-const sourceDiagnostics = computed(() => editorMode.value === 'source'
-  ? parseRichTextHtml(sourceValue.value).diagnostics
-  : [])
+const stringValue = computed(() => props.value == null ? '' : String(props.value))
+const session = useRichTextSession(richTextEditor, sourceEditor,
+  () => tr('propertyEditor.richText.sourcePreserved', '内容无法无损转为可视化编辑，请继续编辑源码。'))
+const { open, mode: editorMode, initialHtml, source: sourceValue, diagnostics: sourceDiagnostics } = session
+const saveBlocked = computed(() => editorMode.value === 'source' && parseRichTextHtml(sourceValue.value).diagnostics.length > 0)
 const editorModeOptions = computed<readonly OcOption[]>(() => [
   { value: 'rich', label: tr('propertyEditor.richText.richTextMode', '富文本'), icon: 'format.text-variant-outline' },
   { value: 'source', label: tr('propertyEditor.richText.htmlSource', 'HTML 源码'), icon: 'format.xml' },
 ])
 
-async function openEditor(): Promise<void> {
-  draftValue.value = stringValue.value
-  sourceValue.value = stringValue.value
-  editorMode.value = parseRichTextHtml(stringValue.value).canEnterVisualMode
-    ? 'rich'
-    : 'source'
-  open.value = true
-  await nextTick()
-  if (editorMode.value === 'rich') richTextEditor.value?.focus()
-  else sourceEditor.value?.focus()
+function openEditor() { if (!props.definition.isReadonly && !open.value) return session.begin(stringValue.value) }
+const setEditorMode = session.switchMode
+function handleSourceInput(event: Event) {
+  if (event.target instanceof HTMLTextAreaElement) session.editSource(event.target.value)
 }
-
-async function setEditorMode(mode: string): Promise<void> {
-  if (mode !== 'rich' && mode !== 'source') return
-  if (mode === editorMode.value) return
-  if (mode === 'rich') {
-    const parsed = parseRichTextHtml(sourceValue.value)
-    if (!parsed.canEnterVisualMode) return
-    draftValue.value = sourceValue.value
-  }
-  else sourceValue.value = formatRichTextHtmlSource(draftValue.value)
-  editorMode.value = mode
-  await nextTick()
-  if (mode === 'rich') richTextEditor.value?.focus()
-  else sourceEditor.value?.focus()
-}
-
-function handleSourceInput(event: Event): void {
-  const target = event.target
-  if (target instanceof HTMLTextAreaElement) sourceValue.value = target.value
-}
-
-function finishEditing(): void {
-  open.value = false
+function finishEditing() {
+  session.finish()
   anchor.value?.querySelector<HTMLButtonElement>('.rich-text-string-field__preview')?.focus()
 }
-
-function cancelEditor(): void {
-  finishEditing()
-}
-
-function saveEditor(): void {
-  if (editorMode.value === 'source' && sourceDiagnostics.value.length > 0) return
-  const normalizedValue = editorMode.value === 'source'
-    ? sourceValue.value
-    : draftValue.value
-  if (normalizedValue !== stringValue.value) {
-    emit('update:value', normalizedValue)
-  }
+function cancelEditor() { finishEditing() }
+function saveEditor() {
+  const value = session.readForSave()
+  if (value === null) return
+  if (value !== stringValue.value) emit('update:value', value)
   finishEditing()
 }
 
@@ -174,7 +147,7 @@ defineExpose({ activate: openEditor })
 .rich-text-string-field__preview {
   display: block;
   min-width: 0;
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
+  padding: var(--oc-field-content-padding, var(--oc-space-2xs) var(--oc-space-xs));
   overflow: hidden;
   border: 0;
   background: transparent;
@@ -218,7 +191,7 @@ defineExpose({ activate: openEditor })
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: var(--oc-space-4);
+  padding: var(--oc-space-md);
   overflow: auto;
   background: var(--oc-bg-input);
   color: var(--oc-fg-default);
@@ -228,24 +201,10 @@ defineExpose({ activate: openEditor })
 .rich-text-string-popover__diagnostics {
   flex: 0 0 auto;
   margin: 0;
-  padding: var(--oc-space-2) var(--oc-space-4);
+  padding: var(--oc-space-xs) var(--oc-space-md);
   border-top: var(--oc-border-width) solid var(--oc-fg-danger);
   background: var(--oc-bg-danger-subtle);
   color: var(--oc-fg-danger);
 }
 
-.rich-text-string-popover__footer-content {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--oc-space-1);
-}
-
-.rich-text-string-popover__actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--oc-space-1);
-}
 </style>

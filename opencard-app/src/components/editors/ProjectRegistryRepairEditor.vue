@@ -49,16 +49,16 @@ function updateModelValue(value: string, history?: HistoryOperationMeta): void {
   height: 100%;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
 }
 
 .project-registry-repair__message {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .project-registry-repair__message > div {
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 </style>

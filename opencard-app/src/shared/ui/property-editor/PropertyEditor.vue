@@ -18,67 +18,69 @@
     <OcEmpty v-if="inputs.length === 0">{{ t('propertyEditor.emptySelection') }}</OcEmpty>
     <template v-else>
       <OcPanel padding="none" border="none" tone="transparent" gap="none">
-        <section v-for="source in displaySources" :key="source.key" class="property-editor__source">
-          <header class="property-editor__source-header">
-            <span class="property-editor__icon-slot" aria-hidden="true">
-              <OcIcon name="data.symbol-class" size="md" tone="muted" />
-            </span>
-            <OcText class="property-editor__source-title" :truncate="true">{{ source.title }}</OcText>
-          </header>
-
-          <section v-for="category in source.categories" :key="`${source.key}:${category.key}`"
-            class="property-editor__category">
-            <header class="property-editor__category-header"
-              :tabindex="resolveCategoryActions(category).length > 0 ? 0 : undefined"
-              @contextmenu="openCategoryContextMenu($event, category)"
-              @keydown="openCategoryKeyboardMenu($event, category)">
-              <span class="property-editor__category-indent" aria-hidden="true" />
+        <div class="property-editor__rows">
+          <template v-for="row in displayRows" :key="row.key">
+            <header v-if="row.kind === 'source'" class="property-editor__source-header"
+              :style="indentStyle(row.level)">
               <span class="property-editor__icon-slot" aria-hidden="true">
-                <OcIcon :name="category.icon" size="md" tone="muted" />
+                <OcIcon name="data.symbol-class" size="md" tone="muted" />
               </span>
-              <OcText class="property-editor__category-title" :truncate="true">{{ category.title }}</OcText>
+              <OcText class="property-editor__source-title" :truncate="true">{{ row.title }}</OcText>
+            </header>
+
+            <header v-else-if="row.kind === 'category' && row.category" class="property-editor__category-header"
+              :style="indentStyle(row.level)"
+              :tabindex="resolveCategoryActions(row.category).length > 0 ? 0 : undefined"
+              @contextmenu="openCategoryContextMenu($event, row.category)"
+              @keydown="openCategoryKeyboardMenu($event, row.category)">
+              <span class="property-editor__icon-slot" aria-hidden="true">
+                <OcIcon :name="row.category.icon" size="md" tone="muted" />
+              </span>
+              <OcText class="property-editor__category-title" :truncate="true">{{ row.category.title }}</OcText>
               <span class="property-editor__category-actions">
-                <OcActionButton v-for="action in resolveCategoryActions(category)" :key="action.key"
+                <OcActionButton v-for="action in resolveCategoryActions(row.category)" :key="action.key"
                   :action="action" size="sm" variant="ghost"
-                  @select="handleCategoryAction($event, category)" />
+                  @select="handleCategoryAction($event, row.category)" />
               </span>
             </header>
 
-            <div class="property-editor__fields">
-            <div v-for="entry in category.entries" :key="`${source.key}:${category.key}:${entry.key}`"
+            <div v-else-if="row.kind === 'field' && row.category && row.entry"
               class="property-editor__row"
-              :class="{ 'is-revealed': revealedFieldIdentity === fieldIdentity(category.inputKey, entry.key) }"
-              :data-input-key="category.inputKey" :data-field-key="entry.key">
+              :style="indentStyle(row.level)"
+              :class="{ 'is-revealed': revealedFieldIdentity === fieldIdentity(row.category.inputKey, row.entry.key) }"
+              :data-input-key="row.category.inputKey" :data-field-key="row.entry.key">
               <div class="property-editor__row-label">
-                <OcIcon :name="getPropertyFieldIcon(entry.definition.fieldType)" tone="muted" size="md" />
-                <OcIcon v-if="fieldWarnings?.has(fieldIdentity(category.inputKey, entry.key))"
+                <OcIcon :name="getPropertyFieldIcon(row.entry.definition.fieldType)" tone="muted" size="md" />
+                <OcIcon v-if="fieldWarnings?.has(fieldIdentity(row.category.inputKey, row.entry.key))"
                   name="status.warning" tone="warning" size="sm"
-                  :data-tooltip="fieldWarnings.get(fieldIdentity(category.inputKey, entry.key))" />
+                  :data-tooltip="fieldWarnings.get(fieldIdentity(row.category.inputKey, row.entry.key))" />
                 <button type="button" class="property-editor__field-key-button"
-                  :data-tooltip="t('propertyEditor.actions.copyFieldKeyTooltip', { key: entry.key })"
-                  :aria-label="t('propertyEditor.actions.copyFieldKey', { key: entry.key })"
-                  @click.stop="copyFieldKey(entry.key)">
-                  <OcText class="property-editor__row-label-text" :truncate="true">{{ entry.label }}</OcText>
+                  :data-tooltip="t('propertyEditor.actions.copyFieldKeyTooltip', { key: row.entry.key })"
+                  :aria-label="t('propertyEditor.actions.copyFieldKey', { key: row.entry.key })"
+                  @click.stop="copyFieldKey(row.entry.key)">
+                  <OcText class="property-editor__row-label-text" :truncate="true">{{ row.entry.label }}</OcText>
                 </button>
               </div>
               <div class="property-editor__value">
-                <span v-if="entry.readonly" class="property-editor__readonly-value">
-                  {{ formatPropertyFieldReadonlyValue(entry.definition, entry.value) }}
+                <span v-if="row.entry.readonly" class="property-editor__readonly-value">
+                  {{ formatPropertyFieldReadonlyValue(row.entry.definition, row.entry.value) }}
                 </span>
                 <PropertyFieldRenderer v-else
-                  :ref="component => setFieldRendererRef(fieldIdentity(category.inputKey, entry.key), component)"
+                  :ref="component => setFieldRendererRef(fieldIdentity(row.category!.inputKey, row.entry!.key), component)"
                   class="entry-control"
-                  :definition="entry.definition"
-                  :value="entry.value"
-                  :editor-id="resolveFieldEditorState(category.inputKey, entry).editorId"
-                  @update:value="handleFieldValueUpdate(category.inputKey, entry, $event)"
+                  :definition="row.entry.definition"
+                  :value="row.entry.value"
+                  :editor-id="resolveFieldEditorState(row.category.inputKey, row.entry).editorId"
+                  @update:value="handleFieldValueUpdate(row.category.inputKey, row.entry, $event)"
+                  @preview:value="emit('preview-property', { key: row.category.inputKey, fieldKey: row.entry.fieldKey, value: $event })"
+                  @cancel:value="emit('cancel-property', { key: row.category.inputKey, fieldKey: row.entry.fieldKey })"
                 />
-                <PropertyFieldActionRail v-if="!entry.readonly"
-                  :actions="resolveFieldActions(category.inputKey, entry)"
-                  @action="handleFieldAction(category.inputKey, entry, $event)"
+                <PropertyFieldActionRail v-if="!row.entry.readonly"
+                  :actions="resolveFieldActions(row.category.inputKey, row.entry)"
+                  @action="handleFieldAction(row.category.inputKey, row.entry, $event)"
                 />
-                <span v-if="entry.tail" class="property-editor__tail">
-                  <template v-for="(part, index) in normalizeNodeTail(entry.tail)"
+                <span v-if="row.entry.tail" class="property-editor__tail">
+                  <template v-for="(part, index) in normalizeNodeTail(row.entry.tail)"
                     :key="typeof part === 'string' ? `text:${index}` : `part:${index}`">
                     <OcText v-if="typeof part === 'string'" tone="muted" size="xs">{{ part }}</OcText>
                     <span v-else-if="part.type === 'badge'" class="property-editor__tail-badge" role="img"
@@ -89,9 +91,8 @@
                 </span>
               </div>
             </div>
-            </div>
-          </section>
-        </section>
+          </template>
+        </div>
       </OcPanel>
     </template>
   </div>
@@ -100,7 +101,7 @@
 
 <script setup lang="ts">
 // Vue 基础能力与依赖组件。
-import { computed, nextTick, onBeforeUnmount, ref, toRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, toRef, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notifyAppError } from '../../../features/notifications/titlebarNotices'
 import type {
@@ -137,6 +138,8 @@ import { normalizeNodeTail } from '../node/node.types'
 // 输出事件协议。
 const emit = defineEmits<{
   (e: 'update-property', payload: PropertyEditorMutation): void
+  (e: 'preview-property', payload: PropertyEditorMutation): void
+  (e: 'cancel-property', payload: PropertyEditorFieldIntent): void
   (e: 'add-property', payload: PropertyEditorAddMutation): void
   (e: 'reset-property', payload: PropertyEditorFieldIntent): void
   (e: 'delete-property', payload: PropertyEditorFieldIntent): void
@@ -205,6 +208,61 @@ const { displaySources } = usePropertyEditorView({
     icon: 'data.list-tree',
   })),
 })
+
+/**
+ * 拍平后的一行。三层在 DOM 上是同级兄弟行、共用同一个间距容器，
+ * 差别只有 `level`（缩进等级）和行的内容，与 OcTree 的可见节点列表一致。
+ */
+interface PropertyEditorDisplayRow {
+  key: string
+  kind: 'source' | 'category' | 'field'
+  level: 0 | 1 | 2
+  title: string
+  /** 分类行自身，以及属性行所属的分类。 */
+  category: PropertyEditorCategoryView | null
+  /** 属性行的字段条目。 */
+  entry: PropertyEditorEntry | null
+}
+
+const displayRows = computed<PropertyEditorDisplayRow[]>(() => {
+  const rows: PropertyEditorDisplayRow[] = []
+  for (const source of displaySources.value) {
+    rows.push({
+      key: `source:${source.key}`,
+      kind: 'source',
+      level: 0,
+      title: source.title,
+      category: null,
+      entry: null,
+    })
+    for (const category of source.categories) {
+      rows.push({
+        key: `category:${source.key}:${category.key}`,
+        kind: 'category',
+        level: 1,
+        title: category.title,
+        category,
+        entry: null,
+      })
+      for (const entry of category.entries) {
+        rows.push({
+          key: `field:${source.key}:${category.key}:${entry.key}`,
+          kind: 'field',
+          level: 2,
+          title: entry.label,
+          category,
+          entry,
+        })
+      }
+    }
+  }
+  return rows
+})
+
+/** 行只带自己的缩进等级，缩进步进由 CSS 的 --oc-indent-step 决定。 */
+function indentStyle(level: PropertyEditorDisplayRow['level']): CSSProperties {
+  return { '--property-indent': String(level) } as CSSProperties
+}
 
 function emitPropertyValue(sourceKey: string, fieldKey: string, value: unknown): void {
   emit('update-property', { key: sourceKey, fieldKey, value })
@@ -410,12 +468,28 @@ onBeforeUnmount(() => {
   line-height: 1.4;
 }
 
-.property-editor__source {
+/* 三层行共用的容器：只有一个均匀间距（与树的节点空隙同档），层级不进 DOM 结构。 */
+.property-editor__rows {
+  display: grid;
+  gap: var(--oc-space-2xs);
   min-width: 0;
 }
 
-.property-editor__source + .property-editor__source {
-  border-top: 1px solid var(--oc-border-muted);
+/*
+ * 对象栏、分类栏、属性行是同级行：几何一致，只有起始缩进不同，
+ * 缩进步进取自 --oc-indent-step（与树、数据表共用）。
+ */
+.property-editor__source-header,
+.property-editor__category-header,
+.property-editor__row {
+  --property-indent: 0;
+  box-sizing: border-box;
+  min-height: var(--oc-property-row-height);
+  padding-block: 0;
+  padding-inline: var(--oc-space-xs);
+  padding-inline-start: calc(var(--oc-space-xs) + var(--property-indent) * var(--oc-indent-step));
+  border-radius: var(--oc-radius-control);
+  transition: background-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .property-editor__source-header,
@@ -424,8 +498,6 @@ onBeforeUnmount(() => {
   align-items: center;
   width: 100%;
   min-width: 0;
-  height: var(--oc-size-md);
-  padding: 0 var(--oc-space-2);
 }
 
 .property-editor__source-header {
@@ -435,26 +507,20 @@ onBeforeUnmount(() => {
 
 .property-editor__category-header {
   color: var(--oc-fg-muted);
-  transition: background-color var(--oc-duration-fast) var(--oc-ease);
 }
 
 .property-editor__category-header:hover,
 .property-editor__category-header:focus-within {
-  background: var(--oc-bg-hover);
-}
-
-.property-editor__category-indent {
-  width: 12px;
-  flex: 0 0 12px;
+  background-image: var(--oc-overlay-hover);
 }
 
 .property-editor__icon-slot {
   display: inline-flex;
-  flex: 0 0 16px;
-  width: 16px;
+  flex: 0 0 var(--oc-icon-size-md);
+  width: var(--oc-icon-size-md);
   align-items: center;
   justify-content: center;
-  margin-right: var(--oc-space-2);
+  margin-right: var(--oc-space-xs);
 }
 
 .property-editor__source-title,
@@ -472,7 +538,7 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   align-items: center;
   opacity: 0;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .property-editor__category-header:hover .property-editor__category-actions,
@@ -480,37 +546,29 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-.property-editor__fields {
-  min-width: 0;
-}
-
 .property-editor__row {
   display: grid;
   grid-template-columns: minmax(76px, 88px) minmax(0, 1fr);
   align-items: start;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
   width: 100%;
   min-width: 0;
-  min-height: var(--oc-property-row-height);
-  padding: 0 var(--oc-space-2) 0 32px;
-  box-sizing: border-box;
-  transition: background-color var(--oc-duration-fast) var(--oc-ease);
 }
 
-.property-editor__row:hover,
+/* 行的悬浮高光不再出现：行内本身就是输入控件，靠控件的焦点外观区分即可。 */
 .property-editor__row:focus-within {
-  background: var(--oc-bg-hover);
+  background-image: var(--oc-overlay-hover);
 }
 
 .property-editor__row.is-revealed {
-  background: var(--oc-bg-selected);
+  background-color: var(--oc-bg-selected);
   box-shadow: inset 2px 0 0 var(--oc-fg-accent);
 }
 
 .property-editor__row-label {
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   min-width: 0;
   min-height: var(--oc-property-row-height);
   overflow: hidden;
@@ -533,7 +591,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: inherit;
   font: inherit;
-  transition: color var(--oc-duration-fast) var(--oc-ease);
+  transition: color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .property-editor__field-key-button:hover,
@@ -546,8 +604,9 @@ onBeforeUnmount(() => {
   box-shadow: var(--oc-focus-ring);
 }
 
+/* 子编辑器占满整行高度，不再靠上下外边距留白。 */
 .entry-control {
-  margin: var(--oc-space-1) 0;
+  margin: 0;
   width: 100%;
   min-width: 0;
 }
@@ -556,7 +615,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   min-width: 0;
 }
 
@@ -570,7 +629,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .property-editor__tail-badge { display: inline-flex; align-items: center; }
@@ -584,7 +643,7 @@ onBeforeUnmount(() => {
 @container (max-width: 240px) {
   .property-editor__row {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--oc-space-1);
+    gap: var(--oc-space-2xs);
   }
 }
 </style>

@@ -38,7 +38,7 @@ export const ocPanelProps = {
     type: String as PropType<OcPanelGap>,
     default: 'none',
   },
-  /** 内边距。默认 '3' */
+  /** 内边距。默认 '3'；简化后的间距只有四档，'1' 与 '2'、'5' 与 '6' 同值。 */
   padding: {
     type: String as PropType<OcPanelPadding>,
     default: '3',
@@ -124,9 +124,9 @@ const panelStyles = computed<CSSProperties>(() => ({
   min-width: 0;
   min-height: 0;
   transition:
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    border-color var(--oc-duration-fast) var(--oc-ease),
-    box-shadow var(--oc-duration-fast) var(--oc-ease);
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    box-shadow var(--oc-duration-quick) var(--oc-ease);
 }
 
 /* Gap */
@@ -135,31 +135,31 @@ const panelStyles = computed<CSSProperties>(() => ({
 }
 
 .oc-panel--gap-1 {
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-panel--gap-2 {
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .oc-panel--gap-3 {
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .oc-panel--gap-4 {
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
 }
 
 .oc-panel--gap-5 {
-  gap: var(--oc-space-5);
+  gap: var(--oc-space-lg);
 }
 
 .oc-panel--gap-6 {
-  gap: var(--oc-space-6);
+  gap: var(--oc-space-lg);
 }
 
 .oc-panel--gap-8 {
-  gap: var(--oc-space-8);
+  gap: calc(var(--oc-space-lg) * 2);
 }
 
 /* Padding */
@@ -168,27 +168,27 @@ const panelStyles = computed<CSSProperties>(() => ({
 }
 
 .oc-panel--padding-1 {
-  padding: var(--oc-space-1);
+  padding: var(--oc-space-2xs);
 }
 
 .oc-panel--padding-2 {
-  padding: var(--oc-space-2);
+  padding: var(--oc-space-xs);
 }
 
 .oc-panel--padding-3 {
-  padding: var(--oc-space-3);
+  padding: var(--oc-space-sm);
 }
 
 .oc-panel--padding-4 {
-  padding: var(--oc-space-4);
+  padding: var(--oc-space-md);
 }
 
 .oc-panel--padding-5 {
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
 }
 
 .oc-panel--padding-6 {
-  padding: var(--oc-space-6);
+  padding: var(--oc-space-lg);
 }
 
 /* Align (cross-axis) */
@@ -263,15 +263,15 @@ const panelStyles = computed<CSSProperties>(() => ({
 }
 
 .oc-panel--radius-sm {
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
 }
 
 .oc-panel--radius-md {
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
 }
 
 .oc-panel--radius-lg {
-  border-radius: var(--oc-radius-lg);
+  border-radius: var(--oc-radius-surface);
 }
 
 /* Shadow */

@@ -77,7 +77,7 @@ function handleChange(event: Event): void {
 .oc-switch {
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   color: var(--oc-fg-default);
   font-size: var(--oc-text-base);
   cursor: pointer;
@@ -100,8 +100,8 @@ function handleChange(event: Event): void {
   border-radius: 999px;
   background: var(--oc-bg-subtle);
   transition:
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    border-color var(--oc-duration-fast) var(--oc-ease);
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-switch__thumb {
@@ -114,8 +114,8 @@ function handleChange(event: Event): void {
   background: var(--oc-fg-muted);
   box-shadow: var(--oc-shadow-sm);
   transition:
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    transform var(--oc-duration-fast) var(--oc-ease);
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    transform var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-switch:hover .oc-switch__track {
@@ -153,11 +153,11 @@ function handleChange(event: Event): void {
 }
 
 .oc-switch__input:checked + .oc-switch__track .oc-switch__thumb.is-toggling {
-  animation: oc-switch-thumb-on var(--oc-duration-slow) var(--oc-ease);
+  animation: oc-switch-thumb-on var(--oc-duration) var(--oc-ease);
 }
 
 .oc-switch__input:not(:checked) + .oc-switch__track .oc-switch__thumb.is-toggling {
-  animation: oc-switch-thumb-off var(--oc-duration-slow) var(--oc-ease);
+  animation: oc-switch-thumb-off var(--oc-duration) var(--oc-ease);
 }
 
 .oc-switch__label {

@@ -36,7 +36,7 @@ const { t } = useI18n()
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   min-width: 0;
   padding-bottom: 1px;
   border-bottom: 1px solid var(--oc-border-muted);

@@ -2226,7 +2226,7 @@ watch(
   overflow: hidden;
   pointer-events: none;
   opacity: 1;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .card-diff-overlay-layer.is-hidden {
@@ -2238,7 +2238,7 @@ watch(
   z-index: var(--oc-z-overlay-toolbar);
   box-sizing: border-box;
   border: var(--oc-border-width) solid var(--oc-diff-changed-border);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   pointer-events: none;
 }
 .card-diff-overlay--added { border-color: var(--oc-diff-added-border); }
@@ -2251,7 +2251,7 @@ watch(
   width: var(--oc-icon-size-md);
   height: var(--oc-icon-size-md);
   place-items: center;
-  border-radius: var(--oc-radius-sm) 0 var(--oc-radius-sm) 0;
+  border-radius: var(--oc-radius-control) 0 var(--oc-radius-control) 0;
   background: var(--oc-diff-changed-border);
   color: var(--oc-fg-default);
 }
@@ -2260,7 +2260,7 @@ watch(
 .card-diff-overlay--after .card-diff-overlay__label {
   right: calc(var(--oc-border-width) * -1);
   left: auto;
-  border-radius: 0 var(--oc-radius-sm) 0 var(--oc-radius-sm);
+  border-radius: 0 var(--oc-radius-control) 0 var(--oc-radius-control);
 }
 .card-diff-overlay--before { border-top-left-radius: 0; }
 .card-diff-overlay--after { border-top-right-radius: 0; }
@@ -2281,7 +2281,7 @@ watch(
   stroke: var(--oc-diff-changed-border);
   stroke-width: var(--oc-border-width);
   stroke-linecap: round;
-  stroke-dasharray: var(--oc-space-1) var(--oc-space-1);
+  stroke-dasharray: var(--oc-space-2xs) var(--oc-space-2xs);
   marker-end: url(#card-diff-hover-arrow);
 }
 
@@ -2298,11 +2298,11 @@ watch(
 }
 
 .card-viewport-comparison-layer.is-transitioning {
-  transition: clip-path var(--oc-duration-normal) var(--oc-ease);
+  transition: clip-path var(--oc-duration) var(--oc-ease);
 }
 
 .card-viewport-comparison-layer .card-viewport-stage.is-transitioning {
-  transition: transform var(--oc-duration-normal) var(--oc-ease);
+  transition: transform var(--oc-duration) var(--oc-ease);
 }
 
 .card-comparison-placeholder {
@@ -2325,7 +2325,7 @@ watch(
   transform: translateX(-50%);
   cursor: ew-resize;
   touch-action: none;
-  transition: left var(--oc-duration-normal) var(--oc-ease);
+  transition: left var(--oc-duration) var(--oc-ease);
 }
 
 .card-viewport-comparison-divider::before {
@@ -2335,7 +2335,7 @@ watch(
   bottom: 0;
   left: 50%;
   width: var(--oc-diff-divider-width);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-diff-divider);
   transform: translateX(-50%);
 }
@@ -2346,7 +2346,7 @@ watch(
 
 .card-viewport-comparison-label {
   position: absolute;
-  top: var(--oc-space-2);
+  top: var(--oc-space-xs);
   display: block;
   max-width: var(--oc-diff-version-label-max-width);
   overflow: hidden;
@@ -2359,12 +2359,12 @@ watch(
 }
 
 .card-viewport-comparison-label--before {
-  right: calc(50% + var(--oc-space-2));
+  right: calc(50% + var(--oc-space-xs));
   text-align: right;
 }
 
 .card-viewport-comparison-label--after {
-  left: calc(50% + var(--oc-space-2));
+  left: calc(50% + var(--oc-space-xs));
   text-align: left;
 }
 
@@ -2400,11 +2400,11 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-3);
-  max-width: calc(100% - var(--oc-space-8) * 2);
-  padding: var(--oc-space-5);
+  gap: var(--oc-space-sm);
+  max-width: calc(100% - calc(var(--oc-space-lg) * 2) * 2);
+  padding: var(--oc-space-lg);
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
   box-shadow: var(--oc-shadow-md);
   color: var(--oc-fg-default);
@@ -2424,7 +2424,7 @@ watch(
 @keyframes card-viewport-status-flash {
   0% {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + var(--oc-space-2)));
+    transform: translate(-50%, calc(-50% + var(--oc-space-xs)));
   }
   20%, 75% {
     opacity: 1;
@@ -2432,7 +2432,7 @@ watch(
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, calc(-50% - var(--oc-space-2)));
+    transform: translate(-50%, calc(-50% - var(--oc-space-xs)));
   }
 }
 
@@ -2443,7 +2443,7 @@ watch(
   transform-origin: 0 0;
   pointer-events: none;
   opacity: 1;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .card-viewport--layer-view .card-viewport-stage {
@@ -2724,7 +2724,7 @@ watch(
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 5px;
+  gap: var(--oc-space-xs);
   font-weight: 600;
 }
 

@@ -235,7 +235,7 @@ const patternRows = computed(buildPattern)
  * 具体位置用封面自身的 Key 做种子打乱，既有固定间隔又不显得是规则网格。
  */
 const COVER_SLOT_STRIDE = 2
-/** 封面淡入的错峰档数；实际间隔是 --oc-duration-fast 的若干分之一。 */
+/** 封面淡入的错峰档数；实际间隔是 --oc-duration-quick 的若干分之一。 */
 const COVER_FADE_STAGGER_STEPS = 8
 
 const coverSlots = computed<ReadonlyMap<string, { cover: WelcomeCoverWallCover; fadeStep: number }>>(() => {
@@ -442,15 +442,15 @@ onBeforeUnmount(() => {
   /* 图片可以绘制之前不占画面：否则异步载入的封面会先闪出一块瓦片底色。 */
   visibility: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
   filter: blur(var(--oc-welcome-cover-wall-blur));
   opacity: var(--oc-welcome-cover-wall-opacity);
   transition:
-    opacity var(--oc-duration-normal) var(--oc-ease),
-    transform var(--oc-duration-normal) var(--oc-ease),
-    box-shadow var(--oc-duration-normal) var(--oc-ease),
-    filter var(--oc-duration-normal) var(--oc-ease);
+    opacity var(--oc-duration) var(--oc-ease),
+    transform var(--oc-duration) var(--oc-ease),
+    box-shadow var(--oc-duration) var(--oc-ease),
+    filter var(--oc-duration) var(--oc-ease);
 }
 
 .welcome-cover-wall__tile.is-ready {
@@ -477,8 +477,8 @@ onBeforeUnmount(() => {
  * 各格再按对角线错开一点，封面是依次浮现的。
  */
 .welcome-cover-wall__tile-cover.is-ready {
-  animation: welcome-cover-wall-cover-in var(--oc-duration-slow) var(--oc-ease) both;
-  animation-delay: calc(var(--welcome-cover-wall-cover-delay, 0) * var(--oc-duration-fast) / 8);
+  animation: welcome-cover-wall-cover-in var(--oc-duration) var(--oc-ease) both;
+  animation-delay: calc(var(--welcome-cover-wall-cover-delay, 0) * var(--oc-duration-quick) / 8);
 }
 
 @keyframes welcome-cover-wall-cover-in {

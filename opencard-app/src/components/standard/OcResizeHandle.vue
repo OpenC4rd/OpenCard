@@ -254,12 +254,12 @@ onBeforeUnmount(() => {
 
 .oc-resize-handle--horizontal {
   width: 100%;
-  height: var(--oc-space-3);
+  height: var(--oc-space-sm);
   cursor: row-resize;
 }
 
 .oc-resize-handle--vertical {
-  width: var(--oc-resize-track-size, var(--oc-space-3));
+  width: var(--oc-resize-track-size, var(--oc-space-sm));
   height: 100%;
   cursor: col-resize;
 }
@@ -267,20 +267,20 @@ onBeforeUnmount(() => {
 .oc-resize-handle::after {
   display: block;
   flex: 0 0 auto;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: currentColor;
   content: '';
-  transition: color var(--oc-duration-fast) var(--oc-ease),
-    box-shadow var(--oc-duration-fast) var(--oc-ease);
+  transition: color var(--oc-duration-quick) var(--oc-ease),
+    box-shadow var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-resize-handle--horizontal::after {
   width: var(--oc-size-md);
-  height: var(--oc-space-1);
+  height: var(--oc-space-2xs);
 }
 
 .oc-resize-handle--vertical::after {
-  width: var(--oc-space-1);
+  width: var(--oc-space-2xs);
   height: var(--oc-size-md);
 }
 
@@ -298,18 +298,18 @@ onBeforeUnmount(() => {
   background: linear-gradient(
     var(--oc-resize-gradient-direction),
     transparent 0,
-    currentColor calc(2 * var(--oc-space-8)),
-    currentColor calc(100% - 2 * var(--oc-space-8)),
+    currentColor calc(2 * calc(var(--oc-space-lg) * 2)),
+    currentColor calc(100% - 2 * calc(var(--oc-space-lg) * 2)),
     transparent 100%
   );
 }
 
 .oc-resize-handle--gradient.oc-resize-handle--vertical::after {
   --oc-resize-gradient-direction: to bottom;
-  top: var(--oc-space-4);
+  top: var(--oc-space-md);
   bottom: 0;
   left: 50%;
-  width: var(--oc-border-width, 1px);
+  width: var(--oc-border-width);
   height: auto;
   transform: translateX(-50%);
 }
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
   left: 0;
   top: 50%;
   width: auto;
-  height: var(--oc-border-width, 1px);
+  height: var(--oc-border-width);
   transform: translateY(-50%);
 }
 

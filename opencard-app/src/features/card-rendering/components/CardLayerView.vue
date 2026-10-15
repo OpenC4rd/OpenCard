@@ -638,7 +638,7 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
   user-select: none;
   touch-action: none;
   background: color-mix(in srgb, var(--oc-bg-raised) 24%, transparent);
-  animation: layer-view-enter var(--oc-duration-normal) var(--oc-ease) both;
+  animation: layer-view-enter var(--oc-duration) var(--oc-ease) both;
 }
 
 .card-layer-view__stack {
@@ -674,7 +674,7 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
   will-change: transform, opacity;
 }
 
@@ -706,7 +706,7 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
   pointer-events: none;
   cursor: pointer;
   will-change: transform;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .card-layer-view__plane {
@@ -802,16 +802,16 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
   width: 2px;
   color: var(--oc-fg-muted);
   transition:
-    top var(--oc-duration-normal) var(--oc-ease),
-    height var(--oc-duration-normal) var(--oc-ease),
-    color var(--oc-duration-fast) var(--oc-ease);
+    top var(--oc-duration) var(--oc-ease),
+    height var(--oc-duration) var(--oc-ease),
+    color var(--oc-duration-quick) var(--oc-ease);
   will-change: top, height;
 }
 
 .card-layer-view__rail-segment-line {
   position: absolute;
   inset: 0;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: currentColor;
   opacity: 0.46;
 }
@@ -822,7 +822,7 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
   left: 50%;
   width: 8px;
   height: 2px;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: currentColor;
   content: '';
   transform: translateX(-50%);
@@ -889,9 +889,9 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
   transform: translateY(-50%);
   cursor: pointer;
   transition:
-    top var(--oc-duration-normal) var(--oc-ease),
-    font-size var(--oc-duration-fast) var(--oc-ease),
-    color var(--oc-duration-fast) var(--oc-ease);
+    top var(--oc-duration) var(--oc-ease),
+    font-size var(--oc-duration-quick) var(--oc-ease),
+    color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .card-layer-view__tick::after {

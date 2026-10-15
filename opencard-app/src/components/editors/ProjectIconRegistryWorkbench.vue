@@ -360,7 +360,7 @@ defineExpose({ selectSeries, navigateToKeyConflict, selectedRuntime })
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: var(--oc-space-2) var(--oc-space-3);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
   border-right: var(--oc-border-width) solid var(--oc-border-muted);
 }
 .project-icon-registry-workbench__sets-tree { min-height: 0; }
@@ -383,17 +383,17 @@ defineExpose({ selectSeries, navigateToKeyConflict, selectedRuntime })
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--oc-space-3);
+  padding: var(--oc-space-sm);
 }
 .project-icon-registry-workbench__placeholder {
   display: grid;
   place-content: center;
   justify-items: center;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
   min-width: 0;
   min-height: 0;
   height: 100%;
-  padding: var(--oc-space-6);
+  padding: var(--oc-space-lg);
   text-align: center;
 }
 </style>

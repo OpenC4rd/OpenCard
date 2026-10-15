@@ -241,7 +241,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--oc-space-3);
+  padding: var(--oc-space-sm);
 }
 
 .oc-album.is-fill {
@@ -250,7 +250,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 
 .oc-album__placeholder {
   display: block;
-  padding: var(--oc-space-4);
+  padding: var(--oc-space-md);
   text-align: center;
 }
 
@@ -260,7 +260,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   /* 调用方给 `--oc-album-cell-block-size` 时格子是固定高的：行高不再由卡宽按封面比例推出。
      图标格那种"小字形 + 大留白"的内容需要它，封面卡不需要，所以默认不设、留 auto。 */
   grid-auto-rows: var(--oc-album-cell-block-size, auto);
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .oc-album__node {
@@ -279,12 +279,12 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   max-block-size: var(--oc-album-cell-block-size, none);
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-block);
   cursor: pointer;
   transition:
-    border-color var(--oc-duration-fast) var(--oc-ease),
-    background-color var(--oc-duration-fast) var(--oc-ease);
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    background-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 /*
@@ -296,8 +296,8 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
-  clip-path: inset(0 round calc(var(--oc-radius-md) - var(--oc-border-width)));
+  border-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
+  clip-path: inset(0 round calc(var(--oc-radius-control) - var(--oc-border-width)));
 }
 
 .oc-album__card:hover {
@@ -317,7 +317,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   /* 选中是叠在玻璃上的一层色，不是把玻璃换掉：`background` 简写会把 `--oc-bg-glass` 一起清掉，
      于是选中那张卡的信息条变成近乎透明的色块、背后内容一览无余，和同一张卡片上其它信息条
      （以及没有选中态的相册）就不是同一种材质了。 */
-  background-image: linear-gradient(var(--oc-bg-selected), var(--oc-bg-selected));
+  background-image: var(--oc-overlay-selected);
 }
 
 .oc-album__card.is-disabled {
@@ -334,12 +334,12 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   /* 图片自己也按内缘圆角收边：卡片那圈的裁剪在这个 WebView 里管不到被提升的图片层，
      否则图片的直角会从圆角处探出来（信息条同理）。几何与 .oc-album__clip 完全一致。 */
   overflow: hidden;
-  border-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
+  border-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   /* 封面可以按封面框的尺寸给自己定尺寸（`cqw`/`cqh`）：图标那种按 em 计量的视觉靠它铺满封面框，
      而不是缩在自己的一小块里。媒体盒自身由 `inset: 0` 定尺寸，不依赖内容，所以尺寸包含没有副作用。 */
   container-type: size;
   /* 卡片可点时封面自己放大一点：手指/光标按下去的确实是这张图。 */
-  transition: transform var(--oc-duration-normal) var(--oc-ease);
+  transition: transform var(--oc-duration) var(--oc-ease);
 }
 
 .oc-album__card:hover .oc-album__media,
@@ -359,12 +359,12 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   inset-block-end: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   min-width: 0;
-  padding: var(--oc-space-1) var(--oc-space-3);
+  padding: var(--oc-space-2xs) var(--oc-space-sm);
   /* 与图片同理：这一层带 backdrop-filter，祖先的圆角裁剪对它不生效，所以它自己按内缘圆角收边。 */
-  border-end-start-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
-  border-end-end-radius: calc(var(--oc-radius-md) - var(--oc-border-width));
+  border-end-start-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
+  border-end-end-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   background: var(--oc-bg-glass);
   -webkit-backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
   backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
@@ -374,7 +374,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-album__label {
@@ -385,7 +385,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   /* Reserve the command height so revealing a command on hover never reflows the card. */
   min-height: var(--oc-size-sm);
 }
@@ -396,7 +396,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   flex: 0 1 auto;
   min-width: 0;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 /*

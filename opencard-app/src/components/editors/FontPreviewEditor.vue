@@ -205,18 +205,18 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
   flex-direction: column;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
   text-align: center;
 }
 
 .font-preview-editor__workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   min-height: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
 }
 
 .font-preview-editor__workspace label {
@@ -227,7 +227,7 @@ onBeforeUnmount(() => {
 .font-preview-editor__input {
   height: 100%;
   min-height: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
   font-size: var(--oc-font-preview-size);
   line-height: normal;
 }

@@ -344,12 +344,12 @@ function buildTask(): ProjectExportTask {
 </script>
 
 <style scoped>
-.project-export-task-editor { display: grid; gap: var(--oc-space-4); min-width: 0; }
-.project-export-task-editor__group { display: grid; gap: var(--oc-space-2); min-width: 0; }
+.project-export-task-editor { display: grid; gap: var(--oc-space-md); min-width: 0; }
+.project-export-task-editor__group { display: grid; gap: var(--oc-space-xs); min-width: 0; }
 .project-export-task-editor__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.project-export-task-editor__field { display: grid; gap: var(--oc-space-1); min-width: 0; color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
+.project-export-task-editor__field { display: grid; gap: var(--oc-space-2xs); min-width: 0; color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
 .project-export-task-editor__picker,
-.project-export-task-editor__resolution-controls { display: flex; align-items: stretch; gap: var(--oc-space-2); min-width: 0; }
+.project-export-task-editor__resolution-controls { display: flex; align-items: stretch; gap: var(--oc-space-xs); min-width: 0; }
 .project-export-task-editor__picker > :first-child { flex: 1 1 auto; }
 .project-export-task-editor__scale-field { flex: 0 0 var(--oc-size-xl); }
 .project-export-task-editor__documents { max-height: var(--oc-list-max-height-sm); overflow-y: auto; }

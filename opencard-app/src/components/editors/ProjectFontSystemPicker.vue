@@ -166,7 +166,7 @@ function toggleFamily(family: SystemFontFamily): void {
 </script>
 
 <style scoped>
-.project-font-system-picker { display: grid; min-width: 0; gap: var(--oc-space-2); }
+.project-font-system-picker { display: grid; min-width: 0; gap: var(--oc-space-xs); }
 /* 虚拟滚动要求树自己滚动，所以这里给的是高度而不是最大高度。 */
 .project-font-system-picker__tree { min-width: 0; height: var(--oc-list-height-md); }
 </style>

@@ -258,7 +258,7 @@ function emitInputValue(
 <style scoped>
 .additional-field-dialog__field {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   min-width: 0;
   font-size: var(--oc-text-sm);
   color: var(--oc-fg-muted);
@@ -266,8 +266,8 @@ function emitInputValue(
 .additional-field-dialog__advanced-toggle { justify-self: start; }
 .additional-field-dialog__advanced { min-width: 0; }
 .additional-field-dialog__empty { margin: 0; color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
-.additional-field-dialog__preview { display: grid; gap: var(--oc-space-2); color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
-.additional-field-dialog__preview-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--oc-space-3); }
+.additional-field-dialog__preview { display: grid; gap: var(--oc-space-xs); color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
+.additional-field-dialog__preview-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--oc-space-sm); }
 .additional-field-dialog__preview-field > span { overflow: hidden; color: var(--oc-fg-default); text-overflow: ellipsis; white-space: nowrap; }
 
 .additional-field-dialog__error {

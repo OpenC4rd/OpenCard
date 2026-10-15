@@ -109,7 +109,9 @@ const rawStringDefinition = computed(() => {
   display: flex;
   width: 100%;
   min-width: 0;
-  align-items: flex-start;
+  align-items: stretch;
+  /* 属性行里的控件没有上下内边距：文字由控件自身居中，高度由行高决定。 */
+  --oc-field-content-padding: 0 var(--oc-space-xs);
 }
 
 .property-field-renderer > * {

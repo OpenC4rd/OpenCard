@@ -138,7 +138,7 @@ function tryParseJson(value: string): { ok: true; value: unknown } | { ok: false
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .oc-json-editor__input {

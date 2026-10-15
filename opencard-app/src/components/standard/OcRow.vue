@@ -47,15 +47,15 @@ withDefaults(defineProps<OcRowProps>(), {
   width: 100%;
   min-height: var(--oc-size-md);
   align-items: center;
-  gap: var(--oc-space-2);
-  padding-inline: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  padding-inline: var(--oc-space-sm);
   border: 0;
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: transparent;
   color: var(--oc-fg-default);
   font: inherit;
   text-align: start;
-  transition: background-color var(--oc-duration-fast) var(--oc-ease);
+  transition: background-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 /* 只有可操作的行才是按钮指针；禁用行保持默认指针（铁律 16：不改鼠标）。 */
@@ -67,7 +67,7 @@ button.oc-row:not(:disabled):not(.is-disabled) {
 .oc-row:hover:not(.is-disabled):not(:disabled),
 .oc-row.is-active:not(.is-disabled):not(:disabled),
 .oc-row:focus-visible:not(.is-disabled):not(:disabled) {
-  background: var(--oc-bg-hover);
+  background-image: var(--oc-overlay-hover);
 }
 
 .oc-row:focus-visible {
@@ -75,7 +75,7 @@ button.oc-row:not(:disabled):not(.is-disabled) {
 }
 
 .oc-row.is-selected {
-  background: var(--oc-bg-selected);
+  background-color: var(--oc-bg-selected);
 }
 
 .oc-row.is-disabled,
@@ -87,7 +87,7 @@ button.oc-row:not(:disabled):not(.is-disabled) {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-row__body {
@@ -119,7 +119,7 @@ button.oc-row:not(:disabled):not(.is-disabled) {
   margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 /*

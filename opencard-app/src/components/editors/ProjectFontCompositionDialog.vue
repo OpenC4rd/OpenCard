@@ -386,15 +386,15 @@ function updateMemberCharacters(index: number, event: Event): void {
 <style scoped>
 .project-font-set-dialog__field,
 .project-font-set-dialog__members,
-.project-font-set-dialog__selected { display: grid; min-width: 0; gap: var(--oc-space-2); }
+.project-font-set-dialog__selected { display: grid; min-width: 0; gap: var(--oc-space-xs); }
 .project-font-set-dialog__field { color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
 .project-font-set-dialog__member-add,
 .project-font-set-dialog__member-row,
-.project-font-set-dialog__member-row > span { display: flex; align-items: center; min-width: 0; gap: var(--oc-space-2); }
-.project-font-set-dialog__member-row { flex-wrap: wrap; justify-content: space-between; padding: var(--oc-space-2); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
+.project-font-set-dialog__member-row > span { display: flex; align-items: center; min-width: 0; gap: var(--oc-space-xs); }
+.project-font-set-dialog__member-row { flex-wrap: wrap; justify-content: space-between; padding: var(--oc-space-xs); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
 .project-font-set-dialog__member-row > :first-child { flex: 1; }
 .project-font-set-dialog__member-add > :first-child { flex: 1; }
 .project-font-set-dialog__selected { max-height: var(--oc-list-max-height-sm); overflow-y: auto; }
-.project-font-set-dialog__range-editor { display: grid; flex: 0 0 100%; gap: var(--oc-space-2); }
-.project-font-set-dialog__range-presets { display: flex; flex-wrap: wrap; gap: var(--oc-space-1); }
+.project-font-set-dialog__range-editor { display: grid; flex: 0 0 100%; gap: var(--oc-space-xs); }
+.project-font-set-dialog__range-presets { display: flex; flex-wrap: wrap; gap: var(--oc-space-2xs); }
 </style>

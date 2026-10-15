@@ -355,9 +355,9 @@ function fontNameFromPath(path: string): string { return projectAssetName(path).
 </script>
 
 <style scoped>
-.project-font-dialog__summary-actions { display: flex; gap: var(--oc-space-2); margin-top: var(--oc-space-3); }
-.project-font-dialog__field { display: grid; gap: var(--oc-space-1); margin-top: var(--oc-space-3); }
-.project-font-dialog__slot-table-wrap { width: 100%; max-width: var(--oc-content-width-md); height: auto; margin-top: var(--oc-space-4); overflow: hidden; }
+.project-font-dialog__summary-actions { display: flex; gap: var(--oc-space-xs); margin-top: var(--oc-space-sm); }
+.project-font-dialog__field { display: grid; gap: var(--oc-space-2xs); margin-top: var(--oc-space-sm); }
+.project-font-dialog__slot-table-wrap { width: 100%; max-width: var(--oc-content-width-md); height: auto; margin-top: var(--oc-space-md); overflow: hidden; }
 .project-font-dialog__slot-table { width: 100%; }
 .project-font-dialog__slot-table th,
 .project-font-dialog__slot-table td { min-width: 0; }
@@ -365,7 +365,7 @@ function fontNameFromPath(path: string): string { return projectAssetName(path).
 .project-font-dialog__slot-corner,
 .project-font-dialog__slot-weight { white-space: nowrap; }
 .project-font-dialog__slot-cell { min-width: 0; }
-.project-font-dialog__slot-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--oc-space-1); min-width: 0; }
+.project-font-dialog__slot-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--oc-space-2xs); min-width: 0; }
 .project-font-dialog__slot-source { width: 100%; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; justify-content: flex-start; overflow: hidden; text-align: left; }
 .project-font-dialog__slot-source:hover:not(:disabled) { background-color: transparent; }
 .project-font-dialog__slot-source--fallback { color: var(--oc-fg-muted); }

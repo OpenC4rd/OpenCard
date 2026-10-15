@@ -278,7 +278,7 @@ async function submit(): Promise<void> {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: start;
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
 }
 
 .feedback-dialog__header-content > :last-child { justify-self: end; }
@@ -293,7 +293,7 @@ async function submit(): Promise<void> {
 }
 
 .feedback-dialog__header-content p {
-  margin-top: var(--oc-space-1);
+  margin-top: var(--oc-space-2xs);
   color: var(--oc-fg-muted);
 }
 
@@ -301,12 +301,12 @@ async function submit(): Promise<void> {
 .feedback-dialog__field-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .feedback-dialog__field {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
 }
@@ -319,10 +319,10 @@ async function submit(): Promise<void> {
 .feedback-dialog__diagnostics pre {
   max-height: 160px;
   overflow: auto;
-  margin: var(--oc-space-2) 0 0;
-  padding: var(--oc-space-3);
+  margin: var(--oc-space-xs) 0 0;
+  padding: var(--oc-space-sm);
   border: 1px solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-input);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -332,8 +332,8 @@ async function submit(): Promise<void> {
 .feedback-dialog__error,
 .feedback-dialog__success {
   margin: 0;
-  padding: var(--oc-space-3);
-  border-radius: var(--oc-radius-sm);
+  padding: var(--oc-space-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-raised);
   color: var(--oc-fg-muted);
 }

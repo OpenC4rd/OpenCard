@@ -9,12 +9,15 @@ import {
 import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
 import { parseRichTextHtml, type RichTextIconNode, type RichTextNode } from '../../rich-text/richTextHtml'
 import { readProjectIconSize } from '../../../features/workspace/services/projectIconDimensionResolver'
+import { resolveRichTextStyle } from '../../rich-text/richTextResourceStyle'
 
 const props = defineProps<{
   html: string
   projectIconCatalog?: ProjectIconCatalog
   /** Icon sources including packages; the host catalog alone cannot resolve a package icon. */
   packageIconSources?: readonly ProjectIconSource[]
+  fontOptions?: readonly { value: string; cssFamily?: string }[]
+  resolveImageSource?: (reference: string) => string | null
 }>()
 
 const document = computed(() => parseRichTextHtml(props.html).document)
@@ -40,7 +43,13 @@ function renderNode(node: RichTextNode): VNodeChild {
         })
       : h('span', { class: 'rich-text-preview__missing' }, '[icon]')
   }
-  return h(node.tag, node.attributes, node.children.map(renderNode))
+  const attributes = { ...node.attributes }
+  if (attributes.style || attributes['data-oc-fill-type'] === 'image') {
+    attributes.style = resolveRichTextStyle(attributes,
+      reference => props.fontOptions?.find(font => font.value === reference)?.cssFamily ?? reference,
+      reference => props.resolveImageSource?.(reference) ?? null)
+  }
+  return h(node.tag, attributes, node.children.map(renderNode))
 }
 
 const rendered = computed(() => document.value.children.map(renderNode))

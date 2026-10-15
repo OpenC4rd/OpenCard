@@ -1,70 +1,69 @@
 <template>
-  <div class="page-property-editor-item" :data-item-key="item.key">
-    <div
-      class="page-property-editor-item__row"
-      :class="{ 'is-group': !item.content?.length }"
-      :style="rowStyle"
-    >
-      <div class="page-property-editor-item__label">
-        <OcText class="page-property-editor-item__title" as="span" size="sm" :bold="!item.content?.length">
-          {{ item.title }}
-        </OcText>
-        <OcText
-          v-if="item.subtitle"
-          class="page-property-editor-item__subtitle"
-          as="span"
-          size="xs"
-          tone="muted"
-        >
-          {{ item.subtitle }}
-        </OcText>
-      </div>
-      <div v-if="item.content?.length" class="page-property-editor-item__content">
-        <template v-for="(part, index) in item.content" :key="partKey(part, index)">
-          <OcText v-if="typeof part === 'string'" as="span" size="sm">{{ part }}</OcText>
-          <PropertyFieldRenderer
-            v-else-if="part.type === 'editor'"
-            class="page-property-editor-item__editor"
-            :class="{ 'is-compact': part.definition.fieldType === 'boolean' }"
-            :definition="part.definition"
-            :value="encodeValue(part)"
-            editor-id="field"
-            @preview:value="handlePreview(part, $event)"
-            @commit:value="handleCommit(part, $event)"
-            @cancel:value="emit('editor-cancel', { itemPath: currentPath, editorKey: part.key })"
-          />
-          <OcActionButton
-            v-else-if="part.iconOnly"
-            :action="part"
-            :variant="part.variant"
-            :size="part.size ?? 'sm'"
-            @select="emit('action', { itemPath: currentPath, actionKey: $event.key })"
-          />
-          <OcButton
-            v-else
-            :icon="part.icon"
-            :variant="part.variant"
-            :size="part.size ?? 'sm'"
-            :disabled="part.disabled"
-            @click="emit('action', { itemPath: currentPath, actionKey: part.key })"
-          >
-            {{ part.title ?? part.key }}
-          </OcButton>
-        </template>
-      </div>
+  <div
+    class="page-property-editor-item"
+    :class="{ 'is-group': !item.content?.length }"
+    :data-item-key="item.key"
+    :style="rowStyle"
+  >
+    <div class="page-property-editor-item__label">
+      <OcText class="page-property-editor-item__title" as="span" size="sm" :bold="!item.content?.length">
+        {{ item.title }}
+      </OcText>
+      <OcText
+        v-if="item.subtitle"
+        class="page-property-editor-item__subtitle"
+        as="span"
+        size="xs"
+        tone="muted"
+      >
+        {{ item.subtitle }}
+      </OcText>
     </div>
-    <PagePropertyEditorItem
-      v-for="child in item.children"
-      :key="child.key"
-      :item="child"
-      :parent-path="currentPath"
-      :depth="depth + 1"
-      @editor-preview="emit('editor-preview', $event)"
-      @editor-commit="emit('editor-commit', $event)"
-      @editor-cancel="emit('editor-cancel', $event)"
-      @action="emit('action', $event)"
-    />
+    <div v-if="item.content?.length" class="page-property-editor-item__content">
+      <template v-for="(part, index) in item.content" :key="partKey(part, index)">
+        <OcText v-if="typeof part === 'string'" as="span" size="sm">{{ part }}</OcText>
+        <PropertyFieldRenderer
+          v-else-if="part.type === 'editor'"
+          class="page-property-editor-item__editor"
+          :class="{ 'is-compact': part.definition.fieldType === 'boolean' }"
+          :definition="part.definition"
+          :value="encodeValue(part)"
+          editor-id="field"
+          @preview:value="handlePreview(part, $event)"
+          @commit:value="handleCommit(part, $event)"
+          @cancel:value="emit('editor-cancel', { itemPath: currentPath, editorKey: part.key })"
+        />
+        <OcActionButton
+          v-else-if="part.iconOnly"
+          :action="part"
+          :variant="part.variant"
+          :size="part.size ?? 'sm'"
+          @select="emit('action', { itemPath: currentPath, actionKey: $event.key })"
+        />
+        <OcButton
+          v-else
+          :icon="part.icon"
+          :variant="part.variant"
+          :size="part.size ?? 'sm'"
+          :disabled="part.disabled"
+          @click="emit('action', { itemPath: currentPath, actionKey: part.key })"
+        >
+          {{ part.title ?? part.key }}
+        </OcButton>
+      </template>
+    </div>
   </div>
+  <PagePropertyEditorItem
+    v-for="child in item.children"
+    :key="child.key"
+    :item="child"
+    :parent-path="currentPath"
+    :depth="depth + 1"
+    @editor-preview="emit('editor-preview', $event)"
+    @editor-commit="emit('editor-commit', $event)"
+    @editor-cancel="emit('editor-cancel', $event)"
+    @action="emit('action', $event)"
+  />
 </template>
 
 <script setup lang="ts">
@@ -99,7 +98,7 @@ const emit = defineEmits<{
 
 const currentPath = computed(() => [...props.parentPath, props.item.key])
 const rowStyle = computed<CSSProperties>(() => ({
-  paddingInlineStart: `calc(var(--oc-page-editor-indent) * ${props.depth})`,
+  paddingInlineStart: `calc(var(--oc-indent-step) * ${props.depth})`,
 }))
 
 function partKey(part: EditorItemPart, index: number): string {
@@ -133,26 +132,26 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
 </script>
 
 <style scoped>
-.page-property-editor-item__row {
+/* 行即节点（与 OcTree 一致）：本行和子项的行在 DOM 上是同一层的兄弟，层级只由 rowStyle 的缩进表达。
+   行只负责自己的尺寸（min-height），行距由上级 `.page-property-editor__items` 的 gap 给出，不用分隔线。 */
+.page-property-editor-item {
   box-sizing: border-box;
   display: grid;
   min-height: var(--oc-page-editor-row-min-height);
-  padding-block: var(--oc-space-3);
   grid-template-columns: minmax(var(--oc-page-editor-title-min-width), 1fr)
     minmax(var(--oc-page-editor-content-min-width), 1fr);
   align-items: center;
-  gap: var(--oc-page-editor-column-gap);
-  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
+  gap: var(--oc-space-lg);
 }
 
-.page-property-editor-item__row.is-group {
+.page-property-editor-item.is-group {
   grid-template-columns: minmax(0, 1fr);
 }
 
 .page-property-editor-item__label {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: var(--oc-space-2xs);
 }
 
 .page-property-editor-item__title {
@@ -171,7 +170,7 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
   align-items: center;
   justify-content: flex-end;
   justify-self: end;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 /* 所有编辑器统一占满同一个宽度：值区宽度由 --oc-page-editor-value-width 决定，
@@ -195,10 +194,10 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
 }
 
 @media (max-width: 680px) {
-  .page-property-editor-item__row:not(.is-group) {
+  .page-property-editor-item:not(.is-group) {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
-    gap: var(--oc-space-2);
+    gap: var(--oc-space-xs);
   }
 
   .page-property-editor-item__content {

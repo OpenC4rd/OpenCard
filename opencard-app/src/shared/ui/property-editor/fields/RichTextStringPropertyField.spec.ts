@@ -1,24 +1,187 @@
 import { mount } from '@vue/test-utils'
 import type { Editor } from '@tiptap/core'
+import { NodeSelection } from '@tiptap/pm/state'
+import { CellSelection } from '@tiptap/pm/tables'
+import PropertyEditor from '../PropertyEditor.vue'
 import { nextTick } from 'vue'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OcOptionGroup from '../../../../components/standard/OcOptionGroup.vue'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../../../../features/workspace/services/projectIconCatalog'
 import { i18n, setAppLocale } from '../../../../i18n'
 import OcRichTextEditor from '../../rich-text/OcRichTextEditor.vue'
 import RichTextPreview from '../../rich-text/RichTextPreview.vue'
 import RichTextStringPropertyField from './RichTextStringPropertyField.vue'
+import type { PropertyCompletionResult } from '../propertyEditor.types'
 
+beforeEach(() => setAppLocale('zh-CN'))
 afterEach(() => {
   document.body.innerHTML = ''
 })
 
 describe('RichTextStringPropertyField', () => {
+  it('preserves pending caret formatting across consecutive real sidebar inputs', async () => {
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: '<p>Hello</p>' },
+    })
+    await wrapper.get('.rich-text-string-field__preview').trigger('click')
+    await nextTick()
+    const editor = (wrapper.getComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor
+    editor.commands.setTextSelection(6)
+    const size = wrapper.getComponent(OcRichTextEditor).get('.oc-rich-text-editor__font-size input')
+    await size.trigger('pointerdown')
+    await size.setValue('24')
+    await nextTick()
+    const color = wrapper.getComponent(PropertyEditor).get('input[aria-label="前景色"]')
+    await color.trigger('pointerdown')
+    await color.setValue('#F14C4C')
+    await color.trigger('keydown', { key: 'Enter' })
+    editor.commands.insertContent('X')
+    const style = editor.state.doc.firstChild!.lastChild!.marks.find(mark => mark.type.name === 'textStyle')!.attrs
+    expect(style.fontSize).toBe('24px')
+    expect(style.color).toBe('#F14C4C')
+    wrapper.unmount()
+  })
+
+  it('keeps mixed formatting intact when the real sidebar updates an unrelated attribute', async () => {
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: '<p>Hello</p>' },
+    })
+    await wrapper.get('.rich-text-string-field__preview').trigger('click')
+    await nextTick()
+    const editor = (wrapper.getComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor
+    editor.commands.setContent('<p><span style="font-size: 12px; color: red;">A</span><span style="font-size: 24px; color: blue;">B</span></p>', false)
+    editor.commands.setTextSelection({ from: 1, to: 3 })
+    await nextTick()
+    expect((wrapper.getComponent(OcRichTextEditor).get('.oc-rich-text-editor__font-size input').element as HTMLInputElement).value).toBe('')
+    const input = wrapper.getComponent(PropertyEditor).get('[data-field-key="strokeWidth"] input')
+    await input.trigger('pointerdown')
+    await input.setValue('2px')
+    const marks = editor.state.doc.firstChild!.content.content.map(node => node.marks.find(mark => mark.type.name === 'textStyle')!.attrs)
+    expect(marks.map(attrs => attrs.fontSize)).toEqual(['12px', '24px'])
+    expect(marks.map(attrs => attrs.color)).toEqual(['red', 'blue'])
+    expect(marks.map(attrs => attrs.textStrokeWidth)).toEqual(['2px', '2px'])
+    wrapper.unmount()
+  })
+
+  it('keeps node and cell selection types when the real sidebar changes formatting', async () => {
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: '<p>Hello</p>' },
+    })
+    await wrapper.get('.rich-text-string-field__preview').trigger('click')
+    await nextTick()
+    const editor = (wrapper.getComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor
+    editor.commands.setContent('<p><span data-oc-binding="self:name">{{self:name}}</span></p>', false)
+    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 1)))
+    await wrapper.getComponent(PropertyEditor).trigger('pointerdown')
+    wrapper.getComponent(PropertyEditor).vm.$emit('update-property', { key: 'rich-text-selection', fieldKey: 'fontSize', value: '24' })
+    expect(editor.state.selection).toBeInstanceOf(NodeSelection)
+    expect(editor.state.doc.nodeAt(1)?.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('24px')
+    editor.commands.setContent('<table><tbody><tr><td><p>A</p></td><td><p>B</p></td></tr></tbody></table>', false)
+    const cells: number[] = []
+    editor.state.doc.descendants((node, position) => { if (node.type.name === 'tableCell') cells.push(position) })
+    editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, cells[0]!, cells[1]!)))
+    await wrapper.getComponent(PropertyEditor).trigger('pointerdown')
+    wrapper.getComponent(PropertyEditor).vm.$emit('update-property', { key: 'rich-text-selection', fieldKey: 'color', value: '#ff0000' })
+    expect(editor.state.selection).toBeInstanceOf(CellSelection)
+    wrapper.unmount()
+  })
+
+  it('round-trips centered bindings and image fill containing package icons without losing the fill', async () => {
+    const html = '<p style="text-align: center;"><span data-oc-binding="card:name">{{card:name}}</span></p><p style="text-align: center;"></p><p style="text-align: center;">aaa<span data-oc-icon-path="icon:hua-se/fang-kuai"></span><span data-oc-icon-path="icon:hua-se/fang-kuai"></span><span data-oc-icon-path="icon:hua-se/fang-kuai"></span>aa<span data-oc-fill-type="image" data-oc-fill-source="素材/卡绘/借刀杀人.png">aa<span data-oc-icon-path="game-icons.net/game-icons@1.0.0#icon:rank/achievement"></span></span></p>'
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: html },
+    })
+    await wrapper.get('.rich-text-string-field__preview').trigger('click')
+    await nextTick()
+    expect(wrapper.getComponent(OcRichTextEditor).isVisible()).toBe(true)
+    expect(document.querySelector('.rich-text-string-popover__diagnostics')).toBeNull()
+    const editor = (wrapper.getComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor
+    expect(editor.getHTML()).toBe(html)
+    document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="HTML 源码"]')!.click()
+    await nextTick()
+    expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(html)
+    document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="富文本"]')!.click()
+    await nextTick()
+    expect(wrapper.getComponent(OcRichTextEditor).isVisible()).toBe(true)
+    expect(editor.getHTML()).toBe(html)
+    wrapper.unmount()
+  })
+
+  it('flushes composed binding input on save and ignores completion after the dialog closes', async () => {
+    let resolveCompletion!: (result: PropertyCompletionResult) => void
+    const provider = vi.fn(() => new Promise<PropertyCompletionResult>(resolve => { resolveCompletion = resolve }))
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true, binding: { provider } },
+        value: '<p><span data-oc-binding="self:name">{{self:name}}</span></p>' },
+    })
+    await wrapper.get('.rich-text-string-field__preview').trigger('click')
+    const editor = (wrapper.getComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor
+    editor.view.dom.querySelector('.binding-node__label')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    await nextTick()
+    const input = document.querySelector<HTMLInputElement>('.binding-node__input')!
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    input.value = 'self:名称'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }))
+    expect(editor.getHTML()).toContain('data-oc-binding="self:name"')
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    document.querySelector<HTMLButtonElement>('[aria-label="保存富文本编辑"]')!.click()
+    await nextTick()
+    expect(wrapper.emitted('update:value')?.[0]?.[0]).toContain('data-oc-binding="self:名称"')
+    resolveCompletion({ replaceStart: 2, replaceEnd: 2, items: [{ key: 'late', label: 'Late', insertText: 'late' }] })
+    await Promise.resolve()
+    await nextTick()
+    expect(document.querySelector('[role="listbox"]')).toBeNull()
+    expect(wrapper.emitted('update:value')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('keeps the same editor and history through source edits, preserving untouched HTML', async () => {
+    const original = '<p>  Hello <b>世界</b></p>'
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: original },
+    })
+    const switchView = async (label: string) => {
+      document.querySelector<HTMLButtonElement>(`[role="radio"][aria-label="${label}"]`)!.click()
+      await nextTick()
+    }
+    await wrapper.get('.rich-text-string-field__preview').trigger('click')
+    const component = wrapper.getComponent(OcRichTextEditor)
+    const editor = (component.vm as unknown as { editor: Editor }).editor
+    await switchView('HTML 源码')
+    expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(original)
+    await switchView('富文本')
+    editor.commands.insertContent('Added')
+    const beforeSource = editor.getJSON()
+    await switchView('HTML 源码')
+    const source = document.querySelector<HTMLTextAreaElement>('textarea')!
+    source.value = '<p>Source change</p>'
+    source.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    await switchView('富文本')
+    expect((wrapper.getComponent(OcRichTextEditor).vm as unknown as { editor: Editor }).editor).toBe(editor)
+    expect(editor.getText()).toBe('Source change')
+    editor.commands.undo()
+    expect(editor.getJSON()).toEqual(beforeSource)
+    editor.commands.undo()
+    await switchView('HTML 源码')
+    expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(original)
+    document.querySelector<HTMLButtonElement>('[aria-label="保存富文本编辑"]')!.click()
+    expect(wrapper.emitted('update:value')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('keeps dynamic style bindings when switching source and visual modes', async () => {
     const sourceHtml = '<p><mark style="background-color: {{parent.color}}; color: inherit;">Text</mark></p>'
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: sourceHtml },
     })
     await wrapper.get('.rich-text-string-field__preview').trigger('click')
@@ -36,7 +199,7 @@ describe('RichTextStringPropertyField', () => {
   it('writes a local draft only when the user saves', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p>Original</p>',
@@ -72,7 +235,7 @@ describe('RichTextStringPropertyField', () => {
     }]
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true, fontOptions },
         value: '<p>Original</p>',
@@ -98,7 +261,7 @@ describe('RichTextStringPropertyField', () => {
     }]
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: {
         definition: {
           title: 'Content',
@@ -122,7 +285,7 @@ describe('RichTextStringPropertyField', () => {
   it('edits bindings inline on double click without opening a dialog', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p><span data-oc-binding="self:name">{{self:name}}</span></p>',
@@ -146,7 +309,7 @@ describe('RichTextStringPropertyField', () => {
   it('edits sanitized HTML source inside the same draft transaction', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p>Original</p>',
@@ -171,7 +334,7 @@ describe('RichTextStringPropertyField', () => {
 
     document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="富文本"]')!.click()
     await nextTick()
-    expect(wrapper.findComponent(OcRichTextEditor).exists()).toBe(false)
+    expect(wrapper.getComponent(OcRichTextEditor).isVisible()).toBe(false)
     expect(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="HTML 源码"]')!.value)
       .toContain('<script>bad</script>')
 
@@ -184,7 +347,7 @@ describe('RichTextStringPropertyField', () => {
   it('formats rich-text blocks when opening the source view', async () => {
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: {
         definition: { title: 'Content', fieldType: 'string', richText: true },
         value: '<p>First</p><p><strong>Second</strong></p>',
@@ -205,7 +368,7 @@ describe('RichTextStringPropertyField', () => {
     const source = '<p>Before</p><script>bad()</script><p>After</p>'
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: source },
     })
     await wrapper.get('.rich-text-string-field__preview').trigger('click')
@@ -226,7 +389,7 @@ describe('RichTextStringPropertyField', () => {
     setAppLocale('en-US')
     const wrapper = mount(RichTextStringPropertyField, {
       attachTo: document.body,
-      global: { plugins: [i18n], stubs: { PropertyEditor: true } },
+      global: { plugins: [i18n] },
       props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: '<p>Original</p>' },
     })
 

@@ -51,7 +51,6 @@ export type RichTextParseResult = {
   diagnostics: RichTextDiagnostic[]
   canEnterVisualMode: boolean
 }
-export type RichTextRenderDocument = RichTextDocument
 
 function elementPath(element: Element): string {
   const parts: string[] = []
@@ -249,12 +248,4 @@ export function normalizeRichTextHtml(source: string): string {
     documentNode.body.append(paragraph)
   }
   return documentNode.body.innerHTML
-}
-
-export function formatRichTextHtmlSource(source: string): string {
-  const parsed = parseRichTextHtml(source)
-  const value = parsed.canEnterVisualMode && /<[^>]+>/.test(source) ? source : normalizeRichTextHtml(source)
-  const documentNode = new DOMParser().parseFromString(value, 'text/html')
-  // Formatting whitespace between block nodes becomes real text when Tiptap preserves whitespace.
-  return Array.from(documentNode.body.childNodes).map(node => node instanceof Element ? node.outerHTML : node.textContent ?? '').join('')
 }

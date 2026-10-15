@@ -106,8 +106,8 @@ function submit(): void {
 </script>
 
 <style scoped>
-.commit-version-dialog { display: grid; gap: var(--oc-space-2); }
-.commit-version-dialog__field { display: grid; gap: var(--oc-space-2); color: var(--oc-fg-muted); }
+.commit-version-dialog { display: grid; gap: var(--oc-space-xs); }
+.commit-version-dialog__field { display: grid; gap: var(--oc-space-xs); color: var(--oc-fg-muted); }
 .commit-version-dialog__field .oc-field-input { min-height: var(--oc-size-lg); }
 .commit-version-dialog p { margin: 0; }
 </style>

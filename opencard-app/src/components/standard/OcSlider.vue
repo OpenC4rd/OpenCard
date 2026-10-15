@@ -254,7 +254,7 @@ function handleKeydown(event: KeyboardEvent): void {
   min-width: 80px;
   height: var(--oc-size-md);
   align-items: center;
-  column-gap: var(--oc-space-2);
+  column-gap: var(--oc-space-xs);
 }
 
 /* 滑块本身不画表面：所在的行或字段已经提供了外观，追加区域只是同一行里的嵌入内容。 */
@@ -276,12 +276,12 @@ function handleKeydown(event: KeyboardEvent): void {
 /* 数值读数浮在拇指上方：平时隐藏且不接收指针，悬停、拖动或键盘聚焦时持续显示。 */
 .oc-slider__readout {
   position: absolute;
-  bottom: calc(100% + var(--oc-space-1));
+  bottom: calc(100% + var(--oc-space-2xs));
   z-index: 1;
   max-width: 100%;
-  padding: 0 var(--oc-space-1);
+  padding: 0 var(--oc-space-2xs);
   border: var(--oc-border-width) solid var(--oc-border-default);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
   box-shadow: var(--oc-shadow-sm);
   color: var(--oc-fg-default);
@@ -291,7 +291,7 @@ function handleKeydown(event: KeyboardEvent): void {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-50%);
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-slider:hover .oc-slider__readout,
@@ -305,7 +305,7 @@ function handleKeydown(event: KeyboardEvent): void {
   width: 100%;
   height: 4px;
   overflow: hidden;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-slider-rail-background, var(--oc-border-default));
 }
 
@@ -321,7 +321,7 @@ function handleKeydown(event: KeyboardEvent): void {
   position: absolute;
   inset-inline: 0;
   top: 50%;
-  height: var(--oc-space-2);
+  height: var(--oc-space-xs);
   pointer-events: none;
   transform: translateY(-50%);
 }

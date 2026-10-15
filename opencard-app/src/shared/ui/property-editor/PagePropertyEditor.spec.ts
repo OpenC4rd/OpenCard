@@ -33,8 +33,8 @@ describe('PagePropertyEditor', () => {
 
     expect(wrapper.text()).toContain('Group')
     expect(wrapper.text()).toContain('px')
-    expect(wrapper.findAll('.page-property-editor-item__row')[1].attributes('style'))
-      .toContain('var(--oc-page-editor-indent) * 1')
+    expect(wrapper.findAll('.page-property-editor-item')[1].attributes('style'))
+      .toContain('var(--oc-indent-step) * 1')
     expect(wrapper.emitted('editor-preview')).toEqual([[
       { itemPath: ['group', 'value'], editorKey: 'number', value: 14 },
     ]])
@@ -58,7 +58,7 @@ describe('PagePropertyEditor', () => {
 
     wrapper.getComponent(PropertyFieldRenderer).vm.$emit('commit:value', 'true')
 
-    expect(wrapper.findAll('.page-property-editor-item__row')).toHaveLength(2)
+    expect(wrapper.findAll('.page-property-editor-item')).toHaveLength(2)
     expect(wrapper.emitted('editor-commit')).toEqual([[
       { itemPath: ['parent'], editorKey: 'enabled', value: true },
     ]])

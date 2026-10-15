@@ -95,9 +95,9 @@ describe('CardDataTable', () => {
     expect(wrapper.findAll('.card-data-table__face-row')).toHaveLength(2)
     expect(wrapper.get('.card-data-table__face-row > th > .card-data-table__face-heading').element.tagName).toBe('SPAN')
     expect(wrapper.get('.card-data-table__block-heading').attributes('style'))
-      .toContain('var(--oc-tree-indent)')
+      .toContain('var(--oc-indent-step)')
     expect(wrapper.get('.card-data-table__field-heading').attributes('style'))
-      .toContain('calc(var(--oc-tree-indent) * 2)')
+      .toContain('calc(var(--oc-indent-step) * 2)')
     expect(wrapper.get('[data-card-id="instance"]').classes()).toContain('is-inherited')
     expect(wrapper.findAllComponents(PropertyFieldRenderer).every(
       control => control.props('appearance') === 'embedded',
@@ -145,9 +145,9 @@ describe('CardDataTable', () => {
     })
 
     expect(wrapper.get('.card-data-table__block-heading').attributes('style'))
-      .toContain('var(--oc-tree-indent)')
+      .toContain('var(--oc-indent-step)')
     expect(wrapper.get('.card-data-table__field-heading').attributes('style'))
-      .toContain('calc(var(--oc-tree-indent) * 2)')
+      .toContain('calc(var(--oc-indent-step) * 2)')
   })
 
   it('renders readonly instance cells as non-focusable text', () => {

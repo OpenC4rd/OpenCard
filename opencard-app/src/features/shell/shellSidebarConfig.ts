@@ -1,7 +1,7 @@
-import { OC_SHARED_THEME_TOKENS } from '../../shared/ui/foundation/themes'
+import { readThemePixels } from '../../shared/ui/foundation/themeTokenPixels'
 
 /** Shell Sidebar 的结构 token 投影；数值来源仍是 foundation shared tokens。 */
-export const SHELL_SIDEBAR_COLLAPSE_THRESHOLD = readPixels('--oc-shell-sidebar-collapse-threshold')
+export const SHELL_SIDEBAR_COLLAPSE_THRESHOLD = readThemePixels('--oc-shell-sidebar-collapse-threshold')
 
 /** 侧栏列表键；侧栏描述符与列表动作分发共用同一份定义。 */
 export const PROJECT_FILES_LIST_KEY = 'project-files'
@@ -33,10 +33,4 @@ export const PROJECT_REVEAL_ACTION_KEY = 'project.reveal'
 
 export function isRepositorySidebarReady(initialized: boolean | null): boolean {
   return initialized === true
-}
-
-function readPixels(token: keyof typeof OC_SHARED_THEME_TOKENS): number {
-  const value = Number.parseFloat(OC_SHARED_THEME_TOKENS[token])
-  if (!Number.isFinite(value)) throw new Error(`Invalid foundation pixel token: ${token}`)
-  return value
 }

@@ -219,13 +219,13 @@ function hasActionChildren(
 .oc-action-button__badge {
   position: absolute;
   z-index: 1;
-  top: calc(-1 * var(--oc-space-1));
-  right: calc(-1 * var(--oc-space-1));
+  top: calc(-1 * var(--oc-space-2xs));
+  right: calc(-1 * var(--oc-space-2xs));
 }
 
 .oc-action-button .oc-button__icon {
   transform-origin: center;
-  transition: transform var(--oc-duration-fast) var(--oc-ease);
+  transition: transform var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-action-button.is-menu-open .oc-button__icon {

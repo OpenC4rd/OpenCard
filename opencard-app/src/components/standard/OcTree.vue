@@ -179,10 +179,14 @@ import type {
   OcNodeTailPart,
 } from '../../shared/ui/node/node.types'
 import { resolveOcPixelToken } from '../../shared/ui/foundation'
+import { readThemePixels } from '../../shared/ui/foundation/themeTokenPixels'
 import {
   useExternalFileDrop,
   type ExternalDropZone,
 } from '../../shared/ui/drop/externalFileDrop'
+
+/** 每层缩进步进；与属性编辑器、数据表共用同一个 foundation token。 */
+const INDENT_STEP = readThemePixels('--oc-indent-step')
 
 type OcTreeSelectionMode = OcNodeSelectionMode
 type OcTreeActivationMode = 'none' | 'single-click' | 'double-click'
@@ -265,7 +269,7 @@ let externalDropZoneDispose: (() => void) | null = null
 const warnedMessages = new Set<string>()
 const virtualScrollTop = ref(0)
 const virtualViewportHeight = ref(0)
-const virtualRowHeight = ref(1)
+const virtualRowPitch = ref(1)
 const collapsedActionKeys = ref<ReadonlySet<OcNodeKey>>(new Set())
 const directActionWidths = new Map<OcNodeKey, number>()
 const VIRTUAL_OVERSCAN_ROWS = 6
@@ -375,7 +379,7 @@ const visibleEntries = computed<VisibleEntry[]>(() => {
 
 const virtualRange = computed(() => {
   if (!props.virtualized) return { start: 0, end: visibleEntries.value.length }
-  const rowHeight = virtualRowHeight.value
+  const rowHeight = virtualRowPitch.value
   const start = Math.max(0, Math.floor(virtualScrollTop.value / rowHeight) - VIRTUAL_OVERSCAN_ROWS)
   const visibleRows = Math.ceil(virtualViewportHeight.value / rowHeight)
   return {
@@ -388,13 +392,13 @@ const renderedEntries = computed(() => visibleEntries.value.slice(
   virtualRange.value.end,
 ))
 const virtualContentStyle = computed<CSSProperties | undefined>(() => props.virtualized
-  ? { height: `${visibleEntries.value.length * virtualRowHeight.value}px` }
+  ? { height: `${visibleEntries.value.length * virtualRowPitch.value}px` }
   : undefined)
 
 function resolveNodeStyle(entry: VisibleEntry): CSSProperties {
   return {
-    '--oc-tree-indent': `${entry.level * 12}px`,
-    ...(props.virtualized ? { transform: `translateY(${entry.index * virtualRowHeight.value}px)` } : {}),
+    '--oc-tree-indent': `${entry.level * INDENT_STEP}px`,
+    ...(props.virtualized ? { transform: `translateY(${entry.index * virtualRowPitch.value}px)` } : {}),
   } as CSSProperties
 }
 
@@ -416,7 +420,9 @@ function handleTreeScroll(event: Event): void {
 function syncVirtualMetrics(): void {
   const root = treeRootElement.value
   if (!props.virtualized || !root) return
-  virtualRowHeight.value = Math.max(1, resolveOcPixelToken('--oc-size-md', root))
+  // 行距 = 行高 + 行间空隙（空隙由 `.oc-tree__node` 的下内边距给出）。
+  virtualRowPitch.value = Math.max(1,
+    resolveOcPixelToken('--oc-size-md', root) + resolveOcPixelToken('--oc-space-2xs', root))
   virtualViewportHeight.value = root.clientHeight
   virtualScrollTop.value = root.scrollTop
 }
@@ -429,7 +435,7 @@ function syncVirtualMetrics(): void {
 function measureTailActionWidth(row: HTMLElement): number {
   const parts = [...row.querySelectorAll<HTMLElement>('.oc-node-tail__action')]
   if (parts.length === 0) return 0
-  const gap = resolveOcPixelToken('--oc-space-1', treeRootElement.value)
+  const gap = resolveOcPixelToken('--oc-space-xs', treeRootElement.value)
   return parts.reduce((total, part) => total + part.getBoundingClientRect().width, 0)
     + gap * (parts.length - 1)
 }
@@ -571,8 +577,8 @@ function scrollRowIntoTreeViewport(key: OcNodeKey): void {
   if (props.virtualized) {
     const index = visibleEntries.value.findIndex(entry => entry.key === key)
     if (index < 0) return
-    const rowTop = index * virtualRowHeight.value
-    const rowBottom = rowTop + virtualRowHeight.value
+    const rowTop = index * virtualRowPitch.value
+    const rowBottom = rowTop + virtualRowPitch.value
     if (rowTop < root.scrollTop) root.scrollTop = rowTop
     else if (rowBottom > root.scrollTop + root.clientHeight) root.scrollTop = rowBottom - root.clientHeight
     virtualScrollTop.value = root.scrollTop
@@ -1003,7 +1009,7 @@ watch([() => props.virtualized, () => visibleEntries.value.length], async () => 
   syncVirtualMetrics()
   const root = treeRootElement.value
   if (!props.virtualized || !root) return
-  const maximum = Math.max(0, visibleEntries.value.length * virtualRowHeight.value - root.clientHeight)
+  const maximum = Math.max(0, visibleEntries.value.length * virtualRowPitch.value - root.clientHeight)
   if (root.scrollTop > maximum) root.scrollTop = maximum
   virtualScrollTop.value = root.scrollTop
 })
@@ -1049,7 +1055,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   min-height: var(--oc-size-md);
-  padding: var(--oc-space-3);
+  padding: var(--oc-space-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1080,7 +1086,7 @@ onBeforeUnmount(() => {
   /* 精灵图裁剪按 em 计量，字号决定实际尺寸。 */
   font-size: var(--oc-size-sm);
   transform-origin: center;
-  transition: transform var(--oc-duration-fast) var(--oc-ease);
+  transition: transform var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-tree__node-visual.is-expanded {
@@ -1101,15 +1107,17 @@ onBeforeUnmount(() => {
 .oc-tree__node {
   position: relative;
   flex: 0 0 auto;
+  /* 行间空隙：节点比行高多出这一档，虚拟列表的行距也按它计算。 */
+  padding-bottom: var(--oc-space-2xs);
 }
 
 .oc-tree__branch-guide {
   position: absolute;
   z-index: 1;
   top: calc(var(--oc-size-md) * 0.5 + 7px);
-  left: calc(var(--oc-space-3) + var(--oc-tree-indent, 0px) + 7px);
+  left: calc(var(--oc-space-sm) + var(--oc-tree-indent) + 7px);
   width: 1px;
-  height: calc(var(--oc-tree-guide-rows) * var(--oc-size-md) - 7px);
+  height: calc(var(--oc-tree-guide-rows) * (var(--oc-size-md) + var(--oc-space-2xs)) - 7px);
   background: var(--oc-border-muted);
   pointer-events: none;
 }
@@ -1118,7 +1126,7 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 1;
   top: calc(var(--oc-size-md) * 0.5);
-  left: calc(var(--oc-space-3) + var(--oc-tree-indent, 0px) - 5px);
+  left: calc(var(--oc-space-sm) + var(--oc-tree-indent) - 5px);
   width: 12px;
   height: 1px;
   background: var(--oc-border-muted);
@@ -1130,7 +1138,7 @@ onBeforeUnmount(() => {
  * 选择器带上节点容器，避免与 OcRow 自己的 `.oc-row` 规则同权重而依赖样式表顺序。
  */
 .oc-tree__node > .oc-tree__row {
-  padding-inline-start: calc(var(--oc-space-3) + var(--oc-tree-indent, 0px));
+  padding-inline-start: calc(var(--oc-space-sm) + var(--oc-tree-indent));
 }
 
 .oc-tree__icon-slot {
@@ -1151,7 +1159,7 @@ onBeforeUnmount(() => {
 .oc-tree__node-icon {
   flex: 0 0 auto;
   transform-origin: center;
-  transition: transform var(--oc-duration-fast) var(--oc-ease);
+  transition: transform var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-tree__node-icon.is-expanded {
@@ -1164,9 +1172,9 @@ onBeforeUnmount(() => {
   top: -6px;
   right: -9px;
   transition:
-    border-color var(--oc-duration-fast) var(--oc-ease),
-    color var(--oc-duration-fast) var(--oc-ease),
-    background-color var(--oc-duration-fast) var(--oc-ease);
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    color var(--oc-duration-quick) var(--oc-ease),
+    background-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-tree__icon-slot:hover .oc-tree__child-count,
@@ -1195,7 +1203,7 @@ onBeforeUnmount(() => {
 .oc-tree__rename-input {
   display: block;
   width: 100%;
-  height: calc(var(--oc-size-md) - var(--oc-space-1));
+  height: calc(var(--oc-size-md) - var(--oc-space-2xs));
 }
 
 /*
@@ -1218,7 +1226,7 @@ onBeforeUnmount(() => {
   content: '';
   position: absolute;
   z-index: 2;
-  left: calc(var(--oc-space-3) + var(--oc-tree-indent, 0px));
+  left: calc(var(--oc-space-sm) + var(--oc-tree-indent));
   right: 0;
   height: 2px;
   background: var(--oc-border-accent);
@@ -1234,6 +1242,6 @@ onBeforeUnmount(() => {
 }
 
 .oc-tree__node.is-drop-inside .oc-tree__row {
-  background: var(--oc-bg-accent-subtle);
+  background-image: var(--oc-overlay-accent);
 }
 </style>

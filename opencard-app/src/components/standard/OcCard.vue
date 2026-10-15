@@ -39,6 +39,8 @@ interface OcCardProps {
   actions?: OcCardAction[]
   /** 占满容器。默认 false */
   fill?: boolean
+  /** 内容区四边留白（8px）。默认 true；内容是自带留白的列表/树时传 false。 */
+  padding?: boolean
 }
 
 interface OcCardEmits {
@@ -57,6 +59,7 @@ const props = withDefaults(defineProps<OcCardProps>(), {
   variant: 'surface',
   actions: () => [],
   fill: false,
+  padding: true,
 })
 
 const emit = defineEmits<OcCardEmits>()
@@ -70,7 +73,7 @@ const forwardedAttrs = computed(() => {
 const hasHeader = computed(() => Boolean(props.title || props.icon || props.actions?.length))
 const cardClasses = computed(() => [
   `oc-card--variant-${props.variant}`,
-  { 'oc-card--fill': props.fill },
+  { 'oc-card--fill': props.fill, 'oc-card--padded': props.padding },
   attrs.class,
 ])
 
@@ -88,11 +91,11 @@ function handleActionSelect(payload: OcActionSelectPayload): void {
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
   transition:
-    background-color var(--oc-duration-fast) var(--oc-ease),
-    border-color var(--oc-duration-fast) var(--oc-ease),
-    box-shadow var(--oc-duration-fast) var(--oc-ease);
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    box-shadow var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-card--variant-plain {
@@ -108,8 +111,6 @@ function handleActionSelect(payload: OcActionSelectPayload): void {
 }
 
 .oc-card--variant-glass {
-  --oc-card-content-padding: var(--oc-floating-surface-padding);
-
   border: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-glass);
   backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
@@ -126,12 +127,17 @@ function handleActionSelect(payload: OcActionSelectPayload): void {
 }
 
 .oc-card__content {
-  padding: var(--oc-card-content-padding, var(--oc-space-1));
+  padding: 0;
   min-height: 0;
   min-width: 0;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+}
+
+/* 有留白时四边同档；无留白时由内容自己（行/树行）带内缩。 */
+.oc-card--padded .oc-card__content {
+  padding: var(--oc-space-sm);
 }
 
 .oc-card__content > * {

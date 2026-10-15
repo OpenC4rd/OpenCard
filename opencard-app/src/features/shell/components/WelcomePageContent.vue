@@ -96,8 +96,8 @@ const { t } = useI18n()
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-5);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-lg);
   color: var(--oc-fg-default);
   text-align: center;
 }
@@ -120,7 +120,7 @@ const { t } = useI18n()
   flex-direction: column;
   align-items: center;
   min-width: 0;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .page-empty-state__icon {
@@ -128,7 +128,7 @@ const { t } = useI18n()
   --oc-phase-image-aspect-ratio: 1;
 
   height: 72px;
-  margin-bottom: var(--oc-space-2);
+  margin-bottom: var(--oc-space-xs);
 }
 
 .page-empty-state h1,
@@ -140,7 +140,7 @@ const { t } = useI18n()
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   font-size: var(--oc-text-lg);
   font-weight: var(--font-weight-ui-title);
   /* 背景封面墙之上的可读性：只给文字加一层底色描边，不遮挡背景。 */
@@ -167,22 +167,22 @@ const { t } = useI18n()
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--oc-space-2);
-  margin-top: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  margin-top: var(--oc-space-sm);
 }
 
 /* 左下角的小按钮：控制背景封面墙显隐。 */
 .page-empty-state__wall-toggle {
   position: absolute;
-  left: var(--oc-space-4);
-  bottom: var(--oc-space-4);
+  left: var(--oc-space-md);
+  bottom: var(--oc-space-md);
   z-index: 2;
 }
 
 /* 切换显隐时整面墙淡入淡出。 */
 .welcome-cover-wall-enter-active,
 .welcome-cover-wall-leave-active {
-  transition: opacity var(--oc-duration-slow) var(--oc-ease);
+  transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
 .welcome-cover-wall-enter-from,

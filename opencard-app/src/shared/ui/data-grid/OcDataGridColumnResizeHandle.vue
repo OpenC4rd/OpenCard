@@ -25,22 +25,22 @@ const emit = defineEmits<{
 .oc-data-grid-column-resize {
   position: absolute;
   inset-block: 0;
-  inset-inline-end: calc(var(--oc-space-1) * -1);
+  inset-inline-end: calc(var(--oc-space-2xs) * -1);
   z-index: 1;
-  width: var(--oc-space-3);
+  width: var(--oc-space-sm);
   cursor: col-resize;
   touch-action: none;
 }
 
 .oc-data-grid-column-resize::after {
   position: absolute;
-  inset-block: var(--oc-space-3);
-  inset-inline-end: calc((var(--oc-space-3) - var(--oc-border-width)) / 2);
+  inset-block: var(--oc-space-sm);
+  inset-inline-end: calc((var(--oc-space-sm) - var(--oc-border-width)) / 2);
   width: var(--oc-border-width);
   background: var(--oc-border-accent);
   content: '';
   opacity: 0;
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-data-grid-column-resize:hover::after,

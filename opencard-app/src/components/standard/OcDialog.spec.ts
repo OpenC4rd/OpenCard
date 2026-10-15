@@ -25,6 +25,32 @@ function mountDialog(props: Record<string, unknown> = {}) {
 }
 
 describe('OcDialog', () => {
+  it('owns an external sidebar in the same modal scope and hands its handle to the layout', async () => {
+    const wrapper = mount(OcDialog, {
+      props: { open: true, title: 'Editor', sidebarTitle: 'Properties', sidebarTooltip: 'Toggle properties' },
+      slots: { default: '<input autofocus>', sidebar: '<input class="property">' },
+      attachTo: document.body, global: { stubs: { transition: false } },
+    })
+    wrappers.push(wrapper)
+    await wrapper.vm.$nextTick()
+    const main = document.body.querySelector('.oc-dialog')!
+    const sidebar = document.body.querySelector('aside')!
+    const handle = document.body.querySelector<HTMLButtonElement>('.oc-dialog-layout__handle')!
+    expect(main.contains(sidebar)).toBe(false)
+    expect(document.body.querySelector('[role="dialog"]')?.contains(sidebar)).toBe(true)
+    expect(handle.getAttribute('aria-label')).toBe('Toggle properties')
+
+    handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+    expect(handle.getAttribute('aria-expanded')).toBe('false')
+    expect(sidebar.hasAttribute('inert')).toBe(true)
+
+    await wrapper.setProps({ sidebar: false })
+    expect(document.body.querySelector('aside')).toBeNull()
+    expect(document.body.querySelector('.oc-dialog-layout__handle')).toBeNull()
+    main.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+  })
   it('activates dialogs by opening order and restores the previous scope on release', async () => {
     const first = mountDialog({ open: false })
     const second = mountDialog()
@@ -92,7 +118,7 @@ describe('OcDialog', () => {
   it('uses a form surface and emits submit without browser navigation', async () => {
     const wrapper = mountDialog({ as: 'form', padded: false, scrollable: false })
     await wrapper.vm.$nextTick()
-    const dialog = document.body.querySelector<HTMLFormElement>('form[role="dialog"]')!
+    const dialog = document.body.querySelector<HTMLFormElement>('[role="dialog"] form')!
     dialog.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }))
 
     expect(wrapper.emitted('submit')).toHaveLength(1)
@@ -103,7 +129,7 @@ describe('OcDialog', () => {
   it('projects semantic content, bounded, and fixed height contracts', async () => {
     const wrapper = mountDialog({ minHeight: 'md', maxHeight: 'lg' })
     await wrapper.vm.$nextTick()
-    let dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!
+    let dialog = document.body.querySelector<HTMLElement>('.oc-dialog')!
     expect(Array.from(dialog.classList)).toEqual(expect.arrayContaining([
       'oc-dialog--height-mode-content',
       'oc-dialog--min-height-md',
@@ -111,7 +137,7 @@ describe('OcDialog', () => {
     ]))
 
     await wrapper.setProps({ heightMode: 'fixed', height: 'workspace', minHeight: undefined, maxHeight: 'viewport' })
-    dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!
+    dialog = document.body.querySelector<HTMLElement>('.oc-dialog')!
     expect(dialog.classList).toContain('oc-dialog--height-mode-fixed')
     expect(dialog.classList).toContain('oc-dialog--height-workspace')
     expect(dialog.classList).not.toContain('oc-dialog--min-height-md')

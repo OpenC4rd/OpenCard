@@ -467,36 +467,36 @@ defineExpose({ navigateToFont })
   border-right: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-base);
 }
-.project-font-registry-workbench__error { grid-row: 1; padding: var(--oc-space-2); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
+.project-font-registry-workbench__error { grid-row: 1; padding: var(--oc-space-xs); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
 .project-font-registry-workbench__list { position: relative; grid-row: 2; min-height: 0; overflow: hidden; }
 .project-font-registry-workbench__list > .oc-tree { position: absolute; inset: 0; }
 .project-font-registry-workbench__right { display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--oc-bg-base); }
-.project-font-registry-workbench__preview-toolbar { display: grid; gap: var(--oc-space-2); padding: var(--oc-space-3); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
-.project-font-registry-workbench__preview-diagnostics { display: grid; gap: var(--oc-space-1); }
-.project-font-registry-workbench__preview { display: grid; place-items: center; min-width: 0; min-height: 0; padding: var(--oc-space-6); overflow: auto; overflow-wrap: anywhere; font-size: var(--oc-font-preview-size); text-align: center; }
+.project-font-registry-workbench__preview-toolbar { display: grid; gap: var(--oc-space-xs); padding: var(--oc-action-padding); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
+.project-font-registry-workbench__preview-diagnostics { display: grid; gap: var(--oc-space-2xs); }
+.project-font-registry-workbench__preview { display: grid; place-items: center; min-width: 0; min-height: 0; padding: var(--oc-space-lg); overflow: auto; overflow-wrap: anywhere; font-size: var(--oc-font-preview-size); text-align: center; }
 .project-font-registry-workbench__preview-content { white-space: pre-wrap; }
 .project-font-registry-workbench__preview-run {
-  border-radius: var(--oc-radius-sm);
-  transition: background-color var(--oc-duration-fast) var(--oc-ease);
+  border-radius: var(--oc-radius-control);
+  transition: background-color var(--oc-duration-quick) var(--oc-ease);
 }
-.project-font-registry-workbench__preview-run:hover { background: var(--oc-bg-hover); }
+.project-font-registry-workbench__preview-run:hover { background-image: var(--oc-overlay-hover); }
 .project-font-registry-workbench__font-info-layer {
   max-width: var(--oc-content-width-sm);
   border: var(--oc-border-width) solid var(--oc-border-muted);
   box-shadow: var(--oc-shadow-md);
   pointer-events: none;
 }
-.project-font-registry-workbench__font-info { padding: var(--oc-space-3); }
-.project-font-registry-workbench__font-info strong { display: block; margin-bottom: var(--oc-space-2); }
-.project-font-registry-workbench__font-info dl { display: grid; gap: var(--oc-space-1); margin: 0; }
+.project-font-registry-workbench__font-info { padding: var(--oc-space-sm); }
+.project-font-registry-workbench__font-info strong { display: block; margin-bottom: var(--oc-space-xs); }
+.project-font-registry-workbench__font-info dl { display: grid; gap: var(--oc-space-2xs); margin: 0; }
 .project-font-registry-workbench__font-info dl > div {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 .project-font-registry-workbench__font-info dt { color: var(--oc-fg-muted); }
 .project-font-registry-workbench__font-info dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.project-font-registry-workbench__placeholder { display: grid; grid-row: 1 / -1; place-content: center; justify-items: center; gap: var(--oc-space-3); min-width: 0; min-height: 0; }
+.project-font-registry-workbench__placeholder { display: grid; grid-row: 1 / -1; place-content: center; justify-items: center; gap: var(--oc-space-sm); min-width: 0; min-height: 0; }
 </style>
 
 (Background: j-xagavb exited 1.)

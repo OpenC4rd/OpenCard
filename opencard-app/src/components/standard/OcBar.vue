@@ -54,8 +54,8 @@ const hasTitle = computed(() => Boolean(props.title) || Boolean(slots.title))
   display: flex;
   align-items: center;
   min-height: var(--oc-size-md);
-  gap: var(--oc-space-2);
-  padding-inline: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  padding-inline: var(--oc-space-sm);
   color: var(--oc-fg-default);
   font-size: var(--oc-text-base);
 }
@@ -65,7 +65,7 @@ const hasTitle = computed(() => Boolean(props.title) || Boolean(slots.title))
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .oc-bar__icon {
@@ -88,7 +88,7 @@ const hasTitle = computed(() => Boolean(props.title) || Boolean(slots.title))
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   flex: 0 0 auto;
 }
 

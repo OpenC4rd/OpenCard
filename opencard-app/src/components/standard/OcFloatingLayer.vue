@@ -100,16 +100,16 @@ const layerStyle = computed<CSSProperties>(() => ({
 .oc-floating-layer {
   z-index: var(--oc-z-popover);
   box-sizing: border-box;
-  color: var(--oc-fg-default, #cccccc);
-  background-color: var(--oc-bg-surface, #252526);
+  color: var(--oc-fg-default);
+  background-color: var(--oc-bg-surface);
   background-clip: padding-box;
-  border-radius: var(--oc-floating-layer-radius, var(--oc-radius-md, 6px));
+  border-radius: var(--oc-floating-layer-radius, var(--oc-radius-control));
   isolation: isolate;
 }
 
 .oc-floating-layer-fade-enter-active,
 .oc-floating-layer-fade-leave-active {
-  transition: opacity var(--oc-duration-fast) var(--oc-ease);
+  transition: opacity var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-floating-layer-fade-enter-from,
@@ -128,7 +128,7 @@ const layerStyle = computed<CSSProperties>(() => ({
 <style>
 .oc-floating-layer--surface {
   border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-floating-layer-radius, var(--oc-radius-md));
+  border-radius: var(--oc-floating-layer-radius, var(--oc-radius-control));
   background: var(--oc-bg-surface);
   box-shadow: var(--oc-shadow-lg);
 }

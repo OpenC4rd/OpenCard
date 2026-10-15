@@ -1,10 +1,10 @@
 import { mergeAttributes, Node, nodeInputRule, nodePasteRule } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import BindingNodeView from './BindingNodeView.vue'
-import type { RichTextBindingCompletionProvider } from './bindingNode.types'
+import type { PropertyCompletionProvider } from '../property-editor/propertyEditor.types'
 
 export type BindingNodeOptions = {
-  completion?: RichTextBindingCompletionProvider
+  completion?: PropertyCompletionProvider
 }
 
 export const BindingNode = Node.create<BindingNodeOptions>({

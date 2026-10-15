@@ -57,15 +57,15 @@ defineOptions({ name: 'OcFieldFrame' })
 .oc-field-frame {
   display: flex;
   align-items: stretch;
-  column-gap: var(--oc-space-1);
+  column-gap: var(--oc-space-2xs);
   min-width: 0;
   overflow: hidden;
   box-sizing: border-box;
   border: var(--oc-field-surface-border-width, 1px) solid var(--oc-field-surface-border-color, var(--oc-border-default));
-  border-radius: var(--oc-field-surface-border-radius, var(--oc-radius-sm));
+  border-radius: var(--oc-field-surface-border-radius, var(--oc-radius-control));
   background: var(--oc-field-surface-background, var(--oc-bg-input));
   color: var(--oc-fg-default);
-  transition: border-color var(--oc-duration-fast) var(--oc-ease);
+  transition: border-color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .oc-field-frame:focus-within:not(.oc-field-frame--disabled):not(.oc-field-frame--readonly) {
@@ -104,7 +104,7 @@ defineOptions({ name: 'OcFieldFrame' })
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-field-frame__control {
@@ -134,7 +134,7 @@ defineOptions({ name: 'OcFieldFrame' })
   flex-wrap: wrap;
   align-items: baseline;
   align-content: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-field-frame--wrap .oc-field-frame__control > :deep(*) {

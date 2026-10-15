@@ -360,14 +360,14 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border-radius: var(--oc-radius-lg, 8px);
+  border-radius: var(--oc-radius-surface);
   background: var(--oc-bg-surface);
 }
 
 .shell-bottom-panel__toggle {
   position: fixed;
-  right: var(--oc-space-3, 8px);
-  bottom: var(--oc-space-3, 8px);
+  right: var(--oc-space-sm);
+  bottom: var(--oc-space-sm);
   left: auto;
   top: auto;
   z-index: var(--oc-z-shell-floating-control);
@@ -379,15 +379,15 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   justify-content: center;
   border: 1px solid var(--oc-border-default);
   border-radius: 50%;
-  border-bottom-right-radius: var(--oc-radius-sm);
+  border-bottom-right-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
   color: var(--oc-fg-muted);
   box-shadow: var(--oc-shadow-sm);
   transform: none;
   transition:
-    border-color var(--oc-duration-fast, 100ms) var(--oc-ease, ease),
-    background-color var(--oc-duration-fast, 100ms) var(--oc-ease, ease),
-    color var(--oc-duration-fast, 100ms) var(--oc-ease, ease);
+    border-color var(--oc-duration-quick) var(--oc-ease),
+    background-color var(--oc-duration-quick) var(--oc-ease),
+    color var(--oc-duration-quick) var(--oc-ease);
 }
 
 .shell-bottom-panel__toggle:hover,
@@ -422,49 +422,49 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--oc-bg-base);
-  transition: height var(--oc-duration-normal, 150ms) var(--oc-ease, ease);
+  transition: height var(--oc-duration) var(--oc-ease);
 }
 
 .shell-bottom-panel.is-expanded .shell-bottom-panel__content {
-  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md, 180px));
+  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md));
 }
 
 .shell-bottom-panel__tabs {
   min-height: 30px;
   display: flex;
   align-items: stretch;
-  gap: var(--oc-space-1, 4px);
-  padding: 0 var(--oc-space-3, 8px);
+  gap: var(--oc-space-2xs);
+  padding: 0 var(--oc-space-sm);
   border-bottom: 1px solid var(--oc-border-muted);
 }
 
 .shell-bottom-panel__tab-list {
   display: flex;
   align-items: stretch;
-  gap: var(--oc-space-1, 4px);
+  gap: var(--oc-space-2xs);
 }
 
 .shell-bottom-panel__tab {
   position: relative;
   min-width: 72px;
-  padding: 0 var(--oc-space-3, 8px);
+  padding: 0 var(--oc-space-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-1, 4px);
+  gap: var(--oc-space-2xs);
   border: 0;
   background: transparent;
   color: var(--oc-fg-muted);
   font: inherit;
-  font-size: var(--oc-text-sm, 11px);
+  font-size: var(--oc-text-sm);
 }
 
 .shell-bottom-panel__tab::after {
   content: '';
   position: absolute;
-  right: var(--oc-space-2, 6px);
+  right: var(--oc-space-xs);
   bottom: 0;
-  left: var(--oc-space-2, 6px);
+  left: var(--oc-space-xs);
   height: 2px;
   background: transparent;
 }
@@ -483,20 +483,20 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 .shell-bottom-panel__count {
   min-width: 16px;
   height: 16px;
-  padding: 0 var(--oc-space-1, 4px);
+  padding: 0 var(--oc-space-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--oc-radius-sm, 3px);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-raised);
   color: var(--oc-icon-warning);
-  font-size: var(--oc-text-xs, 10px);
+  font-size: var(--oc-text-xs);
   line-height: 1;
 }
 
 .shell-bottom-panel__tabpanel {
   min-height: 0;
-  padding: var(--oc-space-2, 6px) var(--oc-space-3, 8px);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
   overflow: auto;
 }
 
@@ -516,14 +516,14 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   display: grid;
   place-items: center;
   color: var(--oc-fg-subtle);
-  font-size: var(--oc-text-sm, 11px);
+  font-size: var(--oc-text-sm);
 }
 
 .shell-bottom-panel__output-lines {
   display: grid;
-  gap: var(--oc-space-1);
-  font-family: var(--oc-font-mono, Consolas, monospace);
-  font-size: var(--oc-text-sm, 11px);
+  gap: var(--oc-space-2xs);
+  font-family: var(--oc-font-mono);
+  font-size: var(--oc-text-sm);
   color: var(--oc-fg-muted);
 }
 
@@ -546,7 +546,7 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   flex: 0 1 auto;
   display: flex;
   align-items: center;
-  border-top-right-radius: var(--oc-radius-md);
+  border-top-right-radius: var(--oc-radius-control);
   background: var(--oc-bg-surface);
 }
 
@@ -554,8 +554,8 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--oc-space-1);
-  padding: 0 var(--oc-space-2);
+  gap: var(--oc-space-2xs);
+  padding: 0 var(--oc-space-xs);
   overflow-x: auto;
 }
 
@@ -563,37 +563,37 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 .shell-bottom-panel__severity-dock::after {
   content: '';
   position: absolute;
-  width: var(--oc-radius-md);
-  height: var(--oc-radius-md);
+  width: var(--oc-radius-control);
+  height: var(--oc-radius-control);
   pointer-events: none;
 }
 
 .shell-bottom-panel__severity-dock::before {
-  top: calc(var(--oc-radius-md) * -1);
+  top: calc(var(--oc-radius-control) * -1);
   left: 0;
   background: radial-gradient(
     circle at top right,
-    transparent var(--oc-radius-md),
-    var(--oc-bg-surface) var(--oc-radius-md)
+    transparent var(--oc-radius-control),
+    var(--oc-bg-surface) var(--oc-radius-control)
   );
 }
 
 .shell-bottom-panel__severity-dock::after {
-  right: calc(var(--oc-radius-md) * -1);
+  right: calc(var(--oc-radius-control) * -1);
   bottom: 0;
   background: radial-gradient(
     circle at top right,
-    transparent var(--oc-radius-md),
-    var(--oc-bg-surface) var(--oc-radius-md)
+    transparent var(--oc-radius-control),
+    var(--oc-bg-surface) var(--oc-radius-control)
   );
 }
 
 .shell-bottom-panel__toolbar-button {
   height: var(--oc-size-sm);
-  padding: 0 var(--oc-space-2);
+  padding: 0 var(--oc-space-xs);
   display: inline-flex;
   align-items: center;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   flex: 0 0 auto;
   border: 0;
   background: transparent;
@@ -621,10 +621,10 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 }
 
 .shell-bottom-panel__severity-dot {
-  width: var(--oc-space-1);
-  height: var(--oc-space-1);
+  width: var(--oc-space-2xs);
+  height: var(--oc-space-2xs);
   flex: 0 0 auto;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: var(--oc-fg-muted);
 }
 
@@ -651,7 +651,7 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 
 .shell-bottom-panel__output-scroll {
   min-height: 0;
-  padding: var(--oc-space-2) var(--oc-space-3);
+  padding: var(--oc-space-xs) var(--oc-space-sm);
   overflow: auto;
 }
 
@@ -661,10 +661,10 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
   align-items: start;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-1) var(--oc-space-2);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-2xs) var(--oc-space-xs);
   border: 0;
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background-color: var(--oc-bg-block);
   color: inherit;
   font: inherit;
@@ -688,7 +688,7 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 
 .shell-bottom-panel__output-line:hover,
 .shell-bottom-panel__output-line:focus-visible {
-  background-image: linear-gradient(var(--oc-bg-hover), var(--oc-bg-hover));
+  background-image: var(--oc-overlay-hover);
   outline: none;
 }
 

@@ -30,7 +30,7 @@ const props = withDefaults(defineProps<OcSkeletonProps>(), {
 .oc-skeleton {
   display: inline-block;
   flex: 0 0 auto;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: color-mix(in srgb, var(--oc-fg-muted) 18%, transparent);
   background-image: linear-gradient(
     90deg,
@@ -46,8 +46,8 @@ const props = withDefaults(defineProps<OcSkeletonProps>(), {
 .oc-skeleton--width-md { width: calc(var(--oc-size-lg) * 4); }
 .oc-skeleton--width-lg { width: calc(var(--oc-size-lg) * 5); }
 .oc-skeleton--width-xl { width: calc(var(--oc-size-lg) * 6); }
-.oc-skeleton--height-sm { height: var(--oc-space-3); }
-.oc-skeleton--height-md { height: var(--oc-space-4); }
+.oc-skeleton--height-sm { height: var(--oc-space-sm); }
+.oc-skeleton--height-md { height: var(--oc-space-md); }
 
 @keyframes oc-skeleton-shimmer {
   from { background-position: 100% 0; }

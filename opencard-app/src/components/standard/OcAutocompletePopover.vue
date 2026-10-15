@@ -116,8 +116,8 @@ watch(
 <style scoped>
 .oc-autocomplete-popover {
   min-width: var(--oc-autocomplete-popover-min-width);
-  padding: var(--oc-space-1);
-  --oc-floating-layer-radius: var(--oc-radius-sm);
+  padding: var(--oc-space-2xs);
+  --oc-floating-layer-radius: var(--oc-radius-control);
 }
 
 .oc-autocomplete-popover__scroll {
@@ -136,7 +136,7 @@ watch(
 .oc-autocomplete-popover__title {
   display: flex;
   align-items: baseline;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .oc-autocomplete-popover__label {

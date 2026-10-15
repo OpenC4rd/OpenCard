@@ -27,9 +27,9 @@ const { t } = useI18n()
   display: grid;
   place-items: center;
   align-content: center;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
   min-height: 100%;
-  padding: var(--oc-space-8);
+  padding: calc(var(--oc-space-lg) * 2);
   text-align: center;
 }
 

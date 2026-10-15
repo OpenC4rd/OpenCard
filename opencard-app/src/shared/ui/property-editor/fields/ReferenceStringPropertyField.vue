@@ -246,7 +246,7 @@ function handleKeydown(event: KeyboardEvent): void {
     --oc-field-control-target-height,
     var(--oc-field-control-height, var(--oc-property-row-height))
   );
-  transition: height var(--oc-duration-normal) var(--oc-ease);
+  transition: height var(--oc-duration) var(--oc-ease);
 }
 
 .reference-string-field__multiline:focus-within {
@@ -261,7 +261,7 @@ function handleKeydown(event: KeyboardEvent): void {
   inset: 0;
   display: flex;
   align-items: center;
-  padding: var(--oc-field-content-padding, var(--oc-space-1) var(--oc-space-2));
+  padding: var(--oc-field-content-padding, var(--oc-space-2xs) var(--oc-space-xs));
   color: var(--oc-fg-disabled);
   pointer-events: none;
   white-space: nowrap;

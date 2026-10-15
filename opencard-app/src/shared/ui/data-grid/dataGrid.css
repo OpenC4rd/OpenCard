@@ -26,7 +26,7 @@
 .oc-data-grid__table td {
   box-sizing: border-box;
   height: var(--oc-table-row-height);
-  padding: 0 var(--oc-space-2);
+  padding: 0 var(--oc-space-xs);
   border-right: var(--oc-border-width) solid var(--oc-border-muted);
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-base);
@@ -79,7 +79,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   width: 100%;
   min-width: 0;
   min-height: var(--oc-field-control-height);

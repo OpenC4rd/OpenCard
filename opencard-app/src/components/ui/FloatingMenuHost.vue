@@ -114,6 +114,6 @@ onBeforeUnmount(() => {
 
 <style>
 .floating-menu-surface {
-  --oc-floating-layer-radius: var(--oc-radius-md);
+  --oc-floating-layer-radius: var(--oc-radius-control);
 }
 </style>

@@ -103,8 +103,8 @@ async function openWithSystem(): Promise<void> {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-5);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-lg);
   color: var(--oc-fg-default);
   text-align: center;
 }
@@ -129,7 +129,7 @@ async function openWithSystem(): Promise<void> {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--oc-space-2);
-  margin-top: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  margin-top: var(--oc-space-sm);
 }
 </style>

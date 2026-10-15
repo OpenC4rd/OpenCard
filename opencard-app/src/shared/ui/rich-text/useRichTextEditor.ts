@@ -1,0 +1,501 @@
+import { computed, getCurrentInstance, ref, watch, watchEffect } from 'vue'
+import { createRichTextInteraction } from './richTextInteraction'
+import { useRichTextFormatting } from './useRichTextFormatting'
+import { resolveRichTextStyle } from '../../rich-text/richTextResourceStyle'
+import { Extension, type ChainedCommands, type Editor, type JSONContent } from '@tiptap/core'
+import { richTextStyleExtensions, fontVariable } from './richTextStyleExtensions'
+import { richTextParseOptions, canonicalEditorHtml, visualEditorHtml, equivalentRichTextHtml } from './richTextEditorHtml'
+import { NodeSelection, Selection } from '@tiptap/pm/state'
+import { DOMParser as ProseMirrorParser, DOMSerializer, type Node as ProseMirrorNode } from '@tiptap/pm/model'
+import { closeHistory } from '@tiptap/pm/history'
+import Color from '@tiptap/extension-color'
+import TextAlign from '@tiptap/extension-text-align'
+import Underline from '@tiptap/extension-underline'
+import StarterKit from '@tiptap/starter-kit'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
+import { useEditor } from '@tiptap/vue-3'
+import type { OcActionDefinition, OcActionSelectPayload } from '../action/action.types'
+import type { FilePathDirectoryProvider } from '../../model/filePath'
+import type {
+  PropertyCompletionItem,
+  PropertyCompletionProvider,
+  PropertyEditorFieldDefinition,
+} from '../property-editor/propertyEditor.types'
+import type { IconToken } from '../icon/iconRegistry'
+import { BindingNode } from './bindingNode'
+
+import { ProjectIconNode } from './projectIconNode'
+import {
+  createProjectIconStyle,
+  createProjectIconPreviewStyle,
+  findProjectIcon,
+  type ProjectIconCatalog,
+  type ProjectIconCatalogEntry,
+} from '../../../features/workspace/services/projectIconCatalog'
+import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
+import { formatProjectIconPath, parseProjectIconPath } from '../../rich-text/projectIconReference'
+import { readProjectIconSize } from '../../../features/workspace/services/projectIconDimensionResolver'
+import {
+  projectIconRecentIdentity,
+  recentProjectIconIdentities,
+  rememberRecentProjectIcon,
+} from './recentProjectIcons'
+import {
+  createRichTextFormatInput,
+  richTextFormatCategories,
+} from './richTextFormat'
+
+type RichTextFontOption = {
+  label: string
+  value: string
+  cssFamily?: string
+}
+
+type RichTextFontSelectOption = RichTextFontOption & {
+  key: string
+  labelStyle?: Readonly<Record<string, string>>
+}
+
+export type RichTextEditorProps = {
+  /** 本次会话的初始 HTML。挂载后内容由编辑器文档持有。 */
+  initialHtml: string
+  /** 行内表达式补全服务。 */
+  bindingCompletion?: PropertyCompletionProvider
+  /** 当前作用域的项目图标目录。 */
+  projectIconCatalog?: ProjectIconCatalog
+  /** Icon sources the toolbar offers: the current project first, then packages that ship icons. */
+  packageIconSources?: readonly ProjectIconSource[]
+  /** 字体稳定引用、显示名称和当前作用域的 CSS 字体。 */
+  fontOptions?: readonly RichTextFontOption[]
+  /** 编辑区继承的基础字体与字号。 */
+  baseStyle?: {
+    fontFamily?: string
+    fontSize?: string
+  }
+  /** 图片填充的目录浏览服务。 */
+  imageDirectoryProvider?: FilePathDirectoryProvider
+  /** 图片填充的引用补全服务。 */
+  imageCompletionProvider?: PropertyCompletionProvider
+  /** 将图片稳定引用解析为当前作用域的显示地址。 */
+  resolveImageSource?: (reference: string) => string | null
+}
+
+export function useRichTextEditor(props: RichTextEditorProps, onChange: () => void) {
+  const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
+    | ((key: string, parameters?: Record<string, unknown>) => string)
+    | undefined
+  const tr = (key: string, fallback: string, parameters?: Record<string, unknown>): string =>
+    translate?.(key, parameters) ?? fallback
+
+  let originalDocument: ProseMirrorNode | null = null
+  let appliedSource: { document: ProseMirrorNode; html: string } | null = null
+  const toolbarRevision = ref(0)
+  const interaction = createRichTextInteraction(() => editor.value, attributes => resolveRichTextStyle({
+    'data-oc-fill-type': String(attributes.textFillType ?? ''),
+    'data-oc-fill-source': String(attributes.textFillSource ?? ''),
+  }, () => null, reference => props.resolveImageSource?.(reference) ?? null))
+  const formatting = useRichTextFormatting(() => editor.value, toolbarRevision, interaction, () => props.baseStyle?.fontSize)
+  function captureInteraction(event: Event) {
+    if (!(event.target instanceof Element) || event.target.closest('.oc-rich-text-editor__surface')) return
+    interaction.capture()
+  }
+  function colorOpen(open: boolean) { if (open) interaction.capture(); else interaction.clearPreview() }
+
+  const fontOptions = computed<readonly RichTextFontSelectOption[]>(() => [
+    { key: '', label: tr('propertyEditor.richText.defaultFont', '默认字体'), value: '' },
+    ...(props.fontOptions ?? []).map(option => ({
+      ...option,
+      key: option.value,
+      labelStyle: { fontFamily: option.cssFamily ?? option.value },
+    })),
+  ])
+  const strokeWidthOptions = computed(() => [
+    { key: '0px', label: tr('propertyEditor.richText.noStroke', '无描边'), value: '0px' },
+    { key: '0.5px', label: '0.5 px', value: '0.5px' },
+    { key: '1px', label: '1 px', value: '1px' },
+    { key: '1.5px', label: '1.5 px', value: '1.5px' },
+    { key: '2px', label: '2 px', value: '2px' },
+    { key: '3px', label: '3 px', value: '3px' },
+  ] as const)
+  const fontVariables = computed(() => Object.fromEntries(fontOptions.value.filter(option => option.value).map(option => [fontVariable(option.value), option.cssFamily ?? option.value])))
+  const alignments = computed<ReadonlyArray<{
+    value: 'left' | 'center' | 'right' | 'justify'
+    icon: IconToken
+    title: string
+  }>>(() => [
+    { value: 'left', icon: 'format.align-start', title: tr('propertyEditor.richText.alignLeft', '左对齐') },
+    { value: 'center', icon: 'format.align-center', title: tr('propertyEditor.richText.alignCenter', '居中') },
+    { value: 'right', icon: 'format.align-end', title: tr('propertyEditor.richText.alignRight', '右对齐') },
+    { value: 'justify', icon: 'format.align-justify', title: tr('propertyEditor.richText.alignJustify', '两端对齐') },
+  ])
+
+  const foregroundColor = computed(() => formatting.value('color'))
+  const backgroundColor = computed(() => formatting.value('backgroundColor'))
+  const activeFontFamily = computed(() => formatting.value('fontFamily'))
+  const activeFontSize = computed(() => formatting.activeSize())
+  const fontSizeOptions = computed(() => {
+    const sizes = [...new Set([...formatting.sizeSteps, Number(formatting.activeSize())].filter(size => size > 0))].sort((a, b) => a - b)
+    return sizes.map(size => ({ key: String(size), label: `${size} px`, value: String(size) }))
+  })
+  function createToolbarCompletion(items: readonly { key: string, label: string, labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
+    return ({ value }) => {
+      const query = value.trim().toLocaleLowerCase()
+      const filterQuery = items.some(item => item.key.toLocaleLowerCase() === query) ? '' : query
+      const suggestions: PropertyCompletionItem[] = items
+        .filter(item => !filterQuery || `${item.label} ${item.key}`.toLocaleLowerCase().includes(filterQuery))
+        .sort((left, right) => Number(right.key.toLocaleLowerCase() === query) - Number(left.key.toLocaleLowerCase() === query))
+        .map(item => ({ ...item, insertText: item.key }))
+      return { replaceStart: 0, replaceEnd: value.length, items: suggestions }
+    }
+  }
+  type StringFieldDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
+  const fontFieldDefinition = computed<StringFieldDefinition>(() => ({
+    title: tr('propertyEditor.richText.font', '字体'), fieldType: 'string',
+    completion: { provider: createToolbarCompletion(fontOptions.value) },
+  }))
+  const fontSizeFieldDefinition = computed<StringFieldDefinition>(() => ({
+    title: tr('propertyEditor.richText.fontSize', '字号'), fieldType: 'string',
+    completion: { provider: createToolbarCompletion(fontSizeOptions.value) },
+  }))
+  const strokeWidthFieldDefinition = computed<StringFieldDefinition>(() => ({
+    title: tr('propertyEditor.richText.strokeWidth', '描边宽度'), fieldType: 'string',
+    completion: { provider: createToolbarCompletion(strokeWidthOptions.value) },
+  }))
+  const lengthCompletionProvider = computed(() => createToolbarCompletion([
+    { key: '0px', label: '0 px' },
+    { key: '1px', label: '1 px' },
+    { key: '2px', label: '2 px' },
+    { key: '4px', label: '4 px' },
+    { key: '8px', label: '8 px' },
+    { key: '12px', label: '12 px' },
+  ]))
+  const propertyCategories = computed(() => richTextFormatCategories(tr))
+  const propertyInputs = computed(() => {
+    toolbarRevision.value
+    return [createRichTextFormatInput({
+      labels: tr,
+      record: Object.fromEntries(Object.entries(formatting.state.value).map(([field, state]) => [field, state.value])),
+      fields: {
+        fontField: fontFieldDefinition.value,
+        fontSizeField: fontSizeFieldDefinition.value,
+        strokeWidthField: strokeWidthFieldDefinition.value,
+        imageDirectoryProvider: props.imageDirectoryProvider,
+        imageCompletionProvider: props.imageCompletionProvider,
+        lengthCompletionProvider: lengthCompletionProvider.value,
+      },
+    })]
+  })
+  const iconCatalogs = computed(() => {
+    const catalogs = new Map<string, ProjectIconCatalog>()
+    for (const source of props.packageIconSources ?? []) catalogs.set(source.packageKey ?? '', source.catalog)
+    if (!catalogs.has('') && props.projectIconCatalog) catalogs.set('', props.projectIconCatalog)
+    return catalogs
+  })
+  const hasProjectIconSources = computed(() => [...iconCatalogs.value.values()]
+    .some(catalog => catalog.entries.length > 0))
+
+  function projectIconSelectionKey(packageKey: string | null, entry: ProjectIconCatalogEntry): string {
+    return `project-icon:${packageKey ?? ''}:${entry.seriesKey}/${entry.iconKey}`
+  }
+
+  function projectIconSeriesGroups(packageKey: string | null, catalog: ProjectIconCatalog) {
+    return catalog.series.map(series => ({
+      key: `project-icon-series:${packageKey ?? ''}:${series.key}`,
+      title: series.name,
+      icon: 'file.project-icon' as const,
+      children: catalog.entries
+        .filter(entry => entry.seriesKey.toLocaleLowerCase() === series.key.toLocaleLowerCase())
+        .map(entry => ({
+          key: projectIconSelectionKey(packageKey, entry),
+          title: entry.name,
+          thumbnailStyle: createProjectIconStyle(entry, readProjectIconSize),
+          thumbnailLabel: entry.name,
+        })),
+    })).filter(series => series.children.length > 0)
+  }
+
+  const projectIconEntriesByActionKey = computed(() => new Map(
+    [...iconCatalogs.value].flatMap(([packageKey, catalog]) => catalog.entries.map(entry => [
+      projectIconSelectionKey(packageKey || null, entry),
+      { packageKey: packageKey || null, entry },
+    ] as const)),
+  ))
+  const recentProjectIconEntries = computed(() => recentProjectIconIdentities.value.flatMap(identity => {
+    // The recent row lists current-project icons; the identity still carries the package so a
+    // package icon and a project icon sharing collection and icon keys cannot collide.
+    const entry = iconCatalogs.value.get('')?.entries.find(candidate => (
+      projectIconRecentIdentity(null, candidate.seriesKey, candidate.iconKey) === identity
+    ))
+    return entry ? [entry] : []
+  }))
+  const projectIconActionChildren = computed(() => {
+    const host = [...iconCatalogs.value]
+      .filter(([packageKey]) => packageKey === '')
+      .flatMap(([, catalog]) => projectIconSeriesGroups(null, catalog))
+    const packages = (props.packageIconSources ?? [])
+      .filter(source => source.packageKey !== null)
+      .map(source => ({
+        key: `project-icon-package:${source.packageKey}`,
+        title: source.label,
+        icon: 'file.package' as const,
+        children: projectIconSeriesGroups(source.packageKey, source.catalog),
+      }))
+      .filter(group => group.children.length > 0)
+    return [...host, ...packages]
+  })
+  const projectIconAction = computed<OcActionDefinition>(() => {
+    toolbarRevision.value
+    return {
+      key: 'project-icon',
+      icon: 'action.project-icon-plus',
+      title: hasSelectedProjectIcon()
+        ? tr('propertyEditor.richText.replaceProjectIcon', '替换项目图标')
+        : tr('propertyEditor.richText.insertProjectIcon', '插入项目图标'),
+      disabled: !hasProjectIconSources.value,
+      children: projectIconActionChildren.value,
+    }
+  })
+  const tableAction = computed<OcActionDefinition>(() => ({
+    key: 'table-actions',
+    icon: 'data.table',
+    title: tr('propertyEditor.richText.tableActions', '表格操作'),
+    children: [
+      { key: 'table.add-row-before', icon: 'nav.arrow-up', title: tr('propertyEditor.richText.addRowBefore', '在上方插入行') },
+      { key: 'table.add-row-after', icon: 'nav.arrow-down', title: tr('propertyEditor.richText.addRowAfter', '在下方插入行') },
+      { key: 'table.add-column-before', icon: 'nav.arrow-left', title: tr('propertyEditor.richText.addColumnBefore', '在左侧插入列') },
+      { key: 'table.add-column-after', icon: 'nav.arrow-right', title: tr('propertyEditor.richText.addColumnAfter', '在右侧插入列') },
+      { key: 'table.toggle-header', icon: 'layout.rows', title: tr('propertyEditor.richText.toggleHeader', '切换表头行') },
+      { key: 'table.delete-row', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteRow', '删除当前行') },
+      { key: 'table.delete-column', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteColumn', '删除当前列') },
+      { key: 'table.delete', icon: 'action.discard', iconTone: 'danger', title: tr('propertyEditor.richText.deleteTable', '删除整个表格') },
+    ],
+  }))
+  const selectedNodeKind = computed<'binding' | 'projectIcon' | null>(() => {
+    const node = editor.value?.state.selection instanceof NodeSelection
+      ? editor.value.state.selection.node
+      : null
+    if (!node) return null
+    if (node.type.name === 'binding') return 'binding'
+    if (node.type.name === 'projectIcon') return 'projectIcon'
+    return null
+  })
+  const selectedNodeAnchor = computed<DOMRect | null>(() => {
+    toolbarRevision.value
+    const currentEditor = editor.value
+    const selection = currentEditor?.state.selection
+    if (!currentEditor || !(selection instanceof NodeSelection) || !selectedNodeKind.value) return null
+    try {
+      const nodeDom = currentEditor.view.nodeDOM(selection.from)
+      if (nodeDom instanceof HTMLElement) return nodeDom.getBoundingClientRect()
+      const coordinates = currentEditor.view.coordsAtPos(selection.from)
+      return new DOMRect(coordinates.left, coordinates.top, Math.max(1, coordinates.right - coordinates.left), Math.max(1, coordinates.bottom - coordinates.top))
+    } catch {
+      return currentEditor.view.dom.getBoundingClientRect()
+    }
+  })
+  const nodeEditOpen = computed(() => Boolean(selectedNodeAnchor.value))
+  const editor = useEditor({
+    content: visualEditorHtml(props.initialHtml),
+    parseOptions: richTextParseOptions,
+    extensions: [
+      Extension.create({ name: 'formatInteraction', addProseMirrorPlugins: () => [interaction.plugin] }),
+      StarterKit.configure({
+        blockquote: false,
+        codeBlock: false,
+        heading: false,
+        horizontalRule: false,
+      }),
+      Table.configure({ resizable: true, allowTableNodeSelection: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Underline,
+      Color,
+      ...richTextStyleExtensions,
+      TextAlign.configure({ types: ['paragraph'] }),
+      BindingNode.configure({
+        completion: request => props.bindingCompletion?.(request) ?? null,
+      }),
+      ProjectIconNode.configure({
+        resolve: reference => resolveProjectIconReference(reference),
+      }),
+    ],
+    editorProps: {
+      attributes: {
+        class: 'oc-rich-text-editor__content',
+        spellcheck: 'true',
+      },
+      handleDOMEvents: {
+        blur: () => {
+          return false
+        },
+      },
+    },
+    onUpdate: onChange,
+    onTransaction: ({ transaction }) => {
+      interaction.update(transaction)
+      toolbarRevision.value += 1
+    },
+  })
+  watch(editor, current => { if (current) originalDocument = current.state.doc }, { flush: 'sync' })
+  // Re-evaluate resource decorations when their reactive environment changes, without a document edit.
+  watchEffect(() => {
+    const current = editor.value
+    if (current && !current.isDestroyed) current.view.updateState(current.state)
+  })
+
+  function getHtml(): string {
+    const current = editor.value
+    if (!current) return props.initialHtml
+    if (appliedSource?.document.eq(current.state.doc)) return appliedSource.html
+    if (originalDocument?.eq(current.state.doc)) return props.initialHtml
+    return canonicalEditorHtml(current.getHTML())
+  }
+  function applyHtml(html: string): boolean {
+    const current = editor.value
+    if (!current) return false
+    const dom = new DOMParser().parseFromString(visualEditorHtml(html), 'text/html').body
+    const next = ProseMirrorParser.fromSchema(current.schema).parse(dom, richTextParseOptions)
+    const output = document.createElement('div')
+    output.append(DOMSerializer.fromSchema(current.schema).serializeFragment(next.content))
+    if (!equivalentRichTextHtml(html, canonicalEditorHtml(output.innerHTML))) return false
+    interaction.release()
+    if (!next.eq(current.state.doc)) {
+      const transaction = closeHistory(current.state.tr).replaceWith(0, current.state.doc.content.size, next.content)
+      transaction.setSelection(Selection.atStart(transaction.doc))
+      current.view.dispatch(transaction)
+      current.view.dispatch(closeHistory(current.state.tr))
+    }
+    appliedSource = { document: current.state.doc, html }
+    return true
+  }
+  function flushPendingInput(): boolean {
+    const detail = { ready: true }
+    editor.value?.view.dom.querySelectorAll('.binding-node.is-editing').forEach(node => {
+      node.dispatchEvent(new CustomEvent('oc-flush-binding', { detail }))
+    })
+    return detail.ready
+  }
+
+  function runCommand(command: string) {
+    interaction.run(current => {
+      const chain = current.chain().focus()
+      const commands: Record<string, (chain: ChainedCommands) => ChainedCommands> = {
+        undo: chain => chain.undo(), redo: chain => chain.redo(),
+        bold: chain => chain.toggleBold(), italic: chain => chain.toggleItalic(),
+        underline: chain => chain.toggleUnderline(), strike: chain => chain.toggleStrike(),
+        bulletList: chain => chain.toggleBulletList(), orderedList: chain => chain.toggleOrderedList(),
+        clear: chain => chain.unsetAllMarks(),
+      }
+      if (commands[command]) commands[command](chain).run()
+      else chain.setTextAlign(command).run()
+    }, command !== 'undo' && command !== 'redo')
+  }
+
+  function insertTable(): void {
+    interaction.run(current => current.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(), true)
+  }
+
+  function handleTableAction(payload: OcActionSelectPayload): void {
+    interaction.run(current => {
+      const chain = current.chain().focus()
+      if (payload.key === 'table.add-row-before') chain.addRowBefore().run()
+      else if (payload.key === 'table.add-row-after') chain.addRowAfter().run()
+      else if (payload.key === 'table.add-column-before') chain.addColumnBefore().run()
+      else if (payload.key === 'table.add-column-after') chain.addColumnAfter().run()
+      else if (payload.key === 'table.toggle-header') chain.toggleHeaderRow().run()
+      else if (payload.key === 'table.delete-row') chain.deleteRow().run()
+      else if (payload.key === 'table.delete-column') chain.deleteColumn().run()
+      else if (payload.key === 'table.delete') chain.deleteTable().run()
+    }, true)
+  }
+
+  function insertBinding(): void {
+    interaction.run(current => current.chain().focus().insertContent({
+      type: 'binding',
+      attrs: { expression: '' },
+    }).run(), true)
+  }
+
+  /** A chosen icon plus the package it belongs to: the stored reference needs both. */
+  type ProjectIconSelection = {
+    packageKey: string | null
+    entry: ProjectIconCatalogEntry
+  }
+
+  function projectIconPath(selection: ProjectIconSelection): string {
+    return formatProjectIconPath({
+      packageKey: selection.packageKey,
+      seriesKey: selection.entry.seriesKey,
+      iconKey: selection.entry.iconKey,
+    })
+  }
+
+  /** Resolves a stored reference: the caller's resolver first, then any catalog the toolbar offers. */
+  function resolveProjectIconReference(reference: string): ProjectIconCatalogEntry | null {
+    const parsed = parseProjectIconPath(reference)
+    if (!parsed) return null
+    const catalog = iconCatalogs.value.get(parsed.packageKey ?? '')
+    return catalog ? findProjectIcon(catalog, parsed.seriesKey, parsed.iconKey) : null
+  }
+
+  function hasSelectedProjectIcon(): boolean {
+    const currentEditor = editor.value
+    const selection = currentEditor?.state.selection
+    return Boolean(currentEditor
+      && selection instanceof NodeSelection
+      && selection.node.type.name === 'projectIcon')
+  }
+
+  function handleProjectIconAction(payload: OcActionSelectPayload): void {
+    const selection = projectIconEntriesByActionKey.value.get(payload.key)
+    if (selection) insertProjectIconEntry(selection)
+  }
+
+  function insertRecentProjectIcon(entry: ProjectIconCatalogEntry): void {
+    insertProjectIconEntry({ packageKey: null, entry })
+  }
+
+  function insertProjectIconEntry(selection: ProjectIconSelection): void {
+    interaction.run(currentEditor => {
+      const attrs = { iconPath: projectIconPath(selection) }
+      if (hasSelectedProjectIcon()) {
+        const position = currentEditor.state.selection.from
+        currentEditor.chain().focus().updateAttributes('projectIcon', attrs).setNodeSelection(position).run()
+      } else currentEditor.chain().focus().insertContent(createProjectIconContent(currentEditor, attrs)).run()
+      rememberRecentProjectIcon(selection.packageKey, selection.entry.seriesKey, selection.entry.iconKey)
+    }, true)
+  }
+
+  function createProjectIconContent(
+    currentEditor: Editor,
+    attrs: { iconPath: string },
+  ): JSONContent {
+    const marks = currentEditor.state.storedMarks ?? currentEditor.state.selection.$from.marks()
+    return {
+      type: 'projectIcon',
+      attrs,
+      ...(marks.length > 0 ? { marks: marks.map(mark => mark.toJSON()) } : {}),
+    }
+  }
+
+  function focus(): void {
+    editor.value?.commands.focus('end', { scrollIntoView: false })
+  }
+
+  return {
+    editor, focus, getHtml, applyHtml, flushPendingInput, endInteraction: interaction.release,
+    fontVariables, captureInteraction, colorOpen, formatting, interaction,
+    fontFieldDefinition, fontSizeFieldDefinition, activeFontFamily, activeFontSize,
+    runCommand, insertTable, tableAction, handleTableAction, insertBinding,
+    hasProjectIconSources, projectIconAction, handleProjectIconAction,
+    recentProjectIconEntries, projectIconSelectionKey, insertRecentProjectIcon,
+    createProjectIconPreviewStyle, readProjectIconSize,
+    foregroundColor, backgroundColor, alignments, tr,
+    selectedNodeAnchor, selectedNodeKind, nodeEditOpen, propertyInputs, propertyCategories,
+  }
+}
+

@@ -6,6 +6,7 @@
     data-drag-handle
     contenteditable="false"
     @oc-edit-binding="startEditing"
+    @oc-flush-binding="flushBinding"
   >
     <span v-if="editing" class="binding-node__editor binding-node__expression"
       @mousedown.stop>
@@ -29,6 +30,7 @@
         @input="handleInput"
         @keydown="handleKeydown"
         @blur="handleBlur"
+        @compositionstart="composing = true; completion.clear()" @compositionend="finishComposition"
       />
       </span>
       <span class="binding-node__brace">{{ closeBrace }}</span>
@@ -62,14 +64,12 @@
 import type { NodeViewProps } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { computed, getCurrentInstance, nextTick, onMounted, ref, useId, type ComponentPublicInstance } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
 import OcAutocompletePopover from '../../../components/standard/OcAutocompletePopover.vue'
 import type { BindingNodeOptions } from './bindingNode'
-import type {
-  RichTextBindingCompletionItem,
-  RichTextBindingCompletionResult,
-} from './bindingNode.types'
+import type { PropertyCompletionItem } from '../property-editor/propertyEditor.types'
+import { usePropertyCompletion } from '../property-editor/fields/usePropertyCompletion'
 
 const props = defineProps<NodeViewProps>()
 
@@ -83,11 +83,12 @@ const openBrace = '{{'
 const closeBrace = '}}'
 const input = ref<ComponentPublicInstance | null>(null)
 const editSession = ref<{ original: string, draft: string } | null>(null)
-const completionState = ref<RichTextBindingCompletionResult | null>(null)
-const activeKey = ref<string | null>(null)
-const menuOpen = ref(false)
-const autocompleteId = useId()
-let completionRequestId = 0
+const completion = usePropertyCompletion()
+const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, suggestions } = completion
+let composing = false
+let disposed = false
+let blurTimer: ReturnType<typeof setTimeout> | undefined
+onBeforeUnmount(() => { disposed = true; clearTimeout(blurTimer); editSession.value = null })
 
 const expression = computed(() => String(props.node.attrs.expression ?? '').trim())
 const editing = computed(() => editSession.value !== null)
@@ -104,7 +105,6 @@ const expressionStyle = computed(() => {
   const backgroundColor = typeof highlight?.attrs.color === 'string' ? highlight.attrs.color : null
   return backgroundColor ? { backgroundColor } : undefined
 })
-const suggestions = computed(() => completionState.value?.items ?? [])
 const completionProvider = computed(() => (
   (props.extension.options as BindingNodeOptions).completion
 ))
@@ -117,8 +117,12 @@ onMounted(() => {
 })
 
 async function startEditing(): Promise<void> {
+  if (disposed) return
+  clearTimeout(blurTimer)
+  completion.clear()
   editSession.value = { original: expression.value, draft: expression.value }
   await nextTick()
+  if (disposed || !editing.value) return
   inputElement.value?.focus()
   inputElement.value?.setSelectionRange(draftExpression.value.length, draftExpression.value.length)
   await refreshCompletion()
@@ -134,21 +138,13 @@ function handleLabelClick(): void {
 }
 
 async function refreshCompletion(): Promise<void> {
+  if (!editing.value || composing || disposed) return
   const provider = completionProvider.value
-  if (!provider) {
-    closeMenu()
-    return
-  }
-
-  const wrappedValue = `{{${draftExpression.value}}}`
+  if (!provider) return completion.clear()
+  const value = `{{${draftExpression.value}}}`
   const cursor = (inputElement.value?.selectionStart ?? draftExpression.value.length) + 2
-  const requestId = ++completionRequestId
-  const result = await provider({ value: wrappedValue, cursor })
-  if (requestId !== completionRequestId) return
-
-  completionState.value = result
-  menuOpen.value = Boolean(result?.items.length)
-  activeKey.value = result?.items[0]?.key ?? null
+  await completion.refresh(() => provider({ value, cursor }), () => editing.value && !disposed && !composing)
+    .catch(() => completion.clear())
 }
 
 function handleInput(event: Event): void {
@@ -163,16 +159,17 @@ function acceptSuggestionByKey(key: string): void {
   if (suggestion) acceptSuggestion(suggestion)
 }
 
-function acceptSuggestion(suggestion: RichTextBindingCompletionItem): void {
+function acceptSuggestion(suggestion: PropertyCompletionItem): void {
   const state = completionState.value
   if (!state) return
 
-  const replaceStart = Math.max(0, state.replaceStart - 2)
-  const replaceEnd = Math.max(replaceStart, Math.min(draftExpression.value.length, state.replaceEnd - 2))
+  const replaceStart = Math.max(0, (suggestion.replaceStart ?? state.replaceStart) - 2)
+  const replaceEnd = Math.max(replaceStart, Math.min(draftExpression.value.length, (suggestion.replaceEnd ?? state.replaceEnd) - 2))
   draftExpression.value = `${draftExpression.value.slice(0, replaceStart)}${suggestion.insertText}${draftExpression.value.slice(replaceEnd)}`
   const cursor = replaceStart + suggestion.insertText.length
 
   nextTick(() => {
+    if (!editing.value || disposed) return
     inputElement.value?.focus()
     inputElement.value?.setSelectionRange(cursor, cursor)
   })
@@ -185,9 +182,9 @@ function acceptSuggestion(suggestion: RichTextBindingCompletionItem): void {
   commitExpression()
 }
 
-function commitExpression(): void {
+function commitExpression(focus = true): void {
   const session = editSession.value
-  if (!session) return
+  if (!session || composing || disposed) return
   const value = session.draft.trim()
   closeMenu()
   editSession.value = null
@@ -196,7 +193,7 @@ function commitExpression(): void {
     return
   }
   props.updateAttributes({ expression: value })
-  props.editor.commands.focus()
+  if (focus) props.editor.commands.focus()
 }
 
 function cancelEditing(): void {
@@ -208,44 +205,29 @@ function cancelEditing(): void {
   else props.editor.commands.focus()
 }
 
-function closeMenu(): void {
-  completionRequestId += 1
-  completionState.value = null
-  activeKey.value = null
-  menuOpen.value = false
-}
-
+function closeMenu(): void { clearTimeout(blurTimer); completion.clear() }
 function handleBlur(): void {
-  window.setTimeout(() => {
-    if (editSession.value && document.activeElement !== inputElement.value) commitExpression()
+  completion.invalidate()
+  clearTimeout(blurTimer)
+  blurTimer = setTimeout(() => {
+    if (!disposed && editing.value && document.activeElement !== inputElement.value) commitExpression(false)
   }, 0)
 }
-
+function finishComposition(event: CompositionEvent) {
+  composing = false
+  handleInput(event)
+  if (document.activeElement !== inputElement.value) commitExpression(false)
+}
+function flushBinding(event: Event) {
+  if (composing) (event as CustomEvent<{ ready: boolean }>).detail.ready = false
+  else commitExpression(false)
+}
 function handleKeydown(event: KeyboardEvent): void {
-  if (menuOpen.value && suggestions.value.length > 0) {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      const direction = event.key === 'ArrowDown' ? 1 : -1
-      const currentIndex = Math.max(0, suggestions.value.findIndex(item => item.key === activeKey.value))
-      const nextIndex = (currentIndex + direction + suggestions.value.length) % suggestions.value.length
-      activeKey.value = suggestions.value[nextIndex]?.key ?? null
-      return
-    }
-    if (event.key === 'Tab' || event.key === 'Enter') {
-      event.preventDefault()
-      if (activeKey.value) acceptSuggestionByKey(activeKey.value)
-      return
-    }
-  }
-
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    commitExpression()
-  } else if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    cancelEditing()
-  }
+  event.stopPropagation()
+  if (event.isComposing || composing) return
+  if (event.key === 'Escape') { event.preventDefault(); cancelEditing(); return }
+  if (completion.handleKeydown(event, acceptSuggestion)) return
+  if (event.key === 'Enter') { event.preventDefault(); commitExpression() }
 }
 </script>
 

@@ -270,7 +270,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   pointer-events: none;
-  transition: transform var(--oc-duration-normal) var(--oc-ease);
+  transition: transform var(--oc-duration) var(--oc-ease);
 }
 
 .cde-overlay-dock.is-resizing {

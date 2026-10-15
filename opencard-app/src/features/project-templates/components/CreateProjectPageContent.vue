@@ -170,8 +170,11 @@ onBeforeUnmount(stopCoverSlideshow)
 .create-project__form {
   min-width: 0;
   min-height: 0;
-  padding: var(--oc-space-5);
+  display: grid;
+  align-content: start;
+  padding: var(--oc-space-lg);
   overflow-y: auto;
+  background: var(--oc-bg-surface);
 }
 
 .create-project__catalog {
@@ -179,7 +182,7 @@ onBeforeUnmount(stopCoverSlideshow)
   isolation: isolate;
   min-width: 0;
   min-height: 0;
-  padding: var(--oc-space-5);
+  padding: var(--oc-space-lg);
   overflow: hidden;
   border-right: 1px solid var(--oc-border-muted);
 }
@@ -229,22 +232,22 @@ onBeforeUnmount(stopCoverSlideshow)
 
 .create-project__details {
   margin-top: auto;
-  padding: var(--oc-space-4) 0;
+  padding: var(--oc-space-md) 0;
   display: grid;
-  gap: var(--oc-space-3);
+  gap: var(--oc-space-sm);
 }
 
 .create-project__details-heading {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .create-project__details-heading > div {
   min-width: 0;
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .create-project__details-heading strong {
@@ -256,7 +259,7 @@ onBeforeUnmount(stopCoverSlideshow)
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
 }
 
 .create-project__template-source-label {
@@ -285,8 +288,8 @@ onBeforeUnmount(stopCoverSlideshow)
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  gap: var(--oc-space-4);
-  padding: var(--oc-space-2) 0;
+  gap: var(--oc-space-md);
+  padding: var(--oc-space-xs) 0;
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
@@ -315,7 +318,7 @@ onBeforeUnmount(stopCoverSlideshow)
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -324,8 +327,8 @@ onBeforeUnmount(stopCoverSlideshow)
 .create-project__resource-package-list li {
   min-width: 0;
   max-width: 100%;
-  padding: var(--oc-space-1) var(--oc-space-2);
-  border-radius: var(--oc-radius-sm);
+  padding: var(--oc-space-2xs) var(--oc-space-xs);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-hover);
   color: var(--oc-fg-default);
   overflow: hidden;
@@ -335,14 +338,11 @@ onBeforeUnmount(stopCoverSlideshow)
 
 .create-project__form label {
   display: grid;
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-md) 0;
+  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);
-}
-
-.create-project__form label {
-  padding: var(--oc-space-4) 0;
-  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
 .create-project__form label > span,
@@ -355,19 +355,13 @@ onBeforeUnmount(stopCoverSlideshow)
 .create-project__path-field {
   display: flex;
   align-items: center;
-  gap: var(--oc-space-2);
-}
-
-.create-project__form {
-  display: grid;
-  align-content: start;
-  background: var(--oc-bg-surface);
+  gap: var(--oc-space-xs);
 }
 
 .create-project__form-heading {
   display: grid;
-  gap: var(--oc-space-1);
-  padding-bottom: var(--oc-space-4);
+  gap: var(--oc-space-2xs);
+  padding-bottom: var(--oc-space-md);
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
@@ -382,8 +376,8 @@ onBeforeUnmount(stopCoverSlideshow)
 
 .create-project__target {
   display: grid;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-4) 0;
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-md) 0;
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
@@ -395,12 +389,12 @@ onBeforeUnmount(stopCoverSlideshow)
 }
 
 .create-project__form-actions {
-  padding-top: var(--oc-space-4);
+  padding-top: var(--oc-action-padding);
   justify-content: flex-end;
 }
 
 .create-project__status {
-  margin: var(--oc-space-2) 0 0;
+  margin: var(--oc-space-xs) 0 0;
 }
 
 .is-error {
@@ -439,7 +433,7 @@ onBeforeUnmount(stopCoverSlideshow)
 
   .create-project__catalog,
   .create-project__form {
-    padding: var(--oc-space-4);
+    padding: var(--oc-space-md);
   }
 
   .create-project__path-field {

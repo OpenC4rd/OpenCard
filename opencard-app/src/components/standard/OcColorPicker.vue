@@ -604,7 +604,7 @@ function clampUnit(value: number): number {
   padding: 4px;
   place-items: center;
   border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background: var(--oc-bg-input);
   color: var(--oc-fg-default);
   cursor: pointer;
@@ -643,13 +643,13 @@ function clampUnit(value: number): number {
   width: 10px;
   height: 10px;
   border: var(--oc-border-width) solid currentColor;
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: transparent;
 }
 
 .oc-color-picker__field-input {
   height: 100%;
-  padding: 0 var(--oc-space-2) 0 0;
+  padding: 0 var(--oc-space-xs) 0 0;
   font-size: var(--oc-text-xs);
   text-align: right;
   text-transform: uppercase;
@@ -695,15 +695,15 @@ function clampUnit(value: number): number {
 
 .oc-color-picker__panel {
   display: grid;
-  gap: var(--oc-space-2);
-  padding: var(--oc-space-3);
+  gap: var(--oc-space-xs);
+  padding: var(--oc-space-sm);
 }
 
 .oc-color-picker__saturation {
   position: relative;
   height: var(--oc-color-picker-plane-height);
   overflow: hidden;
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   background-image:
     linear-gradient(to top, #000, transparent),
     linear-gradient(to right, #fff, transparent);
@@ -713,16 +713,13 @@ function clampUnit(value: number): number {
 
 .oc-color-picker__cursor {
   position: absolute;
+  width: 10px;
+  height: 10px;
   pointer-events: none;
   transform: translate(-50%, -50%);
   border: var(--oc-color-channel-handle-border-width) solid var(--oc-color-channel-handle-border-color);
   border-radius: 50%;
   box-shadow: var(--oc-color-channel-handle-shadow);
-}
-
-.oc-color-picker__cursor {
-  width: 10px;
-  height: 10px;
 }
 
 .oc-color-picker__saturation:focus-visible {
@@ -732,7 +729,7 @@ function clampUnit(value: number): number {
 
 .oc-color-picker__channel-sliders {
   display: grid;
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-color-picker__slider-row {
@@ -756,7 +753,7 @@ function clampUnit(value: number): number {
   width: var(--oc-color-channel-handle-width);
   height: var(--oc-color-channel-handle-height);
   border: var(--oc-color-channel-handle-border-width) solid var(--oc-color-channel-handle-border-color);
-  border-radius: var(--oc-radius-full);
+  border-radius: var(--oc-radius-pill);
   background: transparent;
   box-shadow: var(--oc-color-channel-handle-shadow);
   transition: none;
@@ -765,7 +762,7 @@ function clampUnit(value: number): number {
 .oc-color-picker__mode-row {
   display: grid;
   grid-template-columns: var(--oc-size-md) minmax(0, 1fr);
-  gap: var(--oc-space-2);
+  gap: var(--oc-space-xs);
   align-items: center;
 }
 
@@ -776,26 +773,26 @@ function clampUnit(value: number): number {
 .oc-color-picker__preview {
   width: var(--oc-size-md);
   height: var(--oc-size-md);
-  border-radius: var(--oc-radius-sm);
+  border-radius: var(--oc-radius-control);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oc-border-strong) 55%, transparent);
 }
 
 .oc-color-picker__channels {
   display: grid;
   grid-template-columns: repeat(var(--oc-color-channel-count), minmax(0, 1fr));
-  gap: var(--oc-space-1);
+  gap: var(--oc-space-2xs);
 }
 
 .oc-color-picker__channel-label {
   display: inline-flex;
   align-items: center;
-  padding-inline-start: var(--oc-space-1);
+  padding-inline-start: var(--oc-space-2xs);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-xs);
 }
 
 .oc-color-picker__channel-input {
-  padding-inline: var(--oc-space-1);
+  padding-inline: var(--oc-space-2xs);
   text-align: right;
 }
 
@@ -812,7 +809,7 @@ function clampUnit(value: number): number {
 .oc-color-picker__presets {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 3px;
+  gap: var(--oc-space-2xs);
 }
 
 .oc-color-picker__preset {

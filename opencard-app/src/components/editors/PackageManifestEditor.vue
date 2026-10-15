@@ -153,7 +153,7 @@ defineExpose({ presentation })
 .package-manifest-editor {
   display: flex;
   flex-direction: column;
-  gap: var(--oc-space-4);
+  gap: var(--oc-space-md);
 }
 
 /* 几何与边框归这个框所有；OcCover 只负责把封面铺满框内。 */
@@ -162,6 +162,6 @@ defineExpose({ presentation })
   height: var(--oc-cover-preview-height);
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
-  border-radius: var(--oc-radius-md);
+  border-radius: var(--oc-radius-control);
 }
 </style>
