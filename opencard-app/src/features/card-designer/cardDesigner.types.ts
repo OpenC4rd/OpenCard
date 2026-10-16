@@ -28,7 +28,4 @@ export interface CardDesignerSessionView {
 export interface CardDesignerProps extends EditorProps {
   renderCardImages?: (render: PreparedCardRender, faces: readonly CardFaceKey[], scale: number, outputs?: ReadonlyMap<CardFaceKey, string>) => Promise<ReadonlyMap<CardFaceKey, Uint8Array> | null>
   imageExportBusy?: boolean
-  debugHideCdeOverlays?: boolean
-  debugTransparentCdeViewport?: boolean
-  debugPassiveCdeViewport?: boolean
 }

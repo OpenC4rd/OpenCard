@@ -1,6 +1,6 @@
 <template>
   <ReferenceStringTokenField v-if="definition.listSeparator" :definition="definition" :value="value"
-    @update:value="emit('update:value', $event)" />
+    @update:value="emit('update:value', $event as string)" />
 
   <div v-else class="reference-string-field">
     <OcFieldFrame v-if="definition.multiline" class="reference-string-field__multiline" full-width

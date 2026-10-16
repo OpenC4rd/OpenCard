@@ -77,7 +77,7 @@
               :data-tooltip="option.label" data-tooltip-overflow>{{ option.label }}</span>
           </template>
           <template v-if="option.value === modelValue" #append>
-            <OcIcon name="action.check" size="sm" tone="active" />
+            <OcIcon name="action.check" size="sm" />
           </template>
         </OcRow>
         <div v-if="options.length === 0" class="oc-select__empty">{{ emptyText }}</div>

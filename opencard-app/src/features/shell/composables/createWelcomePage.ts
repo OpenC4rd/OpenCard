@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import WelcomePageContent from '../components/WelcomePageContent.vue'
@@ -6,9 +6,11 @@ import type { SpacePage } from '../spacePage'
 import { useAppProjectActions } from '../services/appProjectActions'
 import { useShellNavigation } from './useShellNavigation'
 import { useWelcomePageState } from './useWelcomePageState'
+import { useTutorialStore } from '../../tutorials/tutorialStore'
 
 export function createWelcomePage(): SpacePage {
   const settings = useAppSettingsStore()
+  const tutorial = useTutorialStore()
   const app = useAppProjectActions()
   const { projectPath } = useProjectStore()
   const { isWelcome } = useShellNavigation()
@@ -16,6 +18,11 @@ export function createWelcomePage(): SpacePage {
     projectPath, isWelcomeMode: isWelcome,
     openRecentProject: app.openRecentProject, relocateRecentProject: app.relocateRecentProject,
   })
+  watch(() => settings.isReady.value && isWelcome.value
+    && !projectPath.value && !tutorial.session.value
+    && !settings.settings.value.tutorials.seen.includes('overview'), ready => {
+    if (ready) tutorial.start('overview')
+  }, { immediate: true })
   return {
     key: 'welcome',
     navigation: { key: 'welcome', icon: 'nav.welcome', labelKey: 'app.shell.space.welcome' },

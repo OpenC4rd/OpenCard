@@ -2,7 +2,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { useProjectTemplateStore } from '../../project-templates/store/projectTemplateStore'
-import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useAppStateStore } from '../../app-state/store/appStateStore'
 import { getPathDirectory } from '../../../shared/model/filePath'
 import { notifyAppError, notifyWarning, notifySuccess } from '../../notifications/titlebarNotices'
 import { classifyExternalOpenPath } from '../services/externalOpenService'
@@ -24,14 +24,14 @@ export function useApplicationActions(options: {
 }) {
   const { t, locale } = useI18n()
   const project = useProjectStore()
-  const settings = useAppSettingsStore()
+  const history = useAppStateStore()
   const templates = useProjectTemplateStore()
   const navigation = useShellNavigation()
   const lifecycle = useAppProjectLifecycle({
     project,
     sessions: { closeWorkspaceSessions: () => options.workbench().closeWorkspaceSessions(), open: path => options.workbench().open(path) },
     closeCurrentProject: () => options.workbench().requestProjectClose('current'),
-    settings, templates, shellLocation: navigation.location, translate: t,
+    history, templates, shellLocation: navigation.location, translate: t,
   })
   const busy = computed(() => options.createProject().busy.value || options.exportTemplate().busy.value)
   async function newProject(): Promise<void> {

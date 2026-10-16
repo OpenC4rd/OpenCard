@@ -242,7 +242,7 @@ const darkTheme: OcThemeTokens = {
   '--oc-icon-muted': '#8b949e',
   '--oc-icon-accent': '#9b90ff',
   '--oc-icon-success': '#3fb950',
-  '--oc-icon-active': '#58a6ff',
+  '--oc-icon-active': 'currentColor',
   '--oc-icon-warning': '#d29922',
   '--oc-icon-danger': '#f85149',
 
@@ -319,7 +319,7 @@ const lightTheme: OcThemeTokens = {
   '--oc-icon-muted': '#7f879a',
   '--oc-icon-accent': '#5b6de8',
   '--oc-icon-success': '#1f9d68',
-  '--oc-icon-active': '#2563eb',
+  '--oc-icon-active': 'currentColor',
   '--oc-icon-warning': '#b77e18',
   '--oc-icon-danger': '#cf4444',
 

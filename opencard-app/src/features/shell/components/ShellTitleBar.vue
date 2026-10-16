@@ -186,9 +186,10 @@ onBeforeUnmount(() => {
         <AppearanceShaderPreview :progress="titlebarProgress" />
       </div>
     </Transition>
-    <div class="titlebar-left" data-tooltip-group>
+    <div class="titlebar-left" data-tooltip-group data-oc-tutorial="shell.titlebar-menus">
       <button
         class="titlebar-icon"
+        data-oc-tutorial="shell.sidebar-toggle"
         type="button"
         :data-tooltip="props.collapsed ? props.expandTooltip || null : props.collapseTooltip || null"
         @click="emit('toggle-sidebar')"
@@ -254,6 +255,7 @@ onBeforeUnmount(() => {
       <div
         ref="taskPanelAnchor"
         class="titlebar-brand-lockup"
+        data-oc-tutorial="shell.titlebar-tasks"
         :class="{ 'titlebar-brand-lockup-interactive': Boolean(props.tasks?.length) }"
         :data-tauri-drag-region="props.dragRegion && !props.tasks?.length ? '' : null"
         :tabindex="props.tasks?.length ? 0 : undefined"
@@ -323,19 +325,20 @@ onBeforeUnmount(() => {
 
     <div class="titlebar-right">
       <div
-        v-if="latestTitleBarNotice"
         ref="noticeAnchor"
         class="titlebar-notice-host"
+        data-oc-tutorial="shell.titlebar-notices"
         @pointerenter="openNoticePanel"
         @pointerleave="scheduleNoticePanelClose"
         @focusin="openNoticePanel"
         @focusout="scheduleNoticePanelClose"
       >
-        <ShellTitleBarNotice :key="latestTitleBarNotice.id" :notice="latestTitleBarNotice" />
+        <ShellTitleBarNotice v-if="latestTitleBarNotice" :key="latestTitleBarNotice.id" :notice="latestTitleBarNotice" />
       </div>
       <OcFloatingLayer
         :open="noticePanelOpen"
         :anchor="noticePanelAnchor"
+        :owner="noticeAnchor"
         placement="bottom-end"
         :gap="-(noticeAnchor?.offsetHeight ?? 0)"
         :max-height="360"

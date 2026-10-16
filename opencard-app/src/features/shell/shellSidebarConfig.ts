@@ -23,6 +23,8 @@ export const TEMPLATE_COVERS_LIST_KEY = 'template-covers'
 export const TIMELINE_REFRESH_ACTION_KEY = 'timeline.refresh'
 /** 把包导入软件存储、预装到新项目、或从存储里移除。 */
 export const IMPORT_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.import'
+/** 把模板包装进用户模板目录。 */
+export const IMPORT_TEMPLATE_ACTION_KEY = 'import-template'
 /** 对选中的包批量预装 / 批量取消预装。 */
 export const USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY = 'resource-package.use-selected'
 export const DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY = 'resource-package.disable-selected'

@@ -29,6 +29,7 @@
       @transitionend="handleSidebarTransitionEnd"
     >
       <ShellSpaceRail
+        data-oc-tutorial="shell.navigation"
         :active-space="activeSpace"
         :spaces="shellSpaces"
         :label="t('app.shell.space.navigation')"
@@ -36,6 +37,7 @@
         @select="handleSpaceSelect"
       />
       <ShellSidebar
+        data-oc-tutorial="shell.sidebar"
         :collapsed="effectiveSidebarCollapsed"
         :width="sidebarWidth"
         :body-group="currentPage.sidebar.value[0]"
@@ -60,9 +62,9 @@
         <div
           ref="pageStackRef"
           class="open-card-shell__page-stack"
-          :class="{ 'is-bottom-panel-expanded': isBottomPanelExpanded }"
+          :class="{ 'is-bottom-panel-expanded': isBottomPanelVisible }"
         >
-          <div class="open-card-shell__page-content">
+          <div class="open-card-shell__page-content" data-oc-tutorial="shell.content">
             <component :is="currentPage.content" :key="currentPage.contentKey ?? currentPage.key" v-bind="currentPage.contentProps.value" />
           </div>
           <div
@@ -73,9 +75,10 @@
             <span>{{ bottomPanelPreviewPercentage }}%</span>
           </div>
           <ShellBottomPanel
+            data-oc-tutorial="shell.bottom-panel"
             :style="{ '--shell-bottom-panel-height': `${bottomPanelHeight}px` }"
             :resizing="isBottomPanelResizing"
-            :expanded="isBottomPanelExpanded"
+            :expanded="isBottomPanelVisible"
             :active-tab="activeBottomTab"
             :issue-count="problems.count"
             :issue-severity="problems.severity"
@@ -110,7 +113,7 @@
             @output-clear="clearAppOutputEntries"
           >
             <template #leading>
-              <OcResizeTrack v-if="isBottomPanelExpanded" class="open-card-shell__bottom-panel-resizer" edge="top" placement="inside"
+              <OcResizeTrack v-if="isBottomPanelVisible" class="open-card-shell__bottom-panel-resizer" edge="top" placement="inside"
                 direction="reverse" :value="bottomPanelHeight" :minimum="bottomPanelMinimum" :maximum="bottomPanelMaximum"
                 :label="t('app.shell.resizeBottomPanel')" @focusin="measureBottomPanel"
                 @resize-start="handleBottomPanelResizeStart" @update:value="resizeBottomPanel"
@@ -124,6 +127,8 @@
     <component v-for="page in overlayPages" :key="page.key" :is="page.overlays" v-bind="page.overlayProps?.value" />
     <ShellOverlayHost v-bind="app.globalOverlayProps.value" :is-external-file-drag-active="isExternalFileDragActive"
       :is-external-file-drag-over-zone="isExternalFileDragOverZone" />
+    <OcTutorial :session="tutorial.session.value" @exit="tutorial.exit"
+      @complete="tutorial.completeStep($event.tutorialId, $event.stepId, $event.run)" />
   </main>
 </template>
 
@@ -135,7 +140,8 @@ import { appLocaleLanguageTag } from '../../i18n/appLocale'
 import { notifyError, setTitleBarNoticeHistoryLimit } from '../notifications/titlebarNotices'
 import { useAppSettingsStore } from '../settings/store/appSettingsStore'
 import { useProjectStore } from '../workspace/store/projectStore'
-import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from '../settings/model/appSettings'
+import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from '../app-state/model/appState'
+import { useAppStateStore } from '../app-state/store/appStateStore'
 import { registerUnhandledExternalDrop, useExternalFileDrop } from '../../shared/ui/drop/externalFileDrop'
 import { appOutputEntries, clearAppOutputEntries } from '../logging/appOutput'
 import ShellBottomPanel, { type ShellBottomPanelTab } from './components/ShellBottomPanel.vue'
@@ -150,6 +156,8 @@ import { useShellSidebarLayout } from './composables/useShellSidebarLayout'
 import { useShellBottomPanelLayout } from './composables/useShellBottomPanelLayout'
 import { useShellProgressTasks } from './composables/useShellProgressTasks'
 import { initializeAppPages } from './composables/useAppPages'
+import OcTutorial from '../../components/standard/OcTutorial.vue'
+import { useTutorialStore } from '../tutorials/tutorialStore'
 import { useAppProjectActions } from './services/appProjectActions'
 import { createShellTitleBarMenus } from './composables/useShellTitleBarMenus'
 import { EMPTY_PAGE_PROBLEMS } from './spacePage'
@@ -170,6 +178,9 @@ const {
   notifyWindowControlError: () => notifyError(t('app.notifications.windowControlFailed')),
 })
 const app = initializeAppPages(destroyWindow)
+const tutorial = useTutorialStore()
+const tutorialTargets = computed(() => tutorial.session.value?.step.targets.map(target => target.key) ?? [])
+onUnmounted(tutorial.exit)
 const { currentPage, spaces: shellSpaces } = app
 const overlayPages = Object.values(app.pages).filter(page => page.overlays)
 const problems = computed(() => currentPage.value.bottomPanel?.value ?? EMPTY_PAGE_PROBLEMS)
@@ -189,11 +200,13 @@ const { isExpanded: isBottomPanelExpanded, height: bottomPanelHeight, previewHei
   minimum: bottomPanelMinimum, maximum: bottomPanelMaximum, measure: measureBottomPanel,
   resize: resizeBottomPanel, finishResize: finishBottomPanelResize,
 } = useShellBottomPanelLayout(pageStackRef)
+const isBottomPanelVisible = computed(() => isBottomPanelExpanded.value
+  || tutorialTargets.value.includes('shell.bottom-panel'))
 const activeBottomTab = ref<ShellBottomPanelTab>('issues')
 const {
   sidebarCollapsed,
   sidebarWidth,
-  effectiveSidebarCollapsed,
+  effectiveSidebarCollapsed: layoutSidebarCollapsed,
   sidebarResizeActive,
   sidebarResizeToggleAnimating,
   sidebarPersistedLayout,
@@ -204,11 +217,13 @@ const {
   handleSidebarResize,
   handleSidebarLayoutChange,
 } = useShellSidebarLayout({
-  settings: settingsStore,
+  state: useAppStateStore(),
   persistenceKey: computed(() => currentPage.value.sidebarLayout?.persistenceKey.value ?? ''),
   viewportWidth,
   expandOnNarrowViewport: computed(() => currentPage.value.sidebarLayout?.expandOnNarrowViewport ?? false),
 })
+// 介绍时临时展示侧栏，结束后恢复原有布局，不改写用户的折叠记录。
+const effectiveSidebarCollapsed = computed(() => tutorialTargets.value.includes('shell.sidebar') ? false : layoutSidebarCollapsed.value)
 const shellMainStyle = computed(() => ({
   '--shell-sidebar-width': effectiveSidebarCollapsed.value ? '0px' : `${sidebarWidth.value}px`,
 }))

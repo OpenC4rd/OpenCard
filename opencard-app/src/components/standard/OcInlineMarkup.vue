@@ -35,6 +35,6 @@ const nodes = computed(() => parseInlineMarkup(props.source))
 }
 
 .oc-inline-markup__icon {
-  vertical-align: text-bottom;
+  vertical-align: -0.125em;
 }
 </style>

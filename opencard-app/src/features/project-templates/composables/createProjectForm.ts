@@ -11,7 +11,7 @@ import {
   type ProjectTemplate,
   type ProjectTemplateKey,
 } from '../model/projectTemplate'
-import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useAppStateStore } from '../../app-state/store/appStateStore'
 import { useProjectTemplateStore } from '../store/projectTemplateStore'
 import { notifyError } from '../../notifications/titlebarNotices'
 import { publishAppOutput } from '../../logging/appOutput'
@@ -21,15 +21,15 @@ export function createProjectForm(options: {
   selectedKey: Ref<ProjectTemplateKey | null>
   externalBusy: Readonly<Ref<boolean>>
   onBusy: (busy: boolean) => void
-  onCreated: (project: CreatedProject) => Promise<void>
+  onCreated: (project: CreatedProject) => Promise<boolean>
 }) {
   const { t, locale } = useI18n()
   const store = useProjectTemplateStore()
-  const appSettingsStore = useAppSettingsStore()
+  const appStateStore = useAppStateStore()
 
   const projectName = ref(t('projectTemplates.defaults.projectName'))
   const selectedEntry = ref('')
-  const parentPath = ref(appSettingsStore.settings.value.projectCreation.lastParentPath)
+  const parentPath = ref(appStateStore.state.value.projects.lastParentPath)
   const isCreating = ref(false)
   const isImporting = ref(false)
   const isChoosingParent = ref(false)
@@ -113,7 +113,7 @@ export function createProjectForm(options: {
       const selected = await store.pickProjectParentDirectory(t('projectTemplates.dialogs.chooseParent'))
       if (selected) {
         parentPath.value = selected
-        appSettingsStore.updateProjectCreation({ lastParentPath: selected })
+        appStateStore.updateProjects({ lastParentPath: selected })
       }
     } catch (cause) {
       reportFailure(cause)
@@ -137,8 +137,8 @@ export function createProjectForm(options: {
     }
   }
 
-  async function createProject(): Promise<void> {
-    if (!canCreate.value || !selectedTemplate.value) return
+  async function createProject(): Promise<boolean> {
+    if (!canCreate.value || !selectedTemplate.value) return false
     isCreating.value = true
     try {
       const project = await store.createProject({
@@ -147,9 +147,10 @@ export function createProjectForm(options: {
         projectName: projectName.value,
         entry: selectedEntry.value || undefined,
       })
-      await options.onCreated(project)
+      return await options.onCreated(project)
     } catch (cause) {
       reportFailure(cause)
+      return false
     } finally {
       isCreating.value = false
     }
@@ -193,7 +194,7 @@ export function createProjectForm(options: {
 
   function reset(): void {
     projectName.value = t('projectTemplates.defaults.projectName')
-    parentPath.value = appSettingsStore.settings.value.projectCreation.lastParentPath
+    parentPath.value = appStateStore.state.value.projects.lastParentPath
     selectedEntry.value = selectedTemplateEntries.value[0] ?? ''
   }
 

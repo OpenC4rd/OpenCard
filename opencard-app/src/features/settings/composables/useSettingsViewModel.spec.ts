@@ -55,7 +55,7 @@ describe('useSettingsViewModel', () => {
       { type: 'icon', icon: 'tool.workspace' },
       { type: 'icon', icon: 'tool.collaboration' },
     ])
-    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'exporting', 'rendering', 'cache'])
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'tutorials', 'exporting', 'rendering', 'cache'])
     expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([
       'appearance.locale',
       'shell.titleBarNoticeHistoryLimit',
@@ -129,7 +129,7 @@ describe('useSettingsViewModel', () => {
 
   it('projects appearance preview, sliders, and one card per theme', async () => {
     const settings = createDefaultAppSettings()
-    settings.appearance.userThemePresets.dark = [{
+    settings.appearance.themes.dark.presets = [{
       name: 'Forest',
       definition: {
         colors: { '--oc-accent': '#112233', '--oc-bg-base': '#223344', '--oc-fg-default': '#DDEEFF' },
@@ -137,10 +137,10 @@ describe('useSettingsViewModel', () => {
         fontFamily: 'Inter',
       },
     }]
-    settings.appearance.themeOverrides.dark = { ...settings.appearance.userThemePresets.dark[0]!.definition.colors }
-    settings.appearance.accentNeighborAngles.dark = -70
-    settings.appearance.fontFamilies.dark = 'Inter'
-    settings.appearance.themePresetIds.dark = 'user:Forest'
+    settings.appearance.themes.dark.colors = { ...settings.appearance.themes.dark.presets[0]!.definition.colors }
+    settings.appearance.themes.dark.accentNeighborAngle = -70
+    settings.appearance.themes.dark.fontFamily = 'Inter'
+    settings.appearance.themes.dark.presetId = 'user:Forest'
     const categoryKey = ref<SettingsCategoryKey>('appearance')
     const { activeCategory } = useSettingsViewModel({
       settings: ref(settings), categoryKey, projectOpen: ref(false),

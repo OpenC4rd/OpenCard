@@ -93,8 +93,9 @@ import { resolveEntryIcon } from '../model/fileTypes'
 import { formatPackageCoordinate, parsePackageCoordinate } from '../model/packageCoordinate'
 import { toKeySlug } from '../../../shared/model/keySlug'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
-import type { ProjectPackageBuilderState } from '../../settings/model/appSettings'
-import { findProjectWorkspaceState, updateProjectWorkspaceState, type ProjectWorkspaceStateRead } from '../../settings/model/workspaceState'
+import type { ProjectPackageBuilderState } from '../../app-state/model/appState'
+import { findProjectWorkspaceState, updateProjectWorkspaceState, type ProjectWorkspaceStateRead } from '../../app-state/model/workspaceState'
+import { useAppStateStore } from '../../app-state/store/appStateStore'
 import type {
   OcNode,
   OcNodeAction,
@@ -120,6 +121,7 @@ const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
 const projectStore = useProjectStore()
 const appSettingsStore = useAppSettingsStore()
+const appStateStore = useAppStateStore()
 const name = ref('')
 const displayName = ref('')
 const author = ref('')
@@ -385,7 +387,7 @@ function close(): void {
 }
 function packageBuilderCache(): ProjectWorkspaceStateRead['packageBuilder'] {
   return findProjectWorkspaceState(
-    appSettingsStore.settings.value.projectCreation.workspaceStates,
+    appStateStore.state.value.projects.workspaces,
     props.projectRootPath,
   )?.packageBuilder
 }
@@ -542,9 +544,9 @@ function rememberBuildInputs(): void {
     otherPaths: [...selectedOtherPaths.value],
     imagePaths: [],
   }
-  appSettingsStore.updateProjectCreation({
-    workspaceStates: updateProjectWorkspaceState(
-      appSettingsStore.settings.value.projectCreation.workspaceStates,
+  appStateStore.updateProjects({
+    workspaces: updateProjectWorkspaceState(
+      appStateStore.state.value.projects.workspaces,
       props.projectRootPath,
       (current) => {
         current.packageBuilder = cache

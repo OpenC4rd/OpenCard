@@ -135,10 +135,10 @@ import type { EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { HistoryOperationMeta } from '../../features/editor-runtime/history/history.types'
 import type { EditorNavigationResult, SessionNavigationToken } from '../../features/editor-runtime/model/editorIssue'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
-import { useAppSettingsStore } from '../../features/settings/store/appSettingsStore'
+import { useAppStateStore } from '../../features/app-state/store/appStateStore'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import { prefersReducedMotion } from '../../shared/ui/foundation'
-import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../features/settings/model/workspaceState'
+import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../features/app-state/model/workspaceState'
 import {
   normalizeProjectAllowedHost,
   parseProjectMetadataText,
@@ -164,7 +164,7 @@ const editorState = computed(() => props.session.state)
 const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
 const projectStore = useProjectStore()
-const settingsStore = useAppSettingsStore()
+const appStateStore = useAppStateStore()
 const profile = ref<ProjectProfile | null>(null)
 const remoteHostDrafts = ref<string[]>([])
 const exportDocumentCandidates = ref<ExportDocumentCandidate[]>([])
@@ -196,7 +196,7 @@ const projectDirectoryKey = computed(() => {
     : normalized
 })
 const projectWorkspaceState = computed(() => findProjectWorkspaceState(
-  settingsStore.settings.value.projectCreation.workspaceStates,
+  appStateStore.state.value.projects.workspaces,
   projectDirectoryKey.value,
 ))
 const remoteResourceMode = computed(() => profile.value?.remoteResources?.mode ?? 'deny')
@@ -324,7 +324,7 @@ function setProjectSectionCollapsed(sectionKey: ProjectProfileSectionKey, collap
   if (!workspaceKey) return
 
   const workspaceStates = updateProjectWorkspaceState(
-    settingsStore.settings.value.projectCreation.workspaceStates,
+    appStateStore.state.value.projects.workspaces,
     workspaceKey,
     (current) => {
       const collapsedSections = new Set(current.projectProfile?.collapsedSections
@@ -336,7 +336,7 @@ function setProjectSectionCollapsed(sectionKey: ProjectProfileSectionKey, collap
       return current
     },
   )
-  settingsStore.updateProjectCreation({ workspaceStates })
+  appStateStore.updateProjects({ workspaces: workspaceStates })
 }
 
 function toggleProjectSection(sectionKey: ProjectProfileSectionKey): void {

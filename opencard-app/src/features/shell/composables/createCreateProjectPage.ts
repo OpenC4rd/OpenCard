@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { createProjectForm } from '../../project-templates/composables/createProjectForm'
 import CreateProjectPageContent from '../../project-templates/components/CreateProjectPageContent.vue'
@@ -9,26 +9,52 @@ import type { SpacePage } from '../spacePage'
 import type { useAppProjectLifecycle } from './useAppProjectLifecycle'
 import { useShellNavigation } from './useShellNavigation'
 import { useCreateProjectPageState } from './useCreateProjectPageState'
+import { useTutorialStore } from '../../tutorials/tutorialStore'
+import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { notifySuccess } from '../../notifications/titlebarNotices'
 
 export function createCreateProjectPage(lifecycle: ReturnType<typeof useAppProjectLifecycle>) {
   const { t } = useI18n()
   const { isCreateProject, returnFromFlow } = useShellNavigation()
+  const tutorial = useTutorialStore()
+  const settings = useAppSettingsStore()
+  watch(isCreateProject, entered => {
+    if (entered) tutorial.completeStep('overview', 'new-project')
+  }, { immediate: true })
+  watch(() => isCreateProject.value && settings.isReady.value && !tutorial.session.value
+    && !settings.settings.value.tutorials.seen.includes('welcome'), ready => {
+    if (ready) tutorial.start('welcome')
+  }, { immediate: true })
   const feature = useCreateProjectPageState({
     projectStore: useProjectStore(), isCreateProjectMode: isCreateProject, isActivatingProject: lifecycle.isActivating,
     requestConfirmation, enterCreateProject: lifecycle.enterCreateProject,
     onTemplateImport: () => form.beginImport(),
   })
-  async function created(project: CreatedProject): Promise<void> {
-    if (await lifecycle.activateCreatedProject(project)) await feature.installAttachedResourcePackages()
+  async function created(project: CreatedProject): Promise<boolean> {
+    if (!await lifecycle.activateCreatedProject(project)) return false
+    await feature.installAttachedResourcePackages()
+    return true
   }
   const form = createProjectForm({
     selectedKey: feature.selectedTemplateKey, externalBusy: lifecycle.isActivating, onCreated: created,
     onBusy: busy => { feature.isCreateProjectOperationBusy.value = busy },
   })
+  const model = { ...form, async createProject(): Promise<boolean> {
+    if (!form.canCreate.value) return false
+    const run = tutorial.session.value?.run
+    tutorial.completeStep('welcome', 'template', run)
+    tutorial.completeStep('welcome', 'packages', run)
+    tutorial.completeStep('welcome', 'details', run)
+    const created = await form.createProject()
+    if (created && run !== undefined && tutorial.completeStep('welcome', 'create-project', run)) {
+      notifySuccess(t('tutorial.welcome.completed'))
+    }
+    return created
+  } }
   const page: SpacePage = {
     key: 'create-project', content: CreateProjectPageContent,
     contentProps: computed(() => ({
-      model: form, attachedResourcePackages: feature.attachedResourcePackages.value,
+      model, attachedResourcePackages: feature.attachedResourcePackages.value,
     })),
     sidebar: computed(() => feature.section.value.map(group => ({ ...group, onAction: returnFromFlow,
       lists: group.lists.map(list => ({ ...list, onAction: key => feature.handleListAction(list.key, key) })),

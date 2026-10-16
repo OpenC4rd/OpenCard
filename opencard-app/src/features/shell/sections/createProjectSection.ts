@@ -11,6 +11,7 @@ import type { ShellListGroup } from '../shell.types'
 import {
   DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
   IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
+  IMPORT_TEMPLATE_ACTION_KEY,
   RESOURCE_PACKAGES_LIST_KEY,
   TEMPLATES_LIST_KEY,
   USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
@@ -55,9 +56,15 @@ export function createCreateProjectSection(options: CreateProjectSectionOptions)
     lists: [
       {
         key: TEMPLATES_LIST_KEY,
+        tutorialKey: 'create-project.templates',
         title: options.translate('projectTemplates.sections.templates'),
         placeholder: '',
-        actions: [],
+        actions: [{
+          key: IMPORT_TEMPLATE_ACTION_KEY,
+          icon: 'action.import',
+          hoverTip: options.translate('projectTemplates.actions.import'),
+          disabled: options.busy.value,
+        }],
         content: {
           type: 'tree' as const,
           data: options.templateTreeData.value,
@@ -73,6 +80,7 @@ export function createCreateProjectSection(options: CreateProjectSectionOptions)
       },
       {
         key: RESOURCE_PACKAGES_LIST_KEY,
+        tutorialKey: 'create-project.packages',
         title: options.translate('projectTemplates.sections.resourcePackages'),
         placeholder: options.resourcePackageStore.isLoading.value
           ? options.translate('projectTemplates.status.loadingResourcePackages')

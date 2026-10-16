@@ -1,10 +1,10 @@
-/** Shared per-project workspace cache access: one owner for path keys, value shape, and record projection. */
+/** Shared per-project workspace state access: one owner for path keys, value shape, and record projection. */
 import { toRaw, type DeepReadonly } from 'vue'
-import type { AppSettings, ProjectWorkspaceState } from './appSettings'
+import type { AppState, ProjectWorkspaceState } from './appState'
 
-export type ProjectWorkspaceStates = AppSettings['projectCreation']['workspaceStates']
+export type ProjectWorkspaceStates = AppState['projects']['workspaces']
 export type ProjectWorkspaceStatesSource = DeepReadonly<ProjectWorkspaceStates>
-/** The store exposes settings as a deep-readonly projection; updates return the mutable record. */
+/** The store exposes state as a deep-readonly projection; updates return the mutable record. */
 export type ProjectWorkspaceStateRead = DeepReadonly<ProjectWorkspaceState>
 
 export function findProjectWorkspaceState(
@@ -17,7 +17,7 @@ export function findProjectWorkspaceState(
     .find(([candidate]) => workspaceStateIdentity(candidate) === identity)?.[1]
 }
 
-/** Copies one cached state into a shape callers may patch before storing it back. */
+/** Copies one remembered state into a shape callers may patch before storing it back. */
 export function cloneProjectWorkspaceState(state: ProjectWorkspaceStateRead | undefined): ProjectWorkspaceState {
   // 这份状态是纯数据（加载时已经归一化，未知字段不会留到这里），所以一次深拷贝就够。
   // 必须先 `toRaw`：读出来的是深只读投影，也就是 Vue 代理，而 `structuredClone` 吃代理会抛

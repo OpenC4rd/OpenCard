@@ -16,7 +16,7 @@
   <div ref="editorRootRef" class="card-design-editor" :class="{ 'is-content-pending': editorContentPending }"
     :style="editorShellStyle" tabindex="-1" @keydown="handleRootKeydown">
     <div class="card-design-editor__stage"
-      :class="{ 'is-layer-view-active': layerViewActive, 'is-debug-overlays-hidden': props.debugHideCdeOverlays }">
+      :class="{ 'is-layer-view-active': layerViewActive }">
       <div class="card-design-editor__mode-view">
           <div class="card-design-editor__stage-base" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }">
             <OcPanel fill tone="transparent" border="none" padding="none" overflow="hidden">
@@ -35,15 +35,15 @@
               </div>
               <template v-else>
                 <CardViewport ref="cardViewportRef" v-if="viewFace && renderResources"
-                  class="card-design-editor__viewport" :class="{ 'is-debug-transparent': props.debugTransparentCdeViewport, 'is-debug-passive': props.debugPassiveCdeViewport, 'is-data-table-mode': workspaceMode === 'data-table' }"
+                  class="card-design-editor__viewport" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }"
                   :face="viewFace" :clip-to-face="clipToFace" :resource-context="renderResources" :readonly="workspaceMode !== 'design'"
                   :restore-key="filePath" :transform="viewportTransform"
-                  :selected-block-id="props.debugPassiveCdeViewport || workspaceMode !== 'design' ? null : selectedBlock?.id ?? null"
-                  :selected-location-type="props.debugPassiveCdeViewport || workspaceMode !== 'design' ? null : selectedLocationType"
+                  :selected-block-id="workspaceMode !== 'design' ? null : selectedBlock?.id ?? null"
+                  :selected-location-type="workspaceMode !== 'design' ? null : selectedLocationType"
                   :selected-anchor="selectedAnchor" :selected-parent-block-id="selectedParentBlockId"
                   :selected-parent-flow-direction="selectedParentFlowDirection" :selected-flow-align="selectedFlowAlign"
                   :viewport-insets="viewportInsets"
-                  :selection-info="props.debugPassiveCdeViewport || workspaceMode !== 'design' ? null : selectionInfo"
+                  :selection-info="workspaceMode !== 'design' ? null : selectionInfo"
                   :selection-action-labels="selectionActionLabels" :selection-command-actions="selectionCommandActions"
                   :layer-view-active="layerViewActive"
                   :layer-view-base-plane-label="t('cardDesigner.layerView.basePlane')"
@@ -51,10 +51,10 @@
                   :layer-view-shortcut-legend-label="t('cardDesigner.layerView.shortcutLegend')"
                   :layer-view-shortcut-hints="layerViewShortcutHints"
                   :layer-view-atomic-block-ids="layerViewAtomicBlockIds"
-                  :show-info="workspaceMode === 'design' && !selectedBlock && !props.debugPassiveCdeViewport"
-                  :show-position-on-move="workspaceMode === 'design' && !props.debugPassiveCdeViewport && (settingsStore.settings.value.workspace.showSelectionPositionOnMove ?? true)"
-                  :show-size-on-resize="workspaceMode === 'design' && !props.debugPassiveCdeViewport && (settingsStore.settings.value.workspace.showSelectionSizeOnResize ?? true)"
-                  :alignment-snapping-enabled="workspaceMode === 'design' && !props.debugPassiveCdeViewport && alignmentSnappingEnabled"
+                  :show-info="workspaceMode === 'design' && !selectedBlock"
+                  :show-position-on-move="workspaceMode === 'design' && (settingsStore.settings.value.workspace.showSelectionPositionOnMove ?? true)"
+                  :show-size-on-resize="workspaceMode === 'design' && (settingsStore.settings.value.workspace.showSelectionSizeOnResize ?? true)"
+                  :alignment-snapping-enabled="workspaceMode === 'design' && alignmentSnappingEnabled"
                   :transform-disabled-block-ids="transformDisabledBlockIds"
                   @pointerdown.capture="handleCanvasPointerDown" @block-click="handleEffectiveViewportBlockClick"
                   @blank-click="clearEffectiveBlockSelection" @resize-selection="handleSelectionResize"
@@ -1932,10 +1932,6 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   margin: auto;
 }
 
-.card-design-editor__viewport.is-debug-passive {
-  pointer-events: none;
-}
-
 .card-design-editor__viewport {
   flex: 1 1 auto;
   min-width: 0;
@@ -2122,13 +2118,6 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
-.card-design-editor__viewport.is-debug-transparent {
-  background-color: transparent;
-  background-image: none;
-}
-
-
-
 .card-design-editor__stage.is-layer-view-active .card-design-editor__stage-layer {
   visibility: hidden;
   opacity: 0;
@@ -2138,12 +2127,6 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 .card-design-editor__stage.is-layer-view-active .card-design-editor__stage-layer,
 .card-design-editor__stage.is-layer-view-active .card-design-editor__stage-layer * {
   pointer-events: none !important;
-}
-
-.card-design-editor__stage.is-debug-overlays-hidden .card-design-editor__stage-layer {
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .card-design-editor__face-tools {

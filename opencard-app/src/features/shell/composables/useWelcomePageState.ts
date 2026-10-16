@@ -2,7 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notifyAppError } from '../../notifications/titlebarNotices'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
-import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useAppStateStore } from '../../app-state/store/appStateStore'
 import type { OcNodeActionEvent, OcNodeActivateEvent, OcNodeCollection, OcNodeSelectionEvent } from '../../../shared/ui/node/node.types'
 import type { WelcomeCoverWallCover } from '../components/WelcomeCoverWall.vue'
 import { createRecentProjectTreeData } from '../shellCatalogProjections'
@@ -22,29 +22,29 @@ export function useWelcomePageState(options: {
   relocateRecentProject: (path: string) => Promise<unknown>
 }) {
   const { t, locale } = useI18n()
-  const settingsStore = useAppSettingsStore()
+  const appStateStore = useAppStateStore()
   const recentProjectSnapshots = useRecentProjectSnapshots({
-    recentProjects: computed(() => settingsStore.settings.value.projectCreation.recentProjects),
+    recentProjects: computed(() => appStateStore.state.value.projects.recent),
   })
   const recentProjectAvailability = computed<ReadonlyMap<string, boolean>>(() => new Map(
     [...recentProjectSnapshots.snapshots.value].map(([key, snapshot]) => [key, snapshot.available]),
   ))
   const welcomeCoverWallCovers = computed<readonly WelcomeCoverWallCover[]>(() => (
-    settingsStore.settings.value.projectCreation.recentProjects.flatMap(path => {
+    appStateStore.state.value.projects.recent.flatMap(path => {
       const snapshot = recentProjectSnapshots.snapshots.value.get(recentProjectKey(path))
       if (!snapshot?.available || !snapshot.cover) return []
       return [{ projectKey: recentProjectKey(path), src: snapshot.cover.src }]
     })
   ))
   const recentProjectTreeData = computed<OcNodeCollection>(() => createRecentProjectTreeData(
-    settingsStore.settings.value.projectCreation.recentProjects,
+    appStateStore.state.value.projects.recent,
     recentProjectAvailability.value,
     recentProjectKey,
     t,
   ))
   const selectedRecentProjectKeys = ref<string[]>([])
   function pathByNodeKey(key: string): string | undefined {
-    return settingsStore.settings.value.projectCreation.recentProjects.find(item => recentProjectKey(item) === key)
+    return appStateStore.state.value.projects.recent.find(item => recentProjectKey(item) === key)
   }
   function handleSelectionChange(event: OcNodeSelectionEvent): void {
     selectedRecentProjectKeys.value = event.selectedKeys
@@ -57,7 +57,7 @@ export function useWelcomePageState(options: {
     const path = pathByNodeKey(event.key)
     if (!path) return
     if (event.actionKey === RECENT_PROJECT_REMOVE_ACTION_KEY) {
-      settingsStore.forgetRecentProject(path)
+      appStateStore.forgetRecentProject(path)
       selectedRecentProjectKeys.value = selectedRecentProjectKeys.value.filter(key => key !== event.key)
     } else if (event.actionKey === RECENT_PROJECT_RELOCATE_ACTION_KEY) {
       void options.relocateRecentProject(path)

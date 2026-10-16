@@ -9,6 +9,7 @@ import {
   setOcTheme,
 } from "./shared/ui/foundation";
 import { useAppSettingsStore } from "./features/settings/store/appSettingsStore";
+import { useAppStateStore } from "./features/app-state/store/appStateStore";
 import { addTitleBarNotice, notifyWarning } from "./features/notifications/titlebarNotices";
 import {
   applyMicaBackdrop,
@@ -72,7 +73,7 @@ function dismissStartupCover(): void {
 async function bootstrap(): Promise<void> {
   const settingsStore = useAppSettingsStore();
   recordStartupTiming("settings load started");
-  await settingsStore.initialize();
+  await Promise.all([settingsStore.initialize(), useAppStateStore().initialize()]);
   recordStartupTiming("settings ready");
   // 用户语言文件要在首帧之前读完，否则界面会先用内置语言画一遍再切过去。
   await reloadUserLocales(settingsStore.settings.value.appearance.locale);
@@ -91,8 +92,8 @@ async function bootstrap(): Promise<void> {
   const applyThemeAppearance = () => {
     const appearance = settingsStore.settings.value.appearance;
     const theme = resolveTheme();
-    setOcTheme(theme, appearance.themeOverrides[theme], appearance.accentNeighborAngles[theme], {
-      fontFamily: appearance.fontFamilies[theme],
+    setOcTheme(theme, appearance.themes[theme].colors, appearance.themes[theme].accentNeighborAngle, {
+      fontFamily: appearance.themes[theme].fontFamily,
       baseFontSize: appearance.baseFontSize,
     });
     setOcGlassIntensity(appearance.glassIntensity);
@@ -155,14 +156,14 @@ async function bootstrap(): Promise<void> {
     () => {
       const appearance = settingsStore.settings.value.appearance;
       const theme = resolveTheme();
-      const overrides = appearance.themeOverrides[theme];
+      const colors = appearance.themes[theme].colors;
       return [
         theme,
-        overrides["--oc-accent"] ?? null,
-        overrides["--oc-bg-base"] ?? null,
-        overrides["--oc-fg-default"] ?? null,
-        appearance.accentNeighborAngles[theme],
-        appearance.fontFamilies[theme],
+        colors["--oc-accent"],
+        colors["--oc-bg-base"],
+        colors["--oc-fg-default"],
+        appearance.themes[theme].accentNeighborAngle,
+        appearance.themes[theme].fontFamily,
         appearance.baseFontSize,
       ] as const;
     },

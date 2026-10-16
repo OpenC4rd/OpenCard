@@ -2,13 +2,16 @@
 <template>
   <span
     class="oc-progress-bar"
+    :class="{ 'oc-progress-bar--thin': variant === 'thin' }"
     role="progressbar"
     aria-valuemin="0"
     :aria-valuemax="max ?? undefined"
     :aria-valuenow="value"
     :aria-valuetext="text || undefined"
   >
-    <span class="oc-progress-bar__fill" :style="{ width: fillWidth }" />
+    <span class="oc-progress-bar__track">
+      <span class="oc-progress-bar__fill" :style="{ width: fillWidth }" />
+    </span>
     <span v-if="text" class="oc-progress-bar__text">{{ text }}</span>
   </span>
 </template>
@@ -24,11 +27,12 @@ interface OcProgressBarProps {
   value: number
   /** 上限；null 表示无上限，不画填充 */
   max: number | null
-  /** 叠在轨道中间的文字 */
+  /** 文字水平、垂直居中；细条通过文字阴影保持可读。 */
   text?: string
+  variant?: 'default' | 'thin'
 }
 
-const props = defineProps<OcProgressBarProps>()
+const props = withDefaults(defineProps<OcProgressBarProps>(), { variant: 'default' })
 
 const fillWidth = computed(() => {
   if (props.max == null || props.max <= 0) return '0%'
@@ -38,12 +42,16 @@ const fillWidth = computed(() => {
 
 <style scoped>
 .oc-progress-bar {
-  position: relative;
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: center;
-  height: var(--oc-size-sm);
   min-width: 0;
+}
+
+.oc-progress-bar__track {
+  grid-area: 1 / 1;
+  position: relative;
+  height: var(--oc-size-sm);
+  width: 100%;
   overflow: hidden;
   border-radius: var(--oc-radius-pill);
   background: var(--oc-bg-raised);
@@ -53,12 +61,20 @@ const fillWidth = computed(() => {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  background-image: var(--oc-overlay-accent);
+  background: var(--oc-accent);
 }
 
 .oc-progress-bar__text {
+  grid-area: 1 / 1;
   position: relative;
+  text-align: center;
   color: var(--oc-fg-default);
   font-size: var(--oc-text-xs);
+}
+
+.oc-progress-bar--thin .oc-progress-bar__track { height: var(--oc-space-2xs); }
+.oc-progress-bar--thin .oc-progress-bar__text {
+  justify-self: center;
+  text-shadow: 0 0 2px var(--oc-bg-surface), 0 1px 2px var(--oc-bg-surface);
 }
 </style>

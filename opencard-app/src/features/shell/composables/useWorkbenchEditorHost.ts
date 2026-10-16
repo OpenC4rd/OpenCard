@@ -88,7 +88,7 @@ export function useWorkbenchEditorHost(options: {
         comparison: options.comparison.value ?? undefined,
         resourceRootPath: project.projectPath.value || null,
         resourceEnvironment: project.resourceEnvironment.value,
-        themeId: theme, themeOverrides: settings.value.appearance.themeOverrides[theme],
+        themeId: theme, themeOverrides: settings.value.appearance.themes[theme].colors,
         language: fileType.language ?? 'plaintext',
         ...(state.editorId === 'card-designer' && !fallback ? options.cardProps.value : {}),
         ...bound.events,

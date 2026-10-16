@@ -1,11 +1,11 @@
-<!-- 多项字符串字段：已提交的项显示为标签，最后一段用输入框编辑；值仍是单个字符串，分隔符见 definition.listSeparator。 -->
+<!-- 多项标签字段：支持字符串数组，或按 listSeparator 分隔的字符串。 -->
 <template>
   <div class="reference-string-token-field-shell">
     <OcFieldFrame class="reference-string-token-field" full-width wrap :readonly="definition.isReadonly"
       :invalid="hasInvalidToken">
       <span v-for="(token, index) in tokens" :key="`${index}:${token}`"
         class="reference-string-token-field__token" :class="{ 'is-invalid': isInvalidToken(token) }">
-        <span class="reference-string-token-field__token-text">{{ token }}</span>
+        <span class="reference-string-token-field__token-text">{{ definition.optionLabels?.[token] ?? token }}</span>
         <OcButton class="reference-string-token-field__token-remove" icon-only size="sm" variant="ghost"
           icon="action.close" :data-tooltip="removeText" :aria-label="removeText"
           :disabled="definition.isReadonly" @click="removeToken(index)" />
@@ -64,7 +64,7 @@ import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 
 import { usePropertyCompletion } from './usePropertyCompletion'
 
-type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
+type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' | 'string[]' }>
 type TextControl = HTMLInputElement | HTMLTextAreaElement
 
 const props = defineProps<{
@@ -73,13 +73,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:value', value: string): void
+  (e: 'update:value', value: string | string[]): void
 }>()
 
 const { t, te } = useI18n()
 const removeText = computed(() => te('propertyEditor.tokens.remove') ? t('propertyEditor.tokens.remove') : 'Remove item')
 const separator = computed<ReferenceStringListSeparator>(() => props.definition.listSeparator ?? 'semicolon')
 const separatorChar = computed(() => referenceStringSeparatorChar(separator.value))
+const arrayMode = computed(() => props.definition.fieldType === 'string[]')
 
 const initial = splitReferenceStringTokens(stringOf(props.value), separator.value)
 const tokens = ref<string[]>(initial.tokens)
@@ -106,16 +107,20 @@ watch(() => props.value, value => {
 })
 
 function stringOf(value: unknown): string {
+  if (Array.isArray(value)) return referenceStringTokenPrefix(value.map(String), separator.value)
   return value == null ? '' : String(value)
 }
 function isInvalidToken(token: string): boolean {
   return props.definition.listInvalid?.(token) === true
 }
 
-function emitTokens(): void {
-  const next = joinReferenceStringTokens(tokens.value, draft.value, separator.value)
-  lastEmitted = next
-  if ((props.definition.commitMode ?? 'input') === 'input') emit('update:value', next)
+function emitTokens(commit = true): void {
+  if (arrayMode.value && !commit) return
+  const next = arrayMode.value
+    ? [...tokens.value, draft.value].map(token => token.trim()).filter(Boolean)
+    : joinReferenceStringTokens(tokens.value, draft.value, separator.value)
+  lastEmitted = stringOf(next)
+  if (arrayMode.value || (props.definition.commitMode ?? 'input') === 'input') emit('update:value', next)
 }
 
 async function focusInput(): Promise<void> {
@@ -131,7 +136,6 @@ function commitDraft(): void {
   draft.value = ''
   emitTokens()
   completion.clear()
-  void focusInput()
 }
 
 function removeToken(index: number): void {
@@ -150,7 +154,7 @@ function setCursor(control: TextControl, cursor: number): void {
 async function refreshCompletion(
   control: TextControl,
   value = editedValue.value,
-  cursor = control.selectionStart ?? value.length,
+  cursor = referenceStringTokenPrefix(tokens.value, separator.value).length + (control.selectionStart ?? draft.value.length),
 ): Promise<void> {
   activeInput.value = control
   const provider = props.definition.completion?.provider
@@ -162,7 +166,7 @@ function handleInput(event: Event): void {
   const control = event.target as TextControl
   activeInput.value = control
   draft.value = control.value
-  emitTokens()
+  emitTokens(false)
   const prefixLength = referenceStringTokenPrefix(tokens.value, separator.value).length
   void refreshCompletion(control, editedValue.value, prefixLength + (control.selectionStart ?? draft.value.length))
 }
@@ -182,7 +186,8 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 }
 
 function handleBlur(): void {
-  if ((props.definition.commitMode ?? 'input') === 'blur') {
+  if (arrayMode.value) commitDraft()
+  else if ((props.definition.commitMode ?? 'input') === 'blur') {
     const next = joinReferenceStringTokens(tokens.value, draft.value, separator.value)
     if (next !== stringOf(props.value)) emit('update:value', next)
   }
@@ -218,6 +223,10 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
   const parsed = splitReferenceStringTokens(nextValue, separator.value)
   tokens.value = parsed.tokens
   draft.value = parsed.draft
+  if (arrayMode.value && draft.value.trim()) {
+    tokens.value.push(draft.value.trim())
+    draft.value = ''
+  }
   emitTokens()
 
   const prefixLength = referenceStringTokenPrefix(tokens.value, separator.value).length

@@ -23,7 +23,7 @@
         <OcIcon :name="part.icon" :tone="part.tone" size="sm" />
       </span>
       <!-- 命令不是拖拽手柄：行内按在它身上不得启动拖拽，OcTree 的拖拽守卫读这个标记。 -->
-      <span v-else class="oc-node-tail__action" data-tree-interactive="true">
+      <span v-else class="oc-node-tail__action" :class="{ 'oc-node-tail__action--always': part.alwaysVisible }" data-tree-interactive="true">
         <OcActionButton
           :action="part"
           size="sm"
@@ -104,7 +104,7 @@ function handleSelect(payload: { key: string }): void {
   --oc-node-tail-action-display: inline-flex;
 }
 
-.oc-node-tail--always {
+.oc-node-tail--always, .oc-node-tail__action--always {
   --oc-node-tail-action-display: inline-flex;
 }
 </style>

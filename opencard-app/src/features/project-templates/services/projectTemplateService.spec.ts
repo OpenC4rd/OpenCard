@@ -777,27 +777,17 @@ describe('ProjectTemplateService safety boundaries', () => {
     expect(await fs.fileExists('/appdata/templates/multi-entry/content/z-last.ocdocument')).toBe(true)
   })
 
-  it('deletes a user template and rejects deletion of a built-in template', async () => {
+  it('deletes unusable user template folders by path and rejects paths outside the library', async () => {
     const fs = new MemoryFileSystem()
-    fs.putFile('/appdata/templates/personal/content/main.ocdocument', cardDocument())
-    const service = createService(fs)
-    const userTemplate: ProjectTemplate = {
-      ...templateFixture('/appdata/templates/personal/content'),
-      id: 'personal',
-      key: 'user:personal',
-      source: 'user',
-      rootPath: '/projects/must-not-delete',
-    }
-
+    fs.putFile('/appdata/templates/Broken Template/template.json', '{')
     fs.putFile('/projects/must-not-delete/keep.txt', 'keep')
-    await service.deleteUserTemplate(userTemplate)
-    expect(await fs.fileExists('/appdata/templates/personal')).toBe(false)
+    const service = createService(fs)
+    await service.deleteUserTemplate('/appdata/templates/Broken Template')
+    expect(await fs.fileExists('/appdata/templates/Broken Template')).toBe(false)
+    for (const path of ['/projects/must-not-delete', '/resources/templates/blank', '/appdata/templates', '/appdata/templates/../other', '/appdata/templates/nested/template']) {
+      await expect(service.deleteUserTemplate(path)).rejects.toMatchObject({ code: 'builtin-delete-forbidden' })
+    }
     expect(await fs.fileExists('/projects/must-not-delete/keep.txt')).toBe(true)
-
-    const builtin = templateFixture()
-    await expect(service.deleteUserTemplate(builtin)).rejects.toMatchObject({
-      code: 'builtin-delete-forbidden',
-    })
   })
 
   it('warns for a user package ID mismatch and for symlinked package content', async () => {

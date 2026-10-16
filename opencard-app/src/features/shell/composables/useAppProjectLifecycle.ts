@@ -23,7 +23,7 @@ type ProjectLifecycleOptions = {
   }
   /** 按“关闭项目”流程收尾当前项目（含未保存确认）；返回是否已经完成。 */
   closeCurrentProject: () => Promise<'completed' | 'prompted'>
-  settings: {
+  history: {
     rememberRecentProject: (path: string) => void
     forgetRecentProject: (path: string) => void
   }
@@ -55,7 +55,7 @@ export function useAppProjectLifecycle(options: ProjectLifecycleOptions) {
 
     try {
       await options.project.setProjectPath(path)
-      options.settings.rememberRecentProject(options.project.projectPath.value)
+      options.history.rememberRecentProject(options.project.projectPath.value)
       if (entryPath) {
         await options.sessions.open(entryPath)
       }
@@ -111,8 +111,8 @@ export function useAppProjectLifecycle(options: ProjectLifecycleOptions) {
     const selectedPath = await options.project.chooseProjectDirectory(options.translate('app.dialogs.chooseProjectFolder'))
     if (!selectedPath) return null
 
-    options.settings.forgetRecentProject(missingPath)
-    options.settings.rememberRecentProject(selectedPath)
+    options.history.forgetRecentProject(missingPath)
+    options.history.rememberRecentProject(selectedPath)
     return selectedPath
   }
 

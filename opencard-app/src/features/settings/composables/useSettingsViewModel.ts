@@ -11,10 +11,10 @@ import type {
   PropertyEditorFieldDefinition,
 } from '../../../shared/ui/property-editor/propertyEditor.types'
 import type { AppLocaleOption } from '../../../i18n/appLocale'
+import { tutorials } from '../../tutorials/tutorials'
 import {
   MAX_BASE_FONT_SIZE,
   MIN_BASE_FONT_SIZE,
-  OC_THEME_REGISTRY,
   type OcEditableThemeColorKey,
   type OcThemeId,
 } from '../../../shared/ui/foundation'
@@ -228,6 +228,19 @@ export function useSettingsViewModel(
               fieldType: 'boolean',
             }, settings.updates.showReleaseNotesAfterUpdate),
           ], { icon: 'action.download' }),
+          card('tutorials', options.translate('settings.cards.tutorials', 'Tutorials'), [
+            fieldItem('tutorials.seen', {
+              title: options.translate('settings.fields.seenTutorials', 'Viewed tutorials'),
+              fieldType: 'string[]', listSeparator: 'semicolon',
+              optionLabels: Object.fromEntries(Object.entries(tutorials).map(([id, definition]) => [id, options.translate(definition.title, id)])),
+              completion: { provider: ({ value, cursor }) => ({ replaceStart: value.lastIndexOf(';', cursor - 1) + 1, replaceEnd: value.length,
+                items: Object.entries(tutorials).filter(([id]) => !settings.tutorials.seen.includes(id)).map(([id, definition]) => ({
+                  key: id, label: options.translate(definition.title, id), insertText: id,
+                })),
+              }) },
+            }, settings.tutorials.seen,
+            options.translate('settings.descriptions.seenTutorials', 'Remove a tag and save to show that guide again on its next entry.')),
+          ]),
           card('exporting', options.translate('settings.cards.exporting', 'Export'), [
             fieldItem('exporting.openCdeWorkbookAfterExport', {
               title: options.translate('settings.fields.openCdeWorkbookAfterExport', 'Open after export'),
@@ -332,10 +345,10 @@ export function useSettingsViewModel(
         }
       }
       const themeCard = (themeId: OcThemeId): SettingsCardViewModel => {
-        const presetValue = settings.appearance.themePresetIds[themeId]
+        const presetValue = settings.appearance.themes[themeId].presetId
         const presetOptions = [
           ...APP_THEME_PRESETS[themeId].map(presetId => ({ value: presetId, label: presetLabel(themeId, presetId) })),
-          ...settings.appearance.userThemePresets[themeId].map(preset => ({
+          ...settings.appearance.themes[themeId].presets.map(preset => ({
             value: `user:${preset.name}`,
             label: preset.name,
           })),
@@ -350,8 +363,8 @@ export function useSettingsViewModel(
           const title = options.translate(`settings.fields.${key}`, fallback)
           return fieldItem(`color:${colorToken}`, {
             title, fieldType: 'color', allowAlpha: false,
-            defaultValue: settings.appearance.themeOverrides[themeId][colorToken] ?? null,
-          }, settings.appearance.themeOverrides[themeId][colorToken] ?? OC_THEME_REGISTRY[themeId][colorToken])
+            defaultValue: settings.appearance.themes[themeId].colors[colorToken],
+          }, settings.appearance.themes[themeId].colors[colorToken])
         })
         return card(
           `theme:${themeId}`,
@@ -381,12 +394,12 @@ export function useSettingsViewModel(
               fieldType: 'string', commitMode: 'blur',
               placeholder: options.translate('settings.values.systemFont', 'System'),
               completion: { provider: fontCompletion },
-            }, settings.appearance.fontFamilies[themeId] === 'system' ? '' : settings.appearance.fontFamilies[themeId],
+            }, settings.appearance.themes[themeId].fontFamily === 'system' ? '' : settings.appearance.themes[themeId].fontFamily,
             options.translate('settings.descriptions.uiFont', 'Leave empty to use the system font; separate several families with semicolons.')),
             fieldItem('angle', {
               title: options.translate('settings.fields.accentNeighborAngle', 'Secondary color phase angle'),
               fieldType: 'number', presentation: 'slider', min: -180, max: 180, step: 1, suffix: '°',
-            }, settings.appearance.accentNeighborAngles[themeId],
+            }, settings.appearance.themes[themeId].accentNeighborAngle,
             options.translate('settings.descriptions.accentNeighborAngle', 'Which side the secondary color leans toward.')),
           ],
           {

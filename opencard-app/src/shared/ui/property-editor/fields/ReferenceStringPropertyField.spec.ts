@@ -4,8 +4,44 @@ import { createI18n } from 'vue-i18n'
 import { afterEach, describe, expect, it } from 'vitest'
 import ReferenceStringPropertyField from './ReferenceStringPropertyField.vue'
 import StringPropertyField from './StringPropertyField.vue'
+import PropertyFieldRenderer from '../PropertyFieldRenderer.vue'
+import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 
 describe('ReferenceStringPropertyField', () => {
+  it('edits array tags without submitting partial input, and commits on Enter, blur and removal', async () => {
+    const definition: PropertyEditorFieldDefinition = { title: 'Viewed guides', fieldType: 'string[]',
+      listSeparator: 'semicolon', optionLabels: { overview: 'Interface tour' } }
+    const wrapper = mount(PropertyFieldRenderer, { props: { definition, value: ['overview'], editorId: 'field' },
+      global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] } })
+    expect(wrapper.text()).toContain('Interface tour')
+    const input = wrapper.get('input')
+    await input.setValue('welcome')
+    expect(wrapper.emitted('update:value')).toBeUndefined()
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual([['overview', 'welcome']])
+    await wrapper.setProps({ value: ['overview', 'welcome'] })
+    expect(input.element.value).toBe('')
+    await input.setValue('custom')
+    await input.trigger('blur')
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual([['overview', 'welcome', 'custom']])
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual([['welcome', 'custom']])
+    wrapper.unmount()
+  })
+
+  it('keeps existing array tags when accepting a suggestion after focusing the empty input', async () => {
+    const definition: PropertyEditorFieldDefinition = { title: 'Viewed guides', fieldType: 'string[]', listSeparator: 'semicolon',
+      completion: { provider: ({ value, cursor }) => ({ replaceStart: value.lastIndexOf(';', cursor - 1) + 1,
+        replaceEnd: value.length, items: [{ key: 'welcome', label: 'Create project', insertText: 'welcome' }] }) } }
+    const wrapper = mount(PropertyFieldRenderer, { props: { definition, value: ['overview'], editorId: 'field' },
+      global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] } })
+    await wrapper.get('input').trigger('focus')
+    await flushPromises()
+    await wrapper.get('input').trigger('keydown', { key: 'Tab' })
+    expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual([['overview', 'welcome']])
+    wrapper.unmount()
+  })
+
   it.each([StringPropertyField, ReferenceStringPropertyField])('accepts the shortest trailing ghost completion', async (component) => {
     const wrapper = mount(component, { props: {
       value: '12p', definition: { title: 'Width', fieldType: 'string',

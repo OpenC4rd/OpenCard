@@ -2,14 +2,13 @@
 <template>
   <Teleport to="body">
     <Transition name="oc-dialog" @after-leave="finishClose">
-      <div v-if="open" ref="backdropRef" class="oc-dialog__backdrop" @pointerdown.self="handleBackdropPointerDown" @keydown="handleKeydown">
+      <div v-if="open" ref="backdropRef" class="oc-dialog__backdrop" @pointerdown.self="handleBackdropPointerDown">
         <OcDialogLayout :size="size" :sidebar="sidebar" :label="sidebarTitle || title" :tooltip="sidebarTooltip"
           role="dialog" aria-modal="true" :aria-labelledby="titleId"
           :aria-describedby="description ? descriptionId : undefined">
           <template #default>
             <component
               :is="as"
-              ref="dialogRef"
               class="oc-dialog"
               :class="[
                 `oc-dialog--height-mode-${heightMode}`,
@@ -50,7 +49,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch, watchEffect } from 'vue'
-import { activeDialogRoot, registerDialogRoot } from '../../shared/ui/overlayScope'
+import { registerDialogRoot } from '../../shared/ui/overlayScope'
 import OcDialogLayout from './OcDialogLayout.vue'
 
 defineOptions({ name: 'OcDialog', inheritAttrs: false })
@@ -102,13 +101,11 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   submit: [event: Event]
 }>()
-const dialogRef = ref<HTMLElement | null>(null)
 const backdropRef = ref<HTMLElement | null>(null)
 let unregister: (() => void) | undefined
 const dialogId = `oc-dialog-${useId().replace(/:/g, '')}`
 const titleId = `${dialogId}-title`
 const descriptionId = `${dialogId}-description`
-let returnFocusTarget: HTMLElement | null = null
 
 watchEffect(() => {
   if (import.meta.env.DEV && props.heightMode === 'fixed' && !props.height) {
@@ -122,54 +119,24 @@ watchEffect(() => {
   }
 })
 
-const focusableSelector = [
-  'button:not([disabled])',
-  '[href]',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[contenteditable="true"]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
 watch(() => props.open, async open => {
   if (!open) return
-  returnFocusTarget = document.activeElement instanceof HTMLElement ? document.activeElement : null
   await nextTick()
   if (!props.open || !backdropRef.value) return
   unregister?.()
-  unregister = registerDialogRoot(backdropRef.value)
-  focusInitialControl()
+  unregister = registerDialogRoot(backdropRef.value, { onEscape: () => {
+    if (props.closeOnEscape) requestClose('escape')
+  } })
 }, { immediate: true })
 
 onBeforeUnmount(() => {
   unregister?.()
-  if (props.open) restoreFocus()
 })
 
 function finishClose(): void {
   if (props.open) return
   unregister?.()
   unregister = undefined
-  restoreFocus()
-}
-
-function enabledFocusTargets(): HTMLElement[] {
-  return Array.from(backdropRef.value?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
-    .filter(element => !element.closest('[inert]') && element.getAttribute('aria-hidden') !== 'true')
-}
-
-function focusInitialControl(): void {
-  const dialog = dialogRef.value
-  if (!dialog) return
-  const autofocusTarget = dialog.querySelector<HTMLElement>('[autofocus]')
-  ;(autofocusTarget ?? enabledFocusTargets()[0] ?? dialog).focus()
-}
-
-function restoreFocus(): void {
-  const target = returnFocusTarget
-  returnFocusTarget = null
-  if (target?.isConnected) target.focus()
 }
 
 function requestClose(reason: OcDialogCloseReason): void {
@@ -180,32 +147,6 @@ function handleBackdropPointerDown(): void {
   if (props.closeOnBackdrop) requestClose('backdrop')
 }
 
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.defaultPrevented || activeDialogRoot.value !== backdropRef.value) return
-  if (event.key === 'Escape' && props.closeOnEscape && props.dismissible) {
-    event.preventDefault()
-    event.stopPropagation()
-    requestClose('escape')
-    return
-  }
-  if (event.key !== 'Tab') return
-
-  const targets = enabledFocusTargets()
-  if (targets.length === 0) {
-    event.preventDefault()
-    dialogRef.value?.focus()
-    return
-  }
-  const first = targets[0]!
-  const last = targets[targets.length - 1]!
-  if (event.shiftKey && (document.activeElement === first || !backdropRef.value?.contains(document.activeElement))) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
-  }
-}
 </script>
 
 <style scoped>

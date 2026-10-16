@@ -8,10 +8,11 @@
     :model-value="stringValue" :options="selectOptions" appearance="sliding-outline" fill
     @update:model-value="emit('update:value', $event)" />
   <OcSelect v-else-if="definition.options?.length" :model-value="stringValue"
-    :options="selectOptions" full-width @update:model-value="emit('update:value', $event)" />
+    :options="selectOptions" :aria-label="definition.title" full-width @update:model-value="emit('update:value', $event)" />
   <OcFieldFrame v-else-if="definition.multiline" class="multiline-field" full-width>
     <OcFieldInput as="textarea" variant="plain" full-width class="multiline-field__input"
-      :value="draftValue" :placeholder="definition.placeholder"
+      :value="draftValue" :placeholder="definition.placeholder" :maxlength="definition.maxLength" :minlength="definition.minLength"
+      :aria-label="definition.title"
       resize="none" @input="handleInput" @blur="handleBlur" @keydown="handleKeydown" />
   </OcFieldFrame>
   <OcFieldFrame v-else class="autocomplete-field" full-width>
@@ -24,7 +25,8 @@
       type="text"
       :value="draftValue"
       :readonly="definition.isReadonly"
-      :placeholder="definition.placeholder"
+      :placeholder="definition.placeholder" :maxlength="definition.maxLength" :minlength="definition.minLength"
+      :aria-label="definition.title"
       @input="handleInput"
       @blur="handleBlur"
       @keydown="handleKeydown"

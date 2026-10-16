@@ -17,7 +17,8 @@
     @close="emit('close-feedback')" />
 
   <OcDialog :open="Boolean(confirmationRequest)" :title="confirmationRequest?.title ?? ''"
-    :description="confirmationRequest?.message ?? ''" size="sm" @request-close="resolveConfirmation(false)">
+    size="sm" @request-close="resolveConfirmation(false)">
+    <OcInlineMarkup :source="confirmationRequest?.message ?? ''" />
     <template #footer>
       <OcButton variant="ghost" @click="resolveConfirmation(false)">
         {{ t('projectTemplates.actions.cancel') }}
@@ -37,6 +38,7 @@ import FloatingMenuHost from '../../../components/ui/FloatingMenuHost.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
+import OcInlineMarkup from '../../../components/standard/OcInlineMarkup.vue'
 import ReleaseNotesDialog from './ReleaseNotesDialog.vue'
 import FeedbackDialog from '../../feedback/components/FeedbackDialog.vue'
 import FeedbackHistoryDialog from '../../feedback/components/FeedbackHistoryDialog.vue'

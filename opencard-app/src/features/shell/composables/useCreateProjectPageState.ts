@@ -9,7 +9,7 @@ import { useProjectTemplateStore } from '../../project-templates/store/projectTe
 import { useStoredResourcePackageStore } from '../../workspace/store/storedResourcePackageStore'
 import type { useProjectStore } from '../../workspace/store/projectStore'
 import type { ProjectTemplateKey } from '../../project-templates/model/projectTemplate'
-import type { StoredResourcePackage } from '../../workspace/model/storedResourcePackage'
+import type { StoredResourcePackage, StoredResourcePackageWarning } from '../../workspace/model/storedResourcePackage'
 import type {
   OcNodeActionEvent,
   OcNodeCollection,
@@ -19,7 +19,6 @@ import type {
 import {
   ATTACH_RESOURCE_PACKAGE_ACTION_KEY,
   ATTACHED_RESOURCE_PACKAGE_ACTION_KEY,
-  IMPORT_TEMPLATE_ACTION_KEY,
   REMOVE_RESOURCE_PACKAGE_ACTION_KEY,
   TEMPLATE_REMOVE_ACTION_KEY,
   createResourcePackageTreeData,
@@ -31,7 +30,9 @@ import {
   STORED_RESOURCE_PACKAGES_GROUP_KEY,
   USER_TEMPLATES_GROUP_KEY,
   RESOURCE_PACKAGES_LIST_KEY,
+  TEMPLATES_LIST_KEY,
   IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
+  IMPORT_TEMPLATE_ACTION_KEY,
   USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
   DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
 } from '../shellSidebarConfig'
@@ -52,6 +53,7 @@ export function useCreateProjectPageState(options: {
   const selectedTemplateKey = ref<ProjectTemplateKey | null>(null)
   const attachedResourcePackagePaths = ref<string[]>([])
   const builtinResourcePackages = ref<readonly StoredResourcePackage[]>([])
+  const builtinResourcePackageWarnings = ref<readonly StoredResourcePackageWarning[]>([])
   const selectedResourcePackageKeys = ref<readonly string[]>([])
   const templateExpandedKeys = ref<string[]>([BUILTIN_TEMPLATES_GROUP_KEY, USER_TEMPLATES_GROUP_KEY])
   const resourcePackageExpandedKeys = ref<string[]>([
@@ -77,6 +79,7 @@ export function useCreateProjectPageState(options: {
     locale.value,
     t,
     { builtin: BUILTIN_TEMPLATES_GROUP_KEY, user: USER_TEMPLATES_GROUP_KEY },
+    templateStore.warnings.value,
   ))
   const resourcePackageTreeData = computed<OcNodeCollection>(() => createResourcePackageTreeData(
     builtinResourcePackages.value,
@@ -84,6 +87,7 @@ export function useCreateProjectPageState(options: {
     attachedResourcePackagePaths.value,
     t,
     { builtin: BUILTIN_RESOURCE_PACKAGES_GROUP_KEY, stored: STORED_RESOURCE_PACKAGES_GROUP_KEY },
+    { builtin: builtinResourcePackageWarnings.value, stored: resourcePackageStore.warnings.value },
   ))
 
   function describeCause(cause: unknown): string {
@@ -93,31 +97,25 @@ export function useCreateProjectPageState(options: {
     notifyError(message)
     publishAppOutput({ severity: 'error', message, detail: describeCause(cause) })
   }
-  async function removeUserTemplate(key: ProjectTemplateKey): Promise<void> {
-    const template = templateStore.findTemplate(key)
-    if (!template) return
+  async function removeUserTemplate(key: string): Promise<void> {
+    const template = templateStore.findTemplate(key as ProjectTemplateKey)
+    const path = template?.source === 'user' ? template.rootPath : templateStore.warnings.value.find(warning => warning.path === key)?.path
+    if (!path) return
     if (!await options.requestConfirmation({
       title: t('projectTemplates.actions.delete'),
       message: t('projectTemplates.confirmDelete'),
       confirmLabel: t('projectTemplates.actions.delete'),
     })) return
     try {
-      await templateStore.deleteUserTemplate(template)
-      if (selectedTemplateKey.value === template.key) selectedTemplateKey.value = templateStore.templates.value[0]?.key ?? null
+      await templateStore.deleteUserTemplate(path)
+      if (selectedTemplateKey.value === key) selectedTemplateKey.value = templateStore.templates.value[0]?.key ?? null
     } catch (cause) {
       reportFailure(t('projectTemplates.errors.unknown'), cause)
     }
   }
   async function handleTemplateAction(event: OcNodeActionEvent): Promise<void> {
     if (isProjectTemplateBusy.value) return
-    if (event.actionKey === TEMPLATE_REMOVE_ACTION_KEY) {
-      await removeUserTemplate(event.key as ProjectTemplateKey)
-      return
-    }
-    if (event.key === USER_TEMPLATES_GROUP_KEY && event.actionKey === IMPORT_TEMPLATE_ACTION_KEY
-      && !templateStore.isLoading.value) {
-      options.onTemplateImport?.()
-    }
+    if (event.actionKey === TEMPLATE_REMOVE_ACTION_KEY) await removeUserTemplate(event.key)
   }
   async function handleTemplateSelectionChange(event: OcNodeSelectionEvent): Promise<void> {
     const key = event.selectedKeys[0] as ProjectTemplateKey | undefined
@@ -136,15 +134,15 @@ export function useCreateProjectPageState(options: {
       ? [...resourcePackageExpandedKeys.value, event.key]
       : resourcePackageExpandedKeys.value.filter(key => key !== event.key)
   }
-  async function removeStoredResourcePackage(pack: StoredResourcePackage): Promise<void> {
+  async function removeStoredResourcePackage(path: string): Promise<void> {
     if (!await options.requestConfirmation({
       title: t('projectTemplates.sections.resourcePackages'),
-      message: t('projectTemplates.confirmRemoveResourcePackage', { name: pack.title }),
+      message: t('projectTemplates.confirmRemoveResourcePackage', { name: resourcePackageTreeData.value.items.get(path)?.label ?? path }),
       confirmLabel: t('projectTemplates.actions.removeResourcePackage'),
     })) return
     try {
-      await resourcePackageStore.removePackage(pack.path)
-      attachedResourcePackagePaths.value = attachedResourcePackagePaths.value.filter(path => path !== pack.path)
+      await resourcePackageStore.removePackage(path)
+      attachedResourcePackagePaths.value = attachedResourcePackagePaths.value.filter(candidate => candidate !== path)
     } catch (cause) {
       reportFailure(t('projectTemplates.errors.resourcePackageRemoveFailed'), cause)
     }
@@ -152,15 +150,18 @@ export function useCreateProjectPageState(options: {
   function handleResourcePackageAction(event: OcNodeActionEvent): void {
     if (isProjectTemplateBusy.value) return
     const path = event.key
+    if (event.actionKey === REMOVE_RESOURCE_PACKAGE_ACTION_KEY) {
+      if (resourcePackageStore.findPackage(path) || resourcePackageStore.warnings.value.some(warning => warning.path === path)) {
+        void removeStoredResourcePackage(path)
+      }
+      return
+    }
     const pack = allResourcePackages.value.find(candidate => candidate.path === path)
     if (!pack) return
     if (event.actionKey === ATTACH_RESOURCE_PACKAGE_ACTION_KEY) {
       if (!attachedResourcePackagePaths.value.includes(path)) attachedResourcePackagePaths.value = [...attachedResourcePackagePaths.value, path]
     } else if (event.actionKey === ATTACHED_RESOURCE_PACKAGE_ACTION_KEY) {
       attachedResourcePackagePaths.value = attachedResourcePackagePaths.value.filter(candidate => candidate !== path)
-    } else if (event.actionKey === REMOVE_RESOURCE_PACKAGE_ACTION_KEY) {
-      const stored = resourcePackageStore.findPackage(path)
-      if (stored) void removeStoredResourcePackage(stored)
     }
   }
   async function importStoredResourcePackage(): Promise<void> {
@@ -193,6 +194,7 @@ export function useCreateProjectPageState(options: {
     const builtin = await loadBuiltinResourcePackages().catch(() => null)
     if (builtin) {
       builtinResourcePackages.value = builtin.packs
+      builtinResourcePackageWarnings.value = builtin.warnings
       reportCatalogWarnings({ warnings: builtin.warnings, summaryKey: 'projectTemplates.status.unreadableResourcePackages', itemKey: 'projectTemplates.status.unreadableResourcePackage', translate: t })
     }
     try {
@@ -220,7 +222,12 @@ export function useCreateProjectPageState(options: {
   const canUseSelectedResourcePackages = computed(() => selectedResourcePackagePaths.value.some(path => !attachedResourcePackagePaths.value.includes(path)))
   const canDisableSelectedResourcePackages = computed(() => selectedResourcePackagePaths.value.some(path => attachedResourcePackagePaths.value.includes(path)))
   async function handleListAction(listKey: string, actionKey: string): Promise<void> {
-    if (!options.isCreateProjectMode.value || isProjectTemplateBusy.value || listKey !== RESOURCE_PACKAGES_LIST_KEY) return
+    if (!options.isCreateProjectMode.value || isProjectTemplateBusy.value) return
+    if (listKey === TEMPLATES_LIST_KEY) {
+      if (actionKey === IMPORT_TEMPLATE_ACTION_KEY && !templateStore.isLoading.value) await options.onTemplateImport?.()
+      return
+    }
+    if (listKey !== RESOURCE_PACKAGES_LIST_KEY) return
     if (actionKey === IMPORT_RESOURCE_PACKAGE_ACTION_KEY) return importStoredResourcePackage()
     if (actionKey === USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY) {
       attachedResourcePackagePaths.value = [...new Set([...attachedResourcePackagePaths.value, ...selectedResourcePackagePaths.value])]

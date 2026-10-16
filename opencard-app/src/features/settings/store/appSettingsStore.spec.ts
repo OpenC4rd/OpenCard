@@ -1,11 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDefaultAppSettings, getThemePreset } from '../model/appSettings'
-import { MemorySettingsPersistence } from '../services/settingsPersistence'
+import { MemoryJsonPersistence } from '../../../shared/storage/jsonPersistence'
 import { createAppSettingsStore } from './appSettingsStore'
 
 describe('appSettingsStore', () => {
+  it('persists viewed guides and saves tag removal only on explicit save', async () => {
+    const persistence = new MemoryJsonPersistence({ tutorials: { seen: [' overview ', 'overview', 3, '', 'welcome'], extra: true } })
+    const store = createAppSettingsStore(persistence)
+    await store.initialize()
+    expect(store.settings.value.tutorials.seen).toEqual(['overview', 'welcome'])
+    store.previewSetting('tutorials.seen', ['overview'])
+    await store.flush()
+    expect(await persistence.load()).toMatchObject({ tutorials: { seen: ['overview', 'welcome'] } })
+    await store.save()
+    const reloaded = createAppSettingsStore(persistence)
+    await reloaded.initialize()
+    expect(reloaded.settings.value.tutorials.seen).toEqual(['overview'])
+    reloaded.resetAll()
+    await reloaded.flush()
+    expect(await persistence.load()).toMatchObject({ tutorials: { seen: [] } })
+  })
+
   it('loads normalized settings and becomes ready', async () => {
-    const persistence = new MemorySettingsPersistence({
+    const persistence = new MemoryJsonPersistence({
       version: 1,
       appearance: { theme: 'light', locale: 'en-US' },
       shell: { sidebarWidth: 320, sidebarCollapsed: true },
@@ -16,11 +33,10 @@ describe('appSettingsStore', () => {
 
     expect(store.isReady.value).toBe(true)
     expect(store.settings.value.appearance.theme).toBe('light')
-    expect(store.settings.value.shell.sidebarWidth).toBe(320)
   })
 
   it('validates semantic updates and persists the final document', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const store = createAppSettingsStore(persistence)
     await store.initialize()
 
@@ -33,14 +49,12 @@ describe('appSettingsStore', () => {
     store.updateThemeFont('light', 'serif')
     store.updateSetting('updates.showReleaseNotesAfterUpdate', false)
     store.updateSetting('exporting.openCdeWorkbookAfterExport', false)
-    store.updateShell({ sidebarWidth: 9999, sidebarCollapsed: true })
     store.updateSetting('workspace.structureTreeSelectionBehavior', 'expand')
     store.updateSetting('workspace.structureTreeScrollToSelection', false)
     store.updateSetting('workspace.hideDotFiles', false)
     store.updateSetting('workspace.showSelectionPositionOnMove', false)
     store.updateSetting('workspace.showSelectionSizeOnResize', false)
     store.updateSetting('workspace.alignmentSnappingEnabledByDefault', false)
-    store.updateProjectCreation({ lastParentPath: 'D:\\Cards' })
     await store.flush()
 
     const saved = await persistence.load()
@@ -51,10 +65,11 @@ describe('appSettingsStore', () => {
         glassIntensity: 75,
         baseFontSize: 14,
         phaseImageSpeed: 250,
-        accentNeighborAngles: { dark: -50, light: -72 },
-        fontFamilies: { dark: 'system', light: 'serif' },
+        themes: {
+          dark: { accentNeighborAngle: -50, fontFamily: 'system' },
+          light: { accentNeighborAngle: -72, fontFamily: 'serif' },
+        },
       },
-      shell: { sidebarWidth: 420, sidebarCollapsed: true },
       updates: { showReleaseNotesAfterUpdate: false },
       exporting: { openCdeWorkbookAfterExport: false },
       workspace: {
@@ -65,12 +80,11 @@ describe('appSettingsStore', () => {
         showSelectionSizeOnResize: false,
         alignmentSnappingEnabledByDefault: false,
       },
-      projectCreation: { lastParentPath: 'D:\\Cards' },
     })
   })
 
   it('persists the committer identity and the initial-commit option', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const store = createAppSettingsStore(persistence)
     await store.initialize()
 
@@ -93,7 +107,7 @@ describe('appSettingsStore', () => {
   })
 
   it('persists the title bar notice history limit', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const store = createAppSettingsStore(persistence)
     await store.initialize()
 
@@ -105,7 +119,7 @@ describe('appSettingsStore', () => {
   })
 
   it('applies continuous previews without persisting until commit', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const save = vi.spyOn(persistence, 'save')
     const store = createAppSettingsStore(persistence)
     await store.initialize()
@@ -126,24 +140,24 @@ describe('appSettingsStore', () => {
   })
 
   it('previews, persists, applies presets, and resets per-theme appearance', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const save = vi.spyOn(persistence, 'save')
     const store = createAppSettingsStore(persistence)
     await store.initialize()
     save.mockClear()
 
     store.previewThemeColor('dark', '--oc-accent', '#112233')
-    expect(store.settings.value.appearance.themeOverrides.dark['--oc-accent']).toBe('#112233')
+    expect(store.settings.value.appearance.themes.dark.colors['--oc-accent']).toBe('#112233')
     expect(save).not.toHaveBeenCalled()
 
     store.updateThemeColor('dark', '--oc-accent', '#112233')
     store.updateThemeAngle('dark', -72)
     await store.flush()
-    expect(store.settings.value.appearance.accentNeighborAngles.dark).toBe(-72)
+    expect(store.settings.value.appearance.themes.dark.accentNeighborAngle).toBe(-72)
 
     store.applyThemePreset('dark', 'grass-block')
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('grass-block')
-    expect(store.settings.value.appearance.themeOverrides.dark).toEqual({
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('grass-block')
+    expect(store.settings.value.appearance.themes.dark.colors).toEqual({
       '--oc-accent': '#75FF53',
       '--oc-bg-base': '#34251A',
       '--oc-fg-default': '#CCCCCC',
@@ -151,9 +165,13 @@ describe('appSettingsStore', () => {
 
     store.applyThemePreset('dark', 'default')
     await store.flush()
-    expect(store.settings.value.appearance.themeOverrides.dark).toEqual({})
-    expect(store.settings.value.appearance.accentNeighborAngles.dark).toBe(-50)
-    expect(store.settings.value.appearance.fontFamilies.dark).toBe('system')
+    expect(store.settings.value.appearance.themes.dark.colors).toEqual(getThemePreset('dark', 'default')!.colors)
+    expect(store.settings.value.appearance.themes.dark.accentNeighborAngle).toBe(-50)
+    expect(store.settings.value.appearance.themes.dark.fontFamily).toBe('system')
+
+    store.updateThemeColor('dark', '--oc-accent', '#123456')
+    store.updateThemeColor('dark', '--oc-accent', null)
+    expect(store.settings.value.appearance.themes.dark.colors).toEqual(getThemePreset('dark', 'default')!.colors)
 
     store.importThemePreset('dark', 'Forest', {
       colors: {
@@ -164,56 +182,62 @@ describe('appSettingsStore', () => {
       accentNeighborAngle: -25,
       fontFamily: 'Inter; SimSun',
     })
-    expect(store.settings.value.appearance.userThemePresets.dark).toHaveLength(1)
-    expect(store.settings.value.appearance.themeOverrides.dark['--oc-accent']).toBe('#228833')
+    expect(store.settings.value.appearance.themes.dark.presets).toHaveLength(1)
+    expect(store.settings.value.appearance.themes.dark.colors['--oc-accent']).toBe('#228833')
 
     store.updateThemeColor('dark', '--oc-accent', '#FFFFFF')
     // 手改颜色之后不再等于任何预设，选中项回落到"自定义"。
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('')
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('')
     store.applyThemePreset('dark', 'user:Forest')
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('user:Forest')
-    expect(store.settings.value.appearance.themeOverrides.dark['--oc-accent']).toBe('#228833')
-    expect(store.settings.value.appearance.fontFamilies.dark).toBe('Inter; SimSun')
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('user:Forest')
+    expect(store.settings.value.appearance.themes.dark.colors['--oc-accent']).toBe('#228833')
+    expect(store.settings.value.appearance.themes.dark.fontFamily).toBe('Inter; SimSun')
+
+    await store.flush()
+    const reloaded = createAppSettingsStore(persistence)
+    await reloaded.initialize()
+    expect(reloaded.settings.value.appearance.themes).toEqual(store.settings.value.appearance.themes)
+    expect(reloaded.settings.value.appearance.themes.light).toEqual(createDefaultAppSettings().appearance.themes.light)
 
     store.deleteThemePreset('dark', 'user:Forest')
-    expect(store.settings.value.appearance.userThemePresets.dark).toEqual([])
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('')
-    expect(store.settings.value.appearance.themeOverrides.dark['--oc-accent']).toBe('#228833')
+    expect(store.settings.value.appearance.themes.dark.presets).toEqual([])
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('')
+    expect(store.settings.value.appearance.themes.dark.colors['--oc-accent']).toBe('#228833')
   })
 
   it('names the current theme as a custom preset and renames it afterwards', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const store = createAppSettingsStore(persistence)
     await store.initialize()
 
     store.updateThemeColor('dark', '--oc-accent', '#123456')
     store.saveThemePreset('dark', '  我的深色  ')
-    const presets = store.settings.value.appearance.userThemePresets.dark
+    const presets = store.settings.value.appearance.themes.dark.presets
     expect(presets.map(preset => preset.name)).toEqual(['我的深色'])
     expect(presets[0]!.definition.colors).toEqual({
       '--oc-accent': '#123456',
-      // 没被覆盖的颜色取主题注册表里的值，而不是留在预设里当空值。
+      // 保存预设时保留整套主题的颜色。
       '--oc-bg-base': '#1E1E1E',
       '--oc-fg-default': '#CCCCCC',
     })
     expect(presets[0]!.definition.accentNeighborAngle).toBe(-50)
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('user:我的深色')
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('user:我的深色')
 
     store.saveThemePreset('dark', '我的深色 2')
-    expect(store.settings.value.appearance.userThemePresets.dark.map(preset => preset.name))
+    expect(store.settings.value.appearance.themes.dark.presets.map(preset => preset.name))
       .toEqual(['我的深色 2'])
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('user:我的深色 2')
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('user:我的深色 2')
 
     // 空名字与同名提交都不写盘。
     store.saveThemePreset('dark', '   ')
     store.saveThemePreset('dark', '我的深色 2')
     await store.flush()
-    expect(store.settings.value.appearance.userThemePresets.dark.map(preset => preset.name))
+    expect(store.settings.value.appearance.themes.dark.presets.map(preset => preset.name))
       .toEqual(['我的深色 2'])
   })
 
   it('skips importing a theme that already exists and numbers the repeated base name', async () => {
-    const persistence = new MemorySettingsPersistence()
+    const persistence = new MemoryJsonPersistence()
     const store = createAppSettingsStore(persistence)
     await store.initialize()
 
@@ -223,74 +247,40 @@ describe('appSettingsStore', () => {
       fontFamily: 'Inter; SimSun',
     }
     expect(store.importThemePreset('dark', '已导入', forest)).toBe(true)
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('user:已导入')
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('user:已导入')
 
     // 完全相同：不新增，只把已有那条选上。
     expect(store.importThemePreset('dark', '已导入', forest)).toBe(false)
-    expect(store.settings.value.appearance.userThemePresets.dark.map(preset => preset.name))
+    expect(store.settings.value.appearance.themes.dark.presets.map(preset => preset.name))
       .toEqual(['已导入'])
 
     // 内置预设也一样认：导入一份和石墨完全相同的配色不会多出一条。
     const graphite = getThemePreset('dark', 'graphite')!
     expect(store.importThemePreset('dark', '已导入', graphite)).toBe(false)
-    expect(store.settings.value.appearance.userThemePresets.dark.map(preset => preset.name))
+    expect(store.settings.value.appearance.themes.dark.presets.map(preset => preset.name))
       .toEqual(['已导入'])
-    expect(store.settings.value.appearance.themePresetIds.dark).toBe('graphite')
+    expect(store.settings.value.appearance.themes.dark.presetId).toBe('graphite')
 
     // 名字撞车但配色不同：加序号，不顶掉前一条。
     expect(store.importThemePreset('dark', '已导入', {
       ...forest,
       colors: { ...forest.colors, '--oc-accent': '#445566' },
     })).toBe(true)
-    expect(store.settings.value.appearance.userThemePresets.dark.map(preset => preset.name))
+    expect(store.settings.value.appearance.themes.dark.presets.map(preset => preset.name))
       .toEqual(['已导入', '已导入 2'])
   })
 
-  it('keeps recently opened projects in most-recent-first order', async () => {
-    const persistence = new MemorySettingsPersistence()
-    const store = createAppSettingsStore(persistence)
-    await store.initialize()
-
-    store.rememberRecentProject('D:\\Projects\\One\\')
-    store.rememberRecentProject('D:/Projects/Two')
-    store.rememberRecentProject('d:/projects/one')
-    await store.flush()
-
-    expect(store.settings.value.projectCreation.recentProjects).toEqual([
-      'd:/projects/one',
-      'D:/Projects/Two',
-    ])
-    expect(await persistence.load()).toMatchObject({
-      projectCreation: {
-        recentProjects: ['d:/projects/one', 'D:/Projects/Two'],
-      },
-    })
-  })
-
-  it('forgets a recent project without touching its files', async () => {
-    const persistence = new MemorySettingsPersistence()
-    const store = createAppSettingsStore(persistence)
-    await store.initialize()
-    store.rememberRecentProject('D:/Projects/One')
-    store.rememberRecentProject('D:/Projects/Two')
-    store.updateProjectCreation({ workspaceStates: { 'D:/Projects/One': { expandedDirectories: ['assets'] } } })
-
-    store.forgetRecentProject('d:\\projects\\one\\')
-    await store.flush()
-
-    expect(store.settings.value.projectCreation.recentProjects).toEqual(['D:/Projects/Two'])
-    expect(store.settings.value.projectCreation.workspaceStates).not.toHaveProperty('D:/Projects/One')
-  })
-
   it('resets individual sections without replacing other settings', async () => {
-    const store = createAppSettingsStore(new MemorySettingsPersistence())
+    const store = createAppSettingsStore(new MemoryJsonPersistence())
     await store.initialize()
     store.updateSetting('appearance.theme', 'light')
-    store.updateShell({ sidebarWidth: 320 })
+    store.updateSetting('exporting.openCdeWorkbookAfterExport', false)
 
     store.resetSection('appearance')
 
     expect(store.settings.value.appearance).toEqual(createDefaultAppSettings().appearance)
-    expect(store.settings.value.shell.sidebarWidth).toBe(320)
+    expect(store.settings.value.exporting.openCdeWorkbookAfterExport).toBe(false)
   })
+
+
 })

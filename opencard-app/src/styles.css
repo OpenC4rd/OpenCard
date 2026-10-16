@@ -60,7 +60,6 @@
 @property --oc-icon-muted { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-accent { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-success { syntax: '<color>'; inherits: true; initial-value: transparent; }
-@property --oc-icon-active { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-warning { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-danger { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --oc-icon-file-opencard { syntax: '<color>'; inherits: true; initial-value: transparent; }
@@ -131,7 +130,6 @@ html.oc-theme-transitioning {
     --oc-icon-muted 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-accent 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-success 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
-    --oc-icon-active 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-warning 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-danger 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),
     --oc-icon-file-opencard 0ms var(--oc-ease) calc(var(--oc-duration-theme) / 2),

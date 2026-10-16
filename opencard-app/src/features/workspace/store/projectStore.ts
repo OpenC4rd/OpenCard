@@ -43,7 +43,8 @@ import {
   serializeProjectDictionary,
 } from '../model/projectDictionary'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
-import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../settings/model/workspaceState'
+import { findProjectWorkspaceState, updateProjectWorkspaceState } from '../../app-state/model/workspaceState'
+import { useAppStateStore } from '../../app-state/store/appStateStore'
 import { taskScheduler } from '../../../utils/taskScheduler'
 import type { OcNodeDropPosition } from '../../../shared/ui/node/node.types'
 import { getPathBasename, getPathDirectory, normalizePath } from '../../../shared/model/filePath'
@@ -138,6 +139,7 @@ const fileChangeRevision = ref(0)
 const registeredDirectories = ref(new Map<string, number>())
 const expandedDirectories = ref(new Set<string>())
 const settingsStore = useAppSettingsStore()
+const appStateStore = useAppStateStore()
 const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => resourceEnvironment.value?.state.value ?? {
   kind: 'project' as const, namespace: 'unbound', rootPath: null,
   fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
@@ -258,12 +260,12 @@ function toRelativeProjectPath(path: string): string {
 
 async function saveProjectWorkspaceState() {
   if (!projectPath.value) return
-  const states = settingsStore.settings.value.projectCreation.workspaceStates
+  const states = appStateStore.state.value.projects.workspaces
   const workspaceStates = updateProjectWorkspaceState(states, projectPath.value, (current) => {
     current.expandedDirectories = Array.from(expandedDirectories.value).sort()
     return current
   })
-  settingsStore.updateProjectCreation({ workspaceStates })
+  appStateStore.updateProjects({ workspaces: workspaceStates })
 }
 
 async function saveProjectConfiguration(path: string, content: string): Promise<string> {
@@ -352,7 +354,7 @@ const reloadProjectDictionary = () => reloadRegistry(PROJECT_DICTIONARY_FILE_NAM
 
 function loadProjectWorkspaceState() {
   const state = findProjectWorkspaceState(
-    settingsStore.settings.value.projectCreation.workspaceStates,
+    appStateStore.state.value.projects.workspaces,
     projectPath.value,
   )
   expandedDirectories.value = new Set(state?.expandedDirectories ?? [])

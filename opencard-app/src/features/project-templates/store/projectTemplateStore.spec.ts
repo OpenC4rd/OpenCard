@@ -17,7 +17,8 @@ function template(
     description: '',
     entry: 'main.ocdocument',
     rootPath: `/${source}/${id}`,
-    contentPath: `/${source}/${id}/content`,
+    contentPath: `/${source}/${id}/content`,
+
     coverPaths: [],
   }
 }
@@ -80,7 +81,7 @@ describe('projectTemplateStore', () => {
     expect(result).toEqual(catalogImported)
     expect(store.userTemplates.value).toEqual([catalogImported])
 
-    await store.deleteUserTemplate(catalogImported)
+    await store.deleteUserTemplate(catalogImported.rootPath)
     expect(store.userTemplates.value).toEqual([])
     expect(loadCatalog).toHaveBeenCalledTimes(3)
   })

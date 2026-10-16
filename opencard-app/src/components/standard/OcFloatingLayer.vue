@@ -16,8 +16,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, type CSSProperties } from 'vue'
-import { isOverlayRootActive, resolveOverlayRoot } from '../../shared/ui/overlayScope'
+import { computed, ref, toRef, watch, type CSSProperties } from 'vue'
+import { isOverlayRootActive, registerOverlayOwner, resolveOverlayRoot } from '../../shared/ui/overlayScope'
 import {
   autoUpdate,
   flip,
@@ -54,6 +54,9 @@ const props = withDefaults(defineProps<{
 
 
 const floatingRef = ref<HTMLElement | null>(null)
+watch([floatingRef, () => props.owner ?? (props.anchor instanceof HTMLElement ? props.anchor : null)], ([root, owner], _, cleanup) => {
+  if (root && owner) cleanup(registerOverlayOwner(root, owner))
+}, { flush: 'post' })
 const overlayRoot = computed(() => resolveOverlayRoot(props.owner ?? (props.anchor instanceof HTMLElement ? props.anchor : null)))
 const anchorRef = computed<ReferenceElement | null>(() => {
   const anchor = props.anchor

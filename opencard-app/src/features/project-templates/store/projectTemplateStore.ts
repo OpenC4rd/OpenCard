@@ -30,7 +30,7 @@ export interface ProjectTemplateStore {
   importUserTemplate(sourcePath: string): Promise<ProjectTemplate>
   createUserTemplate(request: CreateUserTemplateRequest): Promise<ProjectTemplate>
   exportProjectTemplate(request: ExportProjectTemplateRequest): Promise<string>
-  deleteUserTemplate(template: ProjectTemplate): Promise<void>
+  deleteUserTemplate(path: string): Promise<void>
   createProject(request: CreateProjectFromTemplateRequest): Promise<CreatedProject>
 }
 
@@ -112,9 +112,9 @@ export function createProjectTemplateStore(
     return await service.exportProjectTemplate(request)
   }
 
-  async function deleteUserTemplate(template: ProjectTemplate): Promise<void> {
+  async function deleteUserTemplate(path: string): Promise<void> {
     await waitForCatalogIdle()
-    await service.deleteUserTemplate(template)
+    await service.deleteUserTemplate(path)
     await waitForCatalogIdle()
     await load()
   }

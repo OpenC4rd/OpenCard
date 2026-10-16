@@ -41,7 +41,7 @@ export function useSettingsPageState(options: {
   })
   async function copyTheme(themeId: 'dark' | 'light'): Promise<void> {
     const appearance = options.settingsStore.settings.value.appearance
-    const text = serializeAppTheme(themeId, appearance.themeOverrides[themeId], appearance.accentNeighborAngles[themeId], appearance.fontFamilies[themeId])
+    const text = serializeAppTheme(appearance.themes[themeId])
     try { await navigator.clipboard.writeText(text); notifySuccess(t('settings.themeExchange.copied'), 'action.copy') }
     catch { notifyError(t('settings.themeExchange.copyFailed')) }
   }
@@ -78,12 +78,11 @@ export function useSettingsPageState(options: {
   async function handleIntent(intent: SettingsIntent): Promise<void> {
     const store = options.settingsStore
     switch (intent.type) {
-      case 'setting.preview': store.previewSetting(intent.key, intent.value); return
-      case 'setting.change': store.updateSetting(intent.key, intent.value); return
-      case 'theme-color.preview': case 'theme-color.cancel': store.previewThemeColor(intent.themeId, intent.token, intent.value); return
-      case 'theme-color.change': store.updateThemeColor(intent.themeId, intent.token, intent.value); return
-      case 'theme-angle.preview': store.previewThemeAngle(intent.themeId, intent.value); return
-      case 'theme-angle.change': store.updateThemeAngle(intent.themeId, intent.value); return
+      // 设置页只暂存：改动实时生效但不落盘，由页面右上角的「保存」统一写入。
+      case 'setting.preview': case 'setting.change': store.previewSetting(intent.key, intent.value); return
+      case 'theme-color.preview': case 'theme-color.cancel': case 'theme-color.change':
+        store.previewThemeColor(intent.themeId, intent.token, intent.value); return
+      case 'theme-angle.preview': case 'theme-angle.change': store.previewThemeAngle(intent.themeId, intent.value); return
       case 'theme-font.change': store.updateThemeFont(intent.themeId, intent.value); return
       case 'theme-preset.change': store.applyThemePreset(intent.themeId, intent.presetId); return
       case 'theme-preset.delete': store.deleteThemePreset(intent.themeId, intent.presetId); return

@@ -1,19 +1,14 @@
 <template>
   <OcDialog class="unsaved-editors-dialog"
-    :open="open" :title="title" :description="description" :size="isSingle ? 'md' : 'lg'"
+    :open="open" :title="title" :size="isSingle ? 'md' : 'lg'"
     :height-mode="isSingle ? 'content' : 'fixed'" :height="isSingle ? undefined : 'lg'"
     :padded="false" :scrollable="false" :dismissible="!busy" @request-close="handleCancel">
-    <template #header="{ titleId, descriptionId }">
-        <div class="unsaved-editors-dialog__header-content">
-          <div>
-            <h2 :id="titleId">{{ title }}</h2>
-            <p :id="descriptionId">{{ description }}</p>
-            <p v-if="singleError" class="unsaved-editors-dialog__error" role="alert">
-              {{ resolveError(singleError) }}
-            </p>
-          </div>
-        </div>
-    </template>
+    <div class="unsaved-editors-dialog__message">
+      <p>{{ description }}</p>
+      <p v-if="isSingle && singleError" class="unsaved-editors-dialog__error" role="alert">
+        {{ resolveError(singleError) }}
+      </p>
+    </div>
 
         <div v-if="!isSingle" class="unsaved-editors-dialog__selection-bar">
           <OcCheckbox
@@ -255,27 +250,16 @@ function handleCancel(): void {
   padding: var(--oc-action-padding);
 }
 
-.unsaved-editors-dialog__header-content {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--oc-space-md);
+.unsaved-editors-dialog__message {
+  padding: var(--oc-space-md);
 }
 
-.unsaved-editors-dialog__header-content h2,
-.unsaved-editors-dialog__header-content p {
+.unsaved-editors-dialog__message p {
   margin: 0;
 }
 
-.unsaved-editors-dialog__header-content h2 {
-  font-size: var(--oc-text-lg);
-  font-weight: 600;
-}
-
-.unsaved-editors-dialog__header-content p {
+.unsaved-editors-dialog__message p + p {
   margin-top: var(--oc-space-xs);
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-sm);
 }
 
 .unsaved-editors-dialog__selection-bar {

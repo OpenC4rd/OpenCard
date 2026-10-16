@@ -1,10 +1,9 @@
-import type { ProjectTemplate } from '../project-templates/model/projectTemplate'
+import type { ProjectTemplate, TemplateCatalogWarning } from '../project-templates/model/projectTemplate'
 import { resolveProjectTemplateName } from '../project-templates/model/projectTemplate'
-import type { StoredResourcePackage } from '../workspace/model/storedResourcePackage'
+import type { StoredResourcePackage, StoredResourcePackageWarning } from '../workspace/model/storedResourcePackage'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import type { OcNode, OcNodeAction, OcNodeCollection, OcNodeTailPart } from '../../shared/ui/node/node.types'
 
-export const IMPORT_TEMPLATE_ACTION_KEY = 'import-template'
 export const TEMPLATE_REMOVE_ACTION_KEY = 'template.remove'
 export const ATTACH_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.attach'
 export const ATTACHED_RESOURCE_PACKAGE_ACTION_KEY = 'resource-package.attached'
@@ -24,30 +23,44 @@ export const TEMPLATE_COVER_TREE_PREFIX = 'template-cover:'
 
 export type ShellCatalogLabels = (key: string, params?: Record<string, unknown>) => string
 
+function unusableCatalogItem(warning: { path: string; reason: string }, remove?: OcNodeAction): OcNode {
+  return {
+    label: warning.path.split(/[/\\]/).filter(Boolean).pop() ?? warning.path,
+    tone: 'danger', disabled: true, disabledReason: warning.reason,
+    visual: { type: 'icon', icon: 'status.error', iconTone: 'danger' },
+    ...(remove ? { tail: [remove] } : {}),
+  }
+}
+
 export function createTemplateTreeData(
   builtinTemplates: readonly ProjectTemplate[],
   userTemplates: readonly ProjectTemplate[],
   locale: string,
   translate: ShellCatalogLabels,
   groups: { builtin: string; user: string },
+  warnings: readonly TemplateCatalogWarning[],
 ): OcNodeCollection {
   const items = new Map<string, OcNode>()
   const children = new Map<string, readonly string[]>()
-  for (const [groupKey, templates, removable, actions, emptyLabel] of [
-    [groups.builtin, builtinTemplates, false, [] as OcNodeAction[], 'projectTemplates.status.noBuiltinTemplates'],
-    [groups.user, userTemplates, true, [{ key: IMPORT_TEMPLATE_ACTION_KEY, title: translate('projectTemplates.actions.import'), icon: 'action.import' }], 'projectTemplates.status.noUserTemplates'],
+  for (const [groupKey, templates, removable, emptyLabel] of [
+    [groups.builtin, builtinTemplates, false, 'projectTemplates.status.noBuiltinTemplates'],
+    [groups.user, userTemplates, true, 'projectTemplates.status.noUserTemplates'],
   ] as const) {
-    items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.user'), visual: { type: 'icon', icon: 'file.package' }, ...(actions.length ? { tail: actions } : {}) })
-    if (!templates.length) {
+    items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.user'), visual: { type: 'icon', icon: 'file.template' } })
+    const unusable = removable ? warnings : []
+    if (!templates.length && !unusable.length) {
       const emptyKey = `${groupKey}:empty`
       items.set(emptyKey, { label: translate(emptyLabel), visual: { type: 'icon', icon: 'file.generic' }, disabled: true })
       children.set(groupKey, [emptyKey])
       continue
     }
-    children.set(groupKey, templates.map(template => template.key))
+    children.set(groupKey, [...templates.map(template => template.key), ...unusable.map(warning => warning.path)])
+    for (const warning of unusable) items.set(warning.path, unusableCatalogItem(warning, {
+      key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'action.delete', iconTone: 'danger', alwaysVisible: true,
+    }))
     for (const template of templates) items.set(template.key, {
       label: resolveProjectTemplateName(template, locale),
-      visual: { type: 'icon', icon: 'file.opencard' },
+      visual: { type: 'icon', icon: 'file.template' },
       ...(removable ? { tail: [{ key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'action.delete', iconTone: 'danger' } satisfies OcNodeAction] } : {}),
     })
   }
@@ -85,6 +98,7 @@ export function createResourcePackageTreeData(
   attachedPaths: readonly string[],
   translate: ShellCatalogLabels,
   groups: { builtin: string; stored: string },
+  warnings: { builtin: readonly StoredResourcePackageWarning[]; stored: readonly StoredResourcePackageWarning[] },
 ): OcNodeCollection {
   const items = new Map<string, OcNode>()
   const children = new Map<string, readonly string[]>()
@@ -94,21 +108,23 @@ export function createResourcePackageTreeData(
     [groups.stored, translate('projectTemplates.sections.userPackages'), storedPacks, true],
   ] as const) {
     items.set(groupKey, { label, visual: { type: 'icon', icon: 'file.package' } })
-    if (packs.length === 0) {
+    const unusable = removable ? warnings.stored : warnings.builtin
+    if (packs.length === 0 && unusable.length === 0) {
       const emptyKey = `${groupKey}:empty`
       items.set(emptyKey, { label: translate(removable ? 'projectTemplates.status.noStoredResourcePackages' : 'projectTemplates.status.noBuiltinResourcePackages'), visual: { type: 'icon', icon: 'file.generic' }, disabled: true })
       children.set(groupKey, [emptyKey])
       continue
     }
-    children.set(groupKey, packs.map(pack => pack.path))
+    children.set(groupKey, [...packs.map(pack => pack.path), ...unusable.map(warning => warning.path)])
+    for (const warning of unusable) items.set(warning.path, unusableCatalogItem(warning, removable ? { ...removeAction, alwaysVisible: true } : undefined))
     for (const pack of packs) {
       const isAttached = attachedPaths.includes(pack.path)
       items.set(pack.path, {
         label: pack.title,
         visual: { type: 'icon', icon: 'file.package' },
         tail: [isAttached
-          ? { key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.detachResourcePackage'), icon: 'action.check', iconTone: 'success' }
-          : { key: ATTACH_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.attachResourcePackage'), icon: 'action.add' },
+          ? { key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.detachResourcePackage'), icon: 'action.check', iconTone: 'success', alwaysVisible: true }
+          : { key: ATTACH_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.attachResourcePackage'), icon: 'action.add', alwaysVisible: true },
         ...(removable ? [removeAction] : [])],
       })
     }

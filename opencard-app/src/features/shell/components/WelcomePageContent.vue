@@ -61,7 +61,7 @@ const { t } = useI18n()
       </h1>
       <p>{{ t('app.welcome.subtitle') }}</p>
       <div class="page-empty-state__actions">
-        <OcButton icon="action.add" variant="solid" size="lg" @click="emit('new-project')">
+        <OcButton data-oc-tutorial="welcome.new-project" icon="action.add" variant="solid" size="lg" @click="emit('new-project')">
           {{ t('app.menu.newProject') }}
         </OcButton>
         <OcButton icon="status.folder-open" variant="outline" size="lg" @click="emit('open-project')">

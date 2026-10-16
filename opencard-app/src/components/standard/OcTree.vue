@@ -713,16 +713,15 @@ function tailActionParts(key: OcNodeKey): OcActionDefinition[] {
 }
 
 /**
- * The node's trailing line in order. Multiple commands always use one menu so the first click
- * opens the menu and pointer movement can select the next action.
+ * 常显命令直接保留，其余多个命令合并成菜单。
  */
 function resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNodeTailPart[] {
   const parts = normalizeNodeTail(tail)
-  const actions = parts.filter(isNodeTailAction)
+  const actions = parts.filter(isNodeTailAction).filter(action => !action.alwaysVisible)
   if (actions.length <= 1) return parts
   let overflowPlaced = false
   return parts.flatMap((part): OcNodeTailPart[] => {
-    if (!isNodeTailAction(part)) return [part]
+    if (!isNodeTailAction(part) || part.alwaysVisible) return [part]
     if (overflowPlaced) return []
     overflowPlaced = true
     return [{

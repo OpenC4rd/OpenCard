@@ -7,7 +7,7 @@ import ProjectCoverField from './ProjectCoverField.vue'
 import ProjectExportTaskEditor from './ProjectExportTaskEditor.vue'
 import OcOptionGroup from '../standard/OcOptionGroup.vue'
 import OcButton from '../base/OcButton.vue'
-import { useAppSettingsStore } from '../../features/settings/store/appSettingsStore'
+import { useAppStateStore } from '../../features/app-state/store/appStateStore'
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, te: () => false }) }))
 vi.mock('./MonacoEditor.vue', () => ({ default: { template: '<div class="monaco-stub" />' } }))
@@ -27,7 +27,7 @@ vi.mock('../../features/workspace/services/projectIconCatalog', async (importOri
 describe('ProjectConfigEditor', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    useAppSettingsStore().updateProjectCreation({ workspaceStates: {} })
+    useAppStateStore().updateProjects({ workspaces: {} })
   })
 
   it('edits only project name, description, and version', async () => {
@@ -135,15 +135,15 @@ describe('ProjectConfigEditor', () => {
     expect(wrapper.get('#project-profile-section-information-content').attributes('aria-hidden')).toBe('true')
     expect(wrapper.find('[data-field-key="name"]').exists()).toBe(true)
     expect(wrapper.props('session').state.isDirty).toBe(false)
-    expect(useAppSettingsStore().settings.value.projectCreation.workspaceStates['D:/Demo']).toEqual({
+    expect(useAppStateStore().state.value.projects.workspaces['D:/Demo']).toEqual({
       expandedDirectories: [],
       projectProfile: { collapsedSections: ['information'] },
     })
   })
 
   it('expands a collapsed section when navigating from the outline', async () => {
-    useAppSettingsStore().updateProjectCreation({
-      workspaceStates: {
+    useAppStateStore().updateProjects({
+      workspaces: {
         'D:/Demo': {
           expandedDirectories: [],
           projectProfile: { collapsedSections: ['remote-resources'] },
@@ -160,7 +160,7 @@ describe('ProjectConfigEditor', () => {
 
     expect(wrapper.get('#project-profile-section-remote-resources-content').attributes('aria-hidden')).toBe('false')
     expect(wrapper.props('session').state.isDirty).toBe(false)
-    expect(useAppSettingsStore().settings.value.projectCreation.workspaceStates['D:/Demo']).toEqual({
+    expect(useAppStateStore().state.value.projects.workspaces['D:/Demo']).toEqual({
       expandedDirectories: [],
     })
   })

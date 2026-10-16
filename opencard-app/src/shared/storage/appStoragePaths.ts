@@ -12,6 +12,7 @@ import { homeDir, join } from '@tauri-apps/api/path'
 export const APP_STORAGE_DIRECTORY_NAME = '.opencard'
 
 export const APP_SETTINGS_FILE_NAME = 'settings.json'
+export const APP_STATE_FILE_NAME = 'app-state.json'
 export const APP_UPDATE_STATE_FILE_NAME = 'update-state.json'
 export const APP_FEEDBACK_RECEIPTS_FILE_NAME = 'feedback-receipts.json'
 /** 用户导入进来的包（`.ocpack` 归档）。 */

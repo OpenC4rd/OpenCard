@@ -24,7 +24,6 @@ import {
   TemplateServiceError,
   parseProjectTemplateManifest,
   resolveTemplateEntries,
-  isSafeProjectTemplateId,
   validateProjectName,
   validateTemplateDescription,
   validateTemplateName,
@@ -360,16 +359,14 @@ export class ProjectTemplateService {
     }
     return await this.commitUserTemplate(manifest, request.sourcePath, inspection.entryNames)
   }
-  async deleteUserTemplate(template: ProjectTemplate): Promise<void> {
-    if (template.source !== 'user') {
-      throw new TemplateServiceError('builtin-delete-forbidden', 'Built-in templates cannot be deleted')
-    }
-    if (!isSafeProjectTemplateId(template.id) || template.key !== `user:${template.id}`) {
-      throw new TemplateServiceError('invalid-manifest', 'Invalid user template identity')
-    }
-
+  async deleteUserTemplate(path: string): Promise<void> {
     const userRoot = await this.resolveUserTemplateRoot()
-    await this.fs.deleteFile(await this.paths.join(userRoot, template.id))
+    const name = await this.paths.basename(path)
+    const target = await this.paths.join(userRoot, name)
+    if (!name || name === '.' || name === '..' || normalizeRelativePath(path) !== normalizeRelativePath(target)) {
+      throw new TemplateServiceError('builtin-delete-forbidden', 'Only entries in the user template directory can be deleted')
+    }
+    await this.fs.deleteFile(target)
   }
 
   async createProject(request: CreateProjectFromTemplateRequest): Promise<CreatedProject> {

@@ -181,7 +181,8 @@
 
 .titlebar-notice-host {
   position: relative;
-  min-width: 0;
+  min-width: var(--oc-size-lg);
+  min-height: var(--oc-size-sm);
 }
 
 .titlebar-notice span {

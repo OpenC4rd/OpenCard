@@ -17,6 +17,7 @@ import { createExportTemplatePage } from './createExportTemplatePage'
 import { createAboutPage } from './createAboutPage'
 import { useAppProjectActions } from '../services/appProjectActions'
 import { resolveConfirmation } from '../services/appConfirmation'
+import { useAppStateStore } from '../../app-state/store/appStateStore'
 
 /** Initialize each page once in the application scope; selecting a page only selects its VM. */
 function createAppPages(destroyWindow: () => Promise<void>) {
@@ -34,6 +35,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   })
   const settings = createSettingsPage(() => workbench.cancelExportsAndWait())
   async function completeApplicationClose(action: ApplicationCloseAction): Promise<void> {
+    await useAppStateStore().flush()
     if (action === 'install-update') {
       if (services.availableUpdate.value) await services.installDownloadedUpdate()
       else if (import.meta.env.DEV && services.isDeveloperPreviewDownloaded.value) services.stopDeveloperUpdatePreview()

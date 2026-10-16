@@ -100,6 +100,8 @@ describe('UnsavedEditorsDialog', () => {
     expect(wrapper.find('.unsaved-editors-dialog__list').exists()).toBe(false)
     expect(wrapper.text()).toContain('Save changes to “Pending.ocdocument”?')
     expect(wrapper.text()).toContain('This draft has not been saved to disk.')
+    expect(wrapper.get('.oc-dialog__header').text()).not.toContain('This draft has not been saved to disk.')
+    expect(wrapper.get('.oc-dialog__body').text()).toContain('This draft has not been saved to disk.')
     expect(wrapper.text()).not.toContain('Save selected')
     expect(wrapper.text()).not.toContain('Confirm decisions')
     expect(wrapper.text()).not.toContain('Not saved to disk')

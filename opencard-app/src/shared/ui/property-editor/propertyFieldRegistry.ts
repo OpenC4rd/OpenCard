@@ -20,6 +20,7 @@ import NumberPropertyField from './fields/NumberPropertyField.vue'
 import NumberSliderPropertyField from './fields/NumberSliderPropertyField.vue'
 import ObjectPropertyField from './fields/ObjectPropertyField.vue'
 import ReferenceStringPropertyField from './fields/ReferenceStringPropertyField.vue'
+import ReferenceStringTokenField from './fields/ReferenceStringTokenField.vue'
 import StringPropertyField from './fields/StringPropertyField.vue'
 import VerticalAlignPositionPropertyField from './fields/VerticalAlignPositionPropertyField.vue'
 
@@ -68,6 +69,7 @@ export function formatPropertyFieldReadonlyValue(definition: PropertyEditorField
 }
 
 export function getPropertyFieldComponent(definition: PropertyEditorFieldDefinition): Component {
+  if (definition.fieldType === 'string[]' && definition.listSeparator) return ReferenceStringTokenField
   if (definition.fieldType === 'number' && definition.presentation === 'slider') {
     return NumberSliderPropertyField
   }

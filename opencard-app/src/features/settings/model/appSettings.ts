@@ -13,9 +13,6 @@ import {
 } from '../../../shared/ui/foundation'
 
 export const APP_SETTINGS_VERSION = 1 as const
-export const MIN_SIDEBAR_WIDTH = 220
-export const MAX_SIDEBAR_WIDTH = 420
-export const MAX_RECENT_PROJECTS = 8
 export const DEFAULT_ACCENT_NEIGHBOR_ANGLE = -50
 export const MIN_PHASE_IMAGE_SPEED = 25
 export const MAX_PHASE_IMAGE_SPEED = 400
@@ -65,37 +62,14 @@ export type AppThemeDefinition = {
   accentNeighborAngle: number
   fontFamily: string
 }
-export type ProjectWorkspaceSidebarState = {
-  collapsedLists: string[]
-  listWeights: Record<string, number>
-}
-
-/** Last package-builder input for one project; absent means "no build was made yet". */
-export type ProjectPackageBuilderState = {
-  name: string
-  /** 给人看的名字；缺省是包名。 */
-  title: string
-  author: string
-  version: string
-  fontFamilyKeys: string[]
-  fontCompositionKeys: string[]
-  iconSeriesKeys: string[]
-  customBlockKeys?: string[]
-  imagePaths: string[]
-  otherPaths?: string[]
-}
-
-export type ProjectWorkspaceState = {
-  expandedDirectories: string[]
-  sidebar?: ProjectWorkspaceSidebarState
-  projectProfile?: {
-    collapsedSections: string[]
-  }
-  packageBuilder?: ProjectPackageBuilderState
-}
 export type AppUserThemePreset = {
   name: string
   definition: AppThemeDefinition
+}
+export type AppThemeSettings = AppThemeDefinition & {
+  /** 空串表示自定义；同色预设通过 id 区分。 */
+  presetId: string
+  presets: AppUserThemePreset[]
 }
 
 export const APP_THEME_PRESETS: Readonly<Record<OcThemeId, readonly AppThemePresetId[]>> = {
@@ -104,14 +78,14 @@ export const APP_THEME_PRESETS: Readonly<Record<OcThemeId, readonly AppThemePres
 }
 
 /**
- * OpenCard 默认主题的预设定义。十六进制统一为大写，与存储中的覆盖色保持一致；
+ * OpenCard 默认主题的预设定义。十六进制统一为大写，与存储中的颜色保持一致；
  * 传入主题色即得到"石墨"这类只换主题色的派生预设。
  */
 function openCardThemeDefinition(
   themeId: OcThemeId,
   accentColor = OC_THEME_REGISTRY[themeId]['--oc-accent'],
 ): AppThemeDefinition {
-  return resolveThemeDefinition(themeId, { '--oc-accent': accentColor }, DEFAULT_ACCENT_NEIGHBOR_ANGLE, 'system')
+  return normalizeThemeDefinition(themeId, { colors: { '--oc-accent': accentColor } })
 }
 
 const BUILTIN_THEME_DEFINITIONS: Readonly<
@@ -167,6 +141,7 @@ const BUILTIN_THEME_DEFINITIONS: Readonly<
   },
 }
 export type AppSettingKey =
+  | 'tutorials.seen'
   | 'identity.publisherKey'
   | 'versionControl.committerName'
   | 'versionControl.committerEmail'
@@ -197,6 +172,7 @@ export type AppSettingKey =
 
 export interface AppSettings {
   version: typeof APP_SETTINGS_VERSION
+  tutorials: { seen: string[] }
   identity: {
     publisherKey: string
   }
@@ -215,16 +191,9 @@ export interface AppSettings {
     phaseImageSpeed: number
     /** 窗口底层的系统云母材质（仅 Windows 11 可用）。 */
     micaBackground: boolean
-    themeOverrides: Record<OcThemeId, OcThemeColorOverrides>
-    accentNeighborAngles: Record<OcThemeId, number>
-    fontFamilies: Record<OcThemeId, string>
-    /** 当前选中的预设 id（'' 表示这套配色已被改过、不属于任何预设）；颜色相同的预设靠它区分。 */
-    themePresetIds: Record<OcThemeId, string>
-    userThemePresets: Record<OcThemeId, AppUserThemePreset[]>
+    themes: Record<OcThemeId, AppThemeSettings>
   }
   shell: {
-    sidebarWidth: number
-    sidebarCollapsed: boolean
     titleBarNoticeHistoryLimit: number
   }
   updates: {
@@ -257,11 +226,6 @@ export interface AppSettings {
     showSelectionSizeOnResize: boolean
     alignmentSnappingEnabledByDefault: boolean
     historyEntryLimit: number
-  }
-  projectCreation: {
-    lastParentPath: string
-    recentProjects: string[]
-    workspaceStates: Record<string, ProjectWorkspaceState>
   }
 }
 
@@ -307,6 +271,7 @@ export type SettingsIntent =
 const DEFAULT_PUBLISHER_KEY = createPublisherKey()
 export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
   version: APP_SETTINGS_VERSION,
+  tutorials: { seen: [] },
   identity: Object.freeze({ publisherKey: DEFAULT_PUBLISHER_KEY }),
   versionControl: Object.freeze({
     committerName: '',
@@ -320,18 +285,12 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     baseFontSize: DEFAULT_BASE_FONT_SIZE,
     phaseImageSpeed: 100,
     micaBackground: false,
-    themeOverrides: Object.freeze({ dark: Object.freeze({}), light: Object.freeze({}) }),
-    accentNeighborAngles: Object.freeze({
-      dark: DEFAULT_ACCENT_NEIGHBOR_ANGLE,
-      light: DEFAULT_ACCENT_NEIGHBOR_ANGLE,
-    }),
-    fontFamilies: Object.freeze({ dark: 'system', light: 'system' }),
-    themePresetIds: Object.freeze({ dark: 'default', light: 'default' }),
-    userThemePresets: { dark: [], light: [] },
+    themes: {
+      dark: { ...openCardThemeDefinition('dark'), presetId: 'default', presets: [] },
+      light: { ...openCardThemeDefinition('light'), presetId: 'default', presets: [] },
+    },
   }),
   shell: Object.freeze({
-    sidebarWidth: 292,
-    sidebarCollapsed: false,
     titleBarNoticeHistoryLimit: 128,
   }),
   updates: Object.freeze({
@@ -360,11 +319,6 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     alignmentSnappingEnabledByDefault: true,
     historyEntryLimit: 100,
   }),
-  projectCreation: Object.freeze({
-    lastParentPath: '',
-    recentProjects: [],
-    workspaceStates: {},
-  }),
 })
 
 function clampCacheLimitGb(value: unknown, fallback: number): number {
@@ -380,13 +334,6 @@ function clampCustomBlockDepth(value: unknown): number {
 function clampCustomBlockNodes(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_APP_SETTINGS.rendering.customBlockMaxNodes
   return Math.min(MAX_CUSTOM_BLOCK_NODES, Math.max(MIN_CUSTOM_BLOCK_NODES, Math.round(value)))
-}
-
-function clampSidebarWidth(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return DEFAULT_APP_SETTINGS.shell.sidebarWidth
-  }
-  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(value)))
 }
 
 function clampPercentage(value: unknown, fallback: number): number {
@@ -447,22 +394,6 @@ export function resolveCommitterIdentity(settings: {
   }
 }
 
-function normalizeRecentProjects(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  const seen = new Set<string>()
-  const result: string[] = []
-  for (const item of value) {
-    if (typeof item !== 'string') continue
-    const path = item.trim().replace(/\\/g, '/').replace(/\/+$/, '')
-    const identity = path.toLocaleLowerCase()
-    if (!path || seen.has(identity)) continue
-    seen.add(identity)
-    result.push(path)
-    if (result.length >= MAX_RECENT_PROJECTS) break
-  }
-  return result
-}
-
 function clampPhaseImageSpeed(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return DEFAULT_APP_SETTINGS.appearance.phaseImageSpeed
@@ -496,7 +427,7 @@ function clampAngle(value: unknown, fallback = DEFAULT_ACCENT_NEIGHBOR_ANGLE): n
   return Math.min(180, Math.max(-180, Math.round(value)))
 }
 
-function normalizeThemeColorOverrides(value: unknown): OcThemeColorOverrides {
+function normalizeThemeColors(value: unknown): OcThemeColorOverrides {
   if (!isRecord(value)) return {}
   const result: OcThemeColorOverrides = {}
   for (const token of OC_EDITABLE_THEME_COLOR_KEYS) {
@@ -520,102 +451,54 @@ export function getThemePreset(
   return BUILTIN_THEME_DEFINITIONS[themeId][presetId as AppThemePresetId] ?? null
 }
 
-/** 主题色比较只看颜色本身：存储与预设各自的十六进制大小写不重要。 */
-function sameThemeColor(left: string, right: string): boolean {
-  return left.toUpperCase() === right.toUpperCase()
-}
-
-function matchesThemeColors(
-  themeId: OcThemeId,
-  overrides: OcThemeColorOverrides,
-  colors: Required<OcThemeColorOverrides>,
-): boolean {
-  return OC_EDITABLE_THEME_COLOR_KEYS.every(token => sameThemeColor(
-    overrides[token] ?? OC_THEME_REGISTRY[themeId][token],
-    colors[token],
-  ))
+export function isSameThemeDefinition(left: AppThemeDefinition, right: AppThemeDefinition): boolean {
+  return OC_EDITABLE_THEME_COLOR_KEYS.every(token => (
+    left.colors[token].toUpperCase() === right.colors[token].toUpperCase()
+  )) && left.accentNeighborAngle === right.accentNeighborAngle && left.fontFamily === right.fontFamily
 }
 
 export function resolveThemePresetId(
   themeId: OcThemeId,
-  overrides: OcThemeColorOverrides,
-  accentNeighborAngle: number,
-  fontFamily: string,
+  definition: AppThemeDefinition,
   userPresets: readonly AppUserThemePreset[] = [],
 ): string {
   for (const presetId of APP_THEME_PRESETS[themeId]) {
-    const preset = getThemePreset(themeId, presetId)!
-    if (matchesThemeColors(themeId, overrides, preset.colors)
-      && accentNeighborAngle === preset.accentNeighborAngle
-      && fontFamily === preset.fontFamily) return presetId
+    if (isSameThemeDefinition(definition, getThemePreset(themeId, presetId)!)) return presetId
   }
-  for (const preset of userPresets) {
-    if (matchesThemeColors(themeId, overrides, preset.definition.colors)
-      && accentNeighborAngle === preset.definition.accentNeighborAngle
-      && fontFamily === preset.definition.fontFamily) return `user:${preset.name}`
-  }
-  return ''
+  const preset = userPresets.find(preset => isSameThemeDefinition(definition, preset.definition))
+  return preset ? `user:${preset.name}` : ''
 }
 
-/**
- * 预设 id 只认当前存在的预设：认不出来或是空串就当作"改过的自定义配色"。
- * 老数据没有这个字段，那时才按颜色推导一次，保持升级前的选中项。
- */
-function normalizeThemePresetIds(
-  value: unknown,
-  themeOverrides: Record<OcThemeId, OcThemeColorOverrides>,
-  accentNeighborAngles: Record<OcThemeId, number>,
-  fontFamilies: Record<OcThemeId, string>,
-  userThemePresets: Record<OcThemeId, AppUserThemePreset[]>,
-): Record<OcThemeId, string> {
+function normalizeThemeSettings(themeId: OcThemeId, value: unknown): AppThemeSettings {
   const source = isRecord(value) ? value : {}
-  const resolve = (themeId: OcThemeId): string => {
-    const id = source[themeId]
-    if (typeof id !== 'string') {
-      return resolveThemePresetId(
-        themeId,
-        themeOverrides[themeId],
-        accentNeighborAngles[themeId],
-        fontFamilies[themeId],
-        userThemePresets[themeId],
-      )
-    }
-    const trimmed = id.trim()
-    if (!trimmed) return ''
-    if (APP_THEME_PRESETS[themeId].includes(trimmed as AppThemePresetId)) return trimmed
-    return userThemePresets[themeId].some(preset => `user:${preset.name}` === trimmed) ? trimmed : ''
+  const definition = normalizeThemeDefinition(themeId, source)
+  const presets = normalizeUserThemePresets(themeId, source.presets)
+  const presetId = typeof source.presetId === 'string'
+    ? source.presetId.trim()
+    : resolveThemePresetId(themeId, definition, presets)
+  return {
+    ...definition,
+    presetId: getThemePreset(themeId, presetId, presets) ? presetId : '',
+    presets,
   }
-  return { dark: resolve('dark'), light: resolve('light') }
 }
 
-/**
- * 当前这套主题的完整定义：没被覆盖的颜色取主题注册表里的值，十六进制统一为大写。
- * 内置预设、导出到剪贴板、把当前配色命名成自定义预设都从这里取同一个形状。
- */
-export function resolveThemeDefinition(
-  themeId: OcThemeId,
-  overrides: OcThemeColorOverrides,
-  accentNeighborAngle: number,
-  fontFamily: string,
-): AppThemeDefinition {
+/** 主题与预设共用完整定义，缺失字段取对应深浅主题的默认值。 */
+function normalizeThemeDefinition(themeId: OcThemeId, value: unknown): AppThemeDefinition {
+  const source = isRecord(value) ? value : {}
+  const colors = normalizeThemeColors(source.colors)
   return {
     colors: {
-      '--oc-accent': (overrides['--oc-accent'] ?? OC_THEME_REGISTRY[themeId]['--oc-accent']).toUpperCase(),
-      '--oc-bg-base': (overrides['--oc-bg-base'] ?? OC_THEME_REGISTRY[themeId]['--oc-bg-base']).toUpperCase(),
-      '--oc-fg-default': (overrides['--oc-fg-default'] ?? OC_THEME_REGISTRY[themeId]['--oc-fg-default']).toUpperCase(),
+      '--oc-accent': colors['--oc-accent'] ?? OC_THEME_REGISTRY[themeId]['--oc-accent'].toUpperCase(),
+      '--oc-bg-base': colors['--oc-bg-base'] ?? OC_THEME_REGISTRY[themeId]['--oc-bg-base'].toUpperCase(),
+      '--oc-fg-default': colors['--oc-fg-default'] ?? OC_THEME_REGISTRY[themeId]['--oc-fg-default'].toUpperCase(),
     },
-    accentNeighborAngle,
-    fontFamily,
+    accentNeighborAngle: clampAngle(source.accentNeighborAngle),
+    fontFamily: normalizeUiFontFamily(source.fontFamily),
   }
 }
 
-export function serializeAppTheme(
-  themeId: OcThemeId,
-  overrides: OcThemeColorOverrides,
-  accentNeighborAngle: number,
-  fontFamily: string,
-): string {
-  const definition = resolveThemeDefinition(themeId, overrides, accentNeighborAngle, fontFamily)
+export function serializeAppTheme(definition: AppThemeDefinition): string {
   return `${JSON.stringify({
     format: 'opencard-theme',
     version: 1,
@@ -661,108 +544,22 @@ export function parseAppTheme(content: string): AppThemeDefinition | null {
   }
 }
 
-function normalizeUserThemePresets(value: unknown): AppUserThemePreset[] {
+function normalizeUserThemePresets(themeId: OcThemeId, value: unknown): AppUserThemePreset[] {
   if (!Array.isArray(value)) return []
   const result: AppUserThemePreset[] = []
   for (const item of value) {
     if (!isRecord(item) || typeof item.name !== 'string' || !isRecord(item.definition)) continue
     const name = item.name.trim()
     if (!name || name.length > 80 || /[\u0000-\u001F\u007F]/.test(name)) continue
-    const colors = normalizeThemeColorOverrides(item.definition.colors)
-    if (OC_EDITABLE_THEME_COLOR_KEYS.some(token => !colors[token])) continue
-    if (typeof item.definition.accentNeighborAngle !== 'number'
-      || !Number.isFinite(item.definition.accentNeighborAngle)
-      || item.definition.accentNeighborAngle < -180
-      || item.definition.accentNeighborAngle > 180) continue
-    const fontFamilies = parseUiFontFamilies(item.definition.fontFamily)
-    if (!fontFamilies) continue
     const preset: AppUserThemePreset = {
       name,
-      definition: {
-        colors: colors as Required<OcThemeColorOverrides>,
-        accentNeighborAngle: Math.round(item.definition.accentNeighborAngle),
-        fontFamily: fontFamilies.length ? fontFamilies.join('; ') : 'system',
-      },
+      definition: normalizeThemeDefinition(themeId, item.definition),
     }
     const existingIndex = result.findIndex(candidate => (
       candidate.name.toLocaleLowerCase() === name.toLocaleLowerCase()
     ))
     if (existingIndex >= 0) result[existingIndex] = preset
     else if (result.length < 32) result.push(preset)
-  }
-  return result
-}
-
-function normalizeTextList(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  const result: string[] = []
-  const seen = new Set<string>()
-  for (const item of value) {
-    if (typeof item !== 'string') continue
-    const text = item.trim().replace(/\\/g, '/').replace(/^\/+/, '')
-    if (!text || /[\u0000-\u001F\u007F]/.test(text) || seen.has(text)) continue
-    seen.add(text)
-    result.push(text)
-  }
-  return result
-}
-
-function normalizeText(value: unknown): string {
-  return typeof value === 'string' && !/[\u0000-\u001F\u007F]/.test(value) ? value : ''
-}
-
-function normalizePackageBuilderState(value: unknown): ProjectPackageBuilderState | null {
-  if (!isRecord(value)) return null
-  return {
-    name: normalizeText(value.name),
-    title: normalizeText(value.title),
-    author: normalizeText(value.author),
-    version: normalizeText(value.version),
-    fontFamilyKeys: normalizeTextList(value.fontFamilyKeys),
-    fontCompositionKeys: normalizeTextList(value.fontCompositionKeys),
-    iconSeriesKeys: normalizeTextList(value.iconSeriesKeys),
-    customBlockKeys: normalizeTextList(value.customBlockKeys),
-    imagePaths: normalizeTextList(value.imagePaths),
-    otherPaths: normalizeTextList(value.otherPaths),
-  }
-}
-
-function normalizeWorkspaceStates(value: unknown): Record<string, ProjectWorkspaceState> {
-  if (!isRecord(value)) return {}
-  const result: Record<string, ProjectWorkspaceState> = {}
-  for (const [pathInput, state] of Object.entries(value)) {
-    if (!isRecord(state)) continue
-    const path = pathInput.trim().replace(/\\/g, '/').replace(/\/+$/, '')
-    if (!path) continue
-    const collapsedSections = isRecord(state.projectProfile) && Array.isArray(state.projectProfile.collapsedSections)
-      ? [...new Set(state.projectProfile.collapsedSections.filter((item): item is string => (
-          typeof item === 'string' && item.trim() !== ''
-        )).map(item => item.trim()))]
-      : []
-    const sidebar = isRecord(state.sidebar)
-      ? {
-          collapsedLists: Array.isArray(state.sidebar.collapsedLists)
-            ? [...new Set(state.sidebar.collapsedLists.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map(item => item.trim()))]
-            : [],
-          listWeights: isRecord(state.sidebar.listWeights)
-            ? Object.fromEntries(Object.entries(state.sidebar.listWeights).flatMap(([key, weight]) => (
-                typeof weight === 'number' && Number.isFinite(weight) && weight > 0 ? [[key, weight]] : []
-              ))) as Record<string, number>
-            : {},
-        }
-      : null
-    const packageBuilder = normalizePackageBuilderState(state.packageBuilder)
-    result[path] = {
-      expandedDirectories: Array.isArray(state.expandedDirectories)
-        ? state.expandedDirectories
-          .filter((item): item is string => typeof item === 'string')
-          .map(item => item.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
-          .filter(Boolean)
-        : [],
-      ...(sidebar && (sidebar.collapsedLists.length > 0 || Object.keys(sidebar.listWeights).length > 0) ? { sidebar } : {}),
-      ...(collapsedSections.length > 0 ? { projectProfile: { collapsedSections } } : {}),
-      ...(packageBuilder ? { packageBuilder } : {}),
-    }
   }
   return result
 }
@@ -774,15 +571,15 @@ export function createPublisherKey(): string {
 export function createDefaultAppSettings(): AppSettings {
   return {
     version: APP_SETTINGS_VERSION,
+    tutorials: { seen: [] },
     identity: { ...DEFAULT_APP_SETTINGS.identity },
     versionControl: { ...DEFAULT_APP_SETTINGS.versionControl },
     appearance: {
       ...DEFAULT_APP_SETTINGS.appearance,
-      themeOverrides: { dark: {}, light: {} },
-      accentNeighborAngles: { ...DEFAULT_APP_SETTINGS.appearance.accentNeighborAngles },
-      fontFamilies: { ...DEFAULT_APP_SETTINGS.appearance.fontFamilies },
-      themePresetIds: { ...DEFAULT_APP_SETTINGS.appearance.themePresetIds },
-      userThemePresets: { dark: [], light: [] },
+      themes: {
+        dark: normalizeThemeSettings('dark', DEFAULT_APP_SETTINGS.appearance.themes.dark),
+        light: normalizeThemeSettings('light', DEFAULT_APP_SETTINGS.appearance.themes.light),
+      },
     },
     shell: { ...DEFAULT_APP_SETTINGS.shell },
     updates: { ...DEFAULT_APP_SETTINGS.updates },
@@ -790,64 +587,32 @@ export function createDefaultAppSettings(): AppSettings {
     cache: { ...DEFAULT_APP_SETTINGS.cache },
     rendering: { ...DEFAULT_APP_SETTINGS.rendering },
     workspace: { ...DEFAULT_APP_SETTINGS.workspace },
-    projectCreation: {
-      ...DEFAULT_APP_SETTINGS.projectCreation,
-      recentProjects: [...DEFAULT_APP_SETTINGS.projectCreation.recentProjects],
-      workspaceStates: { ...DEFAULT_APP_SETTINGS.projectCreation.workspaceStates },
-    },
   }
 }
 
 export function normalizeAppSettings(value: unknown): AppSettings {
-  if (!isRecord(value) || value.version !== APP_SETTINGS_VERSION) {
+  if (!isRecord(value)) {
     return createDefaultAppSettings()
   }
 
   const identity = isRecord(value.identity) ? value.identity : {}
+  const tutorials = isRecord(value.tutorials) ? value.tutorials : {}
   const versionControl = isRecord(value.versionControl) ? value.versionControl : {}
   const appearance = isRecord(value.appearance) ? value.appearance : {}
-  const legacyAccentNeighborAngle = clampAngle(appearance.accentNeighborAngle)
   const shell = isRecord(value.shell) ? value.shell : {}
   const updates = isRecord(value.updates) ? value.updates : {}
   const exporting = isRecord(value.exporting) ? value.exporting : {}
   const cache = isRecord(value.cache) ? value.cache : {}
   const rendering = isRecord(value.rendering) ? value.rendering : {}
   const workspace = isRecord(value.workspace) ? value.workspace : {}
-  const projectCreation = isRecord(value.projectCreation) ? value.projectCreation : {}
 
-  const themeOverrides: Record<OcThemeId, OcThemeColorOverrides> = {
-    dark: normalizeThemeColorOverrides(isRecord(appearance.themeOverrides)
-      ? appearance.themeOverrides.dark
-      : undefined),
-    light: normalizeThemeColorOverrides(isRecord(appearance.themeOverrides)
-      ? appearance.themeOverrides.light
-      : undefined),
-  }
-  const accentNeighborAngles: Record<OcThemeId, number> = {
-    dark: clampAngle(
-      isRecord(appearance.accentNeighborAngles) ? appearance.accentNeighborAngles.dark : undefined,
-      legacyAccentNeighborAngle,
-    ),
-    light: clampAngle(
-      isRecord(appearance.accentNeighborAngles) ? appearance.accentNeighborAngles.light : undefined,
-      legacyAccentNeighborAngle,
-    ),
-  }
-  const fontFamilies: Record<OcThemeId, string> = {
-    dark: normalizeUiFontFamily(isRecord(appearance.fontFamilies) ? appearance.fontFamilies.dark : undefined),
-    light: normalizeUiFontFamily(isRecord(appearance.fontFamilies) ? appearance.fontFamilies.light : undefined),
-  }
-  const userThemePresets: Record<OcThemeId, AppUserThemePreset[]> = {
-    dark: normalizeUserThemePresets(isRecord(appearance.userThemePresets)
-      ? appearance.userThemePresets.dark
-      : undefined),
-    light: normalizeUserThemePresets(isRecord(appearance.userThemePresets)
-      ? appearance.userThemePresets.light
-      : undefined),
-  }
+  const themes = isRecord(appearance.themes) ? appearance.themes : {}
 
   return {
     version: APP_SETTINGS_VERSION,
+    tutorials: { seen: Array.isArray(tutorials.seen)
+      ? [...new Set(tutorials.seen.filter((id): id is string => typeof id === 'string').map(id => id.trim()).filter(Boolean))]
+      : [] },
     identity: {
       publisherKey: typeof identity.publisherKey === 'string'
         ? normalizeKeySlug(identity.publisherKey) ?? DEFAULT_APP_SETTINGS.identity.publisherKey
@@ -874,23 +639,12 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       baseFontSize: clampBaseFontSize(appearance.baseFontSize),
       phaseImageSpeed: clampPhaseImageSpeed(appearance.phaseImageSpeed),
       micaBackground: appearance.micaBackground === true,
-      themeOverrides,
-      accentNeighborAngles,
-      fontFamilies,
-      themePresetIds: normalizeThemePresetIds(
-        appearance.themePresetIds,
-        themeOverrides,
-        accentNeighborAngles,
-        fontFamilies,
-        userThemePresets,
-      ),
-      userThemePresets,
+      themes: {
+        dark: normalizeThemeSettings('dark', themes.dark),
+        light: normalizeThemeSettings('light', themes.light),
+      },
     },
     shell: {
-      sidebarWidth: clampSidebarWidth(shell.sidebarWidth),
-      sidebarCollapsed: typeof shell.sidebarCollapsed === 'boolean'
-        ? shell.sidebarCollapsed
-        : DEFAULT_APP_SETTINGS.shell.sidebarCollapsed,
       titleBarNoticeHistoryLimit: clampTitleBarNoticeHistoryLimit(shell.titleBarNoticeHistoryLimit),
     },
     updates: {
@@ -940,13 +694,6 @@ export function normalizeAppSettings(value: unknown): AppSettings {
         ? workspace.alignmentSnappingEnabledByDefault
         : DEFAULT_APP_SETTINGS.workspace.alignmentSnappingEnabledByDefault,
       historyEntryLimit: clampHistoryEntryLimit(workspace.historyEntryLimit),
-    },
-    projectCreation: {
-      lastParentPath: typeof projectCreation.lastParentPath === 'string'
-        ? projectCreation.lastParentPath
-        : DEFAULT_APP_SETTINGS.projectCreation.lastParentPath,
-      recentProjects: normalizeRecentProjects(projectCreation.recentProjects),
-      workspaceStates: normalizeWorkspaceStates(projectCreation.workspaceStates),
     },
   }
 }

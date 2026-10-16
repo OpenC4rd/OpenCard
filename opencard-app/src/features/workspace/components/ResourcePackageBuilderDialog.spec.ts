@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OcTree from '../../../components/standard/OcTree.vue'
 import type { OcNodeCollection } from '../../../shared/ui/node/node.types'
 import { isNodeTailAction, normalizeNodeTail } from '../../../shared/ui/node/node.types'
-import type { AppSettings, ProjectWorkspaceState } from '../../settings/model/appSettings'
+import type { AppSettings } from '../../settings/model/appSettings'
+import type { ProjectWorkspaceState } from '../../app-state/model/appState'
 import type { ProjectCover } from '../model/projectCover'
 import { useShellProgressTasks } from '../../shell/composables/useShellProgressTasks'
 import ResourcePackageBuilderDialog from './ResourcePackageBuilderDialog.vue'
@@ -33,19 +34,20 @@ const projectStore = vi.hoisted(() => ({
 const settings = vi.hoisted(() => ({
   value: {
     identity: { publisherKey: 'publisher-test' },
-    projectCreation: { workspaceStates: {} as Record<string, ProjectWorkspaceState> },
   } as unknown as AppSettings,
 }))
+const appState = vi.hoisted(() => ({ value: { projects: { workspaces: {} as Record<string, ProjectWorkspaceState> } } }))
 const updateSetting = vi.hoisted(() => vi.fn())
-const updateProjectCreation = vi.hoisted(() => vi.fn((patch: { workspaceStates?: Record<string, ProjectWorkspaceState> }) => {
-  if (patch.workspaceStates) settings.value.projectCreation.workspaceStates = patch.workspaceStates
+const updateProjects = vi.hoisted(() => vi.fn((patch: { workspaces?: Record<string, ProjectWorkspaceState> }) => {
+  if (patch.workspaces) appState.value.projects.workspaces = patch.workspaces
 }))
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../store/projectStore', () => ({ useProjectStore: () => projectStore }))
 vi.mock('../../settings/store/appSettingsStore', () => ({
-  useAppSettingsStore: () => ({ settings, updateSetting, updateProjectCreation }),
+  useAppSettingsStore: () => ({ settings, updateSetting }),
 }))
+vi.mock('../../app-state/store/appStateStore', () => ({ useAppStateStore: () => ({ state: appState, updateProjects }) }))
 vi.mock('../services/buildResourcePackage', () => ({ buildResourcePackageFromProject: buildPackage }))
 vi.mock('../services/fileSystemService', () => ({ fileSystemService: { pickSavePath } }))
 vi.mock('../services/projectCoverService', () => ({ readProjectCover }))
@@ -73,9 +75,9 @@ function buildTaskKeys(): readonly string[] {
 }
 
 beforeEach(() => {
-  settings.value.projectCreation.workspaceStates = {}
+  appState.value.projects.workspaces = {}
   updateSetting.mockClear()
-  updateProjectCreation.mockClear()
+  updateProjects.mockClear()
   pickSavePath.mockClear()
   buildPackage.mockClear()
   readProjectCover.mockClear()
@@ -242,7 +244,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
   })
 
   it('restores the previous build and falls back to every candidate when nothing was remembered', async () => {
-    settings.value.projectCreation.workspaceStates = {
+    appState.value.projects.workspaces = {
       '/other': { expandedDirectories: [] },
       '/project': {
         expandedDirectories: [],
@@ -298,8 +300,8 @@ describe('ResourcePackageBuilderDialog selection', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    const currentStates = settings.value.projectCreation.workspaceStates
-    expect(updateProjectCreation).toHaveBeenCalledTimes(1)
+    const currentStates = appState.value.projects.workspaces
+    expect(updateProjects).toHaveBeenCalledTimes(1)
     expect(currentStates['/project']?.packageBuilder).toEqual({
       name: 'Project',
       author: 'publisher-test',

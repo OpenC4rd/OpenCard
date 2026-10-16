@@ -54,7 +54,7 @@ function createHarness(options?: {
       open,
     },
     closeCurrentProject,
-    settings: {
+    history: {
       rememberRecentProject,
       forgetRecentProject,
     },

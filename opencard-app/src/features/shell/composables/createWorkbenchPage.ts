@@ -62,9 +62,6 @@ export function createWorkbenchPage(options: {
   const openSettingsAt = options.openSetting
   const resourcePackageStore = useStoredResourcePackageStore()
   const resourcePackageBuilderOpen = ref(false)
-  const debugHideCdeOverlays = ref(false)
-  const debugTransparentCdeViewport = ref(false)
-  const debugPassiveCdeViewport = ref(false)
   const projectTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
   const projectManagementTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
   const exportRendererRef = ref<InstanceType<typeof CardFaceRenderer>>()
@@ -198,8 +195,6 @@ export function createWorkbenchPage(options: {
   } = useWorkbenchEditorHost({
     activeSession: visibleEditorSession, comparison: editorComparison,
     cardProps: computed(() => ({ renderCardImages, imageExportBusy: isProjectExportRunning.value,
-      debugHideCdeOverlays: debugHideCdeOverlays.value, debugTransparentCdeViewport: debugTransparentCdeViewport.value,
-      debugPassiveCdeViewport: debugPassiveCdeViewport.value,
     })),
     reportIssues: (id, snapshot) => reportSessionIssueSnapshot(id, snapshot),
     openFile: path => handleOpenFile(path), trashFile: path => handleEditorTrashFile(path), translate: t,
@@ -590,9 +585,6 @@ export function createWorkbenchPage(options: {
       case 'open-project': await app.openProject(); return
       case 'export-project-template': return app.exportTemplate()
       case 'export-card-documents': if (projectPath.value) await openProjectExportDialog(); return
-      case 'toggle-debug-hide-cde-overlays': debugHideCdeOverlays.value = !debugHideCdeOverlays.value; return
-      case 'toggle-debug-transparent-cde-viewport': debugTransparentCdeViewport.value = !debugTransparentCdeViewport.value; return
-      case 'toggle-debug-passive-cde-viewport': debugPassiveCdeViewport.value = !debugPassiveCdeViewport.value; return
     }
   }
 
@@ -612,7 +604,7 @@ export function createWorkbenchPage(options: {
       editor: visibleEditorSession.value ? { isDiff: isDiffMode.value, canUndo: canUndoActiveEditor.value, canRedo: canRedoActiveEditor.value } : null,
       shortcuts: { save: primary('s'), undo: primary('z'), redo: /Macintosh|Mac OS X/.test(navigator.userAgent) ? primary('z', true) : primary('y') },
     }
-    const actions: Partial<Record<'file' | 'edit' | 'help', import('../shell.types').ShellMenuContribution['actions']>> = { file: [
+    const actions: Partial<Record<'file' | 'edit', import('../shell.types').ShellMenuContribution['actions']>> = { file: [
       { type: 'divider', key: 'file-save-divider' },
       {
         key: 'save-active-editor',
@@ -659,11 +651,7 @@ export function createWorkbenchPage(options: {
         disabled: !options.editor || options.editor.isDiff || !options.editor.canRedo,
       },
 
-    ], help: import.meta.env.DEV ? [
-      { key: 'toggle-debug-hide-cde-overlays', title: t(debugHideCdeOverlays.value ? 'app.debug.showCdeOverlays' : 'app.debug.hideCdeOverlays'), icon: debugHideCdeOverlays.value ? 'action.check' : 'format.code-braces' },
-      { key: 'toggle-debug-transparent-cde-viewport', title: t(debugTransparentCdeViewport.value ? 'app.debug.showCdeViewportBackground' : 'app.debug.transparentCdeViewport'), icon: debugTransparentCdeViewport.value ? 'action.check' : 'format.code-braces' },
-      { key: 'toggle-debug-passive-cde-viewport', title: t(debugPassiveCdeViewport.value ? 'app.debug.interactiveCdeViewport' : 'app.debug.passiveCdeViewport'), icon: debugPassiveCdeViewport.value ? 'action.check' : 'format.code-braces' },
-    ] : [] }
+    ] }
     return Object.fromEntries(Object.entries(actions).map(([key, entries]) => [key, { actions: entries, onAction: runWorkbenchAction }]))
   })
 

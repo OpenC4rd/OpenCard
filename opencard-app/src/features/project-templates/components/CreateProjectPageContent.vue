@@ -1,101 +1,89 @@
 <template>
   <section class="create-project" :aria-label="t('projectTemplates.title')">
 
+    <div class="create-project__backdrop" aria-hidden="true">
+      <Transition name="create-project-cover">
+        <img v-if="activeCoverSrc" :key="activeCoverSrc" class="create-project__cover-image" :src="activeCoverSrc" alt="" />
+      </Transition>
+    </div>
     <div class="create-project__body">
       <section class="create-project__catalog" :aria-label="t('projectTemplates.catalogLabel')">
         <div class="create-project__catalog-cover" aria-hidden="true">
           <Transition name="create-project-cover">
-            <img v-if="activeCoverSrc" :key="activeCoverSrc" :src="activeCoverSrc" alt="" />
+            <img v-if="activeCoverSrc" :key="activeCoverSrc" class="create-project__cover-image" :src="activeCoverSrc" alt="" />
           </Transition>
           <div class="create-project__catalog-scrim" />
         </div>
         <div class="create-project__catalog-content">
-        <p v-if="store.isLoading.value" class="create-project__status">
-          {{ t('projectTemplates.status.loading') }}
-        </p>
-        <article v-else-if="selectedTemplate" class="create-project__details">
-          <div class="create-project__details-heading">
-            <OcIcon name="file.opencard" size="sm" />
-            <div>
+          <OcText v-if="store.isLoading.value" as="p" size="sm" tone="muted">
+            {{ t('projectTemplates.status.loading') }}
+          </OcText>
+          <OcPanel v-else-if="selectedTemplate" as="article" class="create-project__details" gap="3" padding="none" tone="transparent" border="none" radius="none">
+            <OcPanel gap="1" padding="none" tone="transparent" border="none" radius="none">
               <div class="create-project__template-title">
-                <strong>{{ localizedTemplateName(selectedTemplate) }}</strong>
-                <span class="create-project__template-source-label">
-                  {{ t(`projectTemplates.sources.${selectedTemplate.source}`) }}
-                </span>
+                <OcText as="strong" size="lg" bold>{{ localizedTemplateName(selectedTemplate) }}</OcText>
+                <OcText size="xs" tone="muted">{{ t(`projectTemplates.sources.${selectedTemplate.source}`) }}</OcText>
               </div>
-              <p>{{ localizedTemplateDescription(selectedTemplate) || t('projectTemplates.status.noDescription') }}</p>
-            </div>
-          </div>
-          <dl class="create-project__details-list">
-            <div>
-              <dt>{{ t('projectTemplates.fields.entry') }}</dt>
-              <dd><code>{{ selectedTemplateEntryName(selectedEntry) }}</code></dd>
-            </div>
-            <div>
-              <dt>{{ t('projectTemplates.fields.resourcePackages') }}</dt>
-              <dd>
-                <ul v-if="attachedResourcePackages.length" class="create-project__resource-package-list">
-                  <li v-for="pack in attachedResourcePackages" :key="pack.path">
-                    {{ pack.title }}
-                  </li>
-                </ul>
-                <span v-else>{{ t('projectTemplates.status.noResourcePackagesSelected') }}</span>
-              </dd>
-            </div>
-          </dl>
-        </article>
-        <p v-else class="create-project__status">
-          {{ t('projectTemplates.status.selectTemplate') }}
-        </p>
+              <OcText size="sm" tone="subtle">{{ localizedTemplateDescription(selectedTemplate) || t('projectTemplates.status.noDescription') }}</OcText>
+            </OcPanel>
+            <dl class="create-project__details-list">
+              <div>
+                <OcText as="dt" size="sm" tone="muted">{{ t('projectTemplates.fields.entry') }}</OcText>
+                <OcText as="dd" size="sm" :mono="Boolean(selectedEntry)">{{ selectedTemplateEntryName(selectedEntry) }}</OcText>
+              </div>
+              <div>
+                <OcText as="dt" size="sm" tone="muted">{{ t('projectTemplates.fields.resourcePackages') }}</OcText>
+                <dd class="create-project__packages">
+                  <ul v-if="attachedResourcePackages.length" class="create-project__resource-package-list">
+                    <OcText v-for="pack in attachedResourcePackages" :key="pack.path" as="li" size="sm" truncate>{{ pack.title }}</OcText>
+                  </ul>
+                  <OcText v-else size="sm">{{ t('projectTemplates.status.noResourcePackagesSelected') }}</OcText>
+                </dd>
+              </div>
+            </dl>
+          </OcPanel>
+          <OcText v-else as="p" size="sm" tone="muted">{{ t('projectTemplates.status.selectTemplate') }}</OcText>
 
         </div>
       </section>
       <form class="create-project__form" @submit.prevent="createProject">
-        <div class="create-project__form-heading">
-          <strong>{{ t('projectTemplates.formTitle') }}</strong>
-          <span>{{ selectedTemplate ? localizedTemplateName(selectedTemplate) : t('projectTemplates.status.selectTemplate') }}</span>
-        </div>
-
-        <label>
-          <span>{{ t('projectTemplates.fields.projectName') }}</span>
-          <OcFieldInput
-            :value="projectName"
-            full-width
-            :maxlength="80"
-            :aria-invalid="projectNameError || undefined"
-            @input="projectName = ($event.target as HTMLInputElement).value"
-          />
-          <small v-if="projectNameError" class="is-error">{{ t('projectTemplates.errors.invalidProjectName') }}</small>
-        </label>
-
-        <label v-if="selectedTemplate">
-          <span>{{ t('projectTemplates.fields.entry') }}</span>
-          <OcSelect
-            :model-value="selectedEntry"
-            :options="selectedEntryOptions"
-            full-width
-            :disabled="isBusy"
-            @update:model-value="selectedEntry = $event"
-          />
-        </label>
-
-        <label>
-          <span>{{ t('projectTemplates.fields.location') }}</span>
-          <div class="create-project__path-field">
-            <OcFieldInput class="create-project__location-input" :value="parentPath" readonly full-width mono />
-            <OcButton class="create-project__browse" type="button" variant="outline" icon="status.folder-open" :disabled="isBusy" @click="chooseParentDirectory">
-              {{ t('projectTemplates.actions.browse') }}
-            </OcButton>
-          </div>
-        </label>
-
-        <div class="create-project__target">
-          <span>{{ t('projectTemplates.fields.target') }}</span>
-          <code>{{ targetPreview || t('projectTemplates.status.chooseLocation') }}</code>
-        </div>
-
+        <OcPanel gap="1" padding="none" tone="transparent" border="none" radius="none">
+          <OcText as="strong" size="lg" bold>{{ t('projectTemplates.formTitle') }}</OcText>
+          <OcText size="sm" tone="muted">{{ selectedTemplate ? localizedTemplateName(selectedTemplate) : t('projectTemplates.status.selectTemplate') }}</OcText>
+        </OcPanel>
+        <fieldset class="create-project__fields" :disabled="isBusy">
+          <OcPanel as="label" data-oc-tutorial="create-project.name" gap="2" padding="none" tone="transparent" border="none" radius="none">
+            <OcText size="sm">{{ t('projectTemplates.fields.projectName') }}</OcText>
+            <OcFieldFrame full-width :invalid="projectNameError">
+              <OcFieldInput variant="plain" full-width :value="projectName" :maxlength="80"
+                :aria-label="t('projectTemplates.fields.projectName')" :aria-invalid="projectNameError || undefined"
+                @input="projectName = ($event.target as HTMLInputElement).value" />
+            </OcFieldFrame>
+            <OcText v-if="projectNameError" as="small" size="sm" tone="danger">{{ t('projectTemplates.errors.invalidProjectName') }}</OcText>
+          </OcPanel>
+          <OcPanel v-if="selectedTemplate" as="label" gap="2" padding="none" tone="transparent" border="none" radius="none">
+            <OcText size="sm">{{ t('projectTemplates.fields.entry') }}</OcText>
+            <OcSelect :model-value="selectedEntry" :options="selectedEntryOptions" full-width :disabled="isBusy"
+              :aria-label="t('projectTemplates.fields.entry')" @update:model-value="selectedEntry = $event" />
+          </OcPanel>
+          <OcPanel as="label" data-oc-tutorial="create-project.location" gap="2" padding="none" tone="transparent" border="none" radius="none">
+            <OcText size="sm">{{ t('projectTemplates.fields.location') }}</OcText>
+            <div class="create-project__path-field">
+              <OcFieldFrame full-width readonly>
+                <OcFieldInput variant="plain" full-width mono readonly :value="parentPath" :aria-label="t('projectTemplates.fields.location')" />
+              </OcFieldFrame>
+              <OcButton type="button" size="md" variant="outline" icon="status.folder-open" :disabled="isBusy" @click="chooseParentDirectory">
+                {{ t('projectTemplates.actions.browse') }}
+              </OcButton>
+            </div>
+          </OcPanel>
+          <OcPanel gap="2" padding="none" tone="transparent" border="none" radius="none">
+            <OcText size="sm">{{ t('projectTemplates.fields.target') }}</OcText>
+            <OcText class="create-project__target" size="sm" tone="muted" :mono="Boolean(targetPreview)">{{ targetPreview || t('projectTemplates.status.chooseLocation') }}</OcText>
+          </OcPanel>
+        </fieldset>
         <div class="create-project__form-actions">
-          <OcButton type="submit" variant="solid" icon="action.folder-plus" :disabled="!canCreate">
+          <OcButton data-oc-tutorial="create-project.submit" type="submit" variant="solid" icon="action.folder-plus" :disabled="!canCreate">
             {{ isCreating ? t('projectTemplates.status.creating') : t('projectTemplates.actions.create') }}
           </OcButton>
         </div>
@@ -108,8 +96,10 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OcButton from '../../../components/base/OcButton.vue'
+import OcPanel from '../../../components/base/OcPanel.vue'
+import OcText from '../../../components/base/OcText.vue'
+import OcFieldFrame from '../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
-import OcIcon from '../../../components/base/OcIcon.vue'
 import OcSelect from '../../../components/standard/OcSelect.vue'
 import type { StoredResourcePackage } from '../../workspace/model/storedResourcePackage'
 import type { createProjectForm } from '../composables/createProjectForm'
@@ -136,6 +126,8 @@ onBeforeUnmount(stopCoverSlideshow)
 
 <style scoped>
 .create-project {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -149,7 +141,21 @@ onBeforeUnmount(stopCoverSlideshow)
 }
 
 
+.create-project__backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: calc(-1 * var(--oc-bg-glass-blur));
+  pointer-events: none;
+}
+
+.create-project__backdrop .create-project__cover-image {
+  filter: blur(var(--oc-bg-glass-blur));
+  opacity: 0.08;
+}
+
 .create-project__body {
+  position: relative;
+  z-index: 1;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -158,23 +164,19 @@ onBeforeUnmount(stopCoverSlideshow)
   overflow: hidden;
 }
 
-.create-project__catalog,
-.create-project__location-input {
-  flex: 1 1 0;
-}
-
-.create-project__browse {
-  flex: 0 0 auto;
-}
-
 .create-project__form {
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-space-lg);
   padding: var(--oc-space-lg);
   overflow-y: auto;
-  background: var(--oc-bg-surface);
+}
+
+.create-project__form > * {
+  flex-shrink: 0;
 }
 
 .create-project__catalog {
@@ -195,7 +197,7 @@ onBeforeUnmount(stopCoverSlideshow)
   pointer-events: none;
 }
 
-.create-project__catalog-cover img {
+.create-project__cover-image {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -225,34 +227,14 @@ onBeforeUnmount(stopCoverSlideshow)
   transition: opacity 360ms ease;
 }
 
-.create-project__catalog-cover img.create-project-cover-enter-from,
-.create-project__catalog-cover img.create-project-cover-leave-to {
+.create-project__cover-image.create-project-cover-enter-from,
+.create-project__cover-image.create-project-cover-leave-to {
   opacity: 0;
 }
 
 .create-project__details {
   margin-top: auto;
-  padding: var(--oc-space-md) 0;
-  display: grid;
-  gap: var(--oc-space-sm);
-}
-
-.create-project__details-heading {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--oc-space-xs);
-}
-
-.create-project__details-heading > div {
-  min-width: 0;
-  display: grid;
-  gap: var(--oc-space-2xs);
-}
-
-.create-project__details-heading strong {
-  overflow-wrap: anywhere;
-  font-size: var(--oc-text-lg);
+  padding-block: var(--oc-space-md);
 }
 
 .create-project__template-title {
@@ -260,148 +242,87 @@ onBeforeUnmount(stopCoverSlideshow)
   align-items: baseline;
   flex-wrap: wrap;
   gap: var(--oc-space-xs);
-}
-
-.create-project__template-source-label {
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-xs);
-}
-
-.create-project__details-heading p {
-  margin: 0;
-  color: var(--oc-fg-subtle);
-  font-size: var(--oc-text-sm);
-  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .create-project__details-list {
-  display: grid;
-  border-top: var(--oc-border-width) solid var(--oc-border-muted);
-}
-
-.create-project__details dl,
-.create-project__details dd {
   margin: 0;
 }
 
-.create-project__details dl > div {
+.create-project__details-list > div {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
   gap: var(--oc-space-md);
-  padding: var(--oc-space-xs) 0;
+  padding-block: var(--oc-space-xs);
   border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
 }
 
-.create-project__details dt {
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-sm);
-}
-
-.create-project__details code {
-  overflow-wrap: anywhere;
-  color: var(--oc-fg-default);
-  font-family: var(--oc-font-mono);
-  font-size: var(--oc-text-sm);
-}
-
-.create-project__details dd {
+.create-project__details-list dd {
   min-width: 0;
-  justify-self: end;
-  overflow-wrap: anywhere;
+  margin: 0;
   text-align: right;
-  font-size: var(--oc-text-sm);
+  overflow-wrap: anywhere;
 }
 
-/* 预装的包显示成 chips：一行放不下就换行，单个名字过宽时省略号截断。 */
+.create-project__packages {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--oc-size-md);
+}
+
 .create-project__resource-package-list {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--oc-space-2xs);
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.create-project__resource-package-list li {
+.create-project__resource-package-list > li {
   min-width: 0;
   max-width: 100%;
-  padding: var(--oc-space-2xs) var(--oc-space-xs);
+  padding-inline: var(--oc-space-xs);
   border-radius: var(--oc-radius-control);
-  background: var(--oc-bg-hover);
-  color: var(--oc-fg-default);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background-image: var(--oc-overlay-hover);
+  line-height: var(--oc-size-sm);
 }
 
-.create-project__form label {
+.create-project__fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
   display: grid;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-md) 0;
-  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-sm);
+  gap: var(--oc-space-lg);
 }
 
-.create-project__form label > span,
-.create-project__target > span {
-  color: var(--oc-fg-default);
-  font-weight: 600;
-}
-
-.create-project__form-actions,
 .create-project__path-field {
   display: flex;
   align-items: center;
   gap: var(--oc-space-xs);
 }
 
-.create-project__form-heading {
-  display: grid;
-  gap: var(--oc-space-2xs);
-  padding-bottom: var(--oc-space-md);
-  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
+.create-project__path-field > .oc-field-frame {
+  flex: 1 1 0;
 }
 
-.create-project__form-heading span {
-  color: var(--oc-fg-subtle);
-  font-size: var(--oc-text-sm);
-}
-
-.create-project__form-heading strong {
-  font-size: var(--oc-text-lg);
+.create-project__path-field > .oc-button {
+  flex-shrink: 0;
 }
 
 .create-project__target {
-  display: grid;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-md) 0;
-  border-bottom: var(--oc-border-width) solid var(--oc-border-muted);
-}
-
-.create-project__target code {
   overflow-wrap: anywhere;
-  color: var(--oc-fg-muted);
-  font-family: var(--oc-font-mono);
-  font-size: var(--oc-text-sm);
 }
 
 .create-project__form-actions {
-  padding-top: var(--oc-action-padding);
+  display: flex;
   justify-content: flex-end;
 }
-
-.create-project__status {
-  margin: var(--oc-space-xs) 0 0;
-}
-
-.is-error {
-  color: var(--oc-fg-danger);
-  font-size: var(--oc-text-sm);
-}
-
 
 @container (max-width: 860px) {
   .create-project__body {
@@ -409,8 +330,7 @@ onBeforeUnmount(stopCoverSlideshow)
     overflow-y: auto;
   }
 
-  .create-project__catalog,
-  .create-project__form {
+  .create-project__catalog {
     overflow: visible;
   }
 
@@ -435,12 +355,5 @@ onBeforeUnmount(stopCoverSlideshow)
   .create-project__form {
     padding: var(--oc-space-md);
   }
-
-  .create-project__path-field {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-
 }
 </style>

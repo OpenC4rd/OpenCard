@@ -105,6 +105,11 @@ describe('OcDialog', () => {
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!
     const first = dialog.querySelector<HTMLElement>('[autofocus]')!
     const last = dialog.querySelector<HTMLElement>('.footer-action')!
+    expect(trigger.inert).toBe(true)
+
+    first.addEventListener('keydown', event => event.preventDefault(), { once: true })
+    first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(wrapper.emitted('request-close')).toBeUndefined()
 
     last.focus()
     last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
@@ -113,6 +118,7 @@ describe('OcDialog', () => {
     await wrapper.setProps({ open: false })
     await new Promise(resolve => window.setTimeout(resolve, 200))
     expect(document.activeElement).toBe(trigger)
+    expect(trigger.inert).toBeFalsy()
   })
 
   it('uses a form surface and emits submit without browser navigation', async () => {

@@ -1,6 +1,6 @@
 /**
  * 模块说明：
- * - 管理侧栏的持久化宽度、折叠状态与拖拽调宽交互，并把布局变化写回应用设置。
+ * - 管理侧栏的持久化宽度、折叠状态与拖拽调宽交互，并把布局变化写回长期应用状态。
  * 职责边界：
  * - 只维护侧栏布局状态与其持久化，不渲染侧栏、不定义列表内容与分组规则。
  */
@@ -9,15 +9,15 @@ import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   type ProjectWorkspaceSidebarState,
-} from '../../settings/model/appSettings'
-import { updateProjectWorkspaceState } from '../../settings/model/workspaceState'
-import type { AppSettingsStore } from '../../settings/store/appSettingsStore'
+} from '../../app-state/model/appState'
+import { updateProjectWorkspaceState } from '../../app-state/model/workspaceState'
+import type { AppStateStore } from '../../app-state/store/appStateStore'
 import { SHELL_SIDEBAR_COLLAPSE_THRESHOLD } from '../shellSidebarConfig'
 
 type ShellSidebarLayoutOptions = {
-  /** 侧栏宽度、折叠状态与项目侧栏缓存的真相仓储。 */
-  settings: AppSettingsStore
-  /** 当前页提供的布局缓存 key；空字符串表示不缓存列表布局。 */
+  /** 侧栏宽度、折叠状态与项目侧栏记录的真相仓储。 */
+  state: AppStateStore
+  /** 当前页提供的布局记录 key；空字符串表示不记忆列表布局。 */
   persistenceKey: Readonly<Ref<string>>
   /** 窗口视口宽度；窄视口下侧栏默认收起。 */
   viewportWidth: Readonly<Ref<number>>
@@ -42,14 +42,14 @@ type ShellSidebarLayout = {
 
 export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): ShellSidebarLayout {
   const {
-    settings: settingsStore,
+    state: appStateStore,
     persistenceKey,
     viewportWidth,
     expandOnNarrowViewport,
   } = options
 
-  const sidebarCollapsed = computed(() => settingsStore.settings.value.shell.sidebarCollapsed)
-  const sidebarWidth = ref(settingsStore.settings.value.shell.sidebarWidth)
+  const sidebarCollapsed = computed(() => appStateStore.state.value.layout.sidebarCollapsed)
+  const sidebarWidth = ref(appStateStore.state.value.layout.sidebarWidth)
   const lastExpandedSidebarWidth = ref(sidebarWidth.value)
   const sidebarResizeActive = ref(false)
   const sidebarResizeCollapsed = ref<boolean | null>(null)
@@ -59,12 +59,12 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
     (sidebarResizeCollapsed.value ?? sidebarCollapsed.value)
     || (viewportWidth.value < 960 && !expandOnNarrowViewport.value)
   ))
-  watch(() => settingsStore.settings.value.shell.sidebarWidth, width => {
+  watch(() => appStateStore.state.value.layout.sidebarWidth, width => {
     if (!sidebarResizeActive.value) sidebarWidth.value = width
   })
   const sidebarPersistedLayout = computed<ProjectWorkspaceSidebarState | undefined>(() => {
     const key = persistenceKey.value
-    const sidebar = key ? settingsStore.settings.value.projectCreation.workspaceStates[key]?.sidebar : undefined
+    const sidebar = key ? appStateStore.state.value.projects.workspaces[key]?.sidebar : undefined
     return sidebar ? {
       collapsedLists: [...sidebar.collapsedLists],
       listWeights: { ...sidebar.listWeights },
@@ -73,9 +73,9 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
   function handleSidebarLayoutChange(layout: ProjectWorkspaceSidebarState): void {
     const key = persistenceKey.value
     if (!key) return
-    settingsStore.updateProjectCreation({
-      workspaceStates: updateProjectWorkspaceState(
-        settingsStore.settings.value.projectCreation.workspaceStates,
+    appStateStore.updateProjects({
+      workspaces: updateProjectWorkspaceState(
+        appStateStore.state.value.projects.workspaces,
         key,
         current => {
           current.sidebar = {
@@ -90,7 +90,7 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
 
   function toggleSidebarCollapsed() {
     if (sidebarCollapsed.value) {
-      settingsStore.updateShell({
+      appStateStore.updateLayout({
         sidebarCollapsed: false,
         sidebarWidth: lastExpandedSidebarWidth.value,
       })
@@ -98,7 +98,7 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
     }
 
     lastExpandedSidebarWidth.value = Math.max(sidebarWidth.value, MIN_SIDEBAR_WIDTH)
-    settingsStore.updateShell({ sidebarCollapsed: true })
+    appStateStore.updateLayout({ sidebarCollapsed: true })
   }
 
   function handleSidebarResizeStart(): void {
@@ -111,7 +111,7 @@ export function useShellSidebarLayout(options: ShellSidebarLayoutOptions): Shell
   function handleSidebarResizeEnd(): void {
     const revision = sidebarResizeRevision
     const collapsed = sidebarResizeCollapsed.value ?? sidebarCollapsed.value
-    settingsStore.updateShell({
+    appStateStore.updateLayout({
       sidebarCollapsed: collapsed,
       sidebarWidth: sidebarWidth.value,
     })

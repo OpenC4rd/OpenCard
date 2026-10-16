@@ -73,6 +73,7 @@ export interface ShellMenuContribution {
 }
 
 export interface ShellList {
+  tutorialKey?: string;
   onAction?: ShellActionHandler;
   title: string;
   placeholder: string;

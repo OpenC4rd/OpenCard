@@ -11,7 +11,7 @@
       @cancel:value="emit('cancel:value')"
     />
     <ArrayPropertyField
-      v-else-if="isArrayPropertyFieldType(definition.fieldType)"
+      v-else-if="isArrayPropertyFieldType(definition.fieldType) && !(definition.fieldType === 'string[]' && definition.listSeparator)"
       ref="fieldComponent"
       :definition="definition"
       :element-component="getArrayPropertyElementComponent(definition.fieldType)"

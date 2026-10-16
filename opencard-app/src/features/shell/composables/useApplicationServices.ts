@@ -4,6 +4,8 @@ import type { FeedbackKind, FeedbackPage } from '../../feedback/model/feedback'
 import { useFeedbackDiagnostics } from '../../feedback/composables/useFeedbackDiagnostics'
 import { useFeedbackInbox } from '../../feedback/composables/useFeedbackInbox'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useTutorialStore } from '../../tutorials/tutorialStore'
+import { activeDialogRoot } from '../../../shared/ui/overlayScope'
 import { notifyWarning } from '../../notifications/titlebarNotices'
 import type { ShellTitleBarAppAction } from '../shell.types'
 import { useAppUpdater } from './useAppUpdater'
@@ -14,6 +16,7 @@ export function useApplicationServices(options: {
 }) {
   const { t, locale } = useI18n()
   const settingsStore = useAppSettingsStore()
+  const tutorial = useTutorialStore()
   const developerMode = ref(false)
   const { setTask: setShellProgressTask, removeTask: removeShellProgressTask } = useShellProgressTasks()
   const UPDATE_PROGRESS_TASK_KEY = 'app-update'
@@ -62,9 +65,9 @@ export function useApplicationServices(options: {
   ))
 
   watch(
-    [hasUnseenCurrentReleaseNotes, () => settingsStore.settings.value.updates.showReleaseNotesAfterUpdate],
-    ([unseen, showReleaseNotes]) => {
-      if (unseen && showReleaseNotes && releaseNotesDialogMode.value === null) {
+    [hasUnseenCurrentReleaseNotes, () => settingsStore.settings.value.updates.showReleaseNotesAfterUpdate, activeDialogRoot, tutorial.session],
+    ([unseen, showReleaseNotes, modal, session]) => {
+      if (unseen && showReleaseNotes && !modal && !session && releaseNotesDialogMode.value === null) {
         releaseNotesDialogMode.value = 'current'
       }
     },

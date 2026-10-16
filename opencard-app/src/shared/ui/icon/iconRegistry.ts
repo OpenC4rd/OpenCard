@@ -54,6 +54,8 @@ import {
   mdiContentSaveOffOutline,
   mdiCubeUnfolded,
   mdiCursorText,
+  mdiMouseLeftClick,
+  mdiMouseOutline,
   mdiDatabaseOutline,
   mdiDownload,
   mdiDragVariant,
@@ -119,6 +121,7 @@ import {
   mdiImageFilterCenterFocusWeak,
   mdiImageOutline,
   mdiKeyboardSpace,
+  mdiKeyboard,
   mdiLandRowsHorizontal,
   mdiLandRowsVertical,
   mdiImageMinusOutline,
@@ -181,6 +184,7 @@ import {
   mdiWindowMinimize,
   mdiWindowRestore,
   mdiXml,
+  mdiZipBoxOutline,
 } from '@mdi/js'
 import type { OcThemeTokenKey } from '../foundation/themeTokens'
 type IconGlyph = {
@@ -281,7 +285,10 @@ export const iconGlyphs = {
   'tool.zoom-out': glyph(mdiMagnifyMinusOutline),
 
   'input.mouse-scroll-wheel': glyph(mdiMouseScrollWheel),
+  'input.mouse-left-click': glyph(mdiMouseLeftClick),
+  'input.mouse': glyph(mdiMouseOutline),
   'input.keyboard-space': glyph(mdiKeyboardSpace),
+  'input.keyboard': glyph(mdiKeyboard),
   'input.keyboard-shift': glyph(mdiAppleKeyboardShift),
 
   'layout.fill': glyph(mdiArrowExpandAll),
@@ -379,6 +386,7 @@ export const iconGlyphs = {
   'file.package': glyph(mdiPackageVariantClosed),
   'file.project-icon': glyph(mdiStickerEmoji),
   'file.settings': glyph(mdiCogOutline),
+  'file.template': glyph(mdiZipBoxOutline),
   'file.text': glyph(mdiCardTextOutline),
   'file.typescript': glyph(mdiLanguageTypescript),
   'file.vue': glyph(mdiVuejs),

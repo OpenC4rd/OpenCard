@@ -1,12 +1,12 @@
 import { nextTick, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_APP_SETTINGS,
+  createDefaultAppState,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
-} from '../../settings/model/appSettings'
-import { MemorySettingsPersistence } from '../../settings/services/settingsPersistence'
-import { createAppSettingsStore } from '../../settings/store/appSettingsStore'
+} from '../../app-state/model/appState'
+import { MemoryJsonPersistence } from '../../../shared/storage/jsonPersistence'
+import { createAppStateStore } from '../../app-state/store/appStateStore'
 import { SHELL_SIDEBAR_COLLAPSE_THRESHOLD } from '../shellSidebarConfig'
 import { useShellSidebarLayout } from './useShellSidebarLayout'
 
@@ -19,21 +19,21 @@ function createSidebarLayout(options: {
   viewportWidth?: number
   expandOnNarrowViewport?: boolean
 } = {}) {
-  const settingsStore = createAppSettingsStore(new MemorySettingsPersistence())
-  settingsStore.updateShell({
-    sidebarWidth: options.sidebarWidth ?? DEFAULT_APP_SETTINGS.shell.sidebarWidth,
-    sidebarCollapsed: options.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.shell.sidebarCollapsed,
+  const stateStore = createAppStateStore(new MemoryJsonPersistence())
+  stateStore.updateLayout({
+    sidebarWidth: options.sidebarWidth ?? createDefaultAppState().layout.sidebarWidth,
+    sidebarCollapsed: options.sidebarCollapsed ?? createDefaultAppState().layout.sidebarCollapsed,
   })
   const persistenceKey = ref(options.persistenceKey ?? '')
   const viewportWidth = ref(options.viewportWidth ?? 1440)
   const expandOnNarrowViewport = ref(options.expandOnNarrowViewport ?? false)
   const layout = useShellSidebarLayout({
-    settings: settingsStore,
+    state: stateStore,
     persistenceKey,
     viewportWidth,
     expandOnNarrowViewport,
   })
-  return { layout, settingsStore, persistenceKey, viewportWidth, expandOnNarrowViewport }
+  return { layout, stateStore, persistenceKey, viewportWidth, expandOnNarrowViewport }
 }
 
 describe('useShellSidebarLayout', () => {
@@ -46,37 +46,37 @@ describe('useShellSidebarLayout', () => {
   })
 
   it('follows sidebar width changes made outside the resize interaction', async () => {
-    const { layout, settingsStore } = createSidebarLayout({ sidebarWidth: 260 })
+    const { layout, stateStore } = createSidebarLayout({ sidebarWidth: 260 })
 
-    settingsStore.updateShell({ sidebarWidth: 300 })
+    stateStore.updateLayout({ sidebarWidth: 300 })
     await nextTick()
 
     expect(layout.sidebarWidth.value).toBe(300)
   })
 
   it('keeps the local width while a resize interaction is active', async () => {
-    const { layout, settingsStore } = createSidebarLayout({ sidebarWidth: 260 })
+    const { layout, stateStore } = createSidebarLayout({ sidebarWidth: 260 })
     layout.handleSidebarResizeStart()
     layout.handleSidebarResize(300)
 
-    settingsStore.updateShell({ sidebarWidth: 240 })
+    stateStore.updateLayout({ sidebarWidth: 240 })
     await nextTick()
 
     expect(layout.sidebarWidth.value).toBe(300)
   })
 
   it('toggles between collapsed and expanded and restores the last expanded width', () => {
-    const { layout, settingsStore } = createSidebarLayout({ sidebarWidth: 300 })
+    const { layout, stateStore } = createSidebarLayout({ sidebarWidth: 300 })
 
     layout.toggleSidebarCollapsed()
-    expect(settingsStore.settings.value.shell.sidebarCollapsed).toBe(true)
+    expect(stateStore.state.value.layout.sidebarCollapsed).toBe(true)
     expect(layout.effectiveSidebarCollapsed.value).toBe(true)
-    expect(settingsStore.settings.value.shell.sidebarWidth).toBe(300)
+    expect(stateStore.state.value.layout.sidebarWidth).toBe(300)
 
-    settingsStore.updateShell({ sidebarWidth: 260 })
+    stateStore.updateLayout({ sidebarWidth: 260 })
     layout.toggleSidebarCollapsed()
-    expect(settingsStore.settings.value.shell.sidebarCollapsed).toBe(false)
-    expect(settingsStore.settings.value.shell.sidebarWidth).toBe(300)
+    expect(stateStore.state.value.layout.sidebarCollapsed).toBe(false)
+    expect(stateStore.state.value.layout.sidebarWidth).toBe(300)
     expect(layout.effectiveSidebarCollapsed.value).toBe(false)
   })
 
@@ -99,7 +99,7 @@ describe('useShellSidebarLayout', () => {
   })
 
   it('clamps the dragged width and persists it with the collapsed state on resize end', async () => {
-    const { layout, settingsStore } = createSidebarLayout({ sidebarWidth: 300 })
+    const { layout, stateStore } = createSidebarLayout({ sidebarWidth: 300 })
 
     layout.handleSidebarResizeStart()
     expect(layout.sidebarResizeActive.value).toBe(true)
@@ -113,14 +113,14 @@ describe('useShellSidebarLayout', () => {
     layout.handleSidebarResizeEnd()
     await nextTick()
 
-    expect(settingsStore.settings.value.shell.sidebarWidth).toBe(MIN_SIDEBAR_WIDTH)
-    expect(settingsStore.settings.value.shell.sidebarCollapsed).toBe(false)
+    expect(stateStore.state.value.layout.sidebarWidth).toBe(MIN_SIDEBAR_WIDTH)
+    expect(stateStore.state.value.layout.sidebarCollapsed).toBe(false)
     expect(layout.sidebarResizeActive.value).toBe(false)
     expect(layout.sidebarResizeToggleAnimating.value).toBe(false)
   })
 
   it('collapses on a drag below the threshold and keeps the expanded width', async () => {
-    const { layout, settingsStore } = createSidebarLayout({ sidebarWidth: 300 })
+    const { layout, stateStore } = createSidebarLayout({ sidebarWidth: 300 })
 
     layout.handleSidebarResizeStart()
     layout.handleSidebarResize(SHELL_SIDEBAR_COLLAPSE_THRESHOLD - 1)
@@ -132,8 +132,8 @@ describe('useShellSidebarLayout', () => {
     layout.handleSidebarResizeEnd()
     await nextTick()
 
-    expect(settingsStore.settings.value.shell.sidebarCollapsed).toBe(true)
-    expect(settingsStore.settings.value.shell.sidebarWidth).toBe(300)
+    expect(stateStore.state.value.layout.sidebarCollapsed).toBe(true)
+    expect(stateStore.state.value.layout.sidebarWidth).toBe(300)
     expect(layout.sidebarResizeActive.value).toBe(false)
   })
 
@@ -152,13 +152,13 @@ describe('useShellSidebarLayout', () => {
   })
 
   it('stores the reported sidebar layout for the open project', () => {
-    const { layout, settingsStore } = createSidebarLayout({ persistenceKey: PROJECT_PATH })
+    const { layout, stateStore } = createSidebarLayout({ persistenceKey: PROJECT_PATH })
     expect(layout.sidebarPersistedLayout.value).toBeUndefined()
 
     const reported = { collapsedLists: ['project-files'], listWeights: { 'project-files': 2 } }
     layout.handleSidebarLayoutChange(reported)
 
-    expect(settingsStore.settings.value.projectCreation.workspaceStates[PROJECT_PATH]?.sidebar)
+    expect(stateStore.state.value.projects.workspaces[PROJECT_PATH]?.sidebar)
       .toEqual(reported)
     expect(layout.sidebarPersistedLayout.value).toEqual(reported)
 
@@ -167,11 +167,11 @@ describe('useShellSidebarLayout', () => {
   })
 
   it('ignores the reported sidebar layout while no project is open', () => {
-    const { layout, settingsStore } = createSidebarLayout()
+    const { layout, stateStore } = createSidebarLayout()
 
     layout.handleSidebarLayoutChange({ collapsedLists: ['project-files'], listWeights: {} })
 
-    expect(settingsStore.settings.value.projectCreation.workspaceStates).toEqual({})
+    expect(stateStore.state.value.projects.workspaces).toEqual({})
     expect(layout.sidebarPersistedLayout.value).toBeUndefined()
   })
 })

@@ -9,6 +9,10 @@
 /artifacts/
 *.log
 
+# Local UI review artifacts (agent-generated audits and screenshots)
+/.codex-ui-audit/
+/opencard-app/.codex-ui-review.html
+
 # Downloaded third-party icon libraries (staging area, not part of the product)
 /icon-library/
 

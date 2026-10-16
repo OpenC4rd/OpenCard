@@ -24,7 +24,10 @@ export interface OcNodeBadge {
 }
 
 /** Inline action definition; its `key` is reported back through the node action event. */
-export type OcNodeAction = OcActionDefinition
+export type OcNodeAction = OcActionDefinition & {
+  /** 单个命令常显，其余命令仍跟随列表的显示规则。 */
+  alwaysVisible?: boolean
+}
 
 /**
  * One ordered trailing line per node: secondary text, read-only status chips, and commands.
