@@ -14,6 +14,8 @@
             :value="activeFontFamily" @update:value="formatting.apply('fontFamily', $event)" />
           <ReferenceStringPropertyField class="oc-rich-text-editor__font-size" :definition="fontSizeFieldDefinition"
             :value="activeFontSize" @update:value="formatting.apply('fontSize', $event)" />
+        </div>
+        <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupTypography', '文字')">
           <OcButton size="md" icon-only icon="format.font-size-decrease" :data-tooltip="tr('propertyEditor.richText.decreaseFontSize', '减小字号')" :aria-label="tr('propertyEditor.richText.decreaseFontSize', '减小字号')"
             @mousedown.prevent @click="formatting.adjustSize(-1)" />
           <OcButton size="md" icon-only icon="format.font-size-increase" :data-tooltip="tr('propertyEditor.richText.increaseFontSize', '增大字号')" :aria-label="tr('propertyEditor.richText.increaseFontSize', '增大字号')"
@@ -57,14 +59,14 @@
           </OcButton>
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupColorAndStroke', '颜色与描边')">
-          <OcColorPicker :label="tr('propertyEditor.richText.foregroundColor', '前景色')" :model-value="foregroundColor"
+          <OcColorPicker :label="tr('propertyEditor.richText.foregroundColor', '前景色')" :model-value="foregroundColor" :mixed="formatting.state.value.foregroundColor.kind === 'mixed'"
             @open-change="colorOpen($event)"
-            @preview="formatting.preview('color', $event)" @commit="formatting.apply('color', $event)" @cancel="interaction.clearPreview">
+            @preview="formatting.preview('foregroundColor', $event)" @commit="formatting.apply('foregroundColor', $event)" @cancel="interaction.clearPreview">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command">
               <OcIcon name="format.color-fill" size="md" /><span :style="{ backgroundColor: color }" />
             </span></template>
           </OcColorPicker>
-          <OcColorPicker :label="tr('propertyEditor.richText.textBackgroundColor', '文字背景色')" :model-value="backgroundColor"
+          <OcColorPicker :label="tr('propertyEditor.richText.textBackgroundColor', '文字背景色')" :model-value="backgroundColor" :mixed="formatting.state.value.backgroundColor.kind === 'mixed'"
             @open-change="colorOpen($event)"
             @preview="formatting.preview('backgroundColor', $event)" @commit="formatting.apply('backgroundColor', $event)" @cancel="interaction.clearPreview">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command">
@@ -75,7 +77,7 @@
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupAlignment', '段落对齐')">
           <OcButton v-for="alignment in alignments" :key="alignment.value" size="md" icon-only
             :icon="alignment.icon" :data-tooltip="alignment.title" :aria-label="alignment.title"
-            :active="editor.isActive({ textAlign: alignment.value })"
+            :active="formatting.state.value.textAlign.value === alignment.value"
             @mousedown.prevent @click="runCommand(alignment.value)" />
         </div>
         <div class="oc-rich-text-editor__tool-group oc-rich-text-editor__tool-group--tail" role="group" :aria-label="tr('propertyEditor.richText.groupClearFormatting', '清除格式')">
@@ -122,7 +124,7 @@ const {
 } = useRichTextEditor(props, () => emit('change'))
 const properties = computed(() => ({
   inputs: propertyInputs.value, categories: propertyCategories.value,
-  update: formatting.update, preview: formatting.previewProperty,
+  update: formatting.update, reset: formatting.reset, preview: formatting.previewProperty,
   cancel: interaction.clearPreview, capture: interaction.capture,
 }))
 defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteraction, properties })
@@ -145,7 +147,6 @@ defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteract
   align-items: stretch;
   gap: var(--oc-space-2xs);
   padding: var(--oc-space-2xs);
-  overflow: hidden;
   border-bottom: var(--oc-border-width) solid var(--oc-border-default);
   background: var(--oc-bg-raised);
 }
@@ -155,6 +156,8 @@ defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteract
   width: 100%;
   min-width: 0;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: var(--oc-space-2xs);
 }
 
 .oc-rich-text-editor__tool-group {
@@ -254,10 +257,32 @@ defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteract
 
 .oc-rich-text-editor__surface :deep(th),
 .oc-rich-text-editor__surface :deep(td) {
+  position: relative;
   min-width: var(--oc-size-lg);
   padding: var(--oc-space-2xs) var(--oc-space-xs);
-  border: var(--oc-border-width) solid var(--oc-border-default);
+  border: var(--oc-border-width) solid var(--oc-border-strong);
   vertical-align: top;
+}
+
+.oc-rich-text-editor__surface :deep([class~="tableWrapper"]) {
+  overflow-x: auto;
+}
+
+.oc-rich-text-editor__surface :deep(th) {
+  background: var(--oc-bg-raised);
+}
+
+.oc-rich-text-editor__surface :deep(.column-resize-handle) {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: var(--oc-space-2xs);
+  background: var(--oc-border-strong);
+  pointer-events: none;
+}
+
+.oc-rich-text-editor__surface :deep(.resize-cursor) {
+  cursor: col-resize;
 }
 
 .oc-rich-text-editor__surface :deep([class~="selectedCell"]) {

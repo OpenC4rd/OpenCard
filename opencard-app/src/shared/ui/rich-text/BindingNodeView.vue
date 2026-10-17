@@ -83,7 +83,7 @@ const openBrace = '{{'
 const closeBrace = '}}'
 const input = ref<ComponentPublicInstance | null>(null)
 const editSession = ref<{ original: string, draft: string } | null>(null)
-const completion = usePropertyCompletion()
+const completion = usePropertyCompletion(() => inputElement.value)
 const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, suggestions } = completion
 let composing = false
 let disposed = false
@@ -169,8 +169,7 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
   const cursor = replaceStart + suggestion.insertText.length
 
   nextTick(() => {
-    if (!editing.value || disposed) return
-    inputElement.value?.focus()
+    if (!editing.value || disposed || document.activeElement !== inputElement.value) return
     inputElement.value?.setSelectionRange(cursor, cursor)
   })
 
@@ -207,7 +206,7 @@ function cancelEditing(): void {
 
 function closeMenu(): void { clearTimeout(blurTimer); completion.clear() }
 function handleBlur(): void {
-  completion.invalidate()
+  completion.clear()
   clearTimeout(blurTimer)
   blurTimer = setTimeout(() => {
     if (!disposed && editing.value && document.activeElement !== inputElement.value) commitExpression(false)

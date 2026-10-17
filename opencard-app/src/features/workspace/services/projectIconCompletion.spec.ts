@@ -27,6 +27,15 @@ const sources = [projectSource, packageSource]
 const readSize = () => ({ width: 16, height: 8 })
 
 describe('project icon completion', () => {
+  it.each(['icon:status/warning', 'alice/theme@1.0.0#icon:mark/sword'])('does not suggest rewriting an already complete reference: %s', async value => {
+    const provider = createProjectIconCompletionProvider(sources, { mode: 'reference', readDimensions: readSize })
+    const completed = await provider({ value, cursor: value.length })
+    expect(completed?.items).toEqual([])
+    expect(completed?.parent).toMatchObject({ label: '..', keepOpen: true })
+    const partial = value.slice(0, -1)
+    const editing = await provider({ value: partial, cursor: partial.length })
+    expect(editing?.items).toContainEqual(expect.objectContaining({ insertText: value }))
+  })
   it('lists collections without repeating their key', async () => {
     const result = await createProjectIconCompletionProvider(sources, { mode: 'reference' })(
       { value: 'icon:', cursor: 5 },
@@ -43,7 +52,7 @@ describe('project icon completion', () => {
       readDimensions: readSize,
     })({ value, cursor: value.length })
     const icon = result?.items[0]
-    expect(icon).toMatchObject({ label: 'Warning badge', insertText: 'icon:status/warning' })
+    expect(icon).toMatchObject({ label: 'Warning badge', insertText: 'icon:status/warning', keepOpen: true })
     expect(icon).not.toHaveProperty('detail')
     expect(icon?.thumbnailStyle?.width).toBe('2em')
   })

@@ -1,20 +1,88 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { afterEach, describe, expect, it } from 'vitest'
 import ReferenceStringPropertyField from './ReferenceStringPropertyField.vue'
 import StringPropertyField from './StringPropertyField.vue'
 import PropertyFieldRenderer from '../PropertyFieldRenderer.vue'
+import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 
 describe('ReferenceStringPropertyField', () => {
+  enableAutoUnmount(afterEach)
+  it.each([undefined, 'semicolon' as const])('dismisses on outside pointer even when focus is retained, and ignores IME confirmation: %s', async listSeparator => {
+    const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
+      props: { value: '', definition: { title: 'Reference', fieldType: 'string', listSeparator,
+        completion: { provider: () => ({ replaceStart: 0, replaceEnd: 0,
+          items: [{ key: 'scope', label: 'Scope', insertText: 'scope:', keepOpen: true }] }) } } },
+      global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] },
+    })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
+      await input.trigger('keydown', { key: 'Enter', isComposing: true })
+      expect(wrapper.emitted('update:value')).toBeUndefined()
+      const option = document.querySelector<HTMLElement>('[role="option"]')!
+      option.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }))
+      await flushPromises()
+      expect(wrapper.emitted('update:value')).toBeDefined()
+      expect(document.activeElement).toBe(input.element)
+      expect(input.attributes('aria-expanded')).toBe('true')
+      outside.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }))
+      await nextTick()
+      expect(document.activeElement).toBe(input.element)
+      expect(input.attributes('aria-expanded')).toBe('false')
+      expect(input.attributes('aria-activedescendant')).toBeUndefined()
+      await input.trigger('click')
+      await flushPromises()
+      expect(input.attributes('aria-expanded')).toBe('true')
+      outside.click()
+      await nextTick()
+      expect(input.attributes('aria-expanded')).toBe('false')
+      await input.trigger('click')
+      await flushPromises()
+      outside.focus()
+      await nextTick()
+      expect(input.attributes('aria-expanded')).toBe('false')
+    } finally { wrapper.unmount(); outside.remove() }
+  })
+  it('keeps an accepted value closed through provider reconstruction until the next user interaction', async () => {
+    const definition = () => ({ title: 'Length', fieldType: 'string' as const, completion: { provider: () => ({
+      replaceStart: 0, replaceEnd: 3, items: [{ key: '2px', label: '2 px', insertText: '2px' }],
+    }) } })
+    const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
+      props: { value: '0px', definition: definition(),
+        'onUpdate:value': (value: string) => { void wrapper.setProps({ value, definition: definition() }) } },
+    })
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
+      await input.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+      expect(wrapper.props('value')).toBe('2px')
+      expect(wrapper.getComponent(OcAutocompletePopover).props('open')).toBe(false)
+      await wrapper.setProps({ definition: definition() })
+      await flushPromises()
+      expect(wrapper.getComponent(OcAutocompletePopover).props('open')).toBe(false)
+      await input.trigger('click')
+      await flushPromises()
+      expect(wrapper.getComponent(OcAutocompletePopover).props('open')).toBe(true)
+    } finally { wrapper.unmount() }
+  })
   it('edits array tags without submitting partial input, and commits on Enter, blur and removal', async () => {
     const definition: PropertyEditorFieldDefinition = { title: 'Viewed guides', fieldType: 'string[]',
       listSeparator: 'semicolon', optionLabels: { overview: 'Interface tour' } }
-    const wrapper = mount(PropertyFieldRenderer, { props: { definition, value: ['overview'], editorId: 'field' },
+    const wrapper = mount(PropertyFieldRenderer, { attachTo: document.body, props: { definition, value: ['overview'], editorId: 'field' },
       global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] } })
     expect(wrapper.text()).toContain('Interface tour')
     const input = wrapper.get('input')
+    input.element.focus()
     await input.setValue('welcome')
     expect(wrapper.emitted('update:value')).toBeUndefined()
     await input.trigger('keydown', { key: 'Enter' })
@@ -33,9 +101,9 @@ describe('ReferenceStringPropertyField', () => {
     const definition: PropertyEditorFieldDefinition = { title: 'Viewed guides', fieldType: 'string[]', listSeparator: 'semicolon',
       completion: { provider: ({ value, cursor }) => ({ replaceStart: value.lastIndexOf(';', cursor - 1) + 1,
         replaceEnd: value.length, items: [{ key: 'welcome', label: 'Create project', insertText: 'welcome' }] }) } }
-    const wrapper = mount(PropertyFieldRenderer, { props: { definition, value: ['overview'], editorId: 'field' },
+    const wrapper = mount(PropertyFieldRenderer, { attachTo: document.body, props: { definition, value: ['overview'], editorId: 'field' },
       global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] } })
-    await wrapper.get('input').trigger('focus')
+    wrapper.get('input').element.focus()
     await flushPromises()
     await wrapper.get('input').trigger('keydown', { key: 'Tab' })
     expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual([['overview', 'welcome']])
@@ -54,13 +122,14 @@ describe('ReferenceStringPropertyField', () => {
 
   it('preserves the full-string completion range while editing the last token', async () => {
     const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
       props: { value: 'first; se', definition: { title: 'Sources', fieldType: 'string', listSeparator: 'semicolon',
         completion: { provider: ({ value }) => ({ replaceStart: value.lastIndexOf('se'), replaceEnd: value.length,
           items: [{ key: 'second', label: 'Second', insertText: 'second' }] }) } } },
       global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en: {} } })] },
     })
     const input = wrapper.get('input')
-    await input.trigger('focus')
+    input.element.focus()
     await flushPromises()
     await input.trigger('keydown', { key: 'Tab' })
     expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['first;second'])
@@ -70,16 +139,18 @@ describe('ReferenceStringPropertyField', () => {
   it('discards stale completion results and pending results after blur', async () => {
     const pending: Array<(result: { replaceStart: number; replaceEnd: number; items: Array<{ key: string; label: string; insertText: string }> }) => void> = []
     const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
       props: {
         value: '',
         definition: { title: 'Reference', fieldType: 'string', completion: {
-          provider: () => new Promise(resolve => pending.push(resolve)),
+          provider: ({ value }) => value ? new Promise(resolve => pending.push(resolve)) : null,
         } },
       },
     })
     const result = (label: string) => ({ replaceStart: 0, replaceEnd: 1,
       items: [{ key: label, label, insertText: label }] })
     const input = wrapper.get('input')
+    input.element.focus()
     await input.setValue('a')
     await input.setValue('b')
     pending[1]!(result('Latest'))
@@ -90,8 +161,15 @@ describe('ReferenceStringPropertyField', () => {
     await input.trigger('keydown', { key: 'Enter' })
     expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['Latest'])
     await input.setValue('c')
-    await input.trigger('blur')
+    input.element.blur()
     pending[2]!(result('After blur'))
+    await flushPromises()
+    expect(input.attributes('aria-expanded')).toBe('false')
+    input.element.focus()
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    input.element.dispatchEvent(escape)
+    expect(escape.defaultPrevented).toBe(true)
+    pending[3]!(result('After escape'))
     await flushPromises()
     expect(input.attributes('aria-expanded')).toBe('false')
     wrapper.unmount()
@@ -103,6 +181,7 @@ describe('ReferenceStringPropertyField', () => {
 
   it('executes prepared auto-pairs and completion providers', async () => {
     const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Content',
@@ -126,6 +205,7 @@ describe('ReferenceStringPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
+    input.element.focus()
     const element = input.element as HTMLInputElement
 
     element.value = '{{'
@@ -155,6 +235,7 @@ describe('ReferenceStringPropertyField', () => {
   it('refreshes the provider after keyboard cursor movement', async () => {
     let requestedCursor = -1
     const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Content',
@@ -170,8 +251,10 @@ describe('ReferenceStringPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
+    input.element.focus()
     const element = input.element as HTMLInputElement
-    await input.trigger('focus')
+    input.element.focus()
+    await flushPromises()
     element.setSelectionRange(12, 12)
     await input.trigger('keyup', { key: 'ArrowLeft' })
     await nextTick()
@@ -181,6 +264,7 @@ describe('ReferenceStringPropertyField', () => {
 
   it('uses Shift+Tab for provider parent navigation without consuming it at the root', async () => {
     const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Reference',
@@ -205,8 +289,10 @@ describe('ReferenceStringPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
+    input.element.focus()
     const control = input.element as HTMLInputElement
-    await input.trigger('focus')
+    input.element.focus()
+    await flushPromises()
     await nextTick()
 
     const parentEvent = new KeyboardEvent('keydown', {
@@ -241,6 +327,7 @@ describe('ReferenceStringPropertyField', () => {
 
   it.each([false, true])('projects readonly onto the native control when multiline=%s', (multiline) => {
     const wrapper = mount(ReferenceStringPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Readonly',

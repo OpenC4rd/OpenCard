@@ -88,7 +88,7 @@ const draft = ref(initial.draft)
 /** 自己发出去的值回传时不重新解析，否则正在输入的那一项会被规范化（去空白）打断。 */
 let lastEmitted = ''
 const activeInput = ref<TextControl | null>(null)
-const completion = usePropertyCompletion()
+const completion = usePropertyCompletion(() => activeInput.value)
 const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId } = completion
 
 /** 补全 provider 拿到的是整串 + 整串光标，所以尾巴要补回已提交项的前缀。 */
@@ -146,7 +146,7 @@ function removeToken(index: number): void {
 
 function setCursor(control: TextControl, cursor: number): void {
   nextTick(() => {
-    control.focus()
+    if (document.activeElement !== control) return
     control.setSelectionRange(cursor, cursor)
   })
 }
@@ -158,7 +158,7 @@ async function refreshCompletion(
 ): Promise<void> {
   activeInput.value = control
   const provider = props.definition.completion?.provider
-  if (!provider) return completion.clear()
+  if (!provider || props.definition.isReadonly) return completion.clear()
   await completion.refresh(() => provider({ value, cursor }))
 }
 
@@ -186,12 +186,12 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 }
 
 function handleBlur(): void {
+  completion.clear()
   if (arrayMode.value) commitDraft()
   else if ((props.definition.commitMode ?? 'input') === 'blur') {
     const next = joinReferenceStringTokens(tokens.value, draft.value, separator.value)
     if (next !== stringOf(props.value)) emit('update:value', next)
   }
-  completion.closeAfterBlur()
 }
 
 /** 粘贴一整列来源时按分隔符/换行拆成多项，一次成标签。 */
@@ -242,6 +242,7 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  if (event.isComposing || event.keyCode === 229) return
   if (completion.handleKeydown(event, acceptSuggestion)) return
 
   if (props.definition.isReadonly) return

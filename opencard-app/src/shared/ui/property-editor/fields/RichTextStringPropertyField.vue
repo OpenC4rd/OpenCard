@@ -23,7 +23,7 @@
       :sidebar-tooltip="tr('propertyEditor.richText.toggleProperties', '拖动或双击收起或展开文字属性')"
       :padded="false" :scrollable="false" height-mode="fixed" height="workspace"
       close-on-backdrop @request-close="cancelEditor">
-	          <div class="rich-text-string-popover__editor">
+	          <div class="rich-text-string-popover__editor" tabindex="-1" autofocus>
             <OcRichTextEditor v-if="open" v-show="editorMode === 'rich'" ref="richTextEditor" :initial-html="initialHtml"
               :binding-completion="definition.binding?.provider"
 		              :project-icon-catalog="definition.projectIcon?.catalog"
@@ -35,6 +35,7 @@
               :resolve-image-source="definition.richTextImageResolver"
               />
             <OcFieldInput v-if="editorMode === 'source'" ref="sourceEditor" as="textarea" variant="plain" full-width mono
+              autofocus
               class="rich-text-string-popover__source" :value="sourceValue"
               resize="none" autocomplete="off" spellcheck="false"
               :aria-label="tr('propertyEditor.richText.htmlSource', 'HTML 源码')"
@@ -58,7 +59,8 @@
         <div v-if="richTextEditor" class="oc-rich-text-editor__properties"
           @pointerdown.capture="richTextEditor.properties.capture" @focusin.capture="richTextEditor.properties.capture">
           <PropertyEditor :inputs="richTextEditor.properties.inputs" :categories="richTextEditor.properties.categories"
-            sort-mode="category" @update-property="richTextEditor.properties.update"
+            sort-mode="category" allow-raw-string-editor @update-property="richTextEditor.properties.update"
+            @reset-property="richTextEditor.properties.reset"
             @preview-property="richTextEditor.properties.preview" @cancel-property="richTextEditor.properties.cancel" />
         </div>
       </template>

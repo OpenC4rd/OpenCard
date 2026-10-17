@@ -50,7 +50,6 @@
       :match-anchor-width="true"
       :max-height="maxHeight"
       class="oc-select__floating oc-floating-layer--surface"
-      :data-oc-select-owner="selectId"
     >
       <div :id="listboxId" class="oc-select__listbox" role="listbox">
         <OcRow
@@ -96,7 +95,8 @@ export interface OcSelectOption {
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, useAttrs, useId, watch } from 'vue'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcFloatingLayer from './OcFloatingLayer.vue'
@@ -163,9 +163,8 @@ watch(() => props.disabled || props.readonly, blocked => {
   if (blocked) closeSelect(false)
 })
 
-onMounted(() => document.addEventListener('pointerdown', handleDocumentPointerDown, true))
+useOverlayDismiss(() => open.value, () => rootRef.value, () => closeSelect(false))
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   clearTypeahead()
 })
 
@@ -277,15 +276,6 @@ function clearTypeahead(): void {
   typeaheadTimer = null
 }
 
-function handleDocumentPointerDown(event: PointerEvent): void {
-  if (!open.value) return
-  const path = event.composedPath()
-  if (rootRef.value && path.includes(rootRef.value)) return
-  const insideFloating = path.some(target => (
-    target instanceof HTMLElement && target.dataset.ocSelectOwner === selectId
-  ))
-  if (!insideFloating) closeSelect(false)
-}
 </script>
 
 <style scoped>

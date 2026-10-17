@@ -7,9 +7,9 @@ import {
   type ProjectIconCatalogEntry,
 } from '../../../features/workspace/services/projectIconCatalog'
 import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
-import { parseRichTextHtml, type RichTextIconNode, type RichTextNode } from '../../rich-text/richTextHtml'
+import { parseRichTextHtml, type RichTextIconNode } from '../../rich-text/richTextHtml'
 import { readProjectIconSize } from '../../../features/workspace/services/projectIconDimensionResolver'
-import { resolveRichTextStyle } from '../../rich-text/richTextResourceStyle'
+import { renderRichTextDocument } from './renderRichTextDocument'
 
 const props = defineProps<{
   html: string
@@ -30,29 +30,23 @@ function resolveIconEntry(node: RichTextIconNode): ProjectIconCatalogEntry | nul
   return node.packageKey ? null : findProjectIcon(props.projectIconCatalog, node.seriesKey, node.iconKey)
 }
 
-function renderNode(node: RichTextNode): VNodeChild {
-  if (node.type === 'text') return node.value
-  if (node.type === 'icon') {
-    const entry = resolveIconEntry(node)
-    return entry
-      ? h('span', {
-          class: 'rich-text-preview__icon',
-          style: createProjectIconStyle(entry, readProjectIconSize),
-          role: 'img',
-          'aria-label': entry.name,
-        })
-      : h('span', { class: 'rich-text-preview__missing' }, '[icon]')
-  }
-  const attributes = { ...node.attributes }
-  if (attributes.style || attributes['data-oc-fill-type'] === 'image') {
-    attributes.style = resolveRichTextStyle(attributes,
-      reference => props.fontOptions?.find(font => font.value === reference)?.cssFamily ?? reference,
-      reference => props.resolveImageSource?.(reference) ?? null)
-  }
-  return h(node.tag, attributes, node.children.map(renderNode))
+function renderIcon(node: RichTextIconNode): VNodeChild {
+  const entry = resolveIconEntry(node)
+  return entry
+    ? h('span', {
+        class: 'rich-text-preview__icon',
+        style: createProjectIconStyle(entry, readProjectIconSize),
+        role: 'img',
+        'aria-label': entry.name,
+      })
+    : h('span', { class: 'rich-text-preview__missing' }, '[icon]')
 }
 
-const rendered = computed(() => document.value.children.map(renderNode))
+const rendered = computed(() => renderRichTextDocument(document.value.children, {
+  resolveFont: reference => props.fontOptions?.find(font => font.value === reference)?.cssFamily ?? reference,
+  resolveImage: reference => props.resolveImageSource?.(reference) ?? null,
+  renderIcon,
+}))
 </script>
 
 <template>

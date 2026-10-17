@@ -6,6 +6,26 @@ import OcFieldInput from '../base/OcFieldInput.vue'
 import OcColorPicker from './OcColorPicker.vue'
 
 describe('OcColorPicker', () => {
+  it('preserves its owned panel during focus changes and dismisses on outside activation or focus', async () => {
+    const wrapper = mount(OcColorPicker, { attachTo: document.body, props: { modelValue: '#112233' } })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      const trigger = wrapper.get('.oc-color-picker__trigger')
+      await trigger.trigger('click')
+      document.querySelector<HTMLInputElement>('input[aria-label="HEX"]')!.focus()
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      outside.click()
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      await trigger.trigger('click')
+      outside.focus()
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.emitted('commit')).toBeUndefined()
+    } finally { wrapper.unmount(); outside.remove() }
+  })
   afterEach(() => setOcTheme('dark'))
 
   it('uses a themed popover without a native color input', async () => {

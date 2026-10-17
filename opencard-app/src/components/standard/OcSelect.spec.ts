@@ -11,6 +11,23 @@ const options = [
 ]
 
 describe('OcSelect', () => {
+  it('dismisses for outside activation and keyboard focus without committing a choice', async () => {
+    const wrapper = mount(OcSelect, { attachTo: document.body, props: { modelValue: 'one', options } })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      const trigger = wrapper.get('.oc-select__trigger')
+      await trigger.trigger('click')
+      outside.click()
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      await trigger.trigger('click')
+      outside.focus()
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.emitted('commit')).toBeUndefined()
+    } finally { wrapper.unmount(); outside.remove() }
+  })
   it('keeps a modal dropdown inside its owner and commits its real option', async () => {
     const selected = [] as string[]
     const wrapper = mount(OcDialog, {

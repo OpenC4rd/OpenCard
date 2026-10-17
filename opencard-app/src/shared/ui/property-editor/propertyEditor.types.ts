@@ -93,6 +93,7 @@ export type PropertyFieldConstraintMap = {
   boolean: Record<never, never>
   color: {
     allowAlpha?: boolean
+    placeholder?: string
   }
   object: {
     isArray?: boolean
@@ -109,6 +110,8 @@ export type PropertyFieldType = BasePropertyFieldType | PropertyArrayFieldType
 
 type PropertyEditorFieldBase = {
   title: string
+  /** Display state of a projected value; never written back as field data. */
+  valueState?: 'unset' | 'value' | 'mixed'
   category?: string
   order?: number
   defaultValue?: unknown

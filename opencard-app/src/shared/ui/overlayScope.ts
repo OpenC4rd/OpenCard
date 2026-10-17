@@ -38,11 +38,20 @@ function updateBackground(): void {
 function focusTargets(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(
     'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
-  )].filter(element => !element.closest('[inert]') && element.getAttribute('aria-hidden') !== 'true')
+  )].filter(element => element.getAttribute('tabindex') !== '-1' && isAvailable(element))
+}
+
+function isAvailable(element: HTMLElement): boolean {
+  if (element.closest('[inert], [hidden], [aria-hidden="true"]')) return false
+  for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+    const style = getComputedStyle(current)
+    if (style.display === 'none' || style.visibility === 'hidden') return false
+  }
+  return true
 }
 
 function focusInitial(root: HTMLElement): void {
-  ;(root.querySelector<HTMLElement>('[autofocus]') ?? focusTargets(root)[0] ?? root).focus()
+  ;([...root.querySelectorAll<HTMLElement>('[autofocus]')].find(isAvailable) ?? focusTargets(root)[0] ?? root).focus()
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -85,7 +94,7 @@ export function registerDialogRoot(root: HTMLElement, options: Omit<ModalScope, 
   if (dialogs.value.length === 1) {
     window.addEventListener('keydown', captureKeydown, true)
   }
-  focusInitial(root)
+  if (!root.contains(document.activeElement)) focusInitial(root)
   queueMicrotask(() => {
     if (activeDialogRoot.value === root && !root.contains(document.activeElement)) focusInitial(root)
   })
@@ -106,7 +115,11 @@ export function registerDialogRoot(root: HTMLElement, options: Omit<ModalScope, 
 }
 
 export function resolveOverlayRoot(owner: Element | null): HTMLElement {
-  return owner?.closest<HTMLElement>('[data-oc-modal-root]') ?? document.body
+  for (let index = dialogs.value.length - 1; index >= 0; index--) {
+    const root = dialogs.value[index]!.root
+    if (owner && root.contains(owner)) return root
+  }
+  return document.body
 }
 
 export function isOverlayRootActive(root: HTMLElement): boolean {

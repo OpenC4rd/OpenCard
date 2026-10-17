@@ -1,6 +1,7 @@
 <!-- 属性颜色字段：把值与只读协议适配到标准颜色字段。 -->
 <template>
   <OcColorPicker variant="field" :model-value="stringValue" :label="definition.title"
+    :mixed="definition.valueState === 'mixed'" :placeholder="definition.placeholder"
     :disabled="definition.isReadonly" :allow-alpha="definition.allowAlpha ?? true"
     @preview="emit('preview:value', $event)" @cancel="emit('cancel:value')"
     @update:model-value="emit('update:value', $event)" />

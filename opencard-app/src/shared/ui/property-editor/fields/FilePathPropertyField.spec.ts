@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
 import FilePathPropertyField from './FilePathPropertyField.vue'
@@ -11,6 +11,7 @@ vi.mock('vue-i18n', () => ({
 }))
 
 describe('FilePathPropertyField', () => {
+  enableAutoUnmount(afterEach)
   it('offers parent navigation for a deleted directory but still reports real read failures', async () => {
     const error = new Error('read directory failed')
     const fs = { readDirectoryEntries: vi.fn(async () => { throw error }), fileExists: vi.fn(async () => false) }
@@ -19,11 +20,12 @@ describe('FilePathPropertyField', () => {
       fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }, fs)
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: { definition: { title: 'Image', fieldType: 'filePath', directoryProvider: provider }, value: 'Assets/deleted.png' },
     })
     try {
-      await wrapper.get('input').trigger('focus')
-      await flushPromises()
+      wrapper.get('input').element.focus()
+    await flushPromises()
       expect(fs.fileExists).toHaveBeenCalledWith('/project/Assets')
       expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([expect.objectContaining({ label: '..', insertText: '' })])
       expect(wrapper.props('value')).toBe('Assets/deleted.png')
@@ -50,13 +52,14 @@ describe('FilePathPropertyField', () => {
       }]]),
     }, { readDirectoryEntries, fileExists: async () => true })
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: { definition: { title: 'Image', fieldType: 'filePath', directoryProvider: provider }, value: '',
         'onUpdate:value': (value: string) => { void wrapper.setProps({ value }) },
       },
     })
     try {
       const input = wrapper.get('input')
-      await input.trigger('focus')
+      input.element.focus()
       await flushPromises()
       const rootMenu = wrapper.getComponent(OcAutocompletePopover)
       expect(rootMenu.props('items')).toEqual([
@@ -105,6 +108,7 @@ describe('FilePathPropertyField', () => {
       ? [{ name: 'assets/card.png', isDirectory: false }]
       : [{ name: 'assets', isDirectory: true }])
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
         value: 'assets/',
@@ -112,7 +116,7 @@ describe('FilePathPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
-    await input.trigger('focus')
+    input.element.focus()
     await flushPromises()
 
     const parentEvent = new KeyboardEvent('keydown', {
@@ -140,6 +144,7 @@ describe('FilePathPropertyField', () => {
 
   it('opens virtual scoped-resource entries without appending a path separator', async () => {
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Image',
@@ -163,7 +168,7 @@ describe('FilePathPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
-    await input.trigger('focus')
+    input.element.focus()
     await flushPromises()
 
     expect(wrapper.getComponent(OcAutocompletePopover).props('items')[0]).toEqual(expect.objectContaining({
@@ -189,6 +194,7 @@ describe('FilePathPropertyField', () => {
       { name: 'assets/readme.txt', isDirectory: false },
     ])
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Image',
@@ -200,9 +206,10 @@ describe('FilePathPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
+    input.element.focus()
     ;(input.element as HTMLInputElement).setSelectionRange(0, 0)
 
-    await input.trigger('focus')
+    input.element.focus()
     await flushPromises()
 
     expect(directoryProvider).toHaveBeenCalledWith('assets')
@@ -235,14 +242,15 @@ describe('FilePathPropertyField', () => {
       { name: 'Outputs/domain_main_input.png', isDirectory: false },
     ])
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
         value: 'Outputs/main_in',
       },
     })
     const input = wrapper.get('input')
-
-    await input.trigger('focus')
+    input.element.focus()
+    await flushPromises()
     await input.trigger('click')
     await flushPromises()
 
@@ -261,6 +269,7 @@ describe('FilePathPropertyField', () => {
           { name: 'assets/portrait.png', isDirectory: false },
         ])
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Image',
@@ -272,8 +281,9 @@ describe('FilePathPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
+    input.element.focus()
     const control = input.element as HTMLInputElement
-    await input.trigger('focus')
+    input.element.focus()
     await flushPromises()
     control.value = 'assets/ca'
     control.setSelectionRange(control.value.length, control.value.length)
@@ -328,13 +338,14 @@ describe('FilePathPropertyField', () => {
       { name: 'alice/theme@1.0.0#cover.png', isDirectory: false },
     ])
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
         value: 'alice/theme@1.0.0#',
       },
     })
 
-    await wrapper.get('input').trigger('focus')
+    wrapper.get('input').element.focus()
     await flushPromises()
 
     expect(directoryProvider).toHaveBeenCalledWith('alice/theme@1.0.0#')
@@ -358,6 +369,7 @@ describe('FilePathPropertyField', () => {
         }
       : null)
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: {
           title: 'Directory',
@@ -370,7 +382,7 @@ describe('FilePathPropertyField', () => {
       },
     })
     const input = wrapper.get('input')
-    await input.trigger('focus')
+    input.element.focus()
     await flushPromises()
     expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
       expect.objectContaining({ label: 'assets' }),
@@ -394,14 +406,15 @@ describe('FilePathPropertyField', () => {
       resolveEntries = resolve
     }))
     const wrapper = mount(FilePathPropertyField, {
+      attachTo: document.body,
       props: {
         definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
         value: 'assets/portrait.png',
       },
     })
     const input = wrapper.get('input')
-
-    await input.trigger('focus')
+    input.element.focus()
+    await flushPromises()
     await input.trigger('blur')
     resolveEntries?.([{ name: 'assets/portrait.png', isDirectory: false }])
     await flushPromises()

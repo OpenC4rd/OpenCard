@@ -60,14 +60,9 @@ import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 import { usePropertyCompletion } from './usePropertyCompletion'
 
 type FilePathDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'filePath' }>
-type FilePathSessionState = 'idle' | 'filtering' | 'browsing-directory' | 'committed'
 type PathBrowseContext = {
   directory: string
   fragment: string
-}
-type PathCompletionResolution = {
-  result: PropertyCompletionResult | null
-  state: FilePathSessionState
 }
 
 const props = defineProps<{
@@ -81,24 +76,22 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const activeInput = ref<HTMLInputElement | null>(null)
-const completion = usePropertyCompletion()
+const completion = usePropertyCompletion(() => activeInput.value)
 const { completionState: completionResult, suggestions: items, isMenuOpen, activeKey,
-  autocompleteId, activeDescendantId } = completion
-const isFocused = ref(false)
-const sessionState = ref<FilePathSessionState>('idle')
-let suppressDefinitionInvalidation = false
+  autocompleteId, activeDescendantId, clear: clearCompletion } = completion
 
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)).replace(/\\/g, '/'))
 watch(
-  () => [
-    props.definition.completion?.provider,
-    props.definition.directoryProvider,
-    props.definition.filter,
-  ] as const,
+  [
+    () => props.definition.completion?.provider,
+    () => props.definition.directoryProvider,
+    () => props.definition.filter,
+  ],
   () => {
-    if (sessionState.value === 'committed') return
-    if (suppressDefinitionInvalidation) return
-    clearCompletion()
+    const control = activeInput.value
+    if (control && document.activeElement === control && (isMenuOpen.value || completion.isPending.value)) {
+      void refreshCompletion(control.value.replace(/\\/g, '/'), control.selectionStart ?? control.value.length)
+    } else clearCompletion()
   },
   { deep: true },
 )
@@ -108,48 +101,33 @@ async function refreshCompletion(
   cursor: number,
 ): Promise<void> {
   if (props.definition.isReadonly) return clearCompletion()
-  let state: FilePathSessionState = 'filtering'
   try {
-    const applied = await completion.refresh(async () => {
+    await completion.refresh(async () => {
       const genericResult = await props.definition.completion?.provider?.({ value, cursor })
       if (genericResult) return genericResult
       const directoryProvider = props.definition.directoryProvider
       const context = resolveBrowseContext(value)
-      if (!directoryProvider || !context) { state = 'idle'; return null }
+      if (!directoryProvider || !context) return null
       const entries = await directoryProvider(context.directory)
-      const resolution = createPathCompletionResult(value, context, entries, props.definition.filter)
-      state = resolution.state
-      return resolution.result
-    }, () => isFocused.value)
-    if (applied) sessionState.value = state
+      return createPathCompletionResult(value, context, entries, props.definition.filter)
+    })
   } catch (error) {
     reportAppError('OC-E4005', error)
     clearCompletion()
   }
 }
 
-function clearCompletion(state: FilePathSessionState = 'idle'): void {
-  sessionState.value = state
-  completion.clear()
-}
-
 function handleInput(event: Event): void {
   const control = event.target as HTMLInputElement
   activeInput.value = control
   const value = control.value.replace(/\\/g, '/')
-  sessionState.value = 'filtering'
-  suppressDefinitionInvalidation = true
   emit('update:value', value)
-  void nextTick(() => {
-    suppressDefinitionInvalidation = false
-  })
   void refreshCompletion(value, control.selectionStart ?? value.length)
 }
 
 function handleFocus(event: FocusEvent): void {
   const control = event.target as HTMLInputElement
   activeInput.value = control
-  isFocused.value = true
   void refreshCompletion(stringValue.value, control.selectionStart ?? stringValue.value.length)
 }
 
@@ -165,8 +143,7 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 }
 
 function handleBlur(): void {
-  isFocused.value = false
-  completion.closeAfterBlur(false)
+  clearCompletion()
 }
 
 function applySuggestionByKey(key: string): void {
@@ -179,15 +156,6 @@ function applySuggestionByKey(key: string): void {
   const replaceEnd = item.replaceEnd ?? result.replaceEnd
   const nextValue = `${currentValue.slice(0, replaceStart)}${item.insertText}${currentValue.slice(replaceEnd)}`
   const nextCursor = replaceStart + item.insertText.length
-  if (item.key.startsWith('clear-file:')
-    || item.insertText.endsWith('/')
-    || item.insertText.endsWith('#')
-    || item.insertText.endsWith(':')) {
-    sessionState.value = 'browsing-directory'
-  } else if (item.key.startsWith('path:')) {
-    sessionState.value = 'committed'
-  }
-  if (item.keepOpen) suppressDefinitionInvalidation = true
   emit('update:value', nextValue)
   if (activeInput.value) {
     activeInput.value.value = nextValue
@@ -197,27 +165,17 @@ function applySuggestionByKey(key: string): void {
   if (item.keepOpen) {
     isMenuOpen.value = true
     void nextTick(() => {
-      suppressDefinitionInvalidation = false
       const control = activeInput.value
-      if (!control) return
-      control.focus()
+      if (!control || document.activeElement !== control) return
       control.setSelectionRange(nextCursor, nextCursor)
       void refreshCompletion(nextValue, nextCursor)
     })
   } else {
-    clearCompletion('committed')
+    clearCompletion()
   }
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    clearCompletion()
-    return
-  }
-  if (items.value.length === 0) return
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') isMenuOpen.value = true
-  // 路径字段保留关闭菜单后以 Tab / Enter 确认当前项的行为。
-  if (event.key === 'Tab' || event.key === 'Enter') isMenuOpen.value = true
   completion.handleKeydown(event, item => applySuggestionByKey(item.key))
 }
 
@@ -247,7 +205,7 @@ function createPathCompletionResult(
   context: PathBrowseContext,
   entries: readonly FilePathDirectoryEntry[],
   filter: FilePathFilter | undefined,
-): PathCompletionResolution {
+): PropertyCompletionResult | null {
   const normalizedExtensions = (filter?.extensions ?? []).map(extension => (
     extension.startsWith('.') ? extension.toLocaleLowerCase() : `.${extension.toLocaleLowerCase()}`
   ))
@@ -266,18 +224,15 @@ function createPathCompletionResult(
   ))) {
     const directory = getPathDirectory(value.replace(/\\/g, '/').replace(/\/+$/, ''))
     return {
-      result: {
-        replaceStart: 0,
-        replaceEnd: value.length,
-        items: [{
-          key: `clear-file:${normalizedValue}`,
-          label: t('propertyEditor.filePath.clearSelection'),
-          icon: 'action.close',
-          insertText: directory ? `${directory.replace(/\/+$/, '')}/` : '',
-          keepOpen: true,
-        }],
-      },
-      state: 'committed',
+      replaceStart: 0,
+      replaceEnd: value.length,
+      items: [{
+        key: `clear-file:${normalizedValue}`,
+        label: t('propertyEditor.filePath.clearSelection'),
+        icon: 'action.close',
+        insertText: directory ? `${directory.replace(/\/+$/, '')}/` : '',
+        keepOpen: true,
+      }],
     }
   }
 
@@ -294,12 +249,9 @@ function createPathCompletionResult(
     .map(({ isDirectory: _isDirectory, ...item }) => item)
 
   const parent = createParentCompletionItem(context.directory)
-  return {
-    result: candidates.length > 0 || parent
-      ? { replaceStart: 0, replaceEnd: value.length, items: candidates, ...(parent ? { parent } : {}) }
-      : null,
-    state: context.fragment ? 'filtering' : 'browsing-directory',
-  }
+  return candidates.length > 0 || parent
+    ? { replaceStart: 0, replaceEnd: value.length, items: candidates, ...(parent ? { parent } : {}) }
+    : null
 }
 
 function toPathCompletionItem(entry: FilePathDirectoryEntry, directory: string) {

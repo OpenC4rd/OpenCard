@@ -1,18 +1,19 @@
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import type { PropertyCompletionItem, PropertyCompletionResult } from '../propertyEditor.types'
+import { useOverlayDismiss } from '../../useOverlayDismiss'
 
-export function usePropertyCompletion() {
+export function usePropertyCompletion(getControl: () => HTMLElement | null) {
   const completionState = ref<PropertyCompletionResult | null>(null)
   const isMenuOpen = ref(false)
+  const isPending = ref(false)
   const activeKey = ref<string | null>(null)
   const autocompleteId = useId()
   let requestId = 0
-  let blurTimer: ReturnType<typeof setTimeout> | undefined
   const suggestions = computed(() => {
     const result = completionState.value
     return result ? [...result.items, ...(result.parent ? [result.parent] : [])] : []
   })
-  const activeDescendantId = computed(() => activeKey.value
+  const activeDescendantId = computed(() => isMenuOpen.value && activeKey.value
     ? `${autocompleteId}-option-${activeKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
     : undefined)
 
@@ -20,42 +21,42 @@ export function usePropertyCompletion() {
     if (!items.some(item => item.key === activeKey.value)) activeKey.value = items[0]?.key ?? null
   })
 
-  function invalidate(): void { requestId += 1 }
-  function cancelBlur(): void { clearTimeout(blurTimer) }
+  function invalidate(): void { requestId += 1; isPending.value = false }
   function clear(): void {
-    cancelBlur()
     invalidate()
     completionState.value = null
     activeKey.value = null
     isMenuOpen.value = false
   }
 
-  function closeAfterBlur(clearResult = true): void {
-    invalidate()
-    cancelBlur()
-    blurTimer = setTimeout(() => {
-      if (clearResult) clear()
-      else isMenuOpen.value = false
-    }, 0)
-  }
+  useOverlayDismiss(() => isMenuOpen.value || isPending.value, getControl, clear)
 
   async function refresh(load: () => PropertyCompletionResult | null | Promise<PropertyCompletionResult | null>, canOpen = () => true): Promise<boolean> {
-    cancelBlur()
     const currentRequest = ++requestId
+    isPending.value = true
     try {
       const result = await load()
       if (currentRequest !== requestId) return false
       completionState.value = result
       activeKey.value = suggestions.value[0]?.key ?? null
-      isMenuOpen.value = canOpen() && suggestions.value.length > 0
+      isMenuOpen.value = document.activeElement === getControl() && canOpen() && suggestions.value.length > 0
       return true
     } catch (error) {
       if (currentRequest !== requestId) return false
       throw error
+    } finally {
+      if (currentRequest === requestId) isPending.value = false
     }
   }
 
   function handleKeydown(event: KeyboardEvent, accept: (item: PropertyCompletionItem) => void): boolean {
+    if (event.isComposing || event.keyCode === 229) return false
+    if (event.key === 'Escape' && (isMenuOpen.value || isPending.value)) {
+      event.preventDefault()
+      event.stopPropagation()
+      clear()
+      return true
+    }
     if (!isMenuOpen.value || suggestions.value.length === 0) return false
     if (event.key === 'Tab' && event.shiftKey) {
       const parent = completionState.value?.parent
@@ -75,18 +76,12 @@ export function usePropertyCompletion() {
       if (item) accept(item)
       return true
     }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      invalidate()
-      isMenuOpen.value = false
-      return true
-    }
     return false
   }
 
   onBeforeUnmount(clear)
-  return { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId,
-    refresh, clear, invalidate, closeAfterBlur, handleKeydown }
+  return { completionState, suggestions, isMenuOpen, isPending, activeKey, autocompleteId, activeDescendantId,
+    refresh, clear, invalidate, handleKeydown }
 }
 
 export function matchStaticCompletion(current: string, values: readonly string[]): string {

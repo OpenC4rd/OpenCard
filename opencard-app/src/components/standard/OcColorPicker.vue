@@ -22,7 +22,8 @@
         class="oc-color-picker__field-input"
         variant="plain"
         size="sm"
-        :value="hexDraft"
+        :value="mixed && !open && !inlineEditing ? '' : hexDraft"
+        :placeholder="placeholder"
         :disabled="disabled"
         :aria-label="label"
         style="color: inherit"
@@ -53,8 +54,8 @@
       @click="togglePicker"
       @keydown.esc.stop="closePicker(true, true)"
     >
-      <slot name="trigger" :color="displayColor" :open="open">
-        <span class="oc-color-picker__swatch" :style="{ backgroundColor: displayColor }" />
+      <slot name="trigger" :color="mixed && !open ? 'transparent' : displayColor" :open="open">
+        <span class="oc-color-picker__swatch" :style="{ backgroundColor: mixed && !open ? 'transparent' : displayColor }" />
       </slot>
     </button>
 
@@ -64,7 +65,6 @@
       placement="bottom-start"
       :max-height="360"
       class="oc-color-picker__floating oc-floating-layer--surface"
-      :data-oc-color-owner="pickerId"
     >
       <div class="oc-color-picker__panel" role="dialog" :aria-label="label" @keydown.esc.stop.prevent="closePicker(true, true)">
         <div
@@ -151,7 +151,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch, type CSSProperties } from 'vue'
+import { computed, onBeforeUnmount, ref, useAttrs, watch, type CSSProperties } from 'vue'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import { clamp } from '../../shared/model/number'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
@@ -206,6 +207,10 @@ const props = withDefaults(defineProps<{
   variant?: 'default' | 'field'
   presets?: readonly string[]
   allowAlpha?: boolean
+  /** Values differ across the current selection; no single swatch is implied. */
+  mixed?: boolean
+  /** Text shown in the field when the selection has no single value. */
+  placeholder?: string
 }>(), {
   modelValue: '#000000',
   label: 'Choose color',
@@ -215,6 +220,8 @@ const props = withDefaults(defineProps<{
   variant: 'default',
   presets: () => ['#FFFFFF', '#B8B8B8', '#1F2430', '#000000', '#F14C4C', '#F59E0B', '#3FB950', '#58A6FF', '#7C6CFF', '#A855F7'],
   allowAlpha: true,
+  mixed: false,
+  placeholder: '',
 })
 
 const emit = defineEmits<{
@@ -234,8 +241,8 @@ const initialColor = normalizePickerColor(props.modelValue) ?? '#000000'
 const hsva = ref<HsvaColor>(hexToHsva(initialColor) ?? { hue: 0, saturation: 0, value: 0, alpha: 1 })
 const hexDraft = ref(initialColor)
 const committedValue = ref(hexDraft.value)
+const inlineEditing = ref(false)
 const inputMode = ref<ColorInputMode>('hex')
-const pickerId = `oc-color-${useId().replace(/:/g, '')}`
 let dragKind: 'saturation' | null = null
 let dragPointerId: number | null = null
 
@@ -314,6 +321,7 @@ const channelFields = computed<ColorChannelField[]>(() => {
   return props.allowAlpha ? [...fields, alphaField] : fields
 })
 const fieldStyle = computed<CSSProperties>(() => {
+  if (props.mixed && !open.value && !inlineEditing.value) return {}
   return {
     backgroundColor: displayColor.value,
     color: getReadableForegroundColor(opaqueColor.value),
@@ -325,9 +333,8 @@ watch(() => props.modelValue, value => {
   syncColor(value)
 })
 
-onMounted(() => document.addEventListener('pointerdown', handleDocumentPointerDown, true))
+useOverlayDismiss(() => open.value, () => rootRef.value, () => closePicker(false, true))
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   stopDragListeners()
 })
 
@@ -455,6 +462,7 @@ function handleSaturationKeydown(event: KeyboardEvent): void {
 }
 
 function handleHexInput(event: Event): void {
+  inlineEditing.value = true
   const target = event.target
   if (!(target instanceof HTMLInputElement)) return
   hexDraft.value = target.value
@@ -463,11 +471,14 @@ function handleHexInput(event: Event): void {
 }
 
 function commitInlineDraft(): void {
+  if (props.mixed && !inlineEditing.value) return
+  inlineEditing.value = false
   if (normalizedDraft.value) commitColor(normalizedDraft.value)
   else restoreInlineDraft()
 }
 
 function restoreInlineDraft(): void {
+  inlineEditing.value = false
   const changed = displayColor.value !== committedValue.value
   syncDraft(committedValue.value, changed)
   if (changed) emit('cancel')
@@ -576,15 +587,6 @@ function normalizePickerColor(value: string): string | null {
   return normalized
 }
 
-function handleDocumentPointerDown(event: PointerEvent): void {
-  if (!open.value) return
-  const path = event.composedPath()
-  if (rootRef.value && path.includes(rootRef.value)) return
-  const insideFloating = path.some(target => (
-    target instanceof HTMLElement && target.dataset.ocColorOwner === pickerId
-  ))
-  if (!insideFloating) closePicker(false, true)
-}
 
 function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value))

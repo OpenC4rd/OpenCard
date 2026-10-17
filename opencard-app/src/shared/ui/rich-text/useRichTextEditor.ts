@@ -6,6 +6,7 @@ import { Extension, type ChainedCommands, type Editor, type JSONContent } from '
 import { richTextStyleExtensions, fontVariable } from './richTextStyleExtensions'
 import { richTextParseOptions, canonicalEditorHtml, visualEditorHtml, equivalentRichTextHtml } from './richTextEditorHtml'
 import { NodeSelection, Selection } from '@tiptap/pm/state'
+import { CellSelection } from '@tiptap/pm/tables'
 import { DOMParser as ProseMirrorParser, DOMSerializer, type Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
 import Color from '@tiptap/extension-color'
@@ -93,10 +94,15 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   let originalDocument: ProseMirrorNode | null = null
   let appliedSource: { document: ProseMirrorNode; html: string } | null = null
   const toolbarRevision = ref(0)
-  const interaction = createRichTextInteraction(() => editor.value, attributes => resolveRichTextStyle({
-    'data-oc-fill-type': String(attributes.textFillType ?? ''),
-    'data-oc-fill-source': String(attributes.textFillSource ?? ''),
-  }, () => null, reference => props.resolveImageSource?.(reference) ?? null))
+  const interaction = createRichTextInteraction(() => editor.value, (node, previewStyle) => {
+    const attributes = node.marks.find(mark => mark.type.name === 'textStyle')?.attrs ?? {}
+    const highlight = node.marks.find(mark => mark.type.name === 'highlight')
+    return resolveRichTextStyle({
+      style: `${highlight ? `background-color: ${highlight.attrs.color || '#ffff00'};` : ''}${previewStyle}`,
+      'data-oc-fill-type': String(attributes.textFillType ?? ''),
+      'data-oc-fill-source': String(attributes.textFillSource ?? ''),
+    }, () => null, reference => props.resolveImageSource?.(reference) ?? null)
+  })
   const formatting = useRichTextFormatting(() => editor.value, toolbarRevision, interaction, () => props.baseStyle?.fontSize)
   function captureInteraction(event: Event) {
     if (!(event.target instanceof Element) || event.target.closest('.oc-rich-text-editor__surface')) return
@@ -112,14 +118,8 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       labelStyle: { fontFamily: option.cssFamily ?? option.value },
     })),
   ])
-  const strokeWidthOptions = computed(() => [
-    { key: '0px', label: tr('propertyEditor.richText.noStroke', '无描边'), value: '0px' },
-    { key: '0.5px', label: '0.5 px', value: '0.5px' },
-    { key: '1px', label: '1 px', value: '1px' },
-    { key: '1.5px', label: '1.5 px', value: '1.5px' },
-    { key: '2px', label: '2 px', value: '2px' },
-    { key: '3px', label: '3 px', value: '3px' },
-  ] as const)
+  const strokeWidthCompletionProvider = createToolbarCompletion(
+    [0, 0.5, 1, 1.5, 2, 3].map(size => ({ key: `${size}px`, label: `${size}px` })))
   const fontVariables = computed(() => Object.fromEntries(fontOptions.value.filter(option => option.value).map(option => [fontVariable(option.value), option.cssFamily ?? option.value])))
   const alignments = computed<ReadonlyArray<{
     value: 'left' | 'center' | 'right' | 'justify'
@@ -132,17 +132,20 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     { value: 'justify', icon: 'format.align-justify', title: tr('propertyEditor.richText.alignJustify', '两端对齐') },
   ])
 
-  const foregroundColor = computed(() => formatting.value('color'))
+  const foregroundColor = computed(() => formatting.value('foregroundColor'))
   const backgroundColor = computed(() => formatting.value('backgroundColor'))
   const activeFontFamily = computed(() => formatting.value('fontFamily'))
-  const activeFontSize = computed(() => formatting.activeSize())
+  const activeFontSize = computed(() => formatting.value('fontSize'))
   const fontSizeOptions = computed(() => {
-    const sizes = [...new Set([...formatting.sizeSteps, Number(formatting.activeSize())].filter(size => size > 0))].sort((a, b) => a - b)
-    return sizes.map(size => ({ key: String(size), label: `${size} px`, value: String(size) }))
+    const current = activeFontSize.value
+    const sizes = [...new Set([...formatting.sizeSteps, ...(current.endsWith('px') ? [Number.parseFloat(current)] : [])])].sort((a, b) => a - b)
+    const options = sizes.map(size => ({ key: `${size}px`, label: `${size}px` }))
+    return current && !current.endsWith('px') ? [{ key: current, label: current }, ...options] : options
   })
   function createToolbarCompletion(items: readonly { key: string, label: string, labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
     return ({ value }) => {
-      const query = value.trim().toLocaleLowerCase()
+      const raw = value.trim().toLocaleLowerCase()
+      const query = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw) ? `${raw}px` : raw
       const filterQuery = items.some(item => item.key.toLocaleLowerCase() === query) ? '' : query
       const suggestions: PropertyCompletionItem[] = items
         .filter(item => !filterQuery || `${item.label} ${item.key}`.toLocaleLowerCase().includes(filterQuery))
@@ -154,37 +157,41 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   type StringFieldDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
   const fontFieldDefinition = computed<StringFieldDefinition>(() => ({
     title: tr('propertyEditor.richText.font', '字体'), fieldType: 'string',
+    placeholder: formatting.state.value.fontFamily.kind === 'mixed'
+      ? tr('propertyEditor.richText.mixed', '混合') : tr('propertyEditor.richText.defaultFont', '默认字体'),
     completion: { provider: createToolbarCompletion(fontOptions.value) },
   }))
   const fontSizeFieldDefinition = computed<StringFieldDefinition>(() => ({
     title: tr('propertyEditor.richText.fontSize', '字号'), fieldType: 'string',
+    commitMode: 'blur',
+    placeholder: formatting.state.value.fontSize.kind === 'mixed' ? tr('propertyEditor.richText.mixed', '混合') : undefined,
     completion: { provider: createToolbarCompletion(fontSizeOptions.value) },
   }))
   const strokeWidthFieldDefinition = computed<StringFieldDefinition>(() => ({
     title: tr('propertyEditor.richText.strokeWidth', '描边宽度'), fieldType: 'string',
-    completion: { provider: createToolbarCompletion(strokeWidthOptions.value) },
+    commitMode: 'blur',
+    completion: { provider: strokeWidthCompletionProvider },
   }))
-  const lengthCompletionProvider = computed(() => createToolbarCompletion([
-    { key: '0px', label: '0 px' },
-    { key: '1px', label: '1 px' },
-    { key: '2px', label: '2 px' },
-    { key: '4px', label: '4 px' },
-    { key: '8px', label: '8 px' },
-    { key: '12px', label: '12 px' },
-  ]))
+  const lengthCompletionProvider = createToolbarCompletion(
+    [0, 1, 2, 4, 8, 12].map(size => ({ key: `${size}px`, label: `${size}px` })))
   const propertyCategories = computed(() => richTextFormatCategories(tr))
   const propertyInputs = computed(() => {
     toolbarRevision.value
+    const selection = editor.value?.state.selection
     return [createRichTextFormatInput({
       labels: tr,
-      record: Object.fromEntries(Object.entries(formatting.state.value).map(([field, state]) => [field, state.value])),
+      title: selection instanceof CellSelection ? tr('propertyEditor.richText.selectedCells', '选中单元格')
+        : selection instanceof NodeSelection ? tr('propertyEditor.richText.selectedNode', '选中节点')
+        : selection && !selection.empty ? tr('propertyEditor.richText.selectionProperties', '选中文本')
+        : tr('propertyEditor.richText.inputProperties', '输入文字'),
+      state: formatting.state.value,
       fields: {
         fontField: fontFieldDefinition.value,
         fontSizeField: fontSizeFieldDefinition.value,
         strokeWidthField: strokeWidthFieldDefinition.value,
         imageDirectoryProvider: props.imageDirectoryProvider,
         imageCompletionProvider: props.imageCompletionProvider,
-        lengthCompletionProvider: lengthCompletionProvider.value,
+        lengthCompletionProvider,
       },
     })]
   })
@@ -258,21 +265,28 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       children: projectIconActionChildren.value,
     }
   })
-  const tableAction = computed<OcActionDefinition>(() => ({
-    key: 'table-actions',
-    icon: 'data.table',
-    title: tr('propertyEditor.richText.tableActions', '表格操作'),
-    children: [
-      { key: 'table.add-row-before', icon: 'nav.arrow-up', title: tr('propertyEditor.richText.addRowBefore', '在上方插入行') },
-      { key: 'table.add-row-after', icon: 'nav.arrow-down', title: tr('propertyEditor.richText.addRowAfter', '在下方插入行') },
-      { key: 'table.add-column-before', icon: 'nav.arrow-left', title: tr('propertyEditor.richText.addColumnBefore', '在左侧插入列') },
-      { key: 'table.add-column-after', icon: 'nav.arrow-right', title: tr('propertyEditor.richText.addColumnAfter', '在右侧插入列') },
-      { key: 'table.toggle-header', icon: 'layout.rows', title: tr('propertyEditor.richText.toggleHeader', '切换表头行') },
-      { key: 'table.delete-row', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteRow', '删除当前行') },
-      { key: 'table.delete-column', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteColumn', '删除当前列') },
-      { key: 'table.delete', icon: 'action.discard', iconTone: 'danger', title: tr('propertyEditor.richText.deleteTable', '删除整个表格') },
-    ],
-  }))
+  const tableAction = computed<OcActionDefinition>(() => {
+    toolbarRevision.value
+    return {
+      key: 'table-actions',
+      icon: 'data.table',
+      title: tr('propertyEditor.richText.tableActions', '表格操作'),
+      children: [
+        { key: 'table.add-row-before', icon: 'nav.arrow-up', title: tr('propertyEditor.richText.addRowBefore', '在上方插入行') },
+        { key: 'table.add-row-after', icon: 'nav.arrow-down', title: tr('propertyEditor.richText.addRowAfter', '在下方插入行') },
+        { key: 'table.add-column-before', icon: 'nav.arrow-left', title: tr('propertyEditor.richText.addColumnBefore', '在左侧插入列') },
+        { key: 'table.add-column-after', icon: 'nav.arrow-right', title: tr('propertyEditor.richText.addColumnAfter', '在右侧插入列') },
+        { key: 'table.toggle-header', icon: 'layout.rows', title: tr('propertyEditor.richText.toggleHeader', '切换表头行') },
+        { key: 'table.toggle-header-column', icon: 'data.table', title: tr('propertyEditor.richText.toggleHeaderColumn', '切换表头列') },
+        { key: 'table.toggle-header-cell', icon: 'data.table', title: tr('propertyEditor.richText.toggleHeaderCell', '切换表头单元格') },
+        { key: 'table.merge-cells', icon: 'data.table', title: tr('propertyEditor.richText.mergeCells', '合并单元格'), disabled: !editor.value?.can().mergeCells() },
+        { key: 'table.split-cell', icon: 'data.table', title: tr('propertyEditor.richText.splitCell', '拆分单元格'), disabled: !editor.value?.can().splitCell() },
+        { key: 'table.delete-row', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteRow', '删除当前行') },
+        { key: 'table.delete-column', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteColumn', '删除当前列') },
+        { key: 'table.delete', icon: 'action.discard', iconTone: 'danger', title: tr('propertyEditor.richText.deleteTable', '删除整个表格') },
+      ],
+    }
+  })
   const selectedNodeKind = computed<'binding' | 'projectIcon' | null>(() => {
     const node = editor.value?.state.selection instanceof NodeSelection
       ? editor.value.state.selection.node
@@ -328,11 +342,6 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
         class: 'oc-rich-text-editor__content',
         spellcheck: 'true',
       },
-      handleDOMEvents: {
-        blur: () => {
-          return false
-        },
-      },
     },
     onUpdate: onChange,
     onTransaction: ({ transaction }) => {
@@ -373,6 +382,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     return true
   }
   function flushPendingInput(): boolean {
+    if (editor.value?.view.composing) return false
     const detail = { ready: true }
     editor.value?.view.dom.querySelectorAll('.binding-node.is-editing').forEach(node => {
       node.dispatchEvent(new CustomEvent('oc-flush-binding', { detail }))
@@ -407,6 +417,10 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       else if (payload.key === 'table.add-column-before') chain.addColumnBefore().run()
       else if (payload.key === 'table.add-column-after') chain.addColumnAfter().run()
       else if (payload.key === 'table.toggle-header') chain.toggleHeaderRow().run()
+      else if (payload.key === 'table.toggle-header-column') chain.toggleHeaderColumn().run()
+      else if (payload.key === 'table.toggle-header-cell') chain.toggleHeaderCell().run()
+      else if (payload.key === 'table.merge-cells') chain.mergeCells().run()
+      else if (payload.key === 'table.split-cell') chain.splitCell().run()
       else if (payload.key === 'table.delete-row') chain.deleteRow().run()
       else if (payload.key === 'table.delete-column') chain.deleteColumn().run()
       else if (payload.key === 'table.delete') chain.deleteTable().run()

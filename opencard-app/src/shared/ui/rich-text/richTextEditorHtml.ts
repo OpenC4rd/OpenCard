@@ -1,5 +1,7 @@
 import { normalizeRichTextHtml, parseRichTextHtml, type RichTextNode } from '../../rich-text/richTextHtml'
 import { fromCssFontFamily, toCssFontFamily } from '../../../features/workspace/model/projectFonts'
+import { normalizeRichTextTables } from '../../rich-text/richTextTable'
+import { resolveRichTextStyle } from '../../rich-text/richTextResourceStyle'
 export const richTextParseOptions = { preserveWhitespace: 'full' as const }
 export function canonicalEditorHtml(value: string): string {
   const dom = new DOMParser().parseFromString(value, 'text/html')
@@ -27,7 +29,7 @@ export function equivalentRichTextHtml(left: string, right: string): boolean {
       }
       const attributes = { ...node.attributes }
       const style = document.createElement('span').style
-      style.cssText = attributes.style ?? ''
+      style.cssText = resolveRichTextStyle(attributes, toCssFontFamily, () => null)
       delete attributes.style
       for (const property of Array.from(style)) {
         const value = style.getPropertyValue(property)
@@ -45,13 +47,18 @@ export function equivalentRichTextHtml(left: string, right: string): boolean {
     }
     return result
   }
-  const tree = (html: string) => normalize(parseRichTextHtml(html).document.children)
+  const tree = (html: string) => {
+    const dom = new DOMParser().parseFromString(html, 'text/html')
+    normalizeRichTextTables(dom.body)
+    return normalize(parseRichTextHtml(dom.body.innerHTML).document.children)
+  }
   return JSON.stringify(tree(left)) === JSON.stringify(tree(right))
 }
 export function visualEditorHtml(value: string): string {
   const parsed = parseRichTextHtml(value)
   if (!parsed.canEnterVisualMode || !/<[^>]+>/.test(value)) return normalizeRichTextHtml(value)
   const documentNode = new DOMParser().parseFromString(value, 'text/html')
+  normalizeRichTextTables(documentNode.body)
   for (const element of Array.from(documentNode.body.querySelectorAll<HTMLElement>('[style]'))) {
     const rawStyle = element.getAttribute('style') ?? ''
     if (!rawStyle.includes('{{') && !rawStyle.includes('}}')) continue

@@ -9,8 +9,8 @@ const ProjectTextStyle = TextStyle.extend({
   parseHTML() {
     return [{
       tag: 'span:not([data-oc-binding]):not([data-oc-icon-path])',
-      getAttrs: element => element.hasAttribute('style') || Array.from(element.attributes)
-        .some(attribute => /^data-oc-(?:fill|shadow)-/.test(attribute.name)) ? {} : false,
+      getAttrs: element => element.hasAttribute('style') || element.getAttribute('data-oc-fill-type') === 'image'
+        || Array.from(element.attributes).some(attribute => /^data-oc-shadow-/.test(attribute.name)) ? {} : false,
     }]
   },
 })
@@ -37,21 +37,21 @@ const TextStyleAttributes = Extension.create({
         textStrokeWidth: {
           default: null,
           parseHTML: element => element.style.webkitTextStrokeWidth || null,
-          renderHTML: attributes => attributes.textStrokeWidth && attributes.textStrokeWidth !== '0px'
+          renderHTML: attributes => attributes.textStrokeWidth
             ? { style: `-webkit-text-stroke-width: ${attributes.textStrokeWidth}` }
             : {},
         },
         textFillType: {
           default: null,
-          parseHTML: element => element.getAttribute('data-oc-fill-type') || null,
-          renderHTML: attributes => attributes.textFillType
+          parseHTML: element => element.getAttribute('data-oc-fill-type') === 'image' ? 'image' : null,
+          renderHTML: attributes => attributes.textFillType === 'image'
             ? { 'data-oc-fill-type': attributes.textFillType }
             : {},
         },
         textFillSource: {
           default: null,
           parseHTML: element => element.getAttribute('data-oc-fill-source') || null,
-          renderHTML: attributes => attributes.textFillSource
+          renderHTML: attributes => attributes.textFillType === 'image' && attributes.textFillSource
             ? {
                 'data-oc-fill-source': attributes.textFillSource,
               }
@@ -68,24 +68,24 @@ const TextStyleAttributes = Extension.create({
             : {},
         },
         textShadowOffsetX: {
-          default: '0px',
-          parseHTML: element => element.getAttribute('data-oc-shadow-offset-x') || '0px',
-          renderHTML: attributes => attributes.textShadowColor
-            ? { 'data-oc-shadow-offset-x': attributes.textShadowOffsetX || '0px' }
+          default: null,
+          parseHTML: element => element.getAttribute('data-oc-shadow-offset-x') || null,
+          renderHTML: attributes => attributes.textShadowOffsetX
+            ? { 'data-oc-shadow-offset-x': attributes.textShadowOffsetX }
             : {},
         },
         textShadowOffsetY: {
-          default: '0px',
-          parseHTML: element => element.getAttribute('data-oc-shadow-offset-y') || '0px',
-          renderHTML: attributes => attributes.textShadowColor
-            ? { 'data-oc-shadow-offset-y': attributes.textShadowOffsetY || '0px' }
+          default: null,
+          parseHTML: element => element.getAttribute('data-oc-shadow-offset-y') || null,
+          renderHTML: attributes => attributes.textShadowOffsetY
+            ? { 'data-oc-shadow-offset-y': attributes.textShadowOffsetY }
             : {},
         },
         textShadowBlur: {
-          default: '0px',
-          parseHTML: element => element.getAttribute('data-oc-shadow-blur') || '0px',
-          renderHTML: attributes => attributes.textShadowColor
-            ? { 'data-oc-shadow-blur': attributes.textShadowBlur || '0px' }
+          default: null,
+          parseHTML: element => element.getAttribute('data-oc-shadow-blur') || null,
+          renderHTML: attributes => attributes.textShadowBlur
+            ? { 'data-oc-shadow-blur': attributes.textShadowBlur }
             : {},
         },
       },

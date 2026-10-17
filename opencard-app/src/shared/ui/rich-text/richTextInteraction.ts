@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type SelectionBookmark, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { closeHistory } from '@tiptap/pm/history'
@@ -9,7 +10,7 @@ const previewKey = new PluginKey<Preview | null>('richTextFormatPreview')
 /** Selection ownership and transient formatting share the editor transaction lifecycle. */
 export function createRichTextInteraction(
   getEditor: () => Editor | undefined,
-  resourceStyle: (attributes: Record<string, unknown>) => string,
+  resourceStyle: (node: ProseMirrorNode, previewStyle: string) => string,
 ) {
   let target: SelectionBookmark | null = null
   let applying = false
@@ -27,16 +28,30 @@ export function createRichTextInteraction(
       },
     },
     props: {
+      // Background is painted with glyph fill in decorations; serialization stays native.
+      markViews: { highlight: () => {
+        const dom = document.createElement('mark')
+        dom.style.backgroundColor = 'transparent'
+        dom.style.color = 'inherit'
+        return { dom }
+      } },
       decorations(state) {
         const preview = previewKey.getState(state)
         const decorations: Decoration[] = []
         state.doc.descendants((node, position) => {
           if (!node.isInline) return
-          const attrs = node.marks.find(mark => mark.type.name === 'textStyle')?.attrs
-          const style = attrs && resourceStyle(attrs)
-          if (style) decorations.push(Decoration.inline(position, position + node.nodeSize, { style }))
+          const hasStyle = node.marks.some(mark => mark.type.name === 'textStyle' || mark.type.name === 'highlight')
+          const end = position + node.nodeSize
+          const boundaries = [position, ...(preview ? [preview.from, preview.to].filter(at => at > position && at < end) : []), end]
+          for (let index = 0; index < boundaries.length - 1; index++) {
+            const from = boundaries[index]!
+            const to = boundaries[index + 1]!
+            const previewStyle = preview && from >= preview.from && to <= preview.to ? preview.style : ''
+            if (!hasStyle && !previewStyle) continue
+            const style = resourceStyle(node, previewStyle)
+            if (style) decorations.push(Decoration.inline(from, to, { style }))
+          }
         })
-        if (preview && preview.from < preview.to) decorations.push(Decoration.inline(preview.from, preview.to, { style: preview.style }))
         return DecorationSet.create(state.doc, decorations)
       },
     },

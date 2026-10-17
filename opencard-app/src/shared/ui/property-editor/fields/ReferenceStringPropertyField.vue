@@ -11,6 +11,7 @@
         full-width
         class="reference-string-field__input"
         :value="draftValue"
+        :aria-label="definition.title"
         :readonly="definition.isReadonly"
         :minlength="definition.minLength"
         :maxlength="definition.maxLength"
@@ -41,6 +42,7 @@
         class="reference-string-field__input"
         type="text"
         :value="draftValue"
+        :aria-label="definition.title"
         :readonly="definition.isReadonly"
         :minlength="definition.minLength"
         :maxlength="definition.maxLength"
@@ -103,7 +105,7 @@ const emit = defineEmits<{
 
 const draftValue = ref(props.value == null ? '' : String(props.value))
 const activeInput = ref<TextControl | null>(null)
-const completion = usePropertyCompletion()
+const completion = usePropertyCompletion(() => activeInput.value)
 const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId } = completion
 
 const autocompleteMatch = computed(() => matchStaticCompletion(
@@ -123,9 +125,9 @@ watch(() => props.value, (value) => {
   }
 })
 
-watch(() => props.definition.completion, () => {
+watch(() => props.definition.completion?.provider, () => {
   const control = activeInput.value
-  if (control && document.activeElement === control) void refreshCompletion(control)
+  if (control && document.activeElement === control && (isMenuOpen.value || completion.isPending.value)) void refreshCompletion(control)
 })
 
 async function refreshCompletion(
@@ -135,7 +137,7 @@ async function refreshCompletion(
 ): Promise<void> {
   activeInput.value = control
   const provider = props.definition.completion?.provider
-  if (!provider) return completion.clear()
+  if (!provider || props.definition.isReadonly) return completion.clear()
   await completion.refresh(() => provider({ value, cursor }))
 }
 
@@ -147,11 +149,17 @@ function emitValue(value: string): void {
 function commitDraft(): void {
   const currentValue = props.value == null ? '' : String(props.value)
   if (draftValue.value !== currentValue) emit('update:value', draftValue.value)
+  if (props.definition.commitMode === 'blur') {
+    const submitted = draftValue.value
+    void nextTick(() => {
+      if (draftValue.value === submitted) draftValue.value = props.value == null ? '' : String(props.value)
+    })
+  }
 }
 
 function setCursor(control: TextControl, cursor: number): void {
   nextTick(() => {
-    control.focus()
+    if (document.activeElement !== control) return
     control.setSelectionRange(cursor, cursor)
   })
 }
@@ -194,8 +202,8 @@ function handleCursorKeyup(event: KeyboardEvent): void {
 }
 
 function handleBlur(): void {
+  completion.clear()
   if ((props.definition.commitMode ?? 'input') === 'blur') commitDraft()
-  completion.closeAfterBlur()
 }
 
 function acceptSuggestionByKey(key: string): void {
@@ -213,6 +221,7 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
   const value = `${draftValue.value.slice(0, state.replaceStart)}${suggestion.insertText}${draftValue.value.slice(state.replaceEnd)}`
   const cursor = state.replaceStart + suggestion.insertText.length
   emitValue(value)
+  if (props.definition.commitMode === 'blur') commitDraft()
   control.value = value
   control.setSelectionRange(cursor, cursor)
   setCursor(control, cursor)
@@ -225,7 +234,9 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  if (event.isComposing || event.keyCode === 229) return
   if (completion.handleKeydown(event, acceptSuggestion)) return
+  if (event.key === 'Enter' && !props.definition.multiline && !event.isComposing) commitDraft()
 
   if (event.key === 'Tab' && !event.shiftKey && autocompleteMatch.value) {
     event.preventDefault()

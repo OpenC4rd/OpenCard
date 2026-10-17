@@ -221,6 +221,7 @@ export function createProjectIconCompletionProvider(
             key: `project-icon:${packageKey ?? ''}:${entry.seriesKey}/${entry.iconKey}`,
             label: entry.name,
             insertText: richText ? `[[${reference}]]` : reference,
+            keepOpen: !richText,
             searchKeys: [entry.iconKey.toLocaleLowerCase(), entry.name.toLocaleLowerCase()],
             thumbnailStyle: createProjectIconStyle(entry, readDimensions),
             thumbnailLabel: entry.name,
@@ -285,7 +286,7 @@ export function createProjectIconCompletionProvider(
     return {
       replaceStart: state.token.start,
       replaceEnd: state.token.end,
-      items,
+      items: richText ? items : items.filter(item => item.insertText !== value),
       parent: {
         key: 'project-icon-parent:',
         label: '..',

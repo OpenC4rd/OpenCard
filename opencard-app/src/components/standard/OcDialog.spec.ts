@@ -25,6 +25,20 @@ function mountDialog(props: Record<string, unknown> = {}) {
 }
 
 describe('OcDialog', () => {
+  it('skips hidden autofocus targets and controls excluded from tab order', async () => {
+    const wrapper = mount(OcDialog, {
+      attachTo: document.body,
+      props: { open: true, title: 'Editor' },
+      slots: { default: '<div style="display:none"><input autofocus></div><textarea autofocus></textarea><button tabindex="-1">Skip</button>' },
+    })
+    wrappers.push(wrapper)
+    await wrapper.vm.$nextTick()
+    expect(document.activeElement).toBe(document.querySelector('textarea'))
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    const textarea = dialog.querySelector('textarea')!
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+    expect(document.activeElement).toBe(textarea)
+  })
   it('owns an external sidebar in the same modal scope and hands its handle to the layout', async () => {
     const wrapper = mount(OcDialog, {
       props: { open: true, title: 'Editor', sidebarTitle: 'Properties', sidebarTooltip: 'Toggle properties' },

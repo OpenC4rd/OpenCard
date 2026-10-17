@@ -1,5 +1,6 @@
 import { parseResourceReference } from '../../features/workspace/services/resourceReference'
 import { parseProjectIconPath } from './projectIconReference'
+import { richTextCellAttributes, richTextColumnWidths } from './richTextTable'
 
 const allowedTags = new Set([
   'B', 'BR', 'COL', 'COLGROUP', 'EM', 'I', 'LI', 'MARK', 'OL', 'P', 'S', 'SPAN',
@@ -82,12 +83,6 @@ export function parseRichTextHtml(source: string): RichTextParseResult {
       pushDiagnostic(diagnostics, element, 'invalid-structure', `Invalid <${element.tagName.toLowerCase()}> parent`)
     }
 
-    if (['TH', 'TD'].includes(element.tagName)) {
-      for (const name of ['colspan', 'rowspan']) {
-        const value = element.getAttribute(name)
-        if (value !== null && value !== '1') pushDiagnostic(diagnostics, element, 'invalid-structure', 'Merged table cells are not supported')
-      }
-    }
   }
 
   function toNode(node: Node): RichTextNode | null {
@@ -117,11 +112,24 @@ export function parseRichTextHtml(source: string): RichTextParseResult {
       'data-oc-fill-type', 'data-oc-fill-source', 'data-oc-shadow-color',
       'data-oc-shadow-offset-x', 'data-oc-shadow-offset-y', 'data-oc-shadow-blur',
     ]) {
+      if (name.startsWith('data-oc-fill-') && node.getAttribute('data-oc-fill-type') !== 'image') continue
       const value = node.getAttribute(name)
       if (value !== null) attributes[name] = value
     }
     if (node.tagName === 'TD' || node.tagName === 'TH') {
-      attributes.colspan = '1'; attributes.rowspan = '1'
+      Object.assign(attributes, richTextCellAttributes(node))
+    }
+    if (node instanceof HTMLTableElement && !node.querySelector(':scope > colgroup')) {
+      const widths = richTextColumnWidths(node)
+      if (widths.some(Boolean)) {
+        const group = node.ownerDocument.createElement('colgroup')
+        for (const width of widths) {
+          const column = node.ownerDocument.createElement('col')
+          if (width) column.style.width = `${width}px`
+          group.append(column)
+        }
+        node.prepend(group)
+      }
     }
     return {
       type: 'element',
@@ -172,25 +180,28 @@ export function sanitizeRichTextHtml(source: string): string {
     const fillType = element.tagName === 'SPAN' ? sanitizeFillType(element.getAttribute('data-oc-fill-type')) : null
     const fillSource = fillType === 'image' ? sanitizeFillSource(element.getAttribute('data-oc-fill-source')) : null
     const shadowColor = element.tagName === 'SPAN' ? sanitizeCssColor(element.getAttribute('data-oc-shadow-color')) : null
-    const shadowOffsetX = shadowColor ? sanitizeCssLength(element.getAttribute('data-oc-shadow-offset-x')) : null
-    const shadowOffsetY = shadowColor ? sanitizeCssLength(element.getAttribute('data-oc-shadow-offset-y')) : null
-    const shadowBlur = shadowColor ? sanitizeCssLength(element.getAttribute('data-oc-shadow-blur')) : null
-    const columnWidth = element.tagName === 'COL' ? (element as HTMLElement).style.width : ''
+    const shadowOffsetX = element.hasAttribute('data-oc-shadow-offset-x') ? sanitizeCssLength(element.getAttribute('data-oc-shadow-offset-x')) : null
+    const shadowOffsetY = element.hasAttribute('data-oc-shadow-offset-y') ? sanitizeCssLength(element.getAttribute('data-oc-shadow-offset-y')) : null
+    const shadowBlur = element.hasAttribute('data-oc-shadow-blur') ? sanitizeCssLength(element.getAttribute('data-oc-shadow-blur')) : null
+    const tableCell = element.tagName === 'TD' || element.tagName === 'TH' ? richTextCellAttributes(element) : {}
+    const layout = element.tagName === 'TABLE' || element.tagName === 'COL'
+      ? Object.fromEntries(tableStyleProperties.map(property => [property, (element as HTMLElement).style.getPropertyValue(property)])) : {}
     for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name)
     for (const property of allowedStyleProperties) {
       const value = styleValues[property]
       if (value && !iconPath) (element as HTMLElement).style.setProperty(property, value)
     }
-    if (columnWidth) (element as HTMLElement).style.width = columnWidth
+    for (const [property, value] of Object.entries(layout)) if (value) (element as HTMLElement).style.setProperty(property, value)
+    for (const [name, value] of Object.entries(tableCell)) element.setAttribute(name, value)
     if (bindingExpression !== null) element.setAttribute('data-oc-binding', bindingExpression)
     if (fillType) element.setAttribute('data-oc-fill-type', fillType)
     if (fillType === 'image' && fillSource) element.setAttribute('data-oc-fill-source', fillSource)
     if (shadowColor) {
       element.setAttribute('data-oc-shadow-color', shadowColor)
-      element.setAttribute('data-oc-shadow-offset-x', shadowOffsetX ?? '0px')
-      element.setAttribute('data-oc-shadow-offset-y', shadowOffsetY ?? '0px')
-      element.setAttribute('data-oc-shadow-blur', shadowBlur ?? '0px')
     }
+    if (shadowOffsetX) element.setAttribute('data-oc-shadow-offset-x', shadowOffsetX)
+    if (shadowOffsetY) element.setAttribute('data-oc-shadow-offset-y', shadowOffsetY)
+    if (shadowBlur) element.setAttribute('data-oc-shadow-blur', shadowBlur)
     if (iconPath) {
       element.setAttribute('data-oc-icon-path', iconPath)
       element.replaceChildren()
@@ -217,8 +228,8 @@ function sanitizeIconPath(value: string | null): string | null {
   const path = value?.trim() ?? ''
   return path && (parseProjectIconPath(path) || /^\{\{\s*[^{}]+?\s*\}\}$/.test(path)) ? path : null
 }
-function sanitizeFillType(value: string | null): 'none' | 'solid' | 'image' | null {
-  return value === 'none' || value === 'solid' || value === 'image' ? value : null
+function sanitizeFillType(value: string | null): 'image' | null {
+  return value === 'image' ? value : null
 }
 function sanitizeFillSource(value: string | null): string | null {
   const source = value?.trim() ?? ''

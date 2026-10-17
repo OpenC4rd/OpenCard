@@ -6,6 +6,20 @@ import { parseRenderReadyBlockForTest, rendererTestGlobal, richTextRendererTestG
 import { cardEditorContextKey } from './cardEditorContext'
 
 describe('TextBlockRenderer', () => {
+  it('renders merged table spans and projects cell widths into real columns', () => {
+    const block = parseRenderReadyBlockForTest(createTextBlock({
+      id: 'table-text-block',
+      content: '<table><tbody><tr><td colspan="2" colwidth="80,120"><p>AB</p></td></tr><tr><td rowspan="2"><p>C</p></td><td><p>D</p></td></tr><tr><td><p>E</p></td></tr></tbody></table>',
+    }))
+    const wrapper = mount(TextBlockRenderer, {
+      props: { block, placement: { kind: 'root' } },
+      global: richTextRendererTestGlobal(block),
+    })
+    expect(wrapper.get('td[colspan="2"]').text()).toBe('AB')
+    expect(wrapper.get('td[rowspan="2"]').text()).toBe('C')
+    expect(wrapper.findAll('col').map(col => col.attributes('style'))).toEqual(['width: 80px;', 'width: 120px;'])
+    wrapper.unmount()
+  })
   it('promotes plain-text line breaks to rich-text paragraphs', () => {
     const block = parseRenderReadyBlockForTest({
       id: 'multiline-text-block',
@@ -183,9 +197,28 @@ describe('TextBlockRenderer', () => {
       global: richTextRendererTestGlobal(block),
     })
 
-    const text = wrapper.get('span').element as HTMLSpanElement
+    const text = wrapper.get('span[style*="background-image"]').element as HTMLSpanElement
     expect(text.style.backgroundImage).toBe('url("asset://assets/paper.png")')
     expect(text.style.webkitBackgroundClip).toBe('text')
-    expect(text.style.color).toBe('transparent')
+    expect(text.style.webkitTextFillColor).toBe('transparent')
+  })
+
+  it.each([
+    '<mark style="background-color:yellow"><span style="font-size:64px" data-oc-fill-type="image" data-oc-fill-source="assets/paper.png">Text</span></mark>',
+    '<span style="font-size:64px" data-oc-fill-type="image" data-oc-fill-source="assets/paper.png"><mark style="background-color:yellow">Text</mark></span>',
+    '<span style="font-size:64px;background-color:yellow" data-oc-fill-type="image" data-oc-fill-source="assets/paper.png">Text</span>',
+  ])('composes background and image on the glyph regardless of inline nesting: %s', content => {
+    const block = parseRenderReadyBlockForTest({ id: 'fill-layers', type: 'text-block', content: `<p>${content}</p>` })
+    const wrapper = mount(TextBlockRenderer, {
+      props: { block, placement: { kind: 'root' } }, global: richTextRendererTestGlobal(block),
+    })
+    const paint = wrapper.get<HTMLElement>('span[style*="background-image"]').element
+    expect(paint.textContent).toBe('Text')
+    expect(paint.children).toHaveLength(0)
+    expect(paint.style.backgroundImage).toContain('url("asset://assets/paper.png")')
+    expect(paint.style.backgroundImage).toContain('linear-gradient(yellow, yellow)')
+    expect(paint.style.webkitBackgroundClip).toBe('text, border-box')
+    expect(paint.closest('span[style*="font-size"]')?.getAttribute('style')).toContain('64px')
+    wrapper.unmount()
   })
 })
