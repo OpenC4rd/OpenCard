@@ -168,7 +168,7 @@ describe('useWorkbenchVersionControl', () => {
 
     expect(versionControl.repositoryReady.value).toBe(false)
     expect(versionControl.repositoryNeedsInitialization.value).toBe(false)
-    expect(versionControl.timelinePlaceholder.value).toBe('sidebar.timelineNoFile')
+    expect(versionControl.timelinePlaceholder.value).toBe('versionControl.timelineNoFile')
 
     projectPath.value = PROJECT_ROOT
     activeSession.value = workspaceSession()
@@ -177,21 +177,21 @@ describe('useWorkbenchVersionControl', () => {
     expect(versionControl.timelineFilePath.value).toBe(DOCUMENT_PATH)
     expect(versionControl.timelineFileName.value).toBe('main.ocdocument')
     expect(versionControl.repositoryNeedsInitialization.value).toBe(false)
-    expect(versionControl.timelinePlaceholder.value).toBe('sidebar.timelineNoCommits')
+    expect(versionControl.timelinePlaceholder.value).toBe('versionControl.timelineNoCommits')
 
     mocks.inspectRepository.mockResolvedValue(ok(repository(false)))
     await versionControl.refreshTimeline()
 
     expect(versionControl.repositoryReady.value).toBe(false)
     expect(versionControl.repositoryNeedsInitialization.value).toBe(true)
-    expect(versionControl.timelinePlaceholder.value).toBe('sidebar.timelineNotInitialized')
+    expect(versionControl.timelinePlaceholder.value).toBe('versionControl.timelineNotInitialized')
 
     mocks.inspectRepository.mockResolvedValue(failure('git unavailable'))
     await versionControl.refreshTimeline()
 
     expect(versionControl.repositoryReady.value).toBe(false)
     expect(versionControl.repositoryNeedsInitialization.value).toBe(false)
-    expect(versionControl.timelinePlaceholder.value).toBe('sidebar.timelineFailed')
+    expect(versionControl.timelinePlaceholder.value).toBe('versionControl.timelineFailed')
   })
 
   it('keeps version graph expansion in step with the commit graph', async () => {
@@ -311,7 +311,7 @@ describe('useWorkbenchVersionControl', () => {
       email: 'zhang-san@noreply.example',
     })
     expect(mocks.stageAll).toHaveBeenCalledWith(PROJECT_ROOT)
-    expect(mocks.createCommit).toHaveBeenCalledWith(PROJECT_ROOT, { message: 'sidebar.initialCommitMessage' })
+    expect(mocks.createCommit).toHaveBeenCalledWith(PROJECT_ROOT, { message: 'versionControl.initialCommitMessage' })
     expect(versionControl.isInitializingRepository.value).toBe(false)
   })
 
@@ -381,7 +381,7 @@ describe('useWorkbenchVersionControl', () => {
 
     await versionControl.initializeProjectRepository()
 
-    expect(noticesAfter(noticeCount)).toEqual(['sidebar.initializeFailed'])
+    expect(noticesAfter(noticeCount)).toEqual(['versionControl.initializeFailed'])
   })
 
   it('reports a failed first commit as such once the repository exists', async () => {
@@ -394,7 +394,7 @@ describe('useWorkbenchVersionControl', () => {
 
     expect(mocks.initializeRepository).toHaveBeenCalled()
     expect(versionControl.isInitializingRepository.value).toBe(false)
-    expect(noticesAfter(noticeCount)).toEqual(['sidebar.initialCommitFailed'])
+    expect(noticesAfter(noticeCount)).toEqual(['versionControl.initialCommitFailed'])
   })
 
   it('refreshes repository status for a file change only while a project is open', async () => {

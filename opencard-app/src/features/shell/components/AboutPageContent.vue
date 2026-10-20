@@ -55,7 +55,7 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
 
       <section v-if="currentReleaseNotes?.body" class="about-content__release-notes">
         <h2>{{ t('app.about.releaseNotes') }}</h2>
-        <div class="oc-release-notes" v-html="renderedReleaseNotes" />
+        <div class="oc-markdown" v-html="renderedReleaseNotes" />
       </section>
 
       <footer>

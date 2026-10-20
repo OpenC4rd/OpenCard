@@ -10,6 +10,7 @@ import {
   type OcEditableThemeColorKey,
   type OcThemeColorOverrides,
   type OcThemeId,
+  type OcTransitionSpeed,
 } from '../../../shared/ui/foundation'
 
 export const APP_SETTINGS_VERSION = 1 as const
@@ -18,6 +19,8 @@ export const MIN_PHASE_IMAGE_SPEED = 25
 export const MAX_PHASE_IMAGE_SPEED = 400
 export const MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT = 1
 export const MAX_TITLE_BAR_NOTICE_HISTORY_LIMIT = 512
+export const MIN_TIPS_INTERVAL_MINUTES = 1
+export const MAX_TIPS_INTERVAL_MINUTES = 120
 export const MIN_AUTO_SAVE_INTERVAL_SECONDS = 5
 export const MAX_AUTO_SAVE_INTERVAL_SECONDS = 300
 /** 缓存上限按 GiB 记：低于 1 装不下一个包，高于 32 还不如自己删缓存。 */
@@ -151,8 +154,11 @@ export type AppSettingKey =
   | 'appearance.glassIntensity'
   | 'appearance.baseFontSize'
   | 'appearance.phaseImageSpeed'
+  | 'appearance.transitionSpeed'
   | 'appearance.micaBackground'
   | 'shell.titleBarNoticeHistoryLimit'
+  | 'shell.tipsEnabled'
+  | 'shell.tipsIntervalMinutes'
   | 'updates.showReleaseNotesAfterUpdate'
   | 'exporting.openCdeWorkbookAfterExport'
   | 'cache.packageLimitGb'
@@ -189,12 +195,16 @@ export interface AppSettings {
     glassIntensity: number
     baseFontSize: number
     phaseImageSpeed: number
+    transitionSpeed: OcTransitionSpeed
     /** 窗口底层的系统云母材质（仅 Windows 11 可用）。 */
     micaBackground: boolean
     themes: Record<OcThemeId, AppThemeSettings>
   }
   shell: {
     titleBarNoticeHistoryLimit: number
+    /** 小贴士：开着时按间隔从注册表里伪随机发一条即时消息。 */
+    tipsEnabled: boolean
+    tipsIntervalMinutes: number
   }
   updates: {
     /** 更新后是否自动弹出版本说明。 */
@@ -284,6 +294,7 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     glassIntensity: 60,
     baseFontSize: DEFAULT_BASE_FONT_SIZE,
     phaseImageSpeed: 100,
+    transitionSpeed: '1x',
     micaBackground: false,
     themes: {
       dark: { ...openCardThemeDefinition('dark'), presetId: 'default', presets: [] },
@@ -292,6 +303,8 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
   }),
   shell: Object.freeze({
     titleBarNoticeHistoryLimit: 128,
+    tipsEnabled: true,
+    tipsIntervalMinutes: 5,
   }),
   updates: Object.freeze({
     showReleaseNotesAfterUpdate: true,
@@ -354,6 +367,13 @@ function clampTitleBarNoticeHistoryLimit(value: unknown): number {
     MAX_TITLE_BAR_NOTICE_HISTORY_LIMIT,
     Math.max(MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT, Math.round(value)),
   )
+}
+
+function clampTipsIntervalMinutes(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_APP_SETTINGS.shell.tipsIntervalMinutes
+  }
+  return Math.min(MAX_TIPS_INTERVAL_MINUTES, Math.max(MIN_TIPS_INTERVAL_MINUTES, Math.round(value)))
 }
 
 function clampAutoSaveIntervalSeconds(value: unknown): number {
@@ -638,6 +658,10 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       ),
       baseFontSize: clampBaseFontSize(appearance.baseFontSize),
       phaseImageSpeed: clampPhaseImageSpeed(appearance.phaseImageSpeed),
+      transitionSpeed: appearance.transitionSpeed === '0.5x' || appearance.transitionSpeed === '1x'
+        || appearance.transitionSpeed === '2x' || appearance.transitionSpeed === 'off'
+        ? appearance.transitionSpeed
+        : DEFAULT_APP_SETTINGS.appearance.transitionSpeed,
       micaBackground: appearance.micaBackground === true,
       themes: {
         dark: normalizeThemeSettings('dark', themes.dark),
@@ -646,6 +670,10 @@ export function normalizeAppSettings(value: unknown): AppSettings {
     },
     shell: {
       titleBarNoticeHistoryLimit: clampTitleBarNoticeHistoryLimit(shell.titleBarNoticeHistoryLimit),
+      tipsEnabled: typeof shell.tipsEnabled === 'boolean'
+        ? shell.tipsEnabled
+        : DEFAULT_APP_SETTINGS.shell.tipsEnabled,
+      tipsIntervalMinutes: clampTipsIntervalMinutes(shell.tipsIntervalMinutes),
     },
     updates: {
       showReleaseNotesAfterUpdate: typeof updates.showReleaseNotesAfterUpdate === 'boolean'

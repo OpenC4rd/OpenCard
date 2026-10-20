@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 import { applyInstance } from '../../entities/card/instance'
 import type { CardDocument, CardInstanceRecord } from '../../entities/card/model'
 import type { ProjectInformation, ProjectRemoteResourcePolicy } from '../workspace/model/projectMetadata'
@@ -84,20 +85,17 @@ export function prepareCardRender(request: CardRenderRequest): PreparedCardRende
     bindingProject: request.environment.project,
     bindingDictionary: request.environment.dictionary,
   })
-  const resourceIssues = validateRenderResources(
+  const issues = computed(() => [...resolved.issues, ...parsed.issues, ...richText.issues, ...validateRenderResources(
     parsed.document,
     request.environment.remoteResourcePolicy,
     request.instance?.id ?? null,
     resources,
-  )
-  const result: RenderPipelineResult = {
+  )])
+  return {
     document: parsed.document,
-    issues: [...resolved.issues, ...parsed.issues, ...resourceIssues, ...richText.issues],
+    get issues() { return issues.value },
     richText: richText.catalog,
     resourceScopes,
-  }
-  return {
-    ...result,
     resources,
   }
 }

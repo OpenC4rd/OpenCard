@@ -113,7 +113,7 @@ function handleActionSelect(payload: OcActionSelectPayload): void {
 .oc-card--variant-glass {
   border: var(--oc-border-width) solid var(--oc-border-muted);
   background: var(--oc-bg-glass);
-  backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
+  backdrop-filter: var(--oc-bg-glass-filter);
   box-shadow: var(--oc-shadow-md);
 }
 

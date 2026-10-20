@@ -13,6 +13,7 @@ import {
   type Ref,
 } from 'vue'
 import type { EditorViewportTransform } from '../editor-runtime/model/editorUiState'
+import { taskScheduler } from '../../utils/taskScheduler'
 
 export type CdeViewportPort = {
   zoomBy: (factor: number) => void
@@ -57,6 +58,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
   let initialFitPending = !options.initialTransform?.value
   let initialFitRequested = false
   let transformPreviewSizeObserver: ResizeObserver | null = null
+  const previewDragInput = taskScheduler.frame(applyPreviewViewportDrag)
 
   const transformPreviewScale = computed(() => {
     const face = options.faceSize.value
@@ -99,8 +101,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
     const previewScale = transformPreviewScale.value
     if (!rect || previewScale <= 0) return null
     return {
-      left: `${rect.left * previewScale}px`,
-      top: `${rect.top * previewScale}px`,
+      transform: `translate3d(${rect.left * previewScale}px, ${rect.top * previewScale}px, 0)`,
       width: `${rect.width * previewScale}px`,
       height: `${rect.height * previewScale}px`,
     }
@@ -213,6 +214,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
   }
 
   function prepareForFileChange(): void {
+    previewDragInput.cancel()
     initialFitPending = !options.initialTransform?.value
     initialFitRequested = false
     previewDragState.value = null
@@ -235,6 +237,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
 
   function startPreviewViewportDrag(event: PointerEvent): void {
     if (event.button !== 0 || transformPreviewScale.value <= 0) return
+    previewDragInput.cancel()
     event.preventDefault()
     event.stopPropagation()
     const target = event.currentTarget
@@ -251,6 +254,11 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
   }
 
   function handlePreviewViewportDrag(event: PointerEvent): void {
+    if (previewDragState.value?.pointerId !== event.pointerId) return
+    previewDragInput.schedule(event)
+  }
+
+  function applyPreviewViewportDrag(event: PointerEvent): void {
     const state = previewDragState.value
     const previewScale = transformPreviewScale.value
     if (!state || state.pointerId !== event.pointerId || previewScale <= 0) return
@@ -267,6 +275,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
   function stopPreviewViewportDrag(event: PointerEvent): void {
     const state = previewDragState.value
     if (!state || state.pointerId !== event.pointerId) return
+    previewDragInput.flush()
     const target = event.currentTarget
     if (target instanceof HTMLElement && target.hasPointerCapture(event.pointerId)) {
       target.releasePointerCapture(event.pointerId)
@@ -308,6 +317,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
   })
 
   onUnmounted(() => {
+    previewDragInput.cancel()
     transformPreviewSizeObserver?.disconnect()
     transformPreviewSizeObserver = null
     previewDragState.value = null

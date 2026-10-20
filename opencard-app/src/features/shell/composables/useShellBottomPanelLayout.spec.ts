@@ -1,8 +1,37 @@
 import { mount } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import OcResizeTrack from '../../../components/standard/OcResizeTrack.vue'
 import { useShellBottomPanelLayout } from './useShellBottomPanelLayout'
+
+it('skips layout animations when the transition duration is zero', async () => {
+  const stack = document.createElement('div')
+  stack.innerHTML = '<div class="open-card-shell__page-content"><div data-oc-layout-anchor="bottom"></div></div>'
+  document.body.append(stack)
+  const content = stack.firstElementChild as HTMLElement
+  const anchor = content.firstElementChild as HTMLElement
+  let contentHeight = 300
+  Object.defineProperty(content, 'clientHeight', { get: () => contentHeight })
+  const animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }))
+  Object.defineProperty(anchor, 'animate', { value: animate })
+  let layout!: ReturnType<typeof useShellBottomPanelLayout>
+  const wrapper = mount(defineComponent({ setup() {
+    layout = useShellBottomPanelLayout(ref(stack))
+    return () => h('div')
+  } }))
+  content.style.setProperty('--oc-duration', '0ms')
+  const disabledChange = layout.animateLayoutChange()
+  contentHeight = 200
+  await disabledChange
+  expect(animate).not.toHaveBeenCalled()
+  content.style.setProperty('--oc-duration', '75ms')
+  const enabledChange = layout.animateLayoutChange()
+  contentHeight = 100
+  await enabledChange
+  expect(animate).toHaveBeenCalledWith({ translate: ['0 100px', '0 0'] }, { duration: 75, easing: 'ease' })
+  wrapper.unmount()
+  stack.remove()
+})
 
 it('previews reverse dragging, cancels without committing, and commits pointer or keyboard changes', async () => {
   const stack = document.createElement('div')

@@ -11,6 +11,11 @@ import {
 } from './appSettings'
 
 describe('appSettings', () => {
+  it('defaults unknown transition speeds without discarding other preferences', () => {
+    expect(normalizeAppSettings({ appearance: { transitionSpeed: '3x', glassIntensity: 25 } }).appearance)
+      .toMatchObject({ transitionSpeed: '1x', glassIntensity: 25 })
+  })
+
   it('returns independent defaults for missing or unsupported data', () => {
     const first = normalizeAppSettings(null)
     const second = normalizeAppSettings({ version: 99 })
@@ -35,10 +40,11 @@ describe('appSettings', () => {
         glassIntensity: 100,
         baseFontSize: 13,
         phaseImageSpeed: 400,
+        transitionSpeed: '1x',
         micaBackground: false,
         themes: createDefaultAppSettings().appearance.themes,
       },
-      shell: { titleBarNoticeHistoryLimit: 128 },
+      shell: { titleBarNoticeHistoryLimit: 128, tipsEnabled: true, tipsIntervalMinutes: 5 },
       updates: { showReleaseNotesAfterUpdate: true },
       exporting: { openCdeWorkbookAfterExport: true },
       cache: { packageLimitGb: 2, networkLimitGb: 1 },
@@ -95,6 +101,19 @@ describe('appSettings', () => {
       name: settings.identity.publisherKey,
       email: `${settings.identity.publisherKey}@noreply.example`,
     })
+  })
+
+  it('normalizes the tip switch and clamps the tip interval', () => {
+    const shellOf = (shell: unknown) => normalizeAppSettings({ version: APP_SETTINGS_VERSION, shell }).shell
+
+    expect(shellOf({})).toEqual({ titleBarNoticeHistoryLimit: 128, tipsEnabled: true, tipsIntervalMinutes: 5 })
+    expect(shellOf({ tipsEnabled: false, tipsIntervalMinutes: 30 }))
+      .toEqual({ titleBarNoticeHistoryLimit: 128, tipsEnabled: false, tipsIntervalMinutes: 30 })
+    // 间隔只在 1 分钟到 2 小时之间有意义；其余输入取默认值和边界。
+    expect(shellOf({ tipsIntervalMinutes: 0 }).tipsIntervalMinutes).toBe(1)
+    expect(shellOf({ tipsIntervalMinutes: 999 }).tipsIntervalMinutes).toBe(120)
+    expect(shellOf({ tipsIntervalMinutes: 'often' }).tipsIntervalMinutes).toBe(5)
+    expect(shellOf({ tipsEnabled: 'yes' }).tipsEnabled).toBe(true)
   })
 
   it('normalizes the welcome background flag', () => {

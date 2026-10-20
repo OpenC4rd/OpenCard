@@ -19,7 +19,7 @@ export function createWelcomePage(): SpacePage {
     openRecentProject: app.openRecentProject, relocateRecentProject: app.relocateRecentProject,
   })
   watch(() => settings.isReady.value && isWelcome.value
-    && !projectPath.value && !tutorial.session.value
+    && !tutorial.session.value
     && !settings.settings.value.tutorials.seen.includes('overview'), ready => {
     if (ready) tutorial.start('overview')
   }, { immediate: true })

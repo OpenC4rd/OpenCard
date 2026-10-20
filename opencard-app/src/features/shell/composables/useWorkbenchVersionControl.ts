@@ -138,7 +138,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
     projectPath,
     timelineFilePath,
     locale,
-    computed(() => t('sidebar.timelineCompareWithDisk')),
+    computed(() => t('versionControl.timelineCompareWithDisk')),
   )
   const {
     treeData: timelineTreeData,
@@ -244,11 +244,11 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
       if (targets.tracked.length === 0 && targets.untracked.length === 0) return
       const name = changesTreeData.value.items.get(event.key)?.label ?? event.key
       const accepted = await options.requestConfirmation({
-        title: t('sidebar.changesDiscard'),
+        title: t('versionControl.changesDiscard'),
         message: targets.untracked.length > 0
-          ? t('sidebar.changesConfirmDiscardWithNew', { name })
-          : t('sidebar.changesConfirmDiscard', { name }),
-        confirmLabel: t('sidebar.changesDiscard'),
+          ? t('versionControl.changesConfirmDiscardWithNew', { name })
+          : t('versionControl.changesConfirmDiscard', { name }),
+        confirmLabel: t('versionControl.changesDiscard'),
       })
       if (accepted) await discardChanges(targets)
       return
@@ -267,14 +267,14 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
   }
 
   const timelinePlaceholder = computed(() => {
-    if (!timelineFilePath.value) return t('sidebar.timelineNoFile')
-    if (timelineLoading.value) return t('sidebar.timelineLoading')
-    if (timelineErrorKind.value) return t('sidebar.timelineFailed')
-    if (timelineInitialized.value === false) return t('sidebar.timelineNotInitialized')
+    if (!timelineFilePath.value) return t('versionControl.timelineNoFile')
+    if (timelineLoading.value) return t('versionControl.timelineLoading')
+    if (timelineErrorKind.value) return t('versionControl.timelineFailed')
+    if (timelineInitialized.value === false) return t('versionControl.timelineNotInitialized')
     if (timelineInitialized.value === true && !projectTimeline.hasHistory.value) {
-      return t('sidebar.timelineNoCommits')
+      return t('versionControl.timelineNoCommits')
     }
-    return t('sidebar.timelineNoFile')
+    return t('versionControl.timelineNoFile')
   })
 
   /**
@@ -299,17 +299,17 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
     try {
       const staged = await stageAll(root)
       if (!staged.ok || !staged.value) {
-        notifyWarning(t('sidebar.initialCommitFailed'))
+        notifyWarning(t('versionControl.initialCommitFailed'))
         return false
       }
-      const committed = await createCommit(root, { message: t('sidebar.initialCommitMessage') })
+      const committed = await createCommit(root, { message: t('versionControl.initialCommitMessage') })
       if (!committed.ok || !committed.value) {
-        notifyWarning(t('sidebar.initialCommitFailed'))
+        notifyWarning(t('versionControl.initialCommitFailed'))
         return false
       }
       return true
     } catch {
-      notifyWarning(t('sidebar.initialCommitFailed'))
+      notifyWarning(t('versionControl.initialCommitFailed'))
       return false
     }
   }
@@ -334,11 +334,11 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
             options.openSetting('versionControl.committerName')
             return
           }
-          notifyError(failure?.message ?? t('sidebar.initializeFailed'))
+          notifyError(failure?.message ?? t('versionControl.initializeFailed'))
           return
         }
       } catch (error) {
-        notifyError(error instanceof Error && error.message ? error.message : t('sidebar.initializeFailed'))
+        notifyError(error instanceof Error && error.message ? error.message : t('versionControl.initializeFailed'))
         return
       }
       await refreshTimeline()
@@ -363,7 +363,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
     if (!root) return
     try {
       await options.requestPathChanges([...targets.tracked, ...targets.untracked], async () => {
-        if (projectPath.value !== root) throw new Error(t('sidebar.changesDiscardFailed'))
+        if (projectPath.value !== root) throw new Error(t('versionControl.changesDiscardFailed'))
         await discardTrackedPaths(root, targets.tracked)
         await discardUntrackedPaths({
           projectRoot: root, paths: targets.untracked, moveToTrash: moveProjectEntryToTrash,
@@ -371,7 +371,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
         await refreshTimelineStatus()
       })
     } catch (error) {
-      notifyError(error instanceof Error && error.message ? error.message : t('sidebar.changesDiscardFailed'))
+      notifyError(error instanceof Error && error.message ? error.message : t('versionControl.changesDiscardFailed'))
     }
   }
 
@@ -383,7 +383,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
       await ignoreGitPath({ projectRoot: root, pattern })
       await refreshTimelineStatus()
     } catch (error) {
-      notifyError(error instanceof Error && error.message ? error.message : t('sidebar.changesIgnoreFailed'))
+      notifyError(error instanceof Error && error.message ? error.message : t('versionControl.changesIgnoreFailed'))
     }
   }
 
@@ -411,7 +411,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
     } catch (error) {
       commitVersionError.value = error instanceof Error && error.message
         ? error.message
-        : t('sidebar.commitDialog.failed')
+        : t('versionControl.commitDialog.failed')
     } finally {
       isCommittingVersion.value = false
     }

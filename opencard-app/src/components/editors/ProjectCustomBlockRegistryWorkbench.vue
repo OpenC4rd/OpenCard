@@ -10,7 +10,7 @@
     <section class="custom-block-registry-workbench__blocks">
       <OcTree v-if="selectedCollection" fill role="listbox" selection-mode="single"
         :data="blockTree" :selected-keys="selectedBlockKey ? [selectedBlockKey] : []"
-        :action-overflow-title="t('customBlockRegistry.actions')"
+        :action-overflow-title="t('customBlockRegistry.blockActions')"
         @selection-change="selectBlock" @action="handleBlockAction" />
       <div v-else class="custom-block-registry-workbench__empty">
         <OcIcon name="entity.block-custom" size="lg" tone="muted" />

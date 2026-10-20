@@ -47,7 +47,7 @@
     >
       <OcActionMenu
         v-if="hasActionChildren(action)"
-        :actions="action.children"
+        :actions="actionChildren(action)"
         :branch-id="menuBranchId"
         @select="handleMenuSelect"
         @dismiss="closeMenu"
@@ -69,6 +69,7 @@ export type {
 
 <script setup lang="ts">
 import { onBeforeUnmount, ref, useId } from 'vue'
+import { actionChildren } from '../../shared/ui/action/action.types'
 import OcButton from '../base/OcButton.vue'
 import type { OcIconSize } from '../base/OcIcon.vue'
 import { inlineMarkupToText } from '../../shared/ui/inline-markup/inlineMarkup'
@@ -79,7 +80,6 @@ import type {
   ActionButtonSize,
   ActionButtonVariant,
   OcActionDefinition,
-  OcActionMenuEntry,
   OcActionSelectPayload,
 } from '../../shared/ui/action/action.types'
 import OcFloatingLayer from './OcFloatingLayer.vue'
@@ -201,8 +201,8 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 
 function hasActionChildren(
   action: OcActionDefinition,
-): action is OcActionDefinition & { children: readonly OcActionMenuEntry[] } {
-  return Array.isArray(action.children) && action.children.length > 0
+): boolean {
+  return typeof action.children === 'function' || Boolean(action.children?.length)
 }
 </script>
 

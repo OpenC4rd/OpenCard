@@ -1,5 +1,8 @@
 /** Workspace entry lookup and OcNode collection projection. */
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, ref, shallowRef, markRaw, watch, getCurrentScope, onScopeDispose, type Ref } from 'vue'
+import { taskScheduler } from '../../../utils/taskScheduler'
+import { sortProjectDirectory } from '../../workspace/services/projectIndexWorker'
+import type { DirEntry } from '@tauri-apps/plugin-fs'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { resolveEntryIcon, resolveFileTypeById, type EntryIconPresentation } from '../../workspace/model/fileTypes'
 import { normalizeNodeTail, type OcNode, type OcNodeAction, type OcNodeCollection, type OcNodeRenameSelection } from '../../../shared/ui/node/node.types'
@@ -59,7 +62,7 @@ type ProjectEntryView = {
   relativePath: string
   label: string
   isDirectory: boolean
-  isExpanded: boolean
+  readonly isExpanded: boolean
   children: ProjectEntryView[]
 }
 
@@ -72,13 +75,15 @@ type UseWorkbenchFileTreeOptions = {
   activeSession: Readonly<Ref<EditorSession | null>>
   hideDotFiles?: Readonly<Ref<boolean>>
   isDirectoryExpanded: (path: string) => boolean
+  getDirectoryState?: (path: string) => { status: string; error?: string } | undefined
+  expandedDirectories?: Readonly<Ref<ReadonlySet<string>>>
   activateSession: (sessionId: string) => void
   openPreviewFile: (path: string) => Promise<unknown>
-  ensureProjectManagementStructure: () => Promise<void>
   translate: (key: string, params?: Record<string, unknown>) => string
   registeredFontSources?: Readonly<Ref<readonly string[] | null>>
   /** 归档路径 → 它自述的坐标。包列表的小字用它；读不出身份的包不在表里。 */
   packageCoordinates?: Readonly<Ref<ReadonlyMap<string, string>>>
+  packagePaths?: Readonly<Ref<readonly string[]>>
 }
 
 function normalizeShellPath(path: string): string {
@@ -96,6 +101,7 @@ function isDotPath(path: string): boolean {
 }
 
 export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
   const selectedProjectEntryKeys = ref<string[]>([])
   const selectedManagementKeys = ref<string[]>([])
   const openedEditorSelectedKeys = ref<string[]>([])
@@ -113,132 +119,152 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     target.value = nextKeys
   }
 
-  const projectProjection = computed(() => {
+  const projectProjection = shallowRef<{ roots: ProjectEntryView[]; byKey: Map<string, ProjectEntryView> }>({ roots: [], byKey: new Map() })
+  const projectTreeData = shallowRef<OcNodeCollection>({ rootKeys: [], items: new Map(), children: new Map() })
+  let projectionRequest: AbortController | undefined
+  const compareEntries = (left: ProjectEntryView, right: ProjectEntryView) =>
+    Number(right.isDirectory) - Number(left.isDirectory) || collator.compare(left.label, right.label)
+
+  function* buildProjectTree(): Generator<void | Promise<void>> {
+    const signal = projectionRequest?.signal
     const roots: ProjectEntryView[] = []
     const byRelativePath = new Map<string, ProjectEntryView>()
     const byKey = new Map<string, ProjectEntryView>()
-
+    const items = new Map<string, OcNode>()
+    const children = new Map<string, readonly string[]>()
+    const old = projectProjection.value.byKey
     for (const file of options.indexedEntries.value) {
       const relativePath = normalizeShellPath(file.name)
-      if ((options.hideDotFiles?.value ?? true) && isDotPath(relativePath)) continue
+      if ((options.hideDotFiles?.value ?? true) && isDotPath(relativePath)) { yield; continue }
       const key = normalizeShellPath(`${options.projectPath.value}/${relativePath}`)
-      const parts = relativePath.split('/')
-      const isDirectory = Boolean(file.isDirectory)
-      const entry: ProjectEntryView = {
-        key,
-        relativePath,
-        label: parts[parts.length - 1] ?? relativePath,
-        isDirectory,
-        isExpanded: isDirectory && options.isDirectoryExpanded(key),
-        children: [],
-      }
-      byRelativePath.set(relativePath, entry)
-      byKey.set(key, entry)
+      const label = relativePath.slice(relativePath.lastIndexOf('/') + 1)
+      const entry: ProjectEntryView = { key, relativePath, label, isDirectory: Boolean(file.isDirectory), get isExpanded() { return options.isDirectoryExpanded(key) }, children: [] }
+      byRelativePath.set(relativePath, entry); byKey.set(key, entry)
+      const before = old.get(key)
+      items.set(key, before?.isDirectory === entry.isDirectory && before.label === label
+        ? projectTreeData.value.items.get(key)! : createProjectEntryNode(entry))
+      yield
     }
-
     for (const [relativePath, entry] of byRelativePath) {
-      const separatorIndex = relativePath.lastIndexOf('/')
-      if (separatorIndex < 0) roots.push(entry)
-      else byRelativePath.get(relativePath.slice(0, separatorIndex))?.children.push(entry)
+      const separator = relativePath.lastIndexOf('/')
+      if (separator < 0) roots.push(entry)
+      else byRelativePath.get(relativePath.slice(0, separator))?.children.push(entry)
+      yield
     }
+    const groups = [roots]
+    for (const entry of byKey.values()) {
+      if (entry.children.length) groups.push(entry.children)
+      yield
+    }
+    for (const group of groups) {
+      if (group.length <= 256) group.sort(compareEntries)
+      else yield (async () => {
+        const input: DirEntry[] = []
+        const lookup = new Map<string, ProjectEntryView>()
+        await taskScheduler.forEach(group, entry => {
+          input.push({ name: entry.label, isDirectory: entry.isDirectory, isFile: !entry.isDirectory, isSymlink: false })
+          lookup.set(entry.label, entry)
+        }, signal)
+        const sorted = await sortProjectDirectory(input, signal)
+        let index = 0
+        await taskScheduler.forEach(sorted, entry => { group[index++] = lookup.get(entry.name)! }, signal)
+      })()
+      yield
+    }
+    for (const entry of byKey.values()) {
+      if (entry.children.length) {
+        const keys: string[] = []
+        for (const child of entry.children) { keys.push(child.key); yield }
+        children.set(entry.key, keys)
+      }
+      yield
+    }
+    const rootKeys: string[] = []
+    for (const entry of roots) { rootKeys.push(entry.key); yield }
+    projectProjection.value = markRaw({ roots, byKey })
+    projectTreeData.value = markRaw({ rootKeys, items, children })
+  }
 
-    const compareEntries = (left: ProjectEntryView, right: ProjectEntryView) =>
-      Number(right.isDirectory) - Number(left.isDirectory)
-      || left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: 'base' })
-    roots.sort(compareEntries)
-    for (const entry of byKey.values()) entry.children.sort(compareEntries)
-
-    return { roots, byKey }
-  })
+  const projectEntryLabels = computed(() => ({
+    rename: options.translate('sidebar.fileActions.rename'),
+    reveal: options.translate('sidebar.fileActions.reveal'),
+    copyRelativePath: options.translate('sidebar.fileActions.copyRelativePath'),
+    copyAbsolutePath: options.translate('sidebar.fileActions.copyAbsolutePath'),
+    delete: options.translate('sidebar.fileActions.delete'),
+    more: options.translate('sidebar.fileActions.more'),
+    confirmDeleteSelected: options.translate('sidebar.fileActions.confirmDeleteSelected', { count: selectedProjectEntryKeys.value.length }),
+  }))
 
   /** Inline actions always target the row that carries them, so keys are node-local and static. */
   function createProjectEntryNode(entry: ProjectEntryView): OcNode {
-    const selectionCount = selectedProjectEntryKeys.value.includes(entry.key)
-      ? selectedProjectEntryKeys.value.length : 1
-    const presentation = resolveEntryIcon(
-      entry.key,
-      entry.isDirectory,
-      entry.isExpanded,
-      options.projectPath.value,
-      registeredFontSourceSet.value,
-    )
+    const menus = () => {
+      const selectionCount = selectedProjectEntryKeys.value.includes(entry.key) ? selectedProjectEntryKeys.value.length : 1
     const rename: OcNodeAction = {
       key: PROJECT_ENTRY_RENAME_ACTION_KEY,
-      title: options.translate('sidebar.fileActions.rename'),
+      title: projectEntryLabels.value.rename,
       icon: 'action.edit',
       disabled: selectionCount > 1,
     }
     const reveal: OcNodeAction = {
       key: PROJECT_ENTRY_REVEAL_ACTION_KEY,
-      title: options.translate('sidebar.fileActions.reveal'),
+      title: projectEntryLabels.value.reveal,
       icon: 'status.folder-open',
     }
     const copyRelativePath: OcNodeAction = {
       key: PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY,
-      title: options.translate('sidebar.fileActions.copyRelativePath'),
+      title: projectEntryLabels.value.copyRelativePath,
       icon: 'action.copy',
     }
     const copyAbsolutePath: OcNodeAction = {
       key: PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY,
-      title: options.translate('sidebar.fileActions.copyAbsolutePath'),
+      title: projectEntryLabels.value.copyAbsolutePath,
       icon: 'action.copy',
     }
     const moveToTrash: OcNodeAction = {
       key: PROJECT_ENTRY_DELETE_ACTION_KEY,
-      title: options.translate('sidebar.fileActions.delete'),
+      title: projectEntryLabels.value.delete,
       icon: 'action.delete',
       children: [{
         key: PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY,
         title: selectionCount > 1
-          ? options.translate('sidebar.fileActions.confirmDeleteSelected', { count: selectionCount })
+          ? projectEntryLabels.value.confirmDeleteSelected
           : options.translate('sidebar.fileActions.confirmDeleteFile', { fileName: entry.label }),
         icon: 'action.delete',
         iconTone: 'danger',
       }],
     }
 
-    return {
-      label: entry.label,
-      renameSelection: !entry.isDirectory
-        ? resolveFilenameRenameSelection(entry.label)
-        : undefined,
-      visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
-      renamable: true,
-      draggable: true,
-      tail: [{
-        key: PROJECT_ENTRY_MORE_ACTION_KEY,
-        title: options.translate('sidebar.fileActions.more'),
-        icon: 'nav.more',
-        children: [rename, moveToTrash, reveal, copyRelativePath, copyAbsolutePath],
-      }],
-      contextActions: [
-        rename,
-        reveal,
-        copyRelativePath,
-        copyAbsolutePath,
-        { type: 'divider', key: 'project-entry-delete-divider' },
-        moveToTrash,
-      ],
+      return { inline: [rename, moveToTrash, reveal, copyRelativePath, copyAbsolutePath],
+        context: [rename, reveal, copyRelativePath, copyAbsolutePath, { type: 'divider' as const, key: 'project-entry-delete-divider' }, moveToTrash] }
     }
+    return markRaw({
+      label: entry.label,
+      renameSelection: !entry.isDirectory ? resolveFilenameRenameSelection(entry.label) : undefined,
+      get visual() {
+        const presentation = resolveEntryIcon(entry.key, entry.isDirectory, options.isDirectoryExpanded(entry.key), options.projectPath.value, registeredFontSourceSet.value)
+        return { type: 'icon' as const, icon: presentation.icon, iconTone: presentation.tone }
+      },
+      get expandable() {
+        return entry.isDirectory && (options.getDirectoryState?.(entry.key)?.status !== 'ready'
+          || (projectProjection.value.byKey.get(entry.key)?.children.length ?? 0) > 0)
+      },
+      get loading() { return entry.isDirectory && options.getDirectoryState?.(entry.key)?.status === 'loading' },
+      get disabledReason() { return options.getDirectoryState?.(entry.key)?.error },
+      renamable: true, draggable: true,
+      tail: [{ key: PROJECT_ENTRY_MORE_ACTION_KEY, get title() { return projectEntryLabels.value.more }, icon: 'nav.more', children: () => menus().inline }],
+      contextActions: () => menus().context,
+    })
   }
 
-  const projectTreeData = computed<OcNodeCollection>(() => {
-    const items = new Map<string, OcNode>()
-    const children = new Map<string, readonly string[]>()
-
-    for (const entry of projectProjection.value.byKey.values()) {
-      items.set(entry.key, createProjectEntryNode(entry))
-      if (entry.children.length > 0) {
-        children.set(entry.key, entry.children.map((child) => child.key))
-      }
-    }
-
-    return {
-      rootKeys: projectProjection.value.roots.map((entry) => entry.key),
-      items,
-      children,
-    }
-  })
+  watch([() => options.indexedEntries.value, () => options.projectPath.value, () => options.hideDotFiles?.value], () => {
+    projectionRequest?.abort()
+    const request = new AbortController()
+    projectionRequest = request
+    void taskScheduler.runBatched(buildProjectTree(), request.signal).catch(error => {
+      if (!request.signal.aborted) notifyAppError('OC-E2005', error)
+    })
+  }, { immediate: true, flush: 'sync' })
+  if (getCurrentScope()) onScopeDispose(() => projectionRequest?.abort())
 
   const projectManagementProjection = computed(() => {
     const emptyTreeData: OcNodeCollection = { rootKeys: [], items: new Map(), children: new Map() }
@@ -276,8 +302,8 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       if (entry.packageDirectory) {
         // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`。每一行都用文件树那一行的节点：
         // 同样的图标、同样的重命名/回收站/在文件管理器显示/复制路径，动作只有一套。
-        const packageNodeKeys = options.indexedEntries.value
-          .map(candidate => normalizeShellPath(candidate.name))
+        const packageNodeKeys = (options.packagePaths?.value ?? [])
+          .map(path => path.slice(normalizeShellPath(options.projectPath.value).length + 1))
           .filter(relative => relative.startsWith(`${entry.path}/`))
           .filter(relative => !relative.slice(entry.path.length + 1).includes('/'))
           .filter(relative => relative.toLocaleLowerCase().endsWith(RESOURCE_PACKAGE_SUFFIX))
@@ -334,8 +360,10 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
   }
 
   const projectExpandedKeys = computed(() =>
-    [...projectProjection.value.byKey.values()]
-      .filter((entry) => entry.isExpanded && entry.children.length > 0)
+    options.expandedDirectories
+      ? [...options.expandedDirectories.value].map(path => normalizeShellPath(`${options.projectPath.value}/${path}`))
+      : [...projectProjection.value.byKey.values()]
+      .filter((entry) => entry.isDirectory && options.isDirectoryExpanded(entry.key))
       .map((entry) => entry.key),
   )
 
@@ -400,8 +428,6 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     const selectedKey = nextSelectedKeys[0]
     if (!selectedKey) return
     try {
-      const isManagementRoot = projectManagementTreeData.value.rootKeys.includes(selectedKey)
-      if (isManagementRoot) await options.ensureProjectManagementStructure()
       const targetPath = projectManagementProjection.value.targetByNodeKey.get(selectedKey)
       if (targetPath) await options.openPreviewFile(targetPath)
     } catch (error) {

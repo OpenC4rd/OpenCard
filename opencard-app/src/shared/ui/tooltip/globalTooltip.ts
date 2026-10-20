@@ -24,6 +24,9 @@ const TOOLTIP_INIT_FLAG = '__oc_tooltip_initialized__';
 /** Attribute declaring the preferred side of the anchor; nearest declaring element wins. */
 export const TOOLTIP_PLACEMENT_ATTRIBUTE = 'data-tooltip-placement';
 
+/** Follow the pointer (default) or anchor to the target; nearest declaration wins. */
+export const TOOLTIP_ANCHOR_ATTRIBUTE = 'data-tooltip-anchor';
+
 /**
  * Attribute marking one interaction region. Controls sharing a declaring element share the warm
  * window, so moving between them (toolbar buttons, node tail actions) swaps instantly. Without a
@@ -84,6 +87,11 @@ function getTooltipPlacement(target: HTMLElement): TooltipPlacement {
   const declared = target.closest(`[${TOOLTIP_PLACEMENT_ATTRIBUTE}]`)
     ?.getAttribute(TOOLTIP_PLACEMENT_ATTRIBUTE);
   return isTooltipPlacement(declared) ? declared : DEFAULT_TOOLTIP_PLACEMENT;
+}
+
+function usesPointerAnchor(target: HTMLElement): boolean {
+  return target.closest(`[${TOOLTIP_ANCHOR_ATTRIBUTE}]`)
+    ?.getAttribute(TOOLTIP_ANCHOR_ATTRIBUTE) !== 'target';
 }
 
 function resolvePlacementAnchor(
@@ -190,6 +198,10 @@ export function setupGlobalTooltip(): void {
   let warmGroupElement: HTMLElement | null = null;
   let warmUntil = 0;
   let warmPlacement: TooltipPlacement | null = null;
+  let pointerPosition: { x: number; y: number } | null = null;
+  let placementFrame: number | null = null;
+  let lastTargetRect: TooltipBox | null = null;
+  let activeText = '';
 
   const resolveGroupElement = (target: HTMLElement): HTMLElement =>
     target.closest<HTMLElement>(`[${TOOLTIP_GROUP_ATTRIBUTE}]`) ?? target;
@@ -222,6 +234,8 @@ export function setupGlobalTooltip(): void {
   const hideTooltip = (): void => {
     cancelPendingTooltip();
     cancelHideTimer();
+    if (placementFrame !== null) window.cancelAnimationFrame(placementFrame);
+    placementFrame = null;
     activeTarget = null;
     layer.classList.remove('open');
     layer.classList.remove('instant');
@@ -240,10 +254,23 @@ export function setupGlobalTooltip(): void {
     }
 
     const targetRect = activeTarget.getBoundingClientRect();
+    lastTargetRect = targetRect;
     const layerRect = layer.getBoundingClientRect();
     const size: TooltipSize = { width: layerRect.width, height: layerRect.height };
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+
+    if (pointerPosition && usesPointerAnchor(activeTarget)) {
+      const left = pointerPosition.x + TOOLTIP_GAP + size.width <= viewportWidth - TOOLTIP_EDGE_PADDING
+        ? pointerPosition.x + TOOLTIP_GAP
+        : pointerPosition.x - TOOLTIP_GAP - size.width;
+      const below = pointerPosition.y + TOOLTIP_GAP + size.height <= viewportHeight - TOOLTIP_EDGE_PADDING;
+      const top = below ? pointerPosition.y + TOOLTIP_GAP : pointerPosition.y - TOOLTIP_GAP - size.height;
+      layer.dataset.placement = below ? 'bottom' : 'top';
+      layer.style.left = `${Math.round(clampToViewport(left, size.width, viewportWidth))}px`;
+      layer.style.top = `${Math.round(clampToViewport(top, size.height, viewportHeight))}px`;
+      return;
+    }
 
     const declared = TOOLTIP_PLACEMENT_FALLBACKS[getTooltipPlacement(activeTarget)];
     /**
@@ -268,6 +295,30 @@ export function setupGlobalTooltip(): void {
     layer.style.top = `${Math.round(clampToViewport(anchor.top, size.height, viewportHeight))}px`;
   };
 
+  // Layout and transform animations can move an anchor without a resize or scroll event.
+  const trackTargetPosition = (): void => {
+    placementFrame = null;
+    if (!activeTarget) return;
+    if (!activeTarget.isConnected) {
+      dismissTooltip();
+      return;
+    }
+    const text = getTooltipText(activeTarget);
+    if (!text) {
+      dismissTooltip();
+      return;
+    }
+    const textChanged = text !== activeText;
+    if (textChanged) {
+      activeText = text;
+      renderTooltipContent(layer, text);
+    }
+    const rect = activeTarget.getBoundingClientRect();
+    if (textChanged || !lastTargetRect || rect.left !== lastTargetRect.left || rect.top !== lastTargetRect.top
+      || rect.right !== lastTargetRect.right || rect.bottom !== lastTargetRect.bottom) placeTooltip();
+    placementFrame = window.requestAnimationFrame(trackTargetPosition);
+  };
+
   const showTooltip = (target: HTMLElement, instant: boolean): void => {
     cancelPendingTooltip();
     cancelHideTimer();
@@ -281,6 +332,7 @@ export function setupGlobalTooltip(): void {
     warmGroupElement = resolveGroupElement(target);
     warmUntil = Date.now() + TOOLTIP_WARM_WINDOW_MS;
     renderTooltipContent(layer, text);
+    activeText = text;
     if (instant) {
       // A swap inside one warm group keeps the layer open: no fade, no blink.
       layer.classList.add('instant');
@@ -293,6 +345,7 @@ export function setupGlobalTooltip(): void {
     layer.setAttribute('aria-hidden', 'false');
     placeTooltip();
     layer.classList.add('open');
+    if (placementFrame === null) placementFrame = window.requestAnimationFrame(trackTargetPosition);
   };
 
   const scheduleTooltip = (target: HTMLElement): void => {
@@ -315,6 +368,7 @@ export function setupGlobalTooltip(): void {
   document.addEventListener(
     'mouseover',
     (event) => {
+      pointerPosition = { x: event.clientX, y: event.clientY };
       const hit = resolveTooltipHit(event.target);
       if (hit.target) {
         scheduleTooltip(hit.target);
@@ -363,11 +417,28 @@ export function setupGlobalTooltip(): void {
     true
   );
 
-  document.addEventListener('pointerdown', dismissTooltip, true);
+  document.addEventListener('pointerdown', (event) => {
+    const target = resolveTooltipHit(event.target).target;
+    const role = target?.getAttribute('role');
+    if (target && (role === 'separator' || role === 'slider') && usesPointerAnchor(target)) {
+      pointerPosition = { x: event.clientX, y: event.clientY };
+      showTooltip(target, true);
+      return;
+    }
+    dismissTooltip();
+  }, true);
+
+  document.addEventListener('pointermove', (event) => {
+    const target = activeTarget ?? pendingTarget;
+    if (!(event.target instanceof Node) || !target?.contains(event.target)) return;
+    pointerPosition = { x: event.clientX, y: event.clientY };
+    if (usesPointerAnchor(target)) placeTooltip();
+  }, true);
 
   document.addEventListener(
     'focusin',
     (event) => {
+      pointerPosition = null;
       const hit = resolveTooltipHit(event.target);
       if (hit.target) {
         showTooltip(hit.target, false);
@@ -403,6 +474,9 @@ export function setupGlobalTooltip(): void {
     (event) => {
       if (event.key === 'Escape') {
         dismissTooltip();
+      } else if (activeTarget?.contains(document.activeElement)) {
+        pointerPosition = null;
+        placeTooltip();
       }
     },
     true

@@ -13,6 +13,7 @@ export type OcNodeSelectionIntent = {
   mode: OcNodeSelectionMode
   /** 当前渲染出来的条目，按视觉顺序；区间选择沿着这个顺序展开。 */
   orderedEntries: readonly { key: OcNodeKey }[]
+  indexByKey?: ReadonlyMap<OcNodeKey, number>
   selectedKeys: readonly OcNodeKey[]
   triggerKey: OcNodeKey
   /** 上一次手势留下的锚点；已不在渲染结果里时忽略。 */
@@ -33,19 +34,22 @@ export function resolveNodeSelection(intent: OcNodeSelectionIntent): OcNodeSelec
   if (mode === 'none') return null
 
   if (mode === 'multiple' && range) {
-    const resolvedAnchor = anchorKey && orderedEntries.some(entry => entry.key === anchorKey)
+    const indexes = intent.indexByKey ?? new Map(orderedEntries.map((entry, index) => [entry.key, index]))
+    const indexOf = (key: OcNodeKey) => indexes.get(key) ?? -1
+    const resolvedAnchor = anchorKey && indexOf(anchorKey) >= 0
       ? anchorKey
       : selectedKeys[0] ?? triggerKey
-    const anchorIndex = orderedEntries.findIndex(entry => entry.key === resolvedAnchor)
-    const targetIndex = orderedEntries.findIndex(entry => entry.key === triggerKey)
+    const anchorIndex = indexOf(resolvedAnchor)
+    const targetIndex = indexOf(triggerKey)
     const rangeKeys = anchorIndex < 0 || targetIndex < 0
       ? [triggerKey]
       : orderedEntries
         .slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
         .map(entry => entry.key)
-    const selectedSet = new Set(toggle ? [...selectedKeys, ...rangeKeys] : rangeKeys)
+    if (!toggle) return { selectedKeys: rangeKeys, movesAnchor: false }
+    const selectedSet = new Set([...selectedKeys, ...rangeKeys])
     return {
-      selectedKeys: orderedEntries.filter(entry => selectedSet.has(entry.key)).map(entry => entry.key),
+      selectedKeys: [...selectedSet].filter(key => indexOf(key) >= 0).sort((left, right) => indexOf(left) - indexOf(right)),
       movesAnchor: false,
     }
   }

@@ -359,7 +359,8 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 .shell-bottom-panel {
   position: relative;
   min-width: 0;
-  overflow: hidden;
+  height: 0;
+  overflow: visible;
   border-radius: var(--oc-radius-surface);
   background: var(--oc-bg-surface);
 }
@@ -416,17 +417,28 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 }
 
 .shell-bottom-panel__content {
-  height: 0;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md));
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--oc-bg-base);
-  transition: height var(--oc-duration) var(--oc-ease);
+  border-radius: inherit;
+  transform: translateY(100%);
+  pointer-events: none;
+  transition: transform var(--oc-duration) var(--oc-ease);
+}
+
+.shell-bottom-panel.is-expanded {
+  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md));
 }
 
 .shell-bottom-panel.is-expanded .shell-bottom-panel__content {
-  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md));
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .shell-bottom-panel__tabs {

@@ -464,7 +464,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   background: var(--oc-bg-glass);
   box-shadow: var(--oc-shadow-md);
   opacity: var(--settings-preview-glass-opacity);
-  backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
+  backdrop-filter: var(--oc-bg-glass-filter);
   transform: scaleY(var(--settings-preview-scale));
   transform-origin: top center;
   will-change: transform, opacity;
@@ -640,7 +640,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   gap: var(--oc-space-xs);
   padding: var(--oc-space-sm) var(--oc-space-xs);
   background: var(--oc-bg-glass);
-  backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
+  backdrop-filter: var(--oc-bg-glass-filter);
 }
 
 .settings-content__preview-canvas {

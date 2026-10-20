@@ -6,10 +6,10 @@
     <template v-if="release">
         <div
           v-if="release.body"
-          class="release-notes-dialog__body oc-release-notes"
+          class="release-notes-dialog__body oc-markdown"
           v-html="renderedBody"
         />
-        <p v-else class="release-notes-dialog__empty oc-release-notes">{{ t('app.updater.releaseNotesEmpty') }}</p>
+        <p v-else class="release-notes-dialog__empty oc-markdown">{{ t('app.updater.releaseNotesEmpty') }}</p>
 
     </template>
     <template v-if="release" #footer>

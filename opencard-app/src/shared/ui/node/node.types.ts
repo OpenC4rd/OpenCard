@@ -60,8 +60,9 @@ export interface OcNode {
   renamable?: boolean
   renameSelection?: OcNodeRenameSelection
   draggable?: boolean
+  expandable?: boolean
   /** Context-menu entries offered by this node. */
-  contextActions?: readonly OcNodeContextEntry[]
+  contextActions?: readonly OcNodeContextEntry[] | (() => readonly OcNodeContextEntry[])
 }
 
 export interface OcNodeCollection {

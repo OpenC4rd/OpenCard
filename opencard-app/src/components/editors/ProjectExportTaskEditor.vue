@@ -1,15 +1,15 @@
 <template>
   <div class="project-export-task-editor">
     <div class="project-export-task-editor__group">
-      <OcText as="span" size="sm">{{ t('projectConfig.export.documents') }}</OcText>
+      <OcText as="span" size="sm">{{ t('projectExport.documents') }}</OcText>
       <div ref="pickerRef" class="project-export-task-editor__picker">
-        <OcFieldInput full-width :value="query" :placeholder="t('projectConfig.export.searchDocuments')"
+        <OcFieldInput full-width :value="query" :placeholder="t('projectExport.searchDocuments')"
           autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" :disabled="busy"
           :aria-expanded="menuOpen" :aria-controls="autocompleteId"
           @focus="openMenu" @input="updateQuery" @blur="closeMenu" @keydown="handleKeydown" />
         <OcButton type="button" icon-only variant="soft" icon="action.add"
-          :disabled="busy || !candidatePath" :aria-label="t('projectConfig.export.addDocument')"
-          :data-tooltip="t('projectConfig.export.addDocument')"
+          :disabled="busy || !candidatePath" :aria-label="t('projectExport.addDocument')"
+          :data-tooltip="t('projectExport.addDocument')"
           @click="addCandidate" />
       </div>
       <OcAutocompletePopover :id="autocompleteId" :open="menuOpen" :anchor="pickerRef"
@@ -18,53 +18,53 @@
         :data="documentTreeData" :selected-keys="[]"
         role="listbox" selection-mode="none" activation-mode="none"
         @action="handleDocumentTreeAction" @move="handleDocumentTreeMove" />
-      <OcText v-else tone="muted" size="sm">{{ t('projectConfig.export.noDocuments') }}</OcText>
+      <OcText v-else tone="muted" size="sm">{{ t('projectExport.noDocuments') }}</OcText>
     </div>
 
     <div class="project-export-task-editor__group project-export-task-editor__grid">
       <label class="project-export-task-editor__field">
-        <span>{{ t('projectConfig.export.selection') }}</span>
+        <span>{{ t('projectExport.selection') }}</span>
         <OcSelect v-model="selectionMode" :options="selectionOptions" full-width :disabled="busy" />
       </label>
       <label class="project-export-task-editor__field">
-        <span>{{ t('projectConfig.export.layout') }}</span>
+        <span>{{ t('projectExport.layout') }}</span>
         <OcSelect v-model="layoutMode" :options="layoutOptions" full-width :disabled="busy" />
       </label>
     </div>
 
     <div class="project-export-task-editor__group">
-      <OcText as="span" size="sm">{{ t('projectConfig.export.resolution') }}</OcText>
+      <OcText as="span" size="sm">{{ t('projectExport.resolution') }}</OcText>
       <div class="project-export-task-editor__resolution-controls">
         <OcEnumStepper :model-value="quality" :options="qualityOptions" :disabled="busy"
-          :previous-label="t('projectConfig.export.previousPreset')"
-          :next-label="t('projectConfig.export.nextPreset')" @update:model-value="updateQuality" />
+          :previous-label="t('projectExport.previousPreset')"
+          :next-label="t('projectExport.nextPreset')" @update:model-value="updateQuality" />
         <NumberPropertyField class="project-export-task-editor__scale-field"
           :definition="scaleDefinition" :value="scaleText" @update:value="updateScale" />
       </div>
       <OcText v-if="selectedDocuments.length === 0" tone="muted" size="sm">
-        {{ t('projectConfig.export.resolutionHint') }}
+        {{ t('projectExport.resolutionHint') }}
       </OcText>
     </div>
 
     <div class="project-export-task-editor__group">
       <label class="project-export-task-editor__field">
-        <span>{{ t('projectConfig.export.outputDirectory') }}</span>
+        <span>{{ t('projectExport.outputDirectory') }}</span>
         <OcFieldFrame>
           <OcFieldInput variant="plain" full-width readonly :value="outputDirectory"
-            :placeholder="t('projectConfig.export.chooseOutputDirectory')" />
+            :placeholder="t('projectExport.chooseOutputDirectory')" />
           <template #suffix>
             <OcButton type="button" icon-only variant="ghost" icon="status.folder-open"
-              :disabled="busy" :aria-label="t('projectConfig.export.chooseOutputDirectory')"
-              :data-tooltip="t('projectConfig.export.chooseOutputDirectory')" @click="chooseOutputDirectory" />
+              :disabled="busy" :aria-label="t('projectExport.chooseOutputDirectory')"
+              :data-tooltip="t('projectExport.chooseOutputDirectory')" @click="chooseOutputDirectory" />
           </template>
         </OcFieldFrame>
       </label>
       <label class="project-export-task-editor__field">
-        <span>{{ t('projectConfig.export.conflict') }}</span>
+        <span>{{ t('projectExport.conflict') }}</span>
         <OcSelect v-model="conflictMode" :options="conflictOptions" full-width :disabled="busy" />
       </label>
       <label class="project-export-task-editor__field">
-        <span>{{ t('projectConfig.export.errorPolicy') }}</span>
+        <span>{{ t('projectExport.errorPolicy') }}</span>
         <OcSelect v-model="errorPolicy" :options="errorPolicyOptions" full-width :disabled="busy" />
       </label>
     </div>
@@ -143,35 +143,35 @@ const activeInput = ref<HTMLInputElement | null>(null)
 const qualityScales = { preview: 0.5, standard: 1, high: 2, ultra: 5 } as const
 const REMOVE_DOCUMENT_ACTION_KEY = 'remove-document'
 const qualityOptions = computed(() => [
-  { value: 'preview', label: t('projectConfig.export.qualityPreview') },
-  { value: 'standard', label: t('projectConfig.export.qualityStandard') },
-  { value: 'high', label: t('projectConfig.export.qualityHigh') },
-  { value: 'ultra', label: t('projectConfig.export.qualityUltra') },
-  { value: 'custom', label: t('projectConfig.export.qualityCustom') },
+  { value: 'preview', label: t('projectExport.qualityPreview') },
+  { value: 'standard', label: t('projectExport.qualityStandard') },
+  { value: 'high', label: t('projectExport.qualityHigh') },
+  { value: 'ultra', label: t('projectExport.qualityUltra') },
+  { value: 'custom', label: t('projectExport.qualityCustom') },
 ])
 const scaleDefinition = computed<Extract<PropertyEditorFieldDefinition, { fieldType: 'number' }>>(() => ({
-  title: t('projectConfig.export.scale'),
+  title: t('projectExport.scale'),
   fieldType: 'number',
   min: 0.1,
   step: 0.1,
   isReadonly: busy.value,
 }))
 const selectionOptions = computed<OcSelectOption[]>(() => [
-  { value: 'blueprint-and-instances', label: t('projectConfig.export.selectionAll') },
-  { value: 'instances', label: t('projectConfig.export.selectionInstances') },
-  { value: 'blueprint', label: t('projectConfig.export.selectionBlueprint') },
+  { value: 'blueprint-and-instances', label: t('projectExport.selectionAll') },
+  { value: 'instances', label: t('projectExport.selectionInstances') },
+  { value: 'blueprint', label: t('projectExport.selectionBlueprint') },
 ])
 const layoutOptions = computed<OcSelectOption[]>(() => [
-  { value: 'none', label: t('projectConfig.export.layoutNone') },
-  { value: 'layout', label: t('projectConfig.export.layoutArrange'), disabled: true },
+  { value: 'none', label: t('projectExport.layoutNone') },
+  { value: 'layout', label: t('projectExport.layoutArrange'), disabled: true },
 ])
 const conflictOptions = computed<OcSelectOption[]>(() => [
-  { value: 'replace', label: t('projectConfig.export.conflictReplace') },
-  { value: 'skip', label: t('projectConfig.export.conflictSkip') },
+  { value: 'replace', label: t('projectExport.conflictReplace') },
+  { value: 'skip', label: t('projectExport.conflictSkip') },
 ])
 const errorPolicyOptions = computed<OcSelectOption[]>(() => [
-  { value: 'continue', label: t('projectConfig.export.errorContinue') },
-  { value: 'stop', label: t('projectConfig.export.errorStop') },
+  { value: 'continue', label: t('projectExport.errorContinue') },
+  { value: 'stop', label: t('projectExport.errorStop') },
 ])
 const suggestions = computed<OcAutocompleteItem[]>(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase()
@@ -183,7 +183,7 @@ const suggestions = computed<OcAutocompleteItem[]>(() => {
 const documentTreeData = computed<OcNodeCollection>(() => {
   const removeDocumentActions: readonly OcNodeAction[] = [{
     key: REMOVE_DOCUMENT_ACTION_KEY,
-    title: t('projectConfig.export.removeDocument'),
+    title: t('projectExport.removeDocument'),
     icon: 'action.delete',
     iconTone: 'danger',
   }]
@@ -208,12 +208,12 @@ const canSubmit = computed(() => selectedDocuments.value.length > 0
 watch(canSubmit, valid => emit('update:valid', valid), { immediate: true })
 const validationMessage = computed(() => {
   const preparationIssue = preparationIssues.value[0]
-  if (preparationIssue) return t(`projectConfig.export.validation.${preparationIssue.code}`, {
+  if (preparationIssue) return t(`projectExport.validation.${preparationIssue.code}`, {
     path: preparationIssue.path ?? '',
   })
-  if (selectedDocuments.value.length === 0) return t('projectConfig.export.documentsRequired')
-  if (!outputDirectory.value.trim()) return t('projectConfig.export.outputRequired')
-  if (!Number.isFinite(scale.value) || scale.value < 0.1) return t('projectConfig.export.scaleInvalid')
+  if (selectedDocuments.value.length === 0) return t('projectExport.validation.documents-required')
+  if (!outputDirectory.value.trim()) return t('projectExport.validation.output-required')
+  if (!Number.isFinite(scale.value) || scale.value < 0.1) return t('projectExport.validation.invalid-scale')
   return ''
 })
 
@@ -323,11 +323,11 @@ function resolveQuality(value: number): typeof quality.value {
   return preset ? preset as typeof quality.value : 'custom'
 }
 async function chooseOutputDirectory(): Promise<void> {
-  const selected = await openDirectory({ directory: true, multiple: false, title: t('projectConfig.export.chooseOutputDirectory') })
+  const selected = await openDirectory({ directory: true, multiple: false, title: t('projectExport.chooseOutputDirectory') })
   if (typeof selected === 'string') outputDirectory.value = selected
 }
 function targetResolution(document: ExportDocumentCandidate): string {
-  if (!document.width || !document.height || !Number.isFinite(scale.value)) return t('projectConfig.export.resolutionUnknown')
+  if (!document.width || !document.height || !Number.isFinite(scale.value)) return t('projectExport.resolutionUnknown')
   return `${Math.round(document.width * scale.value)} × ${Math.round(document.height * scale.value)} px`
 }
 function buildTask(): ProjectExportTask {

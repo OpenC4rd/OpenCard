@@ -18,7 +18,7 @@ export interface OcActionDefinition {
   shortcut?: readonly OcShortcutPart[]
   disabled?: boolean
   disabledReason?: string
-  children?: readonly OcActionMenuEntry[]
+  children?: readonly OcActionMenuEntry[] | (() => readonly OcActionMenuEntry[])
 }
 
 export interface OcActionDivider {
@@ -27,6 +27,10 @@ export interface OcActionDivider {
 }
 
 export type OcActionMenuEntry = OcActionDefinition | OcActionDivider
+
+export function actionChildren(action: OcActionDefinition): readonly OcActionMenuEntry[] {
+  return typeof action.children === 'function' ? action.children() : action.children ?? []
+}
 
 export interface OcActionSelectPayload {
   key: string

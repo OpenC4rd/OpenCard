@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import enUS from '../../../locales/en-US'
 import * as feedbackService from '../services/feedbackService'
 import { feedbackReceiptStore, type FeedbackReceiptRecord } from '../services/feedbackReceiptStore'
-import FeedbackHistoryDialog from './FeedbackHistoryDialog.vue'
+import FeedbackHistory from './FeedbackHistory.vue'
+import { confirmationRequest, resolveConfirmation } from '../../shell/services/appConfirmation'
 
 const record: FeedbackReceiptRecord = {
   reportId: '6e18e221-4c8a-4c90-8234-b2aa60654f70',
@@ -17,8 +18,8 @@ const record: FeedbackReceiptRecord = {
 }
 
 function mountDialog(props: { developerMode?: boolean } = {}) {
-  return mount(FeedbackHistoryDialog, {
-    props: { open: true, ...props },
+  return mount(FeedbackHistory, {
+    props: { active: true, ...props },
     global: {
       plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })],
       stubs: { Teleport: true },
@@ -27,10 +28,37 @@ function mountDialog(props: { developerMode?: boolean } = {}) {
 }
 
 afterEach(() => {
+  resolveConfirmation(false)
   vi.restoreAllMocks()
 })
 
-describe('FeedbackHistoryDialog', () => {
+describe('FeedbackHistory', () => {
+  it('renders Markdown replies without interpreting raw HTML or unsafe links', async () => {
+    vi.spyOn(feedbackReceiptStore, 'list').mockResolvedValue([{
+      ...record,
+      status: 'answered',
+      nextCheckAt: '2999-01-01T00:00:00.000Z',
+      officialResponse: {
+        text: '### Update\n\n**Fixed**\n\n- Keyboard navigation\n\n```text\nTab\n```\n\n[Details](https://example.com/update)\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))',
+        updatedAt: record.updatedAt,
+      },
+    }])
+    vi.spyOn(feedbackReceiptStore, 'markResponseRead').mockResolvedValue()
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    const body = wrapper.get('.feedback-history__response-body')
+    expect(body.get('h3').text()).toBe('Update')
+    expect(body.get('strong').text()).toBe('Fixed')
+    expect(body.get('li').text()).toBe('Keyboard navigation')
+    expect(body.get('pre code').element.textContent).toBe('Tab\n')
+    expect(body.get('a').attributes('href')).toBe('https://example.com/update')
+    expect(body.find('script').exists()).toBe(false)
+    expect(body.findAll('a')).toHaveLength(1)
+    expect(body.text()).toContain('<script>alert(1)</script>')
+    wrapper.unmount()
+  })
+
   it('loads one local receipt and refreshes only its public status projection', async () => {
     const answeredRecord: FeedbackReceiptRecord = {
       ...record,
@@ -80,11 +108,10 @@ describe('FeedbackHistoryDialog', () => {
     await flushPromises()
 
     await wrapper.findAll('button').find(button => button.text().includes('Delete Local Record'))!.trigger('click')
-    expect(wrapper.text()).toContain('does not withdraw or delete')
+    expect(confirmationRequest.value?.message).toContain('does not withdraw or delete')
     expect(remove).not.toHaveBeenCalled()
 
-    const confirmationButtons = wrapper.findAll('.feedback-history__delete-confirm button')
-    await confirmationButtons[confirmationButtons.length - 1]!.trigger('click')
+    resolveConfirmation(true)
     await flushPromises()
 
     expect(remove).toHaveBeenCalledWith(record.reportId)

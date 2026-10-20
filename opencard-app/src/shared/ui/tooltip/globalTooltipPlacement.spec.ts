@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setupGlobalTooltip } from './globalTooltip'
 
 const LAYER_SIZE = { width: 100, height: 30 }
@@ -22,9 +22,11 @@ function stubRect(element: Element, left: number, top: number, width: number, he
 }
 
 describe('globalTooltip placement', () => {
+  afterEach(() => vi.useRealTimers())
   it('follows the declared side, flips when it does not fit, and stays inside the viewport', () => {
+    vi.useFakeTimers()
     document.body.innerHTML = `
-      <button id="plain" data-tooltip="Plain">Plain</button>
+      <button id="plain" data-tooltip="Plain" data-tooltip-anchor="target">Plain</button>
       <button id="bogus" data-tooltip="Bogus" data-tooltip-placement="sideways">Bogus</button>
       <div id="rail" data-tooltip-placement="right"><button id="railed" data-tooltip="Rail">Rail</button></div>
       <div id="rows" data-tooltip-placement="top">
@@ -33,6 +35,7 @@ describe('globalTooltip placement', () => {
       </div>
       <button id="edge-right" data-tooltip="Edge right" data-tooltip-placement="right">Edge right</button>
       <button id="edge-bottom" data-tooltip="Edge bottom" data-tooltip-placement="bottom">Edge bottom</button>
+      <div id="pointer" role="separator" tabindex="0" data-tooltip="Pointer">Pointer</div>
     `
     setupGlobalTooltip()
 
@@ -45,7 +48,7 @@ describe('globalTooltip placement', () => {
       element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
     }
 
-    // No declaration: vertical placement, centred on the anchor, below it.
+    // Target anchor without a direction: centred on the control, below it.
     show('plain', 200, 100)
     expect(layer.dataset.placement).toBe('bottom')
     expect(layer.style.left).toBe('170px')
@@ -82,5 +85,47 @@ describe('globalTooltip placement', () => {
     show('edge-bottom', 200, 730)
     expect(layer.dataset.placement).toBe('top')
     expect(layer.style.top).toBe('690px')
+
+    // A target that moves without a scroll or resize keeps its visible tooltip attached.
+    stubRect(document.getElementById('edge-bottom')!, 300, 500, 40, 24)
+    vi.advanceTimersToNextFrame()
+    expect(layer.style.left).toBe('270px')
+    expect(layer.style.top).toBe('460px')
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    const pointer = document.getElementById('pointer')!
+    stubRect(pointer, 200, 100, 300, 300)
+    const move = (type: string, x: number, y: number): void => {
+      pointer.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }))
+    }
+    move('mouseover', 210, 120)
+    move('pointermove', 240, 150)
+    vi.advanceTimersByTime(350)
+    expect(layer.style.left).toBe('250px')
+    expect(layer.style.top).toBe('160px')
+    move('pointerdown', 310, 220)
+    expect(layer.getAttribute('aria-hidden')).toBe('false')
+    move('pointermove', 310, 220)
+    expect(layer.style.left).toBe('320px')
+    expect(layer.style.top).toBe('230px')
+    move('pointermove', window.innerWidth - 5, window.innerHeight - 5)
+    expect(layer.style.left).toBe(`${window.innerWidth - 115}px`)
+    expect(layer.style.top).toBe(`${window.innerHeight - 45}px`)
+
+    // Keyboard focus ignores the previous mouse position and uses the element's bounds.
+    pointer.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    expect(layer.style.left).toBe('300px')
+    expect(layer.style.top).toBe('410px')
+
+    // An explicit target anchor ignores the mouse, including subsequent movement.
+    const fixed = document.getElementById('plain')!
+    fixed.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: 210, clientY: 110 }))
+    vi.advanceTimersByTime(350)
+    fixed.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 230, clientY: 120 }))
+    expect(layer.style.left).toBe('170px')
+    expect(layer.style.top).toBe('134px')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(layer.getAttribute('aria-hidden')).toBe('true')
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

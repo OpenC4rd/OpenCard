@@ -1,6 +1,6 @@
 <template>
-  <OcDialog :open="open" :title="t('app.exportDialog.title')"
-    :description="t('app.exportDialog.description')" as="form" size="lg"
+  <OcDialog :open="open" :title="t('projectExport.dialog.title')"
+    :description="t('projectExport.dialog.description')" as="form" size="lg"
     height-mode="fixed" height="lg" close-on-backdrop :dismissible="!busy"
     @request-close="emit('close')" @submit="submit">
     <ProjectExportTaskEditor :model-value="modelValue" :documents="documents"
@@ -9,10 +9,10 @@
 
     <template #footer>
       <OcButton type="button" variant="ghost" :disabled="busy" @click="emit('close')">
-        {{ t('app.exportDialog.cancel') }}
+        {{ t('projectExport.dialog.cancel') }}
       </OcButton>
       <OcButton type="submit" variant="solid" :disabled="busy || !valid">
-        {{ busy ? t('projectConfig.export.preparing') : t('projectConfig.export.submit') }}
+        {{ busy ? t('projectExport.preparing') : t('projectExport.submit') }}
       </OcButton>
     </template>
   </OcDialog>

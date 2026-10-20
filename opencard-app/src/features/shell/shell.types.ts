@@ -28,6 +28,7 @@ export interface ShellAction {
 }
 
 export interface ShellButton {
+  tutorialKey?: string;
   icon?: IconToken;
   title: string;
   hoverTip?: string;

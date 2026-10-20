@@ -25,12 +25,14 @@ import {
   MAX_CUSTOM_BLOCK_DEPTH,
   MAX_CUSTOM_BLOCK_NODES,
   MAX_PHASE_IMAGE_SPEED,
+  MAX_TIPS_INTERVAL_MINUTES,
   MAX_TITLE_BAR_NOTICE_HISTORY_LIMIT,
   MIN_AUTO_SAVE_INTERVAL_SECONDS,
   MIN_CACHE_LIMIT_GB,
   MIN_CUSTOM_BLOCK_DEPTH,
   MIN_CUSTOM_BLOCK_NODES,
   MIN_PHASE_IMAGE_SPEED,
+  MIN_TIPS_INTERVAL_MINUTES,
   MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT,
   SETTINGS_CATEGORY_KEYS,
   defaultCommitterEmail,
@@ -183,7 +185,7 @@ export function useSettingsViewModel(
       options: optionIds,
       optionLabels: Object.fromEntries(optionIds.map(id => [id, labelOf(id)])),
     }, preference, options.translate(
-      'settings.descriptions.userLocales',
+      'settings.descriptions.language',
       'Put it in the locales folder under the app storage root; keys you leave out keep the base language value.',
     ))
   }
@@ -222,6 +224,20 @@ export function useSettingsViewModel(
               ),
             ],
           }),
+          card('tips', options.translate('settings.cards.tips', 'Tips'), [
+            fieldItem('shell.tipsEnabled', {
+              title: options.translate('settings.fields.tipsEnabled', 'Tips'),
+              fieldType: 'boolean',
+            }, settings.shell.tipsEnabled),
+            fieldItem('shell.tipsIntervalMinutes', {
+              title: options.translate('settings.fields.tipsInterval', 'Tip interval'),
+              fieldType: 'number', presentation: 'slider',
+              min: MIN_TIPS_INTERVAL_MINUTES, max: MAX_TIPS_INTERVAL_MINUTES, step: 1,
+              ticks: [1, 2, 5, 10, 15, 30, 60, 120],
+              suffix: options.translate('settings.values.minutes', ' minutes'),
+            }, settings.shell.tipsIntervalMinutes,
+            options.translate('settings.descriptions.tipsInterval', 'How often a tip shows up in the title bar.')),
+          ], { icon: 'status.tip' }),
           card('updates', options.translate('settings.cards.updates', 'Updates'), [
             fieldItem('updates.showReleaseNotesAfterUpdate', {
               title: options.translate('settings.fields.showReleaseNotesAfterUpdate', 'Show release notes'),
@@ -255,13 +271,14 @@ export function useSettingsViewModel(
               min: MIN_CUSTOM_BLOCK_DEPTH, max: MAX_CUSTOM_BLOCK_DEPTH, step: 1,
               ticks: [1, 8, 16, 32, 64, 128],
             }, settings.rendering.customBlockMaxDepth,
-            options.translate('settings.descriptions.customBlockLimits', 'A branch shows a placeholder when a limit is reached. Recursive references are allowed.')),
+            options.translate('settings.descriptions.customBlockMaxDepth', 'Branches beyond the nesting depth limit show a placeholder; recursive references are allowed.')),
             fieldItem('rendering.customBlockMaxNodes', {
               title: options.translate('settings.fields.customBlockMaxNodes', 'Custom block maximum nodes'),
               fieldType: 'number', presentation: 'slider',
               min: MIN_CUSTOM_BLOCK_NODES, max: MAX_CUSTOM_BLOCK_NODES, step: 1000,
               ticks: [1000, 10000, 25000, 50000, 100000],
-            }, settings.rendering.customBlockMaxNodes),
+            }, settings.rendering.customBlockMaxNodes,
+            options.translate('settings.descriptions.customBlockMaxNodes', 'Branches beyond the expanded node limit show a placeholder.')),
           ], { icon: 'entity.block-custom' }),
           card('cache', options.translate('settings.cards.cache', 'Cache'), [
             meterItem('cache.snapshots',
@@ -447,6 +464,12 @@ export function useSettingsViewModel(
               fieldType: 'number', presentation: 'slider',
               min: MIN_PHASE_IMAGE_SPEED, max: MAX_PHASE_IMAGE_SPEED, step: 5, suffix: '%',
             }, settings.appearance.phaseImageSpeed),
+            fieldItem('appearance.transitionSpeed', {
+              title: options.translate('settings.fields.transitionSpeed', 'Transition speed'),
+              fieldType: 'string', presentation: 'option-group',
+              options: ['0.5x', '1x', '2x', 'off'],
+              optionLabels: { off: options.translate('settings.values.transitionsOff', 'Off') },
+            }, settings.appearance.transitionSpeed),
             fieldItem('appearance.glassIntensity', {
               title: options.translate('settings.fields.glassIntensity', 'Glass intensity'),
               fieldType: 'number', presentation: 'slider', min: 0, max: 100, step: 1, suffix: '%',

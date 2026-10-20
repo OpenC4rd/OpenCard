@@ -1,0 +1,90 @@
+name: Move preview channel
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview-channel
+  cancel-in-progress: false
+
+jobs:
+  move-pointer:
+    name: Point the preview channel at the newest release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Mirror latest.json into the preview channel release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          # This job publishes the rolling channel release itself, so that release's
+          # own event must not recurse into another pointer move.
+          if [ "$RELEASE_TAG" = 'preview' ]; then
+            echo 'The preview channel release itself does not move the pointer.'
+            exit 0
+          fi
+
+          mkdir -p incoming pointer
+          if ! gh release download "$RELEASE_TAG" --pattern latest.json --dir incoming --clobber; then
+            echo "Release $RELEASE_TAG publishes no latest.json, so the preview channel stays unchanged."
+            exit 0
+          fi
+
+          # Preview builds must reach newer stable releases and stable builds must
+          # never see a preview, so the pointer follows every published release and
+          # only ever moves forward.
+          if gh release download preview --pattern latest.json --dir pointer --clobber 2>/dev/null; then
+            guard=0
+            python3 - pointer/latest.json incoming/latest.json <<'PY' || guard=$?
+          import json, re, sys
+
+
+          def sort_key(version):
+              match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?', version)
+              if match is None:
+                  raise SystemExit(f'unsupported release version: {version}')
+              numbers = tuple(int(part) for part in match.group(1, 2, 3))
+              prerelease = match.group(4)
+              if prerelease is None:
+                  return (numbers, (1,))
+              identifiers = tuple(
+                  (0, int(part), '') if part.isdigit() else (1, 0, part)
+                  for part in prerelease.split('.')
+              )
+              return (numbers, (0, identifiers))
+
+
+          with open(sys.argv[1]) as pointer:
+              current = json.load(pointer)['version']
+          with open(sys.argv[2]) as incoming:
+              next_version = json.load(incoming)['version']
+
+          if sort_key(next_version) > sort_key(current):
+              print(f'{current} -> {next_version}')
+              raise SystemExit(0)
+
+          print(f'the preview channel already carries {current}, which is not older than {next_version}')
+          raise SystemExit(1)
+          PY
+            case "$guard" in
+              0) ;;
+              1) exit 0 ;;
+              *) echo "Could not compare the preview channel version with $RELEASE_TAG."; exit 1 ;;
+            esac
+          fi
+
+          gh release view preview >/dev/null 2>&1 || gh release create preview \
+            --prerelease \
+            --title 'Preview channel' \
+            --notes '预览版更新指针，由发行流程自动维护，请勿下载此处的文件。'
+          gh release upload preview incoming/latest.json --clobber
+          echo "The preview channel now points at $RELEASE_TAG."

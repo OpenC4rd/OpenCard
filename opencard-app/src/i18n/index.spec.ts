@@ -2,6 +2,9 @@ import { describe, expect, it, vi, type Mock } from 'vitest'
 import { fileSystemService } from '../features/workspace/services/fileSystemService'
 import { titleBarNotices } from '../features/notifications/titlebarNotices'
 import zhCN from '../locales/zh-CN'
+import enUS from '../locales/en-US'
+import { tutorials } from '../features/tutorials/tutorials'
+import type { TutorialStep } from '../shared/ui/tutorial/tutorial'
 import { appLocaleOptions, i18n, reloadUserLocales, setAppLocale } from './index'
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
@@ -44,6 +47,44 @@ function noticesSince(count: number) {
 }
 
 describe('app locales', () => {
+  it('keeps both built-in catalogs and every tutorial message reference aligned', () => {
+    function keys(messages: Record<string, unknown>, prefix = ''): string[] {
+      return Object.entries(messages).flatMap(([name, value]) => {
+        const key = prefix ? `${prefix}.${name}` : name
+        return typeof value === 'string' ? [key] : keys(value as Record<string, unknown>, key)
+      })
+    }
+    const english = new Set(keys(enUS))
+    expect([...english].sort()).toEqual(keys(zhCN).sort())
+    const references = Object.values(tutorials).flatMap(tutorial => [tutorial.title, ...tutorial.steps.flatMap(step => {
+      const current: TutorialStep = step
+      return [current.nextLabel, current.exitLabel, current.message?.title, current.message?.desc,
+        ...current.targets.flatMap(target => [target.title, target.desc])].filter((key): key is string => Boolean(key))
+    })])
+    expect(references.filter(key => !english.has(key))).toEqual([])
+  })
+
+  it('uses full keys for omitted or invalid messages with the keys base, including calls with default text', async () => {
+    serveLocaleFiles({ 'keys.json': JSON.stringify({ base: 'keys', messages: {
+      app: { shell: { back: 'Return {name}', close: 'Broken {count', minimize: 12 }, unknown: 'Ignored' },
+    } }) })
+    await reloadUserLocales('keys.json')
+    expect(i18n.global.locale.value).toBe('keys.json')
+    expect(i18n.global.t('app.shell.back', { name: 'Home' })).toBe('Return Home')
+    expect(i18n.global.t('app.shell.close')).toBe('app.shell.close')
+    expect(i18n.global.t('app.shell.minimize', 'Minimize')).toBe('app.shell.minimize')
+    expect(i18n.global.t('settings.actions.save', 'Save')).toBe('settings.actions.save')
+    expect(i18n.global.t('settings.actions.openFile', 'Open settings file')).toBe('settings.actions.openFile')
+    expect(i18n.global.t('tutorial.overview.welcome.description')).toBe('tutorial.overview.welcome.description')
+    expect(i18n.global.te('app.unknown')).toBe(false)
+
+    setAppLocale('en-US')
+    expect(i18n.global.t('app.shell.close')).not.toBe('app.shell.close')
+    serveLocaleFiles({ 'keys.json': '{"base":"keys"}' })
+    await reloadUserLocales('keys.json')
+    expect(i18n.global.t('app.shell.back')).toBe('app.shell.back')
+  })
+
   it('registers a language file, offers it in the picker, and keeps the base for keys it omits', async () => {
     serveLocaleFiles({
       'fr-FR.json': JSON.stringify({

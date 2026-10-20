@@ -93,7 +93,7 @@ describe('user locales', () => {
       { id: 'ja.json', base: 'en-US', messages: { app: { back: '戻る' } } },
     ])
     expect(scan.problems).toEqual([
-      { file: 'broken.json', reason: 'base must be one of zh-CN, en-US' },
+      { file: 'broken.json', reason: 'base must be one of zh-CN, en-US, keys' },
       { file: 'huge.json', reason: `larger than ${MAX_USER_LOCALE_FILE_BYTES} bytes` },
     ])
   })

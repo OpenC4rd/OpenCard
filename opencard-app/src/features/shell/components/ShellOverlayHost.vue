@@ -9,11 +9,9 @@
     :available="releaseNotesDialogMode === 'available'" :busy="isDownloadingUpdate || isInstallingUpdate"
     :downloaded="isUpdateDownloaded" @close="emit('close-release-notes')" @action="emit('release-action')" />
 
-  <FeedbackDialog :open="feedbackCenterPage === 'submit'" :initial-kind="feedbackDialogKind" active-page="submit"
+  <FeedbackDialog :open="feedbackCenterPage !== null" :initial-kind="feedbackDialogKind" :active-page="feedbackCenterPage ?? 'submit'"
+    :developer-mode="developerMode"
     :diagnostics="latestFeedbackDiagnostics" @page-change="emit('feedback-page-change', $event)"
-    @close="emit('close-feedback')" />
-  <FeedbackHistoryDialog :open="feedbackCenterPage === 'history'" active-page="history"
-    :developer-mode="developerMode" @page-change="emit('feedback-page-change', $event)"
     @close="emit('close-feedback')" />
 
   <OcDialog :open="Boolean(confirmationRequest)" :title="confirmationRequest?.title ?? ''"
@@ -41,7 +39,6 @@ import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcInlineMarkup from '../../../components/standard/OcInlineMarkup.vue'
 import ReleaseNotesDialog from './ReleaseNotesDialog.vue'
 import FeedbackDialog from '../../feedback/components/FeedbackDialog.vue'
-import FeedbackHistoryDialog from '../../feedback/components/FeedbackHistoryDialog.vue'
 import type { FeedbackDiagnosticInput, FeedbackKind, FeedbackPage } from '../../feedback/model/feedback'
 import type { ReleaseNotesSnapshot } from '../composables/updateStatePersistence'
 import { confirmationRequest, resolveConfirmation } from '../services/appConfirmation'

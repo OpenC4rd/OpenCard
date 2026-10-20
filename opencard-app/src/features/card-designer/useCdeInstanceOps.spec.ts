@@ -1,3 +1,4 @@
+import { actionChildren } from '../../shared/ui/action/action.types'
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { CardDocument } from '../../entities/card/model'
@@ -42,7 +43,7 @@ describe('useCdeInstanceOps tree actions', () => {
       .filter(isNodeTailAction)
     expect(nodeActions('__blueprint__')).toEqual([])
     expect(nodeActions('instance-1').map(action => action.key)).toEqual(['instance-more'])
-    expect(nodeActions('instance-1')[0]?.children?.map(action => action.key))
+    expect(actionChildren(nodeActions('instance-1')[0]!).map(action => action.key))
       .toEqual(['rename', 'duplicate-instance', 'delete-instance'])
   })
 

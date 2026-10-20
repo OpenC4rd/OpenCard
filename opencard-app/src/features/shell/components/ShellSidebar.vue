@@ -23,6 +23,7 @@ const props = defineProps<{
   resizeToggleAnimating?: boolean;
   resizeLabel?: string;
   listResizeLabel?: string;
+  tutorialTargets?: readonly string[];
 }>();
 
 const emit = defineEmits<{
@@ -84,7 +85,10 @@ function toggleListCollapsed(key: string): void {
   collapsedLists.value[key] = !collapsedLists.value[key];
   emitLayoutChange();
 }
-function isListCollapsed(key: string): boolean { return collapsedLists.value[key] === true; }
+function isListCollapsed(key: string): boolean {
+  const target = activeLists.value.find(list => list.key === key)?.tutorialKey;
+  return !(target && props.tutorialTargets?.includes(target)) && collapsedLists.value[key] === true;
+}
 
 function listSectionStyle(list: ShellList): { flexGrow: string; flexShrink: string; flexBasis: string } {
   return isListCollapsed(list.key)
@@ -147,7 +151,7 @@ function finishResize(): void {
   >
       <div class="shell-sidebar-active-group">
         <div class="shell-sidebar-group shell-sidebar-group-top" data-tooltip-placement="right" data-tooltip-group>
-          <button v-for="button in activeHeadButtons" :key="button.key" class="shell-sidebar-button" type="button" :disabled="button.disabled" :data-tooltip="collapsed ? button.hoverTip || button.title : null" @click="activeGroup?.onAction?.(button.key)">
+          <button v-for="button in activeHeadButtons" :key="button.key" :data-oc-tutorial="button.tutorialKey" class="shell-sidebar-button" type="button" :disabled="button.disabled" :data-tooltip="collapsed ? button.hoverTip || button.title : null" @click="activeGroup?.onAction?.(button.key)">
             <OcIcon v-if="button.icon" :name="button.icon" size="md" /><span v-if="!collapsed">{{ button.title }}</span><span v-if="!collapsed && button.badge" class="oc-number-badge oc-number-badge--neutral">{{ button.badge }}</span>
           </button>
         </div>

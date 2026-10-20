@@ -21,6 +21,7 @@ import {
   type FileInfo,
 } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
+import { taskScheduler } from '../../../utils/taskScheduler'
 
 /**
  * Directory-walk cost for the last measurement window. A recursive walk issues one directory read
@@ -49,6 +50,7 @@ export function takeDirectoryWalkMetrics(): DirectoryWalkMetrics {
  */
 export interface ReadDirectoryEntriesOptions {
   skipDirectory?: (relativePath: string) => boolean
+  signal?: AbortSignal
 }
 
 export interface FileSystemService {
@@ -227,7 +229,27 @@ class FileSystemServiceImpl implements FileSystemService {
 
     async function readRecursive(dirPath: string, currentBasePath: string, currentDepth: number) {
       const readStartedAt = performance.now()
-      const entries = await readDir(dirPath)
+      options.signal?.throwIfAborted()
+      const entries: DirEntry[] = []
+      if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+        const requestId = crypto.randomUUID()
+        const cancel = () => { void invoke('cancel_project_directory', { requestId }).catch(() => {}) }
+        options.signal?.addEventListener('abort', cancel, { once: true })
+        try {
+          while (true) {
+            options.signal?.throwIfAborted()
+            const batch = await invoke<{ entries: DirEntry[]; done: boolean }>('read_project_directory', { path: dirPath, requestId })
+            options.signal?.throwIfAborted()
+            entries.push(...batch.entries)
+            if (batch.done) break
+            await taskScheduler.yieldToUi(options.signal)
+          }
+        } finally {
+          options.signal?.removeEventListener('abort', cancel)
+          await invoke('cancel_project_directory', { requestId })
+        }
+      } else await taskScheduler.forEach(await readDir(dirPath), entry => entries.push(entry), options.signal)
+      options.signal?.throwIfAborted()
       const readMs = performance.now() - readStartedAt
       directoryWalkMetrics.reads += 1
       directoryWalkMetrics.entries += entries.length
@@ -237,7 +259,9 @@ class FileSystemServiceImpl implements FileSystemService {
         directoryWalkMetrics.worstPath = dirPath
       }
 
+      let processed = 0
       for (const entry of entries) {
+        options.signal?.throwIfAborted()
         const relativePath = currentBasePath ? `${currentBasePath}/${entry.name}` : entry.name
         result.push({
           ...entry,
@@ -249,6 +273,7 @@ class FileSystemServiceImpl implements FileSystemService {
           const fullPath = `${dirPath}/${entry.name}`
           await readRecursive(fullPath, relativePath, currentDepth + 1)
         }
+        if (++processed % 256 === 0) await taskScheduler.yieldToUi(options.signal)
       }
     }
 

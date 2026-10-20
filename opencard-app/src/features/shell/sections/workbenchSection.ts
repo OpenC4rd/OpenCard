@@ -17,6 +17,8 @@ import {
   PROJECT_NEW_FILE_ACTION_KEY,
   PROJECT_NEW_FOLDER_ACTION_KEY,
   PROJECT_NEW_OPENCARD_ACTION_KEY,
+  PROJECT_NEW_MARKDOWN_ACTION_KEY,
+  PROJECT_NEW_TEXT_ACTION_KEY,
   PROJECT_REVEAL_ACTION_KEY,
   TIMELINE_LIST_KEY,
   TIMELINE_REFRESH_ACTION_KEY,
@@ -129,6 +131,7 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
       },
       {
         key: PROJECT_MANAGEMENT_LIST_KEY,
+        tutorialKey: 'workbench.management',
         title: options.translate('sidebar.projectManagement'),
         placeholder: '',
         actions: [],
@@ -152,6 +155,7 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
       },
       {
         key: PROJECT_FILES_LIST_KEY,
+        tutorialKey: 'workbench.files',
         title: options.project.folderName.value || options.translate('sidebar.files'),
         placeholder: options.project.path.value
           ? options.translate('sidebar.emptyProject', 'Folder is empty')
@@ -172,6 +176,14 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
               key: PROJECT_NEW_OPENCARD_ACTION_KEY,
               title: options.translate('sidebar.fileActions.newOpenCard'),
               icon: 'file.opencard',
+            }, {
+              key: PROJECT_NEW_MARKDOWN_ACTION_KEY,
+              title: options.translate('sidebar.fileActions.newMarkdown'),
+              icon: 'file.markdown',
+            }, {
+              key: PROJECT_NEW_TEXT_ACTION_KEY,
+              title: options.translate('sidebar.fileActions.newText'),
+              icon: 'file.text',
             }],
           },
           {
@@ -184,6 +196,7 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
         content: {
           type: 'tree' as const,
           data: options.project.files.data.value,
+          virtualized: true,
           selectedKeys: options.project.files.selectedKeys.value,
           expandedKeys: options.project.files.expandedKeys.value,
           role: 'tree' as const,
@@ -204,12 +217,12 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
     if (options.version.ready.value) {
       projectLists.push({
         key: TIMELINE_LIST_KEY,
-        title: options.translate('sidebar.timeline'),
+        title: options.translate('versionControl.timeline'),
         placeholder: options.version.timeline.placeholder.value,
         actions: [{
           key: TIMELINE_REFRESH_ACTION_KEY,
           icon: 'action.refresh',
-          hoverTip: options.translate('sidebar.timelineRefresh'),
+          hoverTip: options.translate('versionControl.timelineRefresh'),
           disabled: !options.version.timeline.filePath.value || options.version.timeline.loading.value,
         }],
         content: {

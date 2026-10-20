@@ -5,16 +5,18 @@ import type { OcdocumentDiffRuntime } from '../../version-control/useOcdocumentD
  * 职责边界：
  * - 只管理文件系统真相 不管理编辑草稿与会话状态
  */
-import { computed, readonly, ref, shallowRef, shallowReactive } from 'vue'
+import { computed, readonly, ref, shallowRef, shallowReactive, markRaw } from 'vue'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { fileSystemService, takeDirectoryWalkMetrics } from '../services/fileSystemService'
 import { createProjectOpenTimer } from '../services/projectOpenTiming'
-import { initializeProjectStructure } from '../services/projectStructureService'
+import { sortProjectDirectory, disposeProjectIndexWorker } from '../services/projectIndexWorker'
+import type { ProjectFileChange } from '../model/projectFileChange'
+import { writeProjectManagementFile } from '../services/projectStructureService'
 import {
   isProjectIndexSkippedPath,
   isProjectInternalRelativePath,
-  PROJECT_INTERNAL_DIRECTORIES,
+  PROJECT_INTERNAL_FILE_DEFAULTS,
   PROJECT_INTERNAL_DIRECTORY_NAME,
   PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
   PROJECT_PACKAGE_DIRECTORY,
@@ -73,7 +75,6 @@ import {
 
 const PROJECT_METADATA_SAVE_DELAY_MS = 1200
 const PROJECT_METADATA_SAVE_KEY = 'project-metadata'
-const PROJECT_TREE_LOOKAHEAD_DEPTH = 2
 
 /**
  * Bulk operations (importing an icon set, installing a package, unpacking a template) write many
@@ -122,7 +123,7 @@ type CopyExternalEntriesResult =
 
 const projectPath = ref('')
 let projectOpenRevision = 0
-const indexedEntries = ref<DirEntry[]>([])
+const indexedEntries = shallowRef<DirEntry[]>([])
 const comparisons = shallowReactive(new Map<string, OcdocumentDiffRuntime>())
 const comparisonDisposals = new Set<Promise<void>>()
 function releaseComparison(id: string): Promise<void> {
@@ -136,7 +137,12 @@ function releaseComparison(id: string): Promise<void> {
 const resourceEnvironment = shallowRef<ResourceEnvironment | null>(null)
 const isWatching = computed(() => resourceEnvironment.value?.watching.value ?? false)
 const fileChangeRevision = ref(0)
-const registeredDirectories = ref(new Map<string, number>())
+const pendingDirectoryChanges = new Map<string, ProjectFileChange>()
+const directoryCache = new Map<string, DirEntry[]>()
+const directoryRequests = new Map<string, AbortController>()
+const projectScans = new Set<AbortController>()
+const directoryStates = shallowReactive(new Map<string, { status: 'loading' | 'ready' | 'failed'; error?: string }>())
+let indexPublication = 0
 const expandedDirectories = ref(new Set<string>())
 const settingsStore = useAppSettingsStore()
 const appStateStore = useAppStateStore()
@@ -147,8 +153,9 @@ const projectResourceEnvironment = computed<ProjectResourceEnvironment>(() => re
 const projectProfile = computed(() => projectResourceEnvironment.value.profile ?? null)
 const resolvedProject = computed(() => projectProfile.value ? toProjectInformation(projectProfile.value) : null)
 const profileError = computed(() => projectResourceEnvironment.value.diagnostics?.[PROJECT_PROFILE_FILE_NAME] ?? null)
-const projectFontFamilies = computed(() => projectResourceEnvironment.value.fontDocument.families ?? [])
-const projectFontCompositions = computed(() => projectResourceEnvironment.value.fontDocument.compositions ?? [])
+const projectFontDocument = computed(() => projectResourceEnvironment.value.fontDocument)
+const projectFontFamilies = computed(() => projectFontDocument.value.families ?? [])
+const projectFontCompositions = computed(() => projectFontDocument.value.compositions ?? [])
 const projectFonts = computed(() => projectResourceEnvironment.value.fonts)
 const fontRegistryError = computed(() => projectResourceEnvironment.value.diagnostics?.[PROJECT_FONT_REGISTRY_FILE_NAME] ?? null)
 const fontRegistryReady = computed(() => !!resourceEnvironment.value)
@@ -167,7 +174,6 @@ const renderEnvironment = computed<CardRenderEnvironment>(() => ({
   ...(resourceEnvironment.value?.renderEnvironment.value ?? { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG }),
   customBlockLimits: { maxDepth: settingsStore.settings.value.rendering.customBlockMaxDepth, maxNodes: settingsStore.settings.value.rendering.customBlockMaxNodes },
 }))
-let projectManagementStructurePromise: Promise<void> | null = null
 
 
 function pathIdentity(path: string): string {
@@ -276,7 +282,7 @@ async function saveProjectConfiguration(path: string, content: string): Promise<
     throw new Error('Project profile must be stored at the project root')
   }
   const canonicalContent = serializeProjectMetadata(profile)
-  await fileSystemService.writeFile(resolvedPath, canonicalContent)
+  await writeProjectFile(resolvedPath, canonicalContent)
   await reloadProjectProfile()
   return canonicalContent
 }
@@ -289,7 +295,7 @@ async function saveProjectFontRegistry(path: string, content: string): Promise<s
     throw new Error('Project font registry must be stored at the project root')
   }
   const canonicalContent = serializeProjectFontRegistry(document)
-  await fileSystemService.writeFile(resolvedPath, canonicalContent)
+  await writeProjectFile(resolvedPath, canonicalContent)
   await reloadProjectFontRegistry()
   return canonicalContent
 }
@@ -304,7 +310,7 @@ async function saveProjectIconRegistry(path: string, content: string): Promise<s
     throw new Error('Project icon registry must be stored at the project root')
   }
   const canonicalContent = serializeProjectIconRegistry(document)
-  await fileSystemService.writeFile(resolvedPath, canonicalContent)
+  await writeProjectFile(resolvedPath, canonicalContent)
   await reloadProjectIconRegistry()
   return canonicalContent
 }
@@ -317,7 +323,7 @@ async function saveProjectCustomBlockRegistry(path: string, content: string): Pr
     throw new Error('Project custom block registry must be stored at the project root')
   }
   const canonicalContent = serializeCustomBlockRegistry(document)
-  await fileSystemService.writeFile(resolvedPath, canonicalContent)
+  await writeProjectFile(resolvedPath, canonicalContent)
   await reloadProjectResourceEnvironment()
   return canonicalContent
 }
@@ -330,7 +336,7 @@ async function saveProjectDictionary(path: string, content: string): Promise<str
     throw new Error('Project dictionary must be stored at the project root')
   }
   const canonicalContent = serializeProjectDictionary(dictionary)
-  await fileSystemService.writeFile(resolvedPath, canonicalContent)
+  await writeProjectFile(resolvedPath, canonicalContent)
   await reloadProjectDictionary()
   return canonicalContent
 }
@@ -358,13 +364,7 @@ function loadProjectWorkspaceState() {
     projectPath.value,
   )
   expandedDirectories.value = new Set(state?.expandedDirectories ?? [])
-  registeredDirectories.value = new Map([['', PROJECT_TREE_LOOKAHEAD_DEPTH]])
-  for (const directory of PROJECT_INTERNAL_DIRECTORIES) {
-    registeredDirectories.value.set(directory, 1)
-  }
-  for (const relativePath of expandedDirectories.value) {
-    registeredDirectories.value.set(relativePath, PROJECT_TREE_LOOKAHEAD_DEPTH)
-  }
+
 }
 
 function scheduleProjectMetadataSave() {
@@ -386,76 +386,96 @@ function isMetadataPath(path: string): boolean {
     .some(fileName => pathIdentity(resolveProjectPath(fileName)) === pathIdentity(path))
 }
 
-/**
- * 那些被跳过的目录的登记不进索引：它们只作为条目被父目录列出。
- * 规则本身在 `model/projectStructure` 里，和 `.opencard` 的定义待在一起。
- */
+async function publishDirectoryIndex(): Promise<void> {
+  const publication = ++indexPublication
+  const next: DirEntry[] = []
+  for (const entries of directoryCache.values()) {
+    await taskScheduler.forEach(entries, entry => next.push(entry))
+    if (publication !== indexPublication) return
+  }
+  if (publication === indexPublication) indexedEntries.value = markRaw(next)
+}
 
-async function refreshIndexedEntries(options?: { persist?: boolean }) {
+async function readDirectoryEntries(path: string = ''): Promise<void> {
   if (!projectPath.value) return
-  const request = projectOpenRevision
-  const root = projectPath.value
+  const relativePath = toRelativeProjectPath(path)
+  if (isProjectIndexSkippedPath(relativePath)) return
+  const project = projectOpenRevision
+  directoryRequests.get(relativePath)?.abort()
+  const controller = new AbortController()
+  directoryRequests.set(relativePath, controller)
+  directoryStates.set(relativePath, { status: 'loading' })
   try {
-    const nextEntries = new Map<string, DirEntry>()
-    const unavailableDirectories = new Set<string>()
-    // 托管目录（.opencard/fonts、.opencard/icons）的内容永远不进索引：它们只作为条目被父目录列出。
-    // 若这里还按登记去列一次，导入过大量字体的项目每次打开都要重新读那个目录。
-    const managedRegistrations = [...registeredDirectories.value.keys()].filter(isProjectIndexSkippedPath)
-    if (managedRegistrations.length > 0) {
-      registeredDirectories.value = new Map([...registeredDirectories.value]
-        .filter(([relativePath]) => !isProjectIndexSkippedPath(relativePath)))
-    }
-    const registrations = Array.from(registeredDirectories.value.entries())
-      .sort(([leftPath], [rightPath]) => leftPath.length - rightPath.length)
-
-    for (const [relativePath, depth] of registrations) {
-      if (request !== projectOpenRevision) return
-      const directoryPath = relativePath ? `${root}/${relativePath}` : root
-      let entries: DirEntry[]
-      try {
-        entries = await fileSystemService.readDirectoryEntries(directoryPath, depth, relativePath, {
-          skipDirectory: isProjectIndexSkippedPath,
-        })
-      } catch (error) {
-        if (!relativePath || await fileSystemService.fileExists(directoryPath)) throw error
-        unavailableDirectories.add(relativePath)
-        continue
-      }
-
-      for (const entry of entries) {
-        nextEntries.set(entry.name, entry)
+    const root = projectPath.value
+    const entries = await fileSystemService.readDirectoryEntries(relativePath ? `${root}/${relativePath}` : root, 1, relativePath, { signal: controller.signal })
+    const previous = directoryCache.get(relativePath)
+    const sorted = await sortProjectDirectory(entries, controller.signal, previous)
+    if (project !== projectOpenRevision || controller.signal.aborted) return
+    directoryStates.set(relativePath, { status: 'ready' })
+    if (sorted === previous) return
+    const directories = new Set<string>()
+    const removed = new Set<string>()
+    await taskScheduler.forEach(sorted, entry => { if (entry.isDirectory) directories.add(entry.name) }, controller.signal)
+    await taskScheduler.forEach(previous ?? [], entry => {
+      if (entry.isDirectory && !directories.has(entry.name)) removed.add(entry.name)
+    }, controller.signal)
+    for (const key of directoryCache.keys()) {
+      let ancestor = key
+      while (ancestor) {
+        if (removed.has(ancestor)) {
+          directoryCache.delete(key); directoryStates.delete(key)
+          directoryRequests.get(key)?.abort(); directoryRequests.delete(key)
+          expandedDirectories.value.delete(key)
+          break
+        }
+        ancestor = getPathDirectory(ancestor)
       }
     }
-
-    if (request !== projectOpenRevision) return
-    if (unavailableDirectories.size > 0) {
-      registeredDirectories.value = new Map([...registeredDirectories.value]
-        .filter(([relativePath]) => !unavailableDirectories.has(relativePath)))
-      expandedDirectories.value = new Set([...expandedDirectories.value]
-        .filter(relativePath => !unavailableDirectories.has(relativePath)))
-    }
-    indexedEntries.value = Array.from(nextEntries.values())
-
-    if (options?.persist !== false) {
-      scheduleProjectMetadataSave()
-    }
+    directoryCache.set(relativePath, sorted)
+    await publishDirectoryIndex()
   } catch (error) {
+    if (controller.signal.aborted || project !== projectOpenRevision) return
+    directoryStates.set(relativePath, { status: 'failed', error: String(error) })
     reportAppError('OC-E2005', error)
+  } finally {
+    if (directoryRequests.get(relativePath) === controller) directoryRequests.delete(relativePath)
   }
 }
 
-async function readDirectoryEntries(path: string = '', depth: number = PROJECT_TREE_LOOKAHEAD_DEPTH) {
-  const relativePath = toRelativeProjectPath(path)
-  // 托管目录的内容不进索引，也不登记，否则会在大目录上退化成每次打开项目都重列一遍。
-  if (isProjectIndexSkippedPath(relativePath)) return
-  const normalizedDepth = Number.isFinite(depth) ? Math.max(1, Math.floor(depth)) : Number.POSITIVE_INFINITY
-  const currentDepth = registeredDirectories.value.get(relativePath) ?? 0
-
-  if (currentDepth < normalizedDepth) {
-    registeredDirectories.value.set(relativePath, normalizedDepth)
+async function refreshChangedDirectories(changes: readonly ProjectFileChange[]): Promise<void> {
+  const directories = new Set<string>()
+  for (const change of changes) {
+    if (change.kind === 'content') continue
+    for (const path of [change.path, change.oldPath].filter((path): path is string => !!path)) {
+      const relative = toRelativeProjectPath(path)
+      const parent = getPathDirectory(relative)
+      if (!parent || directoryCache.has(parent)) directories.add(parent)
+      if (change.kind === 'unknown' && directoryCache.has(relative)) directories.add(relative)
+      // A newly created managed file can introduce several previously missing ancestors.
+      if (relative.startsWith('.opencard/') && !directoryCache.has(parent)) directories.add('')
+    }
   }
+  for (const directory of directories) await readDirectoryEntries(directory)
+}
 
-  await refreshIndexedEntries()
+async function refreshIndexedEntries(paths: readonly string[]): Promise<void> {
+  await refreshChangedDirectories(paths.map(path => ({ path: resolveProjectPath(path), kind: 'structure' })))
+}
+
+async function scanProjectEntries(signal?: AbortSignal): Promise<DirEntry[]> {
+  const root = ensureProjectOpen()
+  const controller = new AbortController()
+  const cancel = () => controller.abort(signal?.reason)
+  signal?.throwIfAborted()
+  signal?.addEventListener('abort', cancel, { once: true })
+  projectScans.add(controller)
+  try {
+    const entries = await fileSystemService.readDirectoryEntries(root, Number.POSITIVE_INFINITY, '', {
+      signal: controller.signal, skipDirectory: path => path.split('/').includes('.git'),
+    })
+    controller.signal.throwIfAborted()
+    return entries
+  } finally { projectScans.delete(controller); signal?.removeEventListener('abort', cancel) }
 }
 
 function setDirectoryExpanded(path: string, expanded: boolean) {
@@ -469,10 +489,6 @@ function setDirectoryExpanded(path: string, expanded: boolean) {
 
   if (expanded) {
     nextExpandedDirectories.add(relativePath)
-    registeredDirectories.value.set(
-      relativePath,
-      Math.max(registeredDirectories.value.get(relativePath) ?? 0, PROJECT_TREE_LOOKAHEAD_DEPTH),
-    )
   } else {
     nextExpandedDirectories.delete(relativePath)
   }
@@ -498,41 +514,51 @@ async function disposeResources(invalidate = true) {
   if (invalidate) projectOpenRevision++
   taskScheduler.cancel(PROJECT_METADATA_SAVE_KEY)
   taskScheduler.cancel(FILE_CHANGE_INDEX_REFRESH_KEY)
+  for (const request of directoryRequests.values()) request.abort()
+  directoryRequests.clear(); pendingDirectoryChanges.clear(); indexPublication++
+  for (const scan of projectScans) scan.abort()
+  projectScans.clear()
   const environment = resourceEnvironment.value
   resourceEnvironment.value = null
+  const environmentDisposal = environment?.dispose()
+  disposeProjectIndexWorker()
   const released = await Promise.allSettled([...comparisonDisposals, ...[...comparisons.keys()].map(releaseComparison)])
-  await environment?.dispose()
+  await environmentDisposal
   const failure = released.find(result => result.status === 'rejected')
   if (failure?.status === 'rejected') throw failure.reason
 }
 async function setProjectPath(path: string) {
   const normalizedPath = normalizePath(path)
-  if (projectPath.value === normalizedPath) return
+  if (projectPath.value === normalizedPath && (!normalizedPath || resourceEnvironment.value)) return
   const request = ++projectOpenRevision
   await disposeResources(false)
   if (request !== projectOpenRevision) return
   projectPath.value = normalizedPath
-  projectManagementStructurePromise = null
   indexedEntries.value = []
-  registeredDirectories.value = new Map()
+  directoryCache.clear(); directoryStates.clear()
   expandedDirectories.value = new Set()
   if (!normalizedPath) return
   const openTimer = createProjectOpenTimer(normalizedPath)
   loadProjectWorkspaceState()
   let environment: ResourceEnvironment
-  try { environment = await createResourceEnvironment(normalizedPath, { watch: true, onFilesChanged() {
+  try { environment = await createResourceEnvironment(normalizedPath, { watch: true, onFilesChanged(changes) {
     if (request !== projectOpenRevision) return
     fileChangeRevision.value++
-    taskScheduler.schedule(FILE_CHANGE_INDEX_REFRESH_KEY, FILE_CHANGE_REFRESH_DELAY_MS, refreshIndexedEntries)
+    for (const change of changes) pendingDirectoryChanges.set(change.path, change)
+    taskScheduler.schedule(FILE_CHANGE_INDEX_REFRESH_KEY, FILE_CHANGE_REFRESH_DELAY_MS, async () => {
+      const pending = [...pendingDirectoryChanges.values()]; pendingDirectoryChanges.clear()
+      await refreshChangedDirectories(pending)
+    })
   } }) } catch (error) { if (request === projectOpenRevision) projectPath.value = ''; throw error }
   if (request !== projectOpenRevision) { await environment.dispose(); return }
   resourceEnvironment.value = environment
-  await refreshIndexedEntries({ persist: false })
+  await readDirectoryEntries()
+  for (const directory of expandedDirectories.value) {
+    if (request !== projectOpenRevision) return
+    await readDirectoryEntries(directory)
+  }
   if (request !== projectOpenRevision) return
   openTimer.step('environment and index')
-  const internalDirectoryExists = await fileSystemService.fileExists(`${normalizedPath}/${PROJECT_INTERNAL_DIRECTORY_NAME}`)
-  if (request !== projectOpenRevision) return
-  if (internalDirectoryExists) void ensureProjectManagementStructure()
   scheduleProjectMetadataSave()
   const walk = takeDirectoryWalkMetrics()
   openTimer.done(`entries ${walk.entries}, ${walk.reads} directory reads`)
@@ -556,19 +582,37 @@ async function resetProjectWorkspaceState(): Promise<void> {
   if (!projectPath.value) return
 
   taskScheduler.cancel(PROJECT_METADATA_SAVE_KEY)
-  registeredDirectories.value = new Map([['', PROJECT_TREE_LOOKAHEAD_DEPTH]])
+  directoryCache.clear(); directoryStates.clear()
   expandedDirectories.value = new Set()
-  await refreshIndexedEntries({ persist: false })
+  await readDirectoryEntries()
   await saveProjectWorkspaceState()
 }
 
+function findProjectManagementFile(path: string) {
+  return (Object.keys(PROJECT_INTERNAL_FILE_DEFAULTS) as (keyof typeof PROJECT_INTERNAL_FILE_DEFAULTS)[])
+    .find(relativePath => pathIdentity(resolveProjectPath(relativePath)) === pathIdentity(path))
+}
+
 async function readFile(path: string) {
-  return await fileSystemService.readFile(resolveProjectPath(path))
+  const resolvedPath = resolveProjectPath(path)
+  const managedPath = findProjectManagementFile(resolvedPath)
+  if (managedPath && !await fileSystemService.fileExists(resolvedPath)) {
+    return PROJECT_INTERNAL_FILE_DEFAULTS[managedPath]
+  }
+  return await fileSystemService.readFile(resolvedPath)
+}
+
+async function writeProjectFile(path: string, content: string): Promise<void> {
+  const resolvedPath = resolveProjectPath(path)
+  const managedPath = findProjectManagementFile(resolvedPath)
+  if (managedPath) await writeProjectManagementFile(fileSystemService, ensureProjectOpen(), managedPath, content)
+  else await fileSystemService.writeFile(resolvedPath, content)
 }
 
 async function saveFile(relativePath: string, content: string) {
-  await fileSystemService.writeFile(resolveProjectPath(relativePath), content)
-  await refreshIndexedEntries()
+  const exists = await fileSystemService.fileExists(resolveProjectPath(relativePath))
+  await writeProjectFile(relativePath, content)
+  if (!exists) await refreshIndexedEntries([relativePath])
 }
 
 async function findAvailableProjectAssetName(targetDirectory: string, fileName: string): Promise<string> {
@@ -650,7 +694,7 @@ async function importProjectFontFiles(
       await fileSystemService.writeBinaryFile(`${targetAbsoluteDirectory}/${outputName}`, prepared.bytes)
       sources.push(fontReference(outputName))
     }
-    await refreshIndexedEntries()
+    await refreshIndexedEntries([targetAbsoluteDirectory])
     return { sources, copied: true }
   }
   const targetExists = await fileSystemService.fileExists(`${targetAbsoluteDirectory}/${fileName}`)
@@ -679,22 +723,8 @@ async function importProjectFontFiles(
   await fileSystemService.createDirectory(outputDirectory)
   if (prepared.repaired) await fileSystemService.writeBinaryFile(`${outputDirectory}/${outputName}`, prepared.bytes)
   else await fileSystemService.copyFile(normalizedSourcePath, `${outputDirectory}/${outputName}`)
-  await refreshIndexedEntries()
+  await refreshIndexedEntries([outputDirectory])
   return { sources: [fontReference(outputName)], copied: true }
-}
-
-async function ensureProjectManagementStructure(): Promise<void> {
-  if (projectManagementStructurePromise) return await projectManagementStructurePromise
-  const root = ensureProjectOpen()
-  projectManagementStructurePromise = (async () => {
-    await initializeProjectStructure(fileSystemService, root)
-    for (const directory of PROJECT_INTERNAL_DIRECTORIES) {
-      registeredDirectories.value.set(directory, 1)
-    }
-    if (projectPath.value !== root) return
-    await refreshIndexedEntries({ persist: false })
-  })()
-  await projectManagementStructurePromise
 }
 
 async function findMatchingProjectFontFile(
@@ -764,7 +794,7 @@ async function installResourcePackageFile(sourcePath: string, projectRootPath?: 
   // 装进一个还没打开的项目（新建项目时的预装）不需要刷新当前项目。
   if (!projectPath.value || pathIdentity(rootPath) !== pathIdentity(projectPath.value)) return
   await reloadProjectResourceEnvironment()
-  await refreshIndexedEntries()
+  await refreshIndexedEntries([packagesRoot])
 }
 
 async function createEntryWithAvailableName(
@@ -787,7 +817,7 @@ async function createEntryWithAvailableName(
     if (!await fileSystemService.fileExists(candidatePath)) {
       if (kind === 'folder') await fileSystemService.createDirectory(candidatePath)
       else await fileSystemService.writeFile(candidatePath, content)
-      await refreshIndexedEntries()
+      await refreshIndexedEntries([candidatePath])
       return candidatePath
     }
     suffix += 1
@@ -801,7 +831,7 @@ async function trashFile(relativePath: string) {
   const resolvedPath = resolveProjectPath(relativePath)
   await fileSystemService.trashFile(resolvedPath)
   await resourceEnvironment.value?.refresh([resolvedPath])
-  await refreshIndexedEntries()
+  await refreshIndexedEntries([resolvedPath])
 }
 
 async function revealEntryInFileManager(path: string) {
@@ -921,17 +951,16 @@ async function moveEntry(sourcePath: string, targetPath: string) {
     }
     expandedDirectories.value = nextExpandedDirectories
 
-    const nextRegisteredDirectories = new Map<string, number>()
-    for (const [relativePath, depth] of registeredDirectories.value.entries()) {
-      nextRegisteredDirectories.set(
-        remapRelativePath(relativePath, sourceRelativePath, targetRelativePath),
-        depth,
-      )
+    for (const key of [...directoryCache.keys()]) {
+      if (key === sourceRelativePath || key.startsWith(`${sourceRelativePath}/`)) {
+        directoryCache.delete(key); directoryStates.delete(key)
+        directoryRequests.get(key)?.abort(); directoryRequests.delete(key)
+      }
     }
-    registeredDirectories.value = nextRegisteredDirectories
   }
 
-  await refreshIndexedEntries()
+  await refreshIndexedEntries([sourcePath, targetPath])
+  for (const directory of expandedDirectories.value) if (!directoryCache.has(directory)) await readDirectoryEntries(directory)
   if (isMetadataPath(normalizedSource) || isMetadataPath(normalizedTarget)) {
     await Promise.all([
       reloadProjectProfile(),
@@ -1098,7 +1127,7 @@ async function copyExternalEntriesIntoProject(
     }
   }
 
-  if (copied > 0) await refreshIndexedEntries()
+  if (copied > 0) await refreshIndexedEntries([`${destinationDirectory}/_`])
   return { ok: true, copied, skipped, failed }
 }
 
@@ -1133,11 +1162,12 @@ export function useProjectStore() {
       return projectPath.value.split('/').pop() || ''
     }),
     indexedEntries: readonly(indexedEntries),
+    directoryStates: readonly(directoryStates),
+    scanProjectEntries,
     expandedDirectories: readonly(expandedDirectories),
     isWatching: readonly(isWatching),
     fileChangeRevision: readonly(fileChangeRevision),
     chooseProjectDirectory,
-    ensureProjectManagementStructure,
     openProject,
     resetProjectWorkspaceState,
     saveProjectConfiguration,

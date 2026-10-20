@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import OcSlider from './OcSlider.vue'
+import { setupGlobalTooltip } from '../../shared/ui/tooltip/globalTooltip'
 
 describe('OcSlider', () => {
   it('supports keyboard preview and commit without a native range input', async () => {
@@ -98,7 +99,6 @@ describe('OcSlider', () => {
 
       // 100px 的一半落在设备像素上；刻度各占一个设备像素（0.5 CSS 像素），并且相位一致。
       expect(wrapper.get('.oc-slider__thumb').attributes('style')).toContain('left: 50px')
-      expect(wrapper.get('.oc-slider__readout').attributes('style')).toContain('left: 50px')
       expect(wrapper.findAll('.oc-slider__tick').map(tick => tick.attributes('style'))).toEqual([
         'left: 25.25px; width: 0.5px;',
         'left: 50.25px; width: 0.5px;',
@@ -110,15 +110,42 @@ describe('OcSlider', () => {
     }
   })
 
-  it('renders the value readout above the thumb only when a value text is given', () => {
-    const bare = mount(OcSlider, { props: { modelValue: 40 } })
-    expect(bare.find('.oc-slider__readout').exists()).toBe(false)
+  it('uses the global tooltip and refreshes its value during keyboard and pointer interaction', async () => {
+    vi.useFakeTimers()
+    setupGlobalTooltip()
+    const wrapper = mount(OcSlider, {
+      attachTo: document.body,
+      props: { modelValue: 40, valueText: '40%' },
+    })
+    try {
+      const track = wrapper.get('[role="slider"]')
+      const layer = document.getElementById('oc-tooltip-layer')!
+      await track.trigger('focusin')
+      expect(layer.textContent).toBe('40%')
+      await track.trigger('keydown', { key: 'ArrowRight' })
+      expect(wrapper.emitted('preview')).toEqual([[41]])
+      await wrapper.setProps({ modelValue: 41, valueText: '41%' })
+      vi.advanceTimersToNextFrame()
+      expect(layer.textContent).toBe('41%')
 
-    const labelled = mount(OcSlider, { props: { modelValue: 40, valueText: '40%' } })
-    const readout = labelled.get('.oc-slider__readout')
-    expect(readout.text()).toBe('40%')
-    // 读数跟着拇指走，并且落在 role="slider" 之外：它只负责显示，不参与拖动命中。
-    expect(readout.attributes('style')).toContain('left: 40%')
-    expect(labelled.get('[role="slider"]').find('.oc-slider__readout').exists()).toBe(false)
+      track.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, clientX: 70, clientY: 80 }))
+      track.element.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, clientX: 90, clientY: 100 }))
+      await wrapper.setProps({ valueText: '90%' })
+      vi.advanceTimersToNextFrame()
+      expect(layer.getAttribute('aria-hidden')).toBe('false')
+      expect(layer.textContent).toBe('90%')
+      expect(layer.style.left).toBe('100px')
+      expect(layer.style.top).toBe('110px')
+
+      await track.trigger('keydown', { key: 'ArrowRight' })
+      expect(layer.style.top).toBe('10px')
+
+      await wrapper.setProps({ disabled: true })
+      vi.advanceTimersToNextFrame()
+      expect(layer.getAttribute('aria-hidden')).toBe('true')
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
   })
 })

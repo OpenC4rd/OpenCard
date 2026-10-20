@@ -1,4 +1,5 @@
 import type { OcActionMenuEntry } from '../../../shared/ui/action/action.types'
+import { actionChildren } from '../../../shared/ui/action/action.types'
 import type { ShellTitleBarMenuGroup, ShellMenuContribution, ShellActionHandler } from '../shell.types'
 
 type Translate = (key: string, paramsOrFallback?: Record<string, unknown> | string) => string
@@ -136,7 +137,7 @@ export function createShellTitleBarMenus(options: ShellTitleBarMenuOptions): She
       for (const entry of entries) {
         if (entry.type === 'divider') continue
         owners.set(entry.key, contribution!.onAction)
-        if (entry.children) collect(entry.children)
+        if (entry.children) collect(actionChildren(entry))
       }
     }
     if (contribution) collect(contribution.actions)

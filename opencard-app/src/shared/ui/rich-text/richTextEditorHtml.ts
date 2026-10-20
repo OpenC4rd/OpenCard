@@ -48,7 +48,7 @@ export function equivalentRichTextHtml(left: string, right: string): boolean {
     return result
   }
   const tree = (html: string) => {
-    const dom = new DOMParser().parseFromString(html, 'text/html')
+    const dom = new DOMParser().parseFromString(html || '<p></p>', 'text/html')
     normalizeRichTextTables(dom.body)
     return normalize(parseRichTextHtml(dom.body.innerHTML).document.children)
   }

@@ -21,13 +21,13 @@
           <div class="card-design-editor__stage-base" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }">
             <OcPanel fill tone="transparent" border="none" padding="none" overflow="hidden">
               <div v-if="editorState.mode === 'diff'" class="card-design-editor__diff-mode-stage">
-                <OcEmpty v-if="!props.comparison" tone="muted">{{ t('sidebar.diffViewer.loading') }}</OcEmpty>
-                <OcEmpty v-else-if="!diffBeforeRender || !diffAfterRender">{{ t('sidebar.diffViewer.parseFailedGeneric')
+                <OcEmpty v-if="!props.comparison" tone="muted">{{ t('versionControl.diffViewer.loading') }}</OcEmpty>
+                <OcEmpty v-else-if="!diffBeforeRender || !diffAfterRender">{{ t('versionControl.diffViewer.parseFailedGeneric')
                 }}</OcEmpty>
                 <CardViewport v-else ref="cardViewportRef" class="card-design-editor__viewport" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }"
                   :face="diffAfterRender.document.faces[activeFaceKey]" :resource-context="diffAfterRender.resources"
                   readonly :transform="viewportTransform" :viewport-insets="diffViewportInsets"
-                  :comparison="diffViewportComparison" :comparison-divider-label="t('sidebar.diffViewer.divider')"
+                  :comparison="diffViewportComparison" :comparison-divider-label="t('versionControl.diffViewer.divider')"
                   @diff-divider-change="handleDiffDividerChange" @blank-click="clearEffectiveBlockSelection"
                   @block-click="handleEffectiveViewportBlockClick"
                   @viewport-transform-change="handleViewportTransformChange"
@@ -208,7 +208,7 @@
           </template>
         </CdeOverlayDock>
 
-        <OcOverlayToolbar v-if="viewFace" class="card-design-editor__face-tools"
+        <OcOverlayToolbar v-if="viewFace" data-oc-layout-anchor="bottom" class="card-design-editor__face-tools"
           :class="{ 'is-resizing': isDockResizing }" orientation="vertical" :style="faceToolsStyle" :label="t('cardDesigner.canvas.controls')"
           :items="editorState.mode === 'diff' ? diffFaceToolbarItems : faceToolbarItems" @select="handleFaceToolbarSelect" />
       </div>
@@ -539,8 +539,8 @@ const diffViewModeAction = computed<OcOverlayToolbarItem>(() => ({
   key: 'toggle-diff-view-mode',
   icon: 'layout.columns',
   title: diffViewMode.value === 'split'
-    ? `${t('sidebar.diffViewer.switchToSideBySide')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`
-    : `${t('sidebar.diffViewer.switchToSplit')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`,
+    ? `${t('versionControl.diffViewer.switchToSideBySide')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`
+    : `${t('versionControl.diffViewer.switchToSplit')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`,
   active: diffViewMode.value === 'side-by-side',
   variant: diffViewMode.value === 'side-by-side' ? 'soft' : 'ghost',
 }))
@@ -2131,8 +2131,8 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 .card-design-editor__face-tools {
   position: absolute;
-  right: var(--oc-floating-surface-gap);
-  bottom: var(--oc-floating-surface-gap);
+  right: var(--oc-space-xs);
+  bottom: var(--oc-space-xs);
   z-index: 3;
   transition: right var(--oc-duration) var(--oc-ease);
 }
@@ -2165,6 +2165,8 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 .card-design-editor__transform-preview-frame {
   position: absolute;
+  left: 0;
+  top: 0;
   z-index: 2;
   box-sizing: border-box;
   margin: 0;

@@ -366,8 +366,8 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   border-end-start-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   border-end-end-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   background: var(--oc-bg-glass);
-  -webkit-backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
-  backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
+  -webkit-backdrop-filter: var(--oc-bg-glass-filter);
+  backdrop-filter: var(--oc-bg-glass-filter);
 }
 
 .oc-album__title {

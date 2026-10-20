@@ -2,15 +2,18 @@ import { createApp, watch } from "vue";
 import App from "./App.vue";
 import { i18n, applyAppLocalePreference, reloadUserLocales } from "./i18n";
 import { setupGlobalTooltip } from "./shared/ui/tooltip/globalTooltip";
+import { taskScheduler } from "./utils/taskScheduler";
 import {
   setOcGlassIntensity,
   setOcMicaBackdrop,
   setOcPhaseImageSpeedMultiplier,
   setOcTheme,
+  setOcTransitionSpeed,
 } from "./shared/ui/foundation";
 import { useAppSettingsStore } from "./features/settings/store/appSettingsStore";
 import { useAppStateStore } from "./features/app-state/store/appStateStore";
-import { addTitleBarNotice, notifyWarning } from "./features/notifications/titlebarNotices";
+import { addTitleBarNotice, notifyTip, notifyWarning } from "./features/notifications/titlebarNotices";
+import { createTipScheduler } from "./features/tips/tipScheduler";
 import {
   applyMicaBackdrop,
   clearMicaBackdrop,
@@ -97,6 +100,7 @@ async function bootstrap(): Promise<void> {
       baseFontSize: appearance.baseFontSize,
     });
     setOcGlassIntensity(appearance.glassIntensity);
+    setOcTransitionSpeed(appearance.transitionSpeed);
     if (lastAppliedTheme !== null && lastAppliedTheme !== theme) {
       const themeName = i18n.global.t(`settings.values.${theme}`);
       addTitleBarNotice({
@@ -180,6 +184,11 @@ async function bootstrap(): Promise<void> {
     (speed) => setOcPhaseImageSpeedMultiplier(speed / 100),
     { immediate: true },
   );
+  watch(
+    () => settingsStore.settings.value.appearance.transitionSpeed,
+    setOcTransitionSpeed,
+    { immediate: true },
+  );
   systemTheme.addEventListener("change", () => {
     if (settingsStore.settings.value.appearance.theme !== "system") return;
     applyThemeAppearance();
@@ -192,7 +201,23 @@ async function bootstrap(): Promise<void> {
     { immediate: true },
   );
 
+  // 小贴士：开关与间隔都来自设置，改了立刻按新设置重新计时。
+  const tipScheduler = createTipScheduler({
+    notify: notifyTip,
+    translate: (key) => i18n.global.t(key),
+  });
+  watch(
+    () => [
+      settingsStore.settings.value.shell.tipsEnabled,
+      settingsStore.settings.value.shell.tipsIntervalMinutes,
+    ] as const,
+    ([enabled, intervalMinutes]) => tipScheduler.configure(enabled, intervalMinutes),
+    { immediate: true },
+  );
+
   setupGlobalTooltip();
+  taskScheduler.observeInteractions(window);
+
   window.addEventListener("contextmenu", (event) => {
     if (!event.defaultPrevented) event.preventDefault();
   });

@@ -16,7 +16,7 @@
  * Each resource environment owns its reader; the webview decodes the concrete icon URL.
  */
 
-import { shallowRef, triggerRef } from 'vue'
+import { shallowRef } from 'vue'
 import type { ProjectIconCatalogEntry } from './projectIconCatalog'
 import type { ProjectIconDimensions } from './projectIconDimensions'
 
@@ -36,22 +36,23 @@ export async function loadProjectImageDimensions(src: string): Promise<ProjectIc
 
 /** Identity is the catalog entry (including its concrete URL), never a relative path. */
 export function createIconDimensionReader() {
-  const sizes = shallowRef(new WeakMap<ProjectIconCatalogEntry, ProjectIconDimensions>())
-  let pending = new WeakSet<ProjectIconCatalogEntry>()
+  let records = new WeakMap<ProjectIconCatalogEntry, { src: string; size: ReturnType<typeof shallowRef<ProjectIconDimensions | undefined>> }>()
   let generation = 0
   return {
-    clear() { generation++; pending = new WeakSet(); sizes.value = new WeakMap() },
+    clear() { generation++; records = new WeakMap() },
     read(entry: ProjectIconCatalogEntry): ProjectIconDimensions | undefined {
-      const known = sizes.value.get(entry)
-      if (known || pending.has(entry)) return known
-      pending.add(entry)
-      const request = generation
-      void loadProjectImageDimensions(entry.src).then(value => {
-        if (request !== generation) return
-        sizes.value.set(entry, value)
-        triggerRef(sizes)
-      }).catch(() => undefined)
-      return undefined
+      const src = entry.src
+      let record = records.get(entry)
+      if (!record || record.src !== src) {
+        record = { src, size: shallowRef<ProjectIconDimensions>() }
+        records.set(entry, record)
+        const request = generation
+        const owner = record
+        void loadProjectImageDimensions(src).then(value => {
+          if (request === generation && records.get(entry) === owner) owner.size.value = value
+        }).catch(() => undefined)
+      }
+      return record.size.value
     },
   }
 }

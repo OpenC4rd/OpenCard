@@ -1,8 +1,11 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import enUS from '../../../locales/en-US'
 import FeedbackDialog from './FeedbackDialog.vue'
+import * as feedbackService from '../services/feedbackService'
+
+afterEach(() => vi.restoreAllMocks())
 
 function mountDialog(props: InstanceType<typeof FeedbackDialog>['$props']) {
   return mount(FeedbackDialog, {
@@ -15,18 +18,13 @@ function mountDialog(props: InstanceType<typeof FeedbackDialog>['$props']) {
 }
 
 describe('FeedbackDialog', () => {
-  it('switches to feedback history through the shared centered page control', async () => {
-    const wrapper = mountDialog({ open: true, activePage: 'submit' })
-    await wrapper.findAll('button').find(button => button.text().includes('My Feedback'))!.trigger('click')
-    expect(wrapper.emitted('pageChange')).toEqual([['history']])
-  })
-
   it('switches between the suggestion and problem forms', async () => {
     const wrapper = mountDialog({ open: true, initialKind: 'suggestion' })
     expect(wrapper.text()).toContain('How would you improve OpenCard?')
     expect(wrapper.text()).not.toContain('How can we reproduce it?')
 
-    await wrapper.findAll('.feedback-dialog__kind button')[0]!.trigger('click')
+    await wrapper.get('[role="combobox"]').trigger('click')
+    await wrapper.findAll('[role="option"]').find(option => option.text() === 'Report a problem')!.trigger('click')
     expect(wrapper.text()).toContain('What happened?')
     expect(wrapper.text()).toContain('How can we reproduce it?')
   })
@@ -48,5 +46,28 @@ describe('FeedbackDialog', () => {
     const wrapper = mountDialog({ open: true })
     expect(wrapper.text()).toContain('Feedback service is not configured')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('locks navigation, kind, inputs and closing until a pending submission finishes', async () => {
+    vi.spyOn(feedbackService, 'isFeedbackServiceConfigured').mockReturnValue(true)
+    let reject!: (reason: Error) => void
+    const pending = new Promise<never>((_, fail) => { reject = fail })
+    vi.spyOn(feedbackService, 'submitFeedback').mockReturnValue(pending)
+    const wrapper = mountDialog({ open: true })
+    try {
+      await wrapper.get('textarea').setValue('Keep the draft while sending')
+      await wrapper.get('form').trigger('submit')
+      expect(wrapper.findAll('[role="tab"], [role="radio"]').every(button => button.attributes('disabled') !== undefined)).toBe(true)
+      expect(wrapper.get('textarea').attributes('disabled')).toBeDefined()
+      expect(wrapper.get('[role="combobox"]').attributes('disabled')).toBeDefined()
+      await wrapper.get('footer button').trigger('click')
+      expect(wrapper.emitted('close')).toBeUndefined()
+      expect(wrapper.emitted('pageChange')).toBeUndefined()
+      reject(new feedbackService.FeedbackServiceError('network', 'offline'))
+      await flushPromises()
+      expect(wrapper.get('textarea').element.value).toBe('Keep the draft while sending')
+      expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
+      expect(wrapper.get('[role="alert"]').text()).toContain('connection')
+    } finally { wrapper.unmount() }
   })
 })

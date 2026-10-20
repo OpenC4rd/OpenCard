@@ -9,6 +9,7 @@ import type { ProjectTemplateStore } from '../store/projectTemplateStore'
 import type { ProjectTemplateKey } from '../model/projectTemplate'
 import OcTutorial from '../../../components/standard/OcTutorial.vue'
 import { useTutorialStore } from '../../tutorials/tutorialStore'
+import { tutorials } from '../../tutorials/tutorials'
 import { createCreateProjectPage } from '../../shell/composables/createCreateProjectPage'
 import type { useAppProjectLifecycle } from '../../shell/composables/useAppProjectLifecycle'
 
@@ -84,7 +85,8 @@ it('starts the guide on the first creation-page visit after state is ready and d
 it('hands the final overview step over to the creation guide on entering the creation page', async () => {
   const tutorial = useTutorialStore()
   tutorial.start('overview')
-  for (let index = 0; index < 7; index++) {
+  for (const step of tutorials.overview.steps) {
+    if (step.id === 'new-project') break
     const session = tutorial.session.value!
     tutorial.completeStep('overview', session.step.id, session.run)
   }

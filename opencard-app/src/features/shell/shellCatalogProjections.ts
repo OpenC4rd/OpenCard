@@ -46,7 +46,7 @@ export function createTemplateTreeData(
     [groups.builtin, builtinTemplates, false, 'projectTemplates.status.noBuiltinTemplates'],
     [groups.user, userTemplates, true, 'projectTemplates.status.noUserTemplates'],
   ] as const) {
-    items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.user'), visual: { type: 'icon', icon: 'file.template' } })
+    items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.userTemplates'), visual: { type: 'icon', icon: 'file.template' } })
     const unusable = removable ? warnings : []
     if (!templates.length && !unusable.length) {
       const emptyKey = `${groupKey}:empty`
@@ -105,7 +105,7 @@ export function createResourcePackageTreeData(
   const removeAction: OcNodeAction = { key: REMOVE_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.removeResourcePackage'), icon: 'action.delete', iconTone: 'danger' }
   for (const [groupKey, label, packs, removable] of [
     [groups.builtin, translate('projectTemplates.sections.builtinPackages'), builtinPacks, false],
-    [groups.stored, translate('projectTemplates.sections.userPackages'), storedPacks, true],
+    [groups.stored, translate('projectTemplates.sections.storedPackages'), storedPacks, true],
   ] as const) {
     items.set(groupKey, { label, visual: { type: 'icon', icon: 'file.package' } })
     const unusable = removable ? warnings.stored : warnings.builtin

@@ -1,8 +1,8 @@
 <template>
   <OcDialog
     :open="open"
-    :title="t('sidebar.commitDialog.title')"
-    :description="t('sidebar.commitDialog.description')"
+    :title="t('versionControl.commitDialog.title')"
+    :description="t('versionControl.commitDialog.description')"
     as="form"
     size="md"
     :dismissible="!busy"
@@ -13,29 +13,29 @@
   >
     <div class="commit-version-dialog" :inert="busy ? true : undefined">
       <label class="commit-version-dialog__field">
-        <OcText as="span" size="sm">{{ t('sidebar.commitDialog.summaryLabel') }}</OcText>
+        <OcText as="span" size="sm">{{ t('versionControl.commitDialog.summaryLabel') }}</OcText>
         <OcFieldInput
           full-width
           autofocus
           required
           :value="summary"
-          :placeholder="t('sidebar.commitDialog.summaryPlaceholder')"
+          :placeholder="t('versionControl.commitDialog.summaryPlaceholder')"
           :aria-invalid="submitted && !summary.trim()"
           :disabled="busy"
           @input="summary = fieldValue($event)"
         />
       </label>
       <OcText v-if="submitted && !summary.trim()" as="p" size="sm" tone="danger" role="alert">
-        {{ t('sidebar.commitDialog.summaryRequired') }}
+        {{ t('versionControl.commitDialog.summaryRequired') }}
       </OcText>
       <label class="commit-version-dialog__field">
-        <OcText as="span" size="sm">{{ t('sidebar.commitDialog.descriptionLabel') }}</OcText>
+        <OcText as="span" size="sm">{{ t('versionControl.commitDialog.descriptionLabel') }}</OcText>
         <OcFieldInput
           as="textarea"
           full-width
           resize="vertical"
           :value="description"
-          :placeholder="t('sidebar.commitDialog.descriptionPlaceholder')"
+          :placeholder="t('versionControl.commitDialog.descriptionPlaceholder')"
           :disabled="busy"
           @input="description = fieldValue($event)"
         />
@@ -47,10 +47,10 @@
 
     <template #footer>
       <OcButton type="button" variant="ghost" :disabled="busy" @click="requestClose">
-        {{ t('sidebar.commitDialog.cancel') }}
+        {{ t('versionControl.commitDialog.cancel') }}
       </OcButton>
       <OcButton type="submit" variant="solid" :disabled="busy || !summary.trim()">
-        {{ busy ? t('sidebar.commitDialog.committing') : t('sidebar.commitDialog.commit') }}
+        {{ busy ? t('versionControl.commitDialog.committing') : t('versionControl.commitDialog.commit') }}
       </OcButton>
     </template>
   </OcDialog>

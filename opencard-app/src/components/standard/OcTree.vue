@@ -27,139 +27,18 @@
     </OcText>
     <div class="oc-tree__content" :class="{ 'is-virtualized': props.virtualized }"
       :style="virtualContentStyle">
-    <div
-      v-for="entry in renderedEntries"
-      :key="entry.key"
-      class="oc-tree__node"
-      :class="resolveNodeClass(entry.key)"
-      :data-oc-tree-key="entry.key"
-      :style="resolveNodeStyle(entry)"
-    >
-      <span
-        v-if="entry.guideRows > 0"
-        class="oc-tree__branch-guide"
-        :data-guide-rows="entry.guideRows"
-        :style="{ '--oc-tree-guide-rows': String(entry.guideRows) }"
-        aria-hidden="true"
-      />
-      <span
-        v-if="entry.parentKey !== null"
-        class="oc-tree__branch-connector"
-        aria-hidden="true"
-      />
-      <OcRow
-        :ref="(element) => setRowRef(entry.key, element)"
-        class="oc-tree__row"
-        :class="{ 'is-selected': isSelected(entry.key), 'is-disabled': entry.item.disabled }"
-        :data-actions-overflowed="collapsedActionKeys.has(entry.key) || undefined"
-        :data-tooltip="entry.item.disabledReason"
-        :role="rowRole"
-        :tabindex="props.tabNavigation === 'roving' && activeKey === entry.key && !entry.item.disabled ? 0 : -1"
-        :aria-disabled="entry.item.disabled || undefined"
-        :aria-busy="entry.item.loading || undefined"
-        :aria-selected="props.role !== 'menu' && props.selectionMode !== 'none' ? isSelected(entry.key) : undefined"
-        :aria-expanded="isExpandable(entry.key) ? isExpanded(entry.key) : undefined"
-        :aria-posinset="props.virtualized ? entry.index + 1 : undefined"
-        :aria-setsize="props.virtualized ? visibleEntries.length : undefined"
-        @focus="activeKey = entry.key"
-        @click="handleRowClick($event, entry.key)"
-        @auxclick="handleRowAuxClick($event, entry.key)"
-        @dblclick="handleRowDoubleClick($event, entry.key)"
-        @mousedown="handleRowMouseDown($event, entry.key)"
-        @keydown="handleRowKeydown($event, entry.key, entry.index)"
-        @contextmenu="handleRowContextMenu($event, entry.key)"
-      >
-        <template #leading>
-          <span
-            class="oc-tree__icon-slot"
-            :class="{ 'is-expandable': isExpandable(entry.key) }"
-            data-tree-interactive="true"
-            @mousedown="handleIconMouseDown($event, entry.key)"
-            @click="handleIconClick($event, entry.key)"
-          >
-            <OcVisual
-              v-if="entry.item.visual"
-              class="oc-tree__node-visual"
-              :class="{ 'is-expanded': entry.item.visual.type === 'icon' && isExpandable(entry.key) && isExpanded(entry.key) }"
-              :visual="entry.item.visual"
-              :label="entry.item.label"
-              size="md"
-            />
-            <OcIcon v-else
-              :name="'circle'"
-              size="md"
-              class="oc-tree__node-icon"
-              :class="{ 'is-expanded': isExpandable(entry.key) && isExpanded(entry.key) }"
-            />
-            <span
-              v-if="isExpandable(entry.key) && childCount(entry.key) > 0"
-              class="oc-tree__child-count oc-number-badge oc-number-badge--neutral"
-              :class="{ 'is-expanded': isExpanded(entry.key) }"
-              aria-hidden="true"
-            >
-              {{ formatChildCount(entry.key) }}
-            </span>
-          </span>
-        </template>
-
-        <template #title>
-          <OcFieldInput
-            v-if="renamingKey === entry.key"
-            :ref="(element) => setRenameInputRef(entry.key, element)"
-            as="input"
-            class="oc-tree__rename-input"
-            type="text"
-            :value="renameDraft"
-            data-tree-interactive="true"
-            @mousedown.stop
-            @click.stop
-            @dblclick.stop
-            @input="handleRenameInput"
-            @keydown.stop="handleRenameKeydown($event, entry.key)"
-            @blur="commitRename(entry.key)"
-          />
-          <OcSkeleton
-            v-else-if="entry.item.loading"
-            width="sm"
-            height="sm"
-          />
-          <OcText
-            v-else
-            class="oc-tree__label"
-            :style="labelStyle(entry.item)"
-            :tone="entry.item.tone"
-            :truncate="true"
-          >
-            {{ entry.item.label }}
-          </OcText>
-        </template>
-
-        <template v-if="entry.item.tail" #append>
-          <OcNodeTail
-            class="oc-tree__tail"
-            :tail="resolveTailParts(entry.key, entry.item.tail)"
-            :action-visibility="props.actionVisibility"
-            :button-tabindex="props.tabNavigation === 'none' ? -1 : undefined"
-            @action="emitActionIntent(entry.key, $event.key)"
-          />
-        </template>
-      </OcRow>
-    </div>
+      <OcTreeRow v-for="entry in renderedEntries" :key="entry.key" :entry="entry" :context="rowContext" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect,
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, markRaw, watch,
   type ComponentPublicInstance, type CSSProperties } from 'vue'
-import type { OcActionDefinition } from '../../shared/ui/action/action.types'
+import { taskScheduler } from '../../utils/taskScheduler'
 import OcFieldInput from '../base/OcFieldInput.vue'
-import OcIcon from '../base/OcIcon.vue'
-import OcNodeTail from './OcNodeTail.vue'
-import OcRow from './OcRow.vue'
 import OcText from '../base/OcText.vue'
-import OcSkeleton from '../base/OcSkeleton.vue'
-import OcVisual from '../base/OcVisual.vue'
+import OcTreeRow, { type OcTreeRowEntry as VisibleEntry, type OcTreeRowContext } from './OcTreeRow.vue'
 import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
 import { resolveNodeSelection, type OcNodeSelectionMode } from '../../shared/ui/node/nodeSelection'
 import { useFloatingMenu, type FloatingMenuItem } from '../../composables/useFloatingMenu'
@@ -212,14 +91,7 @@ interface OcTreeProps {
   externalDrop?: boolean
 }
 
-type VisibleEntry = {
-  key: OcNodeKey
-  item: OcNode
-  level: number
-  parentKey: OcNodeKey | null
-  guideRows: number
-  index: number
-}
+
 
 defineOptions({ name: 'OcTree' })
 
@@ -270,22 +142,16 @@ const warnedMessages = new Set<string>()
 const virtualScrollTop = ref(0)
 const virtualViewportHeight = ref(0)
 const virtualRowPitch = ref(1)
-const collapsedActionKeys = ref<ReadonlySet<OcNodeKey>>(new Set())
-const directActionWidths = new Map<OcNodeKey, number>()
 const VIRTUAL_OVERSCAN_ROWS = 6
-/** Temporary tree state: every row shows its commands, used only to measure them. */
-const COMMANDS_REVEALED_CLASS = 'are-commands-revealed'
 let treeResizeObserver: ResizeObserver | null = null
 
 const selectedKeySet = computed(() => new Set(props.selectedKeys))
 const expandedKeySet = computed(() => new Set(props.expandedKeys))
-const parentKeyLookup = computed(() => {
-  const lookup = new Map<OcNodeKey, OcNodeKey>()
-  for (const [parentKey, childKeys] of props.data.children) {
-    for (const childKey of childKeys) lookup.set(childKey, parentKey)
-  }
-  return lookup
-})
+const parentKeyLookup = shallowRef(new Map<OcNodeKey, OcNodeKey>())
+const visibleEntryIndexes = shallowRef(new Map<OcNodeKey, number>())
+const childCounts = shallowRef(new Map<OcNodeKey, number>())
+const focusableIndexes = shallowRef<number[]>([])
+const focusablePositions = shallowRef(new Map<OcNodeKey, number>())
 const rowRole = computed(() => {
   if (props.role === 'menu') return 'menuitem'
   if (props.role === 'listbox') return 'option'
@@ -298,94 +164,75 @@ function warnContract(message: string): void {
   console.warn(`[OcTree] ${message}`)
 }
 
-function validateContract(): void {
-  const referenceCounts = new Map<OcNodeKey, number>()
-  const countReference = (key: OcNodeKey) => {
-    referenceCounts.set(key, (referenceCounts.get(key) ?? 0) + 1)
-  }
-
-  for (const rootKey of props.data.rootKeys) countReference(rootKey)
-  for (const [parentKey, childKeys] of props.data.children) {
-    if (!props.data.items.has(parentKey)) warnContract(`Children are declared for missing parent "${parentKey}".`)
-    for (const childKey of childKeys) countReference(childKey)
-  }
-  for (const [key, count] of referenceCounts) {
-    if (!props.data.items.has(key)) warnContract(`Missing item for key "${key}".`)
-    if (count > 1) warnContract(`Node "${key}" is referenced more than once.`)
-  }
-
-  const visited = new Set<OcNodeKey>()
-  const visiting = new Set<OcNodeKey>()
-  function visitNode(key: OcNodeKey): void {
-    if (visiting.has(key)) {
-      warnContract(`Children cycle detected at key "${key}".`)
-      return
-    }
-    if (visited.has(key)) return
-    visiting.add(key)
-    for (const childKey of props.data.children.get(key) ?? []) visitNode(childKey)
-    visiting.delete(key)
-    visited.add(key)
-  }
-  for (const key of props.data.items.keys()) visitNode(key)
-}
-
-watchEffect(validateContract)
-
-const visibleEntries = computed<VisibleEntry[]>(() => {
+const visibleEntries = shallowRef<VisibleEntry[]>([])
+let structureRequest: AbortController | undefined
+watch([() => props.data, () => props.expandedKeys], () => {
+  structureRequest?.abort()
+  const request = new AbortController()
+  structureRequest = request
+  const data = props.data
+  const expanded = new Set(props.expandedKeys)
   const entries: VisibleEntry[] = []
+  const indexes = new Map<OcNodeKey, number>()
+  const parents = new Map<OcNodeKey, OcNodeKey>()
+  const counts = new Map<OcNodeKey, number>()
+  const focusable: number[] = []
+  const positions = new Map<OcNodeKey, number>()
+  const visiting = new Set<OcNodeKey>()
   const visited = new Set<OcNodeKey>()
-
-  function visit(key: OcNodeKey, level: number, parentKey: OcNodeKey | null, ancestors: Set<OcNodeKey>): void {
-    const item = props.data.items.get(key)
-    if (!item) {
-      warnContract(`Missing item for key "${key}".`)
-      return
+  function* visit(key: OcNodeKey, level: number, parentKey: OcNodeKey | null): Generator<void> {
+    if (visiting.has(key)) { warnContract(`Children cycle detected at key "${key}".`); return }
+    if (visited.has(key)) { warnContract(`Node "${key}" is referenced more than once.`); return }
+    const item = data.items.get(key)
+    if (!item) { warnContract(`Missing item for key "${key}".`); return }
+    visited.add(key); visiting.add(key)
+    const entry: VisibleEntry = { key, item, level, parentKey, guideRows: 0, index: entries.length }
+    entries.push(entry); indexes.set(key, entry.index)
+    if (!item.disabled) { positions.set(key, focusable.length); focusable.push(entry.index) }
+    yield
+    if (expanded.has(key)) {
+      let lastChildIndex = entry.index
+      for (const child of data.children.get(key) ?? []) {
+        lastChildIndex = entries.length
+        yield* visit(child, level + 1, key)
+      }
+      entry.guideRows = Math.max(0, lastChildIndex - entry.index)
     }
-    if (ancestors.has(key)) {
-      warnContract(`Children cycle detected at key "${key}".`)
-      return
-    }
-    if (visited.has(key)) {
-      warnContract(`Node "${key}" is referenced more than once.`)
-      return
-    }
-
-    visited.add(key)
-    entries.push({ key, item, level, parentKey, guideRows: 0, index: entries.length })
-    if (!isExpanded(key)) return
-
-    const nextAncestors = new Set(ancestors)
-    nextAncestors.add(key)
-    for (const childKey of props.data.children.get(key) ?? []) {
-      visit(childKey, level + 1, key, nextAncestors)
-    }
+    visiting.delete(key)
   }
-
-  for (const rootKey of props.data.rootKeys) {
-    visit(rootKey, 0, null, new Set())
+  function* build(): Generator<void> {
+    for (const [key, children] of data.children) {
+      let count = 0
+      for (const child of children) {
+        parents.set(child, key)
+        if (data.items.has(child) && !data.items.get(child)?.disabled) count++
+        yield
+      }
+      counts.set(key, count)
+    }
+    for (const key of data.rootKeys) yield* visit(key, 0, null)
+    parentKeyLookup.value = markRaw(parents)
+    childCounts.value = markRaw(counts)
+    focusableIndexes.value = markRaw(focusable)
+    focusablePositions.value = markRaw(positions)
+    visibleEntryIndexes.value = markRaw(indexes)
+    visibleEntries.value = markRaw(entries)
   }
+  void taskScheduler.runBatched(build(), request.signal).catch(error => {
+    if (!request.signal.aborted) throw error
+  })
+}, { immediate: true, flush: 'sync' })
 
-  const entryIndexes = new Map(entries.map((entry, index) => [entry.key, index]))
-  for (const [index, entry] of entries.entries()) {
-    if (!isExpanded(entry.key)) continue
-    const childKeys = props.data.children.get(entry.key) ?? []
-    const lastChildIndex = entryIndexes.get(childKeys[childKeys.length - 1] ?? '')
-    if (lastChildIndex !== undefined) entry.guideRows = lastChildIndex - index
-  }
-
-  return entries
-})
-
-const virtualRange = computed(() => {
-  if (!props.virtualized) return { start: 0, end: visibleEntries.value.length }
+const virtualRange = computed<{ start: number; end: number }>((previous) => {
   const rowHeight = virtualRowPitch.value
-  const start = Math.max(0, Math.floor(virtualScrollTop.value / rowHeight) - VIRTUAL_OVERSCAN_ROWS)
+  const start = props.virtualized
+    ? Math.max(0, Math.floor(virtualScrollTop.value / rowHeight) - VIRTUAL_OVERSCAN_ROWS)
+    : 0
   const visibleRows = Math.ceil(virtualViewportHeight.value / rowHeight)
-  return {
-    start,
-    end: Math.min(visibleEntries.value.length, start + visibleRows + VIRTUAL_OVERSCAN_ROWS * 2),
-  }
+  const end = props.virtualized
+    ? Math.min(visibleEntries.value.length, start + visibleRows + VIRTUAL_OVERSCAN_ROWS * 2)
+    : visibleEntries.value.length
+  return previous?.start === start && previous.end === end ? previous : { start, end }
 })
 const renderedEntries = computed(() => visibleEntries.value.slice(
   virtualRange.value.start,
@@ -427,86 +274,7 @@ function syncVirtualMetrics(): void {
   virtualScrollTop.value = root.scrollTop
 }
 
-/**
- * Width the row's commands occupy right now, including the gaps between them.
- * Collapsed commands are represented by the single overflow button, so this doubles
- * as the "collapsed" width the projected-title calculation needs.
- */
-function measureTailActionWidth(row: HTMLElement): number {
-  const parts = [...row.querySelectorAll<HTMLElement>('.oc-node-tail__action')]
-  if (parts.length === 0) return 0
-  const gap = resolveOcPixelToken('--oc-space-xs', treeRootElement.value)
-  return parts.reduce((total, part) => total + part.getBoundingClientRect().width, 0)
-    + gap * (parts.length - 1)
-}
-
-/** Width the node's trailing text occupies right now; the row trades it away before the title. */
-function measureTailTextWidth(row: HTMLElement): number {
-  return [...row.querySelectorAll<HTMLElement>('.oc-node-tail__text')]
-    .reduce((total, part) => total + part.getBoundingClientRect().width, 0)
-}
-
-/**
- * Commands stay hidden until the row is interacted with, so a row at rest reports no width for them.
- * The decision below is about the row the user will actually see, so measurement runs with the tree
- * temporarily showing every row's commands: the reveal class is added, read back, and removed in the
- * same task, before the browser can paint the revealed state.
- */
-function withCommandsRevealed<T>(measure: () => T): T {
-  const root = treeRootElement.value
-  if (!root) return measure()
-  root.classList.add(COMMANDS_REVEALED_CLASS)
-  try {
-    return measure()
-  } finally {
-    root.classList.remove(COMMANDS_REVEALED_CLASS)
-  }
-}
-
-/**
- * A row yields space in one order: the trailing text first, then one action menu, and only then the title.
- */
-function syncActionOverflow(): void {
-  const nextCollapsed = new Set(collapsedActionKeys.value)
-
-  withCommandsRevealed(() => {
-    for (const [key, row] of rowRefs) {
-      const actionCount = tailActionParts(key).length
-      if (actionCount <= 1 || row.clientWidth <= 0) {
-        nextCollapsed.delete(key)
-        directActionWidths.delete(key)
-        continue
-      }
-      const label = row.querySelector<HTMLElement>('.oc-tree__label')
-      if (!label || row.querySelector('.oc-node-tail__action') === null) continue
-      // Width the title holds once the trailing text has given up everything it can, and the width
-      // it needs to be shown in full.
-      const titleWidth = label.getBoundingClientRect().width + measureTailTextWidth(row)
-      const titleDemand = label.scrollWidth
-      const actionWidth = measureTailActionWidth(row)
-
-      if (!nextCollapsed.has(key)) {
-        directActionWidths.set(key, actionWidth)
-        if (titleWidth < titleDemand) nextCollapsed.add(key)
-        continue
-      }
-
-      const directWidth = directActionWidths.get(key)
-      if (directWidth === undefined) continue
-      const projectedTitleWidth = titleWidth - Math.max(0, directWidth - actionWidth)
-      if (projectedTitleWidth >= titleDemand) nextCollapsed.delete(key)
-    }
-  })
-
-  const current = collapsedActionKeys.value
-  if (nextCollapsed.size === current.size && [...nextCollapsed].every(key => current.has(key))) return
-  collapsedActionKeys.value = nextCollapsed
-}
-
-function syncTreeMetrics(): void {
-  syncVirtualMetrics()
-  syncActionOverflow()
-}
+function syncTreeMetrics(): void { syncVirtualMetrics() }
 
 function resolveSelectionAncestorKeys(key: OcNodeKey): OcNodeKey[] {
   const ancestors: OcNodeKey[] = []
@@ -575,8 +343,8 @@ function scrollRowIntoTreeViewport(key: OcNodeKey): void {
   const root = treeRootElement.value
   if (!root) return
   if (props.virtualized) {
-    const index = visibleEntries.value.findIndex(entry => entry.key === key)
-    if (index < 0) return
+    const index = visibleEntryIndexes.value.get(key)
+    if (index === undefined) return
     const rowTop = index * virtualRowPitch.value
     const rowBottom = rowTop + virtualRowPitch.value
     if (rowTop < root.scrollTop) root.scrollTop = rowTop
@@ -610,7 +378,7 @@ watch(
   visibleEntries,
   async (entries) => {
     if (renamingKey.value && !props.data.items.has(renamingKey.value)) cancelRename()
-    if (activeKey.value && entries.some((entry) => entry.key === activeKey.value)) return
+    if (activeKey.value && visibleEntryIndexes.value.has(activeKey.value)) return
     activeKey.value = entries.find((entry) => !entry.item.disabled)?.key ?? null
     await nextTick()
   },
@@ -629,14 +397,12 @@ function isSelected(key: OcNodeKey): boolean {
 }
 
 function isExpandable(key: OcNodeKey): boolean {
-  return (props.data.children.get(key)?.length ?? 0) > 0
+  return props.data.items.get(key)?.expandable ?? ((props.data.children.get(key)?.length ?? 0) > 0)
 }
 
 /** 计子项时只认真正能用的子项：空分组里那行占位（disabled）不是这一组的孩子，不该被数出来。 */
 function childCount(key: OcNodeKey): number {
-  return (props.data.children.get(key) ?? [])
-    .filter(childKey => !props.data.items.get(childKey)?.disabled)
-    .length
+  return childCounts.value.get(key) ?? 0
 }
 
 function formatChildCount(key: OcNodeKey): string {
@@ -673,6 +439,7 @@ function emitSelectionIntent(
   const resolution = resolveNodeSelection({
     mode: props.selectionMode,
     orderedEntries: visibleEntries.value,
+    indexByKey: visibleEntryIndexes.value,
     selectedKeys: props.selectedKeys,
     triggerKey: key,
     anchorKey: selectionAnchorKey.value,
@@ -708,10 +475,6 @@ function handleRowDoubleClick(event: MouseEvent, key: OcNodeKey): void {
   if (props.activationMode === 'double-click') emit('node-activate', { key })
 }
 
-function tailActionParts(key: OcNodeKey): OcActionDefinition[] {
-  return normalizeNodeTail(props.data.items.get(key)?.tail).filter(isNodeTailAction)
-}
-
 /**
  * 常显命令直接保留，其余多个命令合并成菜单。
  */
@@ -735,7 +498,8 @@ function resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNode
 
 function resolveContextActions(key: OcNodeKey): FloatingMenuItem[] {
   const result: FloatingMenuItem[] = []
-  for (const entry of props.data.items.get(key)?.contextActions ?? []) {
+  const entries = props.data.items.get(key)?.contextActions
+  for (const entry of (typeof entries === 'function' ? entries() : entries) ?? []) {
     if (entry.type === 'divider') {
       if (result.length > 0 && result[result.length - 1]?.type !== 'divider') result.push(entry)
       continue
@@ -831,12 +595,10 @@ async function focusEntry(index: number): Promise<void> {
 }
 
 function findFocusableIndex(start: number, direction: -1 | 1): number {
-  const entries = visibleEntries.value
-  for (let offset = 1; offset <= entries.length; offset += 1) {
-    const index = (start + offset * direction + entries.length) % entries.length
-    if (!entries[index]?.item.disabled) return index
-  }
-  return start
+  const key = visibleEntries.value[start]?.key
+  const position = key ? focusablePositions.value.get(key) ?? 0 : 0
+  const indexes = focusableIndexes.value
+  return indexes.length ? indexes[(position + direction + indexes.length) % indexes.length]! : start
 }
 
 function handleRowKeydown(event: KeyboardEvent, key: OcNodeKey, index: number): void {
@@ -849,11 +611,10 @@ function handleRowKeydown(event: KeyboardEvent, key: OcNodeKey, index: number): 
     focusEntry(findFocusableIndex(index, -1))
   } else if (event.key === 'Home') {
     event.preventDefault()
-    focusEntry(visibleEntries.value.findIndex((entry) => !entry.item.disabled))
+    focusEntry(focusableIndexes.value[0] ?? -1)
   } else if (event.key === 'End') {
     event.preventDefault()
-    const reverseIndex = [...visibleEntries.value].reverse().findIndex((entry) => !entry.item.disabled)
-    if (reverseIndex >= 0) focusEntry(visibleEntries.value.length - reverseIndex - 1)
+    focusEntry(focusableIndexes.value[focusableIndexes.value.length - 1] ?? -1)
   } else if (event.key === 'ArrowRight' && isExpandable(key) && !isExpanded(key)) {
     event.preventDefault()
     toggleExpanded(key)
@@ -1012,15 +773,11 @@ watch([() => props.virtualized, () => visibleEntries.value.length], async () => 
   if (root.scrollTop > maximum) root.scrollTop = maximum
   virtualScrollTop.value = root.scrollTop
 })
-watch([renderedEntries, () => props.data], async () => {
-  await nextTick()
-  syncActionOverflow()
-})
 
 onMounted(() => {
   window.addEventListener('mousemove', handleGlobalMouseMove)
   window.addEventListener('mouseup', handleGlobalMouseUp)
-  // 标签字体是异步加载的：装好后标签宽度会变，而 ResizeObserver 只看容器，不看文本，必须在这里补一次重测。
+  // 字体就绪后核对虚拟行距；不读取或揭示行内命令。
   fontFaceSet()?.addEventListener('loadingdone', syncTreeMetrics)
   syncTreeMetrics()
   syncExternalDropZone()
@@ -1033,6 +790,7 @@ onMounted(() => {
 watch(() => props.externalDrop, syncExternalDropZone)
 
 onBeforeUnmount(() => {
+  structureRequest?.abort()
   fontFaceSet()?.removeEventListener('loadingdone', syncTreeMetrics)
   treeResizeObserver?.disconnect()
   externalDropZoneDispose?.()
@@ -1040,6 +798,23 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleGlobalMouseMove)
   window.removeEventListener('mouseup', handleGlobalMouseUp)
 })
+// One stable owner per tree. Each row tracks its own presentation dependencies;
+// scrolling the viewport does not invalidate slots in rows that remain mounted.
+const rowContext: OcTreeRowContext = {
+  props,
+  get rowRole() { return rowRole.value },
+  get activeKey() { return activeKey.value },
+  set activeKey(key) { activeKey.value = key },
+  get renamingKey() { return renamingKey.value },
+  get renameDraft() { return renameDraft.value },
+  get visibleCount() { return visibleEntries.value.length },
+  resolveNodeClass, resolveNodeStyle, setRowRef, isSelected, isExpandable, isExpanded,
+  handleRowClick, handleRowAuxClick, handleRowDoubleClick, handleRowMouseDown,
+  handleRowKeydown, handleRowContextMenu, handleIconMouseDown, handleIconClick,
+  childCount, formatChildCount, setRenameInputRef, handleRenameInput,
+  handleRenameKeydown, commitRename, labelStyle, resolveTailParts, emitActionIntent,
+}
+
 </script>
 
 <style scoped>
@@ -1080,18 +855,6 @@ onBeforeUnmount(() => {
   left: 0;
 }
 
-.oc-tree__node-visual {
-  flex: none;
-  /* 精灵图裁剪按 em 计量，字号决定实际尺寸。 */
-  font-size: var(--oc-size-sm);
-  transform-origin: center;
-  transition: transform var(--oc-duration-quick) var(--oc-ease);
-}
-
-.oc-tree__node-visual.is-expanded {
-  transform: rotate(45deg);
-}
-
 .oc-tree.is-fill {
   width: 100%;
   height: 100%;
@@ -1101,146 +864,5 @@ onBeforeUnmount(() => {
 
 .oc-tree.is-root-drop {
   box-shadow: inset 0 0 0 1px var(--oc-border-accent);
-}
-
-.oc-tree__node {
-  position: relative;
-  flex: 0 0 auto;
-  /* 行间空隙：节点比行高多出这一档，虚拟列表的行距也按它计算。 */
-  padding-bottom: var(--oc-space-2xs);
-}
-
-.oc-tree__branch-guide {
-  position: absolute;
-  z-index: 1;
-  top: calc(var(--oc-size-md) * 0.5 + 7px);
-  left: calc(var(--oc-space-sm) + var(--oc-tree-indent) + 7px);
-  width: 1px;
-  height: calc(var(--oc-tree-guide-rows) * (var(--oc-size-md) + var(--oc-space-2xs)) - 7px);
-  background: var(--oc-border-muted);
-  pointer-events: none;
-}
-
-.oc-tree__branch-connector {
-  position: absolute;
-  z-index: 1;
-  top: calc(var(--oc-size-md) * 0.5);
-  left: calc(var(--oc-space-sm) + var(--oc-tree-indent) - 5px);
-  width: 12px;
-  height: 1px;
-  background: var(--oc-border-muted);
-  pointer-events: none;
-}
-
-/*
- * 行的盒模型与状态外观由 OcRow 提供；缩进是树的几何，只补起始内边距。
- * 选择器带上节点容器，避免与 OcRow 自己的 `.oc-row` 规则同权重而依赖样式表顺序。
- */
-.oc-tree__node > .oc-tree__row {
-  padding-inline-start: calc(var(--oc-space-sm) + var(--oc-tree-indent));
-}
-
-.oc-tree__icon-slot {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: var(--oc-icon-size-md);
-  height: var(--oc-icon-size-md);
-}
-
-.oc-tree__icon-slot.is-expandable {
-  cursor: pointer;
-}
-
-.oc-tree__node-icon {
-  flex: 0 0 auto;
-  transform-origin: center;
-  transition: transform var(--oc-duration-quick) var(--oc-ease);
-}
-
-.oc-tree__node-icon.is-expanded {
-  transform: rotate(45deg);
-}
-
-.oc-tree__child-count {
-  position: absolute;
-  z-index: 1;
-  top: -6px;
-  right: -9px;
-  transition:
-    border-color var(--oc-duration-quick) var(--oc-ease),
-    color var(--oc-duration-quick) var(--oc-ease),
-    background-color var(--oc-duration-quick) var(--oc-ease);
-}
-
-.oc-tree__icon-slot:hover .oc-tree__child-count,
-.oc-tree__child-count.is-expanded {
-  border-color: var(--oc-border-accent);
-  background: var(--oc-bg-raised);
-  color: var(--oc-fg-accent);
-}
-
-/*
- * 标题内容住在 OcRow 的标题位里：标签必须是块盒，单行省略与溢出提示才量得到真实宽度。
- */
-.oc-tree__label {
-  display: block;
-  min-width: 0;
-}
-
-/*
- * 尾部行由 OcNodeTail 渲染，根元素不参与盒模型：命令、徽标与文本继续作为行尾的直接 flex 项，
- * 让位顺序与命令宽度测量都和以前一致。
- */
-.oc-tree__tail {
-  display: contents;
-}
-
-.oc-tree__rename-input {
-  display: block;
-  width: 100%;
-  height: calc(var(--oc-size-md) - var(--oc-space-2xs));
-}
-
-/*
- * 命令平时不显示：行被交互或正在测量时由变量揭示，常显由 OcNodeTail 的 actionVisibility 负责。
- * 变量按继承生效，所以这一条只需写在行上。
- */
-.oc-tree__row:hover,
-.oc-tree__row:focus-within,
-.oc-tree__row.is-selected,
-.oc-tree.are-commands-revealed {
-  --oc-node-tail-action-display: inline-flex;
-}
-
-.oc-tree__node.is-drag-source {
-  opacity: 0.45;
-}
-
-.oc-tree__node.is-drop-before::before,
-.oc-tree__node.is-drop-after::after {
-  content: '';
-  position: absolute;
-  z-index: 2;
-  left: calc(var(--oc-space-sm) + var(--oc-tree-indent));
-  right: 0;
-  height: 2px;
-  background: var(--oc-border-accent);
-  pointer-events: none;
-}
-
-.oc-tree__node.is-drop-before::before {
-  top: 0;
-}
-
-.oc-tree__node.is-drop-after::after {
-  bottom: 0;
-}
-
-.oc-tree__node.is-drop-inside .oc-tree__row {
-  background-image: var(--oc-overlay-accent);
 }
 </style>

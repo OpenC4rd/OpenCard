@@ -5,20 +5,43 @@ Creates and publishes an OpenCard release.
 .DESCRIPTION
 Updates all application version files, runs the frontend and Rust checks,
 creates the release commit and annotated tag, and pushes both atomically.
-After the tag is pushed, it clears RELEASE_NOTES.md in a follow-up commit so
-the next release starts with an empty draft.
+After a stable tag is pushed, it clears RELEASE_NOTES.md in a follow-up commit so
+the next release starts with an empty draft. A preview release leaves the draft
+open, so the notes accumulate until the stable release that closes them.
 After pushing, the script waits for the tag-triggered GitHub Actions workflow
 to finish, so callers should keep waiting for this process instead of running
 the release command again.
 
+A release belongs to one channel, and the channel decides the updater endpoint
+written into tauri.conf.json, so a build only ever searches the channel it was
+released on. A stable version such as 0.5.0 is a stable release, and stable
+builds update only to newer stable releases. A version with a prerelease suffix
+such as 0.5.0-beta.1 is a preview release, and preview builds update to newer
+preview and stable releases. Installing a stable release moves that installation
+onto the stable channel.
+
+A preview release publishes the change since the previous release and keeps the
+draft, so each preview carries everything new since the last stable release. The
+stable release publishes that accumulated draft as it stands and then clears it,
+so its notes never have to be assembled by hand.
+
 .EXAMPLE
 .\scripts\release.ps1 0.2.6 -ReleaseNotesPath C:\Temp\opencard-0.2.6.md
+
+.EXAMPLE
+.\scripts\release.ps1 0.5.0-beta.1
+Publishes a preview release.
 
 .EXAMPLE
 .\scripts\release.ps1 0.2.6 -SkipChecks
 
 .EXAMPLE
 .\scripts\release.ps1 0.2.6 -NoPush
+
+.PARAMETER Channel
+Stable or Preview. Defaults to the channel implied by the version: a prerelease
+suffix means Preview, anything else means Stable. A channel that contradicts the
+version is rejected.
 
 .PARAMETER NoWaitForWorkflow
 Returns after the atomic push instead of waiting for GitHub Actions.
@@ -35,6 +58,10 @@ Maximum time to wait for GitHub Actions after a successful push. Defaults to
 param(
   [Parameter(Position = 0)]
   [string]$Version,
+
+  [Parameter(Position = 1)]
+  [ValidateSet('Stable', 'Preview')]
+  [string]$Channel,
 
   [string]$ReleaseNotesPath,
 
@@ -255,6 +282,27 @@ if ($Version -notmatch $semverPattern) {
   throw "Version must be a semantic version such as 0.2.2 or 0.3.0-alpha. Received: $Version"
 }
 
+$versionChannel = if ($Version.Contains('-')) { 'Preview' } else { 'Stable' }
+$channel = if ([string]::IsNullOrWhiteSpace($Channel)) {
+  $versionChannel
+}
+elseif ($Channel -ieq 'Preview') {
+  'Preview'
+}
+else {
+  'Stable'
+}
+
+if ($channel -ne $versionChannel) {
+  $requirement = if ($channel -eq 'Preview') {
+    'A preview release needs a prerelease suffix such as -beta.1.'
+  }
+  else {
+    'A stable release must not carry a prerelease suffix.'
+  }
+  throw "$requirement Received: $Version"
+}
+
 $appRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $repoRoot = (Resolve-Path (Join-Path $appRoot '..')).Path
 $cargoRoot = Join-Path $appRoot 'src-tauri'
@@ -293,8 +341,18 @@ if ($repositoryTopLevel -ne $repoRoot) {
   throw "Expected a Git repository rooted at $repoRoot"
 }
 
+$repository = Get-GitHubRepositorySlug -RepositoryRoot $repoRoot
+$updaterEndpoint = if ($channel -eq 'Preview') {
+  "https://github.com/$repository/releases/download/preview/latest.json"
+}
+else {
+  "https://github.com/$repository/releases/latest/download/latest.json"
+}
+
+# A preview keeps the draft open, so it must add something. A stable release closes
+# the accumulated draft and may publish it unchanged.
 $previousReleaseNotes = (& git -C $repoRoot show 'HEAD:opencard-app/RELEASE_NOTES.md' 2>$null | Out-String).Trim()
-if ($LASTEXITCODE -eq 0 -and $releaseNotes -eq $previousReleaseNotes) {
+if ($channel -ne 'Stable' -and $LASTEXITCODE -eq 0 -and $releaseNotes -eq $previousReleaseNotes) {
   throw 'Release notes still match the previous release. Update RELEASE_NOTES.md or pass -ReleaseNotesPath.'
 }
 
@@ -320,7 +378,7 @@ if ((Compare-SemVer -Left $Version -Right $currentVersion -Pattern $semverPatter
   throw "The release version must be newer than the current version $currentVersion."
 }
 
-Write-Host "Preparing OpenCard $tag from branch $branch" -ForegroundColor Cyan
+Write-Host "Preparing OpenCard $tag as a $($channel.ToLowerInvariant()) release from branch $branch" -ForegroundColor Cyan
 Invoke-NativeCommand -Command 'git' -Arguments @('fetch', 'origin', '--tags') -WorkingDirectory $repoRoot
 
 & git -C $repoRoot rev-parse --verify --quiet "refs/tags/$tag" *> $null
@@ -348,16 +406,18 @@ Invoke-NativeCommand -Command 'npm.cmd' -Arguments @(
 
 $updateJsonVersion = @'
 const fs = require('node:fs');
-const [filePath, version] = process.argv.slice(1);
+const [filePath, version, endpointsJson] = process.argv.slice(1);
 const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 document.version = version;
+document.plugins.updater.endpoints = JSON.parse(endpointsJson);
 fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`);
 '@
 Invoke-NativeCommand -Command 'node' -Arguments @(
   '-e',
   $updateJsonVersion,
   $tauriConfigPath,
-  $Version
+  $Version,
+  (ConvertTo-Json -InputObject @($updaterEndpoint) -Compress)
 ) -WorkingDirectory $repoRoot
 
 Set-FirstRegexMatch `
@@ -419,27 +479,32 @@ Invoke-NativeCommand -Command 'git' -Arguments @(
 
 Write-Host "Released $tag. GitHub Actions will now build the desktop release." -ForegroundColor Green
 
-Write-Host 'Clearing the release notes draft for the next version...' -ForegroundColor Cyan
-[System.IO.File]::WriteAllText(
-  $releaseNotesTargetPath,
-  '',
-  [System.Text.UTF8Encoding]::new($false)
-)
-try {
-  Invoke-NativeCommand -Command 'git' -Arguments @('add', '--', 'opencard-app/RELEASE_NOTES.md') -WorkingDirectory $repoRoot
-  Invoke-NativeCommand -Command 'git' -Arguments @(
-    'commit',
-    '-m',
-    "chore(release): reset notes after $tag"
-  ) -WorkingDirectory $repoRoot
-  Invoke-NativeCommand -Command 'git' -Arguments @(
-    'push',
-    'origin',
-    "HEAD:refs/heads/$branch"
-  ) -WorkingDirectory $repoRoot
+if ($channel -eq 'Stable') {
+  Write-Host 'Clearing the release notes draft for the next version...' -ForegroundColor Cyan
+  [System.IO.File]::WriteAllText(
+    $releaseNotesTargetPath,
+    '',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  try {
+    Invoke-NativeCommand -Command 'git' -Arguments @('add', '--', 'opencard-app/RELEASE_NOTES.md') -WorkingDirectory $repoRoot
+    Invoke-NativeCommand -Command 'git' -Arguments @(
+      'commit',
+      '-m',
+      "chore(release): reset notes after $tag"
+    ) -WorkingDirectory $repoRoot
+    Invoke-NativeCommand -Command 'git' -Arguments @(
+      'push',
+      'origin',
+      "HEAD:refs/heads/$branch"
+    ) -WorkingDirectory $repoRoot
+  }
+  catch {
+    throw "Release $tag was pushed, but the release notes draft could not be reset on $branch. Do not run the release again. $($_.Exception.Message)"
+  }
 }
-catch {
-  throw "Release $tag was pushed, but the release notes draft could not be reset on $branch. Do not run the release again. $($_.Exception.Message)"
+else {
+  Write-Host 'Keeping the release notes draft open for the next preview or stable release.' -ForegroundColor Cyan
 }
 
 if ($NoWaitForWorkflow) {
@@ -447,7 +512,6 @@ if ($NoWaitForWorkflow) {
   exit 0
 }
 
-$repository = Get-GitHubRepositorySlug -RepositoryRoot $repoRoot
 $releaseCommit = (& git -C $repoRoot rev-list -n 1 $tag).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseCommit)) {
   throw "Release $tag was pushed, but its commit could not be resolved. Do not run the release again."

@@ -1,6 +1,8 @@
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../../workspace/store/projectStore'
+import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useTutorialStore } from '../../tutorials/tutorialStore'
 import CommitVersionDialog from '../../version-control/components/CommitVersionDialog.vue'
 import type { SpacePage } from '../spacePage'
 import { createCollaborationSection } from '../sections/collaborationSection'
@@ -20,6 +22,21 @@ export function createCollaborationPage(options: {
   const project = useProjectStore()
   const version = options.version
   const active = computed(() => navigation.page.value === 'collaboration')
+  const settings = useAppSettingsStore()
+  const tutorial = useTutorialStore()
+  watch([active, project.projectPath], ([visible, path], [, previousPath]) => {
+    if (['initializeVersionControl', 'versionControl'].includes(tutorial.session.value?.tutorialId ?? '')
+      && (!visible || path !== previousPath)) tutorial.exit()
+  })
+  watch(() => active.value && version.repositoryReady.value && !version.isInitializingRepository.value, ready => {
+    if (ready) tutorial.completeStep('initializeVersionControl', 'initialize')
+  })
+  watch(() => {
+    if (!active.value || !project.projectPath.value || !settings.isReady.value || tutorial.session.value) return null
+    const id = version.repositoryNeedsInitialization.value ? 'initializeVersionControl'
+      : version.repositoryReady.value && !version.isInitializingRepository.value ? 'versionControl' : null
+    return id && !settings.settings.value.tutorials.seen.includes(id) ? id : null
+  }, id => { if (id) tutorial.start(id) }, { immediate: true })
   async function onAction(key: string): Promise<void> {
     if (key === 'open-project') {
       await options.openProject()

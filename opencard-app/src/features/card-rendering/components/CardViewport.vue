@@ -10,7 +10,7 @@
     <template v-if="props.comparison">
       <div class="card-viewport-comparison-layer" :class="{ 'is-transitioning': comparisonTransitioning }"
         :style="comparisonBeforeLayerStyle" @transitionend="finishComparisonTransition">
-        <div ref="stageRef" class="card-viewport-stage card-viewport-stage--before" :class="{ 'is-transitioning': comparisonTransitioning }"
+        <div ref="stageRef" data-oc-layout-anchor="center" class="card-viewport-stage card-viewport-stage--before" :class="{ 'is-transitioning': comparisonTransitioning }"
           :style="comparisonBeforeStageStyle" @transitionend="finishComparisonTransition">
           <div v-if="props.comparison.before.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.before.face)" />
           <CardFaceRenderer v-else :face="props.comparison.before.face"
@@ -22,7 +22,7 @@
       </div>
       <div ref="comparisonAfterLayerRef" class="card-viewport-comparison-layer" :class="{ 'is-transitioning': comparisonTransitioning }"
         :style="comparisonAfterLayerStyle">
-        <div ref="comparisonAfterStageRef" class="card-viewport-stage card-viewport-stage--after" :class="{ 'is-transitioning': comparisonTransitioning }"
+        <div ref="comparisonAfterStageRef" data-oc-layout-anchor="center" class="card-viewport-stage card-viewport-stage--after" :class="{ 'is-transitioning': comparisonTransitioning }"
           :style="comparisonAfterStageStyle">
           <div v-if="props.comparison.after.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.after.face)" />
           <CardFaceRenderer v-else :face="props.comparison.after.face"
@@ -33,7 +33,7 @@
         </div>
       </div>
     </template>
-    <div v-else ref="stageRef" class="card-viewport-stage" :style="stageStyle">
+    <div v-else ref="stageRef" data-oc-layout-anchor="center" class="card-viewport-stage" :style="stageStyle">
       <CardFaceRenderer :face="face" :transform-disabled-block-ids="transformDisabledBlockIds"
         :clip-to-face="clipToFace" :resource-context="resourceContext"
         :visual-readiness="visualReadiness"
@@ -162,7 +162,7 @@
         {{ moveGuide.anchor }}
       </span>
       </Transition>
-      <div v-if="selectionFrame" :key="selectedBlockId ?? 'selection'" class="selection-frame" :class="{
+      <div v-if="selectionFrame" data-oc-layout-anchor="center" :key="selectedBlockId ?? 'selection'" class="selection-frame" :class="{
         'selection-frame-movable': showMoveHandle,
         'is-resizing': activeHandle,
         'is-moving': isMovingSelection,
@@ -277,6 +277,7 @@ export interface CardViewportComparison {
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
 import { clamp } from '../../../shared/model/number'
+import { taskScheduler } from '../../../utils/taskScheduler'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../../shared/ui/action/action.types'
 import OcOverlayToolbar from '../../../components/standard/OcOverlayToolbar.vue'
@@ -478,7 +479,7 @@ const targetScale = ref(1)
 const isPanning = ref(false)
 const lastPointerX = ref(0)
 const lastPointerY = ref(0)
-const selectionFrame = ref<SelectionFrame | null>(null)
+const selectionWorldFrame = ref<SelectionFrame | null>(null)
 let selectionSyncScheduled = false
 let selectionSyncInFlight = false
 let selectionSyncAgain = false
@@ -521,8 +522,12 @@ const statusFlash = ref<(CardViewportStatusFlash & { sequence: number }) | null>
 let statusFlashSequence = 0
 
 let resizeObserver: ResizeObserver | null = null
+const selectionResizeTargets = new Set<Element>()
 let diffOverlayMutationObserver: MutationObserver | null = null
 let zoomAnimationFrame: number | null = null
+const panInput = taskScheduler.frame(applyPan)
+const transformInput = taskScheduler.frame(applyTransformMove)
+const faceDimensionInput = taskScheduler.frame(applyFaceDimensionDrag)
 let lastEmittedTransform: ViewportTransform | null = null
 let pendingTransformEchoes: ViewportTransform[] = []
 let previousDimensionCursor = ''
@@ -559,6 +564,28 @@ const baseOffsetY = computed(() => {
 
 const translateX = computed(() => baseOffsetX.value + panX.value)
 const translateY = computed(() => baseOffsetY.value + panY.value)
+
+// DOM measurement belongs to content/layout changes. Navigation only projects cached geometry.
+const selectionFrame = computed<SelectionFrame | null>({
+  get() {
+    const frame = selectionWorldFrame.value
+    if (!frame) return null
+    return {
+      left: frame.left * scale.value + translateX.value,
+      top: frame.top * scale.value + translateY.value,
+      width: frame.width * scale.value,
+      height: frame.height * scale.value,
+    }
+  },
+  set(frame) {
+    selectionWorldFrame.value = frame ? {
+      left: (frame.left - translateX.value) / scale.value,
+      top: (frame.top - translateY.value) / scale.value,
+      width: frame.width / scale.value,
+      height: frame.height / scale.value,
+    } : null
+  },
+})
 
 const stageStyle = computed(() => ({
   transform: `translate(${translateX.value}px, ${translateY.value}px) scale(${scale.value})`,
@@ -803,7 +830,7 @@ function findSelectionAction(
 ): OcActionDefinition | null {
   for (const action of actions) {
     if (action.key === actionKey) return action
-    for (const child of action.children ?? []) {
+    for (const child of (typeof action.children === 'function' ? action.children() : action.children) ?? []) {
       if (child.type === 'divider') continue
       const match = findSelectionAction([child], actionKey)
       if (match) return match
@@ -837,8 +864,7 @@ const selectionFrameStyle = computed(() => {
     return {}
   }
   return {
-    left: `${frame.left}px`,
-    top: `${frame.top}px`,
+    transform: `translate3d(${frame.left}px, ${frame.top}px, 0)`,
     width: `${frame.width}px`,
     height: `${frame.height}px`,
   }
@@ -1037,20 +1063,25 @@ function handleMouseDown(event: MouseEvent) {
 function handleMouseMove(event: MouseEvent) {
   updateHoveredComparisonBlock(event.target)
   if (!isPanning.value) return
+  panInput.schedule({ x: event.clientX, y: event.clientY })
+}
 
-  const deltaX = event.clientX - lastPointerX.value
-  const deltaY = event.clientY - lastPointerY.value
+function applyPan(point: { x: number; y: number }): void {
+  if (!isPanning.value) return
+  const deltaX = point.x - lastPointerX.value
+  const deltaY = point.y - lastPointerY.value
 
   panX.value += deltaX
   panY.value += deltaY
   targetPanX.value = panX.value
   targetPanY.value = panY.value
 
-  lastPointerX.value = event.clientX
-  lastPointerY.value = event.clientY
+  lastPointerX.value = point.x
+  lastPointerY.value = point.y
 }
 
 function handleMouseUp() {
+  panInput.flush()
   isPanning.value = false
 }
 
@@ -1317,6 +1348,10 @@ function startFaceDimensionDrag(dimension: FaceDimension, event: PointerEvent): 
 }
 
 function handleFaceDimensionDrag(event: PointerEvent): void {
+  faceDimensionInput.schedule(event)
+}
+
+function applyFaceDimensionDrag(event: PointerEvent): void {
   const drag = faceDimensionDrag.value
   if (!drag) return
   const clientPosition = drag.dimension === 'width' ? event.clientX : event.clientY
@@ -1333,6 +1368,7 @@ function handleFaceDimensionDrag(event: PointerEvent): void {
 }
 
 function stopFaceDimensionDrag(): void {
+  faceDimensionInput.flush()
   const drag = faceDimensionDrag.value
   faceDimensionDrag.value = null
   window.removeEventListener('pointermove', handleFaceDimensionDrag)
@@ -1433,16 +1469,27 @@ function sameDiffOverlayHighlights(
   })
 }
 
+function observeSelectionGeometry(targets: readonly Element[]): void {
+  for (const previous of selectionResizeTargets) {
+    if (!targets.includes(previous)) { resizeObserver?.unobserve(previous); selectionResizeTargets.delete(previous) }
+  }
+  for (const target of targets) {
+    if (!selectionResizeTargets.has(target)) { selectionResizeTargets.add(target); resizeObserver?.observe(target) }
+  }
+}
+
 function measureSelection(): SelectionMeasurement | null {
   const viewport = viewportRef.value
   const stage = stageRef.value
   const selectedBlockId = props.selectedBlockId
   if (!viewport || !stage || !selectedBlockId) {
+    observeSelectionGeometry([])
     return null
   }
 
   const selectedElement = stage.querySelector(`[data-block-id="${selectedBlockId}"]`)
   if (!selectedElement) {
+    observeSelectionGeometry([])
     return null
   }
 
@@ -1454,9 +1501,11 @@ function measureSelection(): SelectionMeasurement | null {
     : stage.querySelector('.card-canvas')
 
   if (!parentElement) {
+    observeSelectionGeometry([])
     return null
   }
 
+  observeSelectionGeometry([selectedElement, parentElement])
   const parentFrame = getElementFrame(parentElement, viewportRect)
   const safeScale = scale.value || 1
   return {
@@ -1565,6 +1614,7 @@ function requestSelectionFrameSync() {
 
 async function syncSelectionFrame() {
   await nextTick()
+  if (activeHandle.value || isMovingSelection.value) return
   if (props.comparison) {
     observeDiffOverlayStages()
     await nextTick()
@@ -1661,6 +1711,11 @@ function bindTransformListeners() {
 }
 
 function handleTransformMove(event: PointerEvent) {
+  if (!lastTransformClientPosition.value) lastTransformClientPosition.value = { x: event.clientX, y: event.clientY }
+  transformInput.schedule(event)
+}
+
+function applyTransformMove(event: PointerEvent) {
   const measurement = dragMeasurement.value
   const preview = previewWorldRect.value
   const rawPreview = rawPreviewWorldRect.value
@@ -1845,6 +1900,7 @@ function hasMeaningfulMoveChange(preview: SelectionFrame, measurement: Selection
 }
 
 function stopTransform() {
+  transformInput.flush()
   const measurement = dragMeasurement.value
   const preview = previewWorldRect.value
   const blockId = transformBlockId.value
@@ -2118,24 +2174,30 @@ onMounted(() => {
   updateViewportSize()
 
   if (viewportRef.value) {
-    resizeObserver = new ResizeObserver(() => {
-      updateViewportSize()
+    resizeObserver = new ResizeObserver(entries => {
+      if (entries.some(entry => entry.target === viewportRef.value)) updateViewportSize()
       requestSelectionFrameSync()
     })
     resizeObserver.observe(viewportRef.value)
   }
 
+  document.fonts?.addEventListener('loadingdone', requestSelectionFrameSync)
   requestSelectionFrameSync()
   void nextTick().then(observeDiffOverlayStages)
 })
 
 onBeforeUnmount(() => {
+  panInput.cancel()
+  transformInput.cancel()
+  faceDimensionInput.cancel()
   visualReadiness.dispose()
   stopTransform()
   stopFaceDimensionDrag()
   stopZoomAnimation()
   resizeObserver?.disconnect()
   resizeObserver = null
+  selectionResizeTargets.clear()
+  document.fonts?.removeEventListener('loadingdone', requestSelectionFrameSync)
   diffOverlayMutationObserver?.disconnect()
   diffOverlayMutationObserver = null
   statusFlash.value = null
@@ -2174,9 +2236,6 @@ watch(
     props.selectedLocationType,
     props.selectedAnchor,
     props.transformDisabledBlockIds.join('|'),
-    scale.value,
-    translateX.value,
-    translateY.value,
   ],
   () => {
     if (activeHandle.value || isMovingSelection.value) {
@@ -2205,6 +2264,10 @@ watch(
   },
   { deep: true },
 )
+
+watch([translateX, translateY, scale], () => {
+  if (props.comparison) requestSelectionFrameSync()
+})
 
 watch(
   () => props.face,
@@ -2334,7 +2397,7 @@ watch(
   top: 0;
   bottom: 0;
   left: 50%;
-  width: var(--oc-diff-divider-width);
+  width: var(--oc-border-width);
   border-radius: var(--oc-radius-control);
   background: var(--oc-diff-divider);
   transform: translateX(-50%);
@@ -2351,8 +2414,8 @@ watch(
   max-width: var(--oc-diff-version-label-max-width);
   overflow: hidden;
   color: var(--oc-fg-muted);
-  font: var(--oc-text-xs);
-  font-family: var(--oc-font-mono);
+  font-family: var(--oc-font-sans);
+  font-size: var(--oc-text-base);
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
@@ -2664,6 +2727,8 @@ watch(
 
 .selection-frame {
   position: absolute;
+  left: 0;
+  top: 0;
   border-radius: 2px;
   box-shadow: 0 0 0 1px var(--oc-accent-glow);
   pointer-events: none;
@@ -2687,7 +2752,7 @@ watch(
 .selection-quick-actions {
   position: absolute;
   left: calc(var(--oc-border-width) * -1);
-  bottom: calc(100% + var(--oc-floating-surface-gap));
+  bottom: calc(100% + var(--oc-space-xs));
   z-index: var(--oc-z-overlay-toolbar);
   pointer-events: auto;
 }

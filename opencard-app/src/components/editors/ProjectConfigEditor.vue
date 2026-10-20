@@ -95,7 +95,7 @@
           <OcIcon name="status.error" tone="danger" />
           <div>
             <strong>{{ t('projectConfig.invalid') }}</strong>
-            <OcText tone="muted" size="sm">{{ t('projectConfig.repairHint') }}</OcText>
+            <OcText tone="muted" size="sm">{{ t('projectConfig.repairDescription') }}</OcText>
           </div>
         </div>
         <div class="project-profile-editor__source">

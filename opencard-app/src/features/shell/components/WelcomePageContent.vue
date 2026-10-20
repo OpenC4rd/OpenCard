@@ -69,13 +69,12 @@ const { t } = useI18n()
         </OcButton>
       </div>
     </div>
-    <!-- 左下角的小按钮：控制背景封面墙显隐；开关状态由按下态与 aria-pressed 表达。 -->
+    <!-- 左下角的小按钮：控制背景封面墙显隐；开关状态由浅色底表达，同时通过 aria-pressed 暴露给辅助技术。 -->
     <OcButton
       class="page-empty-state__wall-toggle"
       icon="tool.background"
       icon-only
-      variant="ghost"
-      :active="props.backgroundVisible"
+      :variant="props.backgroundVisible ? 'soft' : 'ghost'"
       :aria-pressed="props.backgroundVisible"
       :aria-label="t('app.welcome.backgroundToggle')"
       :data-tooltip="t('app.welcome.backgroundToggle')"

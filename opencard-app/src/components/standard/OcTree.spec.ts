@@ -10,6 +10,7 @@ import OcTree from './OcTree.vue'
 import OcActionButton from './OcActionButton.vue'
 import { useFloatingMenu } from '../../composables/useFloatingMenu'
 import { registerUnhandledExternalDrop } from '../../shared/ui/drop/externalFileDrop'
+import { taskScheduler } from '../../utils/taskScheduler'
 
 const platform = vi.hoisted(() => ({
   dragDropHandler: null as ((event: { payload: unknown }) => void) | null,
@@ -282,6 +283,7 @@ describe('OcTree', () => {
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
+    await vi.waitFor(() => expect(wrapper.find('[data-oc-tree-key="item-999"]').exists()).toBe(true))
     const selectedRow = wrapper.get('[data-oc-tree-key="item-999"] .oc-tree__row')
     expect(selectedRow.attributes()).toMatchObject({
       'aria-posinset': '1000',
@@ -290,6 +292,49 @@ describe('OcTree', () => {
     })
     expect(wrapper.findAll('[data-oc-tree-key]').length).toBeLessThanOrEqual(12)
   })
+  it('stops building a large structure after its view is destroyed', async () => {
+    let reads = 0
+    const keys = Array.from({ length: 10000 }, (_, index) => `item-${index}`)
+    const wrapper = mount(OcTree, { props: {
+      data: createData({ roots: keys, items: keys.map(key => [key, {
+        label: key, get disabled() { reads++; return false },
+      }]) }), virtualized: true,
+    } })
+    wrapper.unmount()
+    const before = reads
+    await taskScheduler.yieldToUi()
+    expect(reads).toBe(before)
+    expect(reads).toBeLessThanOrEqual(256)
+  })
+
+  it('reuses visible rows while scrolling inside the same row range', async () => {
+    let presentations = 0
+    const readsByKey = new Map<string, number>()
+    const keys = Array.from({ length: 1000 }, (_, index) => `item-${index}`)
+    const wrapper = mount(OcTree, { props: {
+      data: createData({ roots: keys, items: keys.map(key => [key, {
+        label: key,
+        get visual() { presentations++; readsByKey.set(key, (readsByKey.get(key) ?? 0) + 1); return { type: 'icon' as const, icon: 'data.collection' as const } },
+      }]) }),
+      virtualized: true,
+    }, attrs: { style: '--oc-size-md: 30px; --oc-space-2xs: 2px' } })
+    await vi.waitFor(() => expect(wrapper.findAll('[data-oc-tree-key]').length).toBeGreaterThan(0))
+    const root = wrapper.get('.oc-tree')
+    const before = presentations
+    for (let offset = 1; offset <= 5; offset++) {
+      root.element.scrollTop = offset
+      await root.trigger('scroll')
+    }
+    expect(presentations).toBe(before)
+    const retainedRowReads = readsByKey.get('item-8')
+    root.element.scrollTop = 400
+    await root.trigger('scroll')
+    expect(presentations).toBeGreaterThan(before)
+    expect(readsByKey.get('item-8')).toBe(retainedRowReads)
+    expect(wrapper.findAll('[data-oc-tree-key]').length).toBeLessThanOrEqual(12)
+    wrapper.unmount()
+  })
+
   it('renders expanded children and rotates the node type icon', () => {
     const wrapper = mount(OcTree, {
       props: {
@@ -765,104 +810,22 @@ describe('OcTree', () => {
     ]])
   })
 
-  it('packs all root actions into one more menu when the title cannot fit without the trade', async () => {
-    let resize: ResizeObserverCallback = () => undefined
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: ResizeObserverCallback) { resize = callback }
-      observe(): void {}
-      disconnect(): void {}
-    })
-    const actions = [
-      { key: 'top', title: 'Move to top', icon: 'tool.flip-to-front' },
-      { key: 'up', title: 'Move up', icon: 'nav.arrow-up' },
-      { key: 'delete', title: 'Delete', icon: 'action.delete' },
-    ] as const
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', { label: 'A readable label', tail: [...actions] }]],
-        }),
-        actionOverflowTitle: 'Item actions',
-      },
-    })
-    const row = wrapper.get('.oc-tree__row').element as HTMLElement
-    const label = wrapper.get('.oc-tree__label').element as HTMLElement
-    const revealClass = vi.spyOn(wrapper.get('.oc-tree').element.classList, 'add')
-    let actionParts = [...wrapper.findAll('.oc-node-tail__action')]
-    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 160 })
-    // The row leaves the title 40px while the title needs 100px, so its commands go into one menu.
-    Object.defineProperty(label, 'scrollWidth', { configurable: true, value: 100 })
-    vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(rect(40, 28))
-    for (const part of actionParts) {
-      vi.spyOn(part.element as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(40, 22))
-    }
-
-    resize([], {} as ResizeObserver)
-    await wrapper.vm.$nextTick()
-    const overflow = wrapper.getComponent(OcActionButton)
-    expect(overflow.props('action')).toMatchObject({
-      title: 'Item actions',
-      icon: 'nav.more',
-      children: [{ key: 'top' }, { key: 'up' }, { key: 'delete' }],
-    })
-    overflow.vm.$emit('select', { key: 'up' })
-    expect(wrapper.emitted('action')).toContainEqual([{
-      key: 'root', actionKey: 'up', source: 'inline',
-    }])
-    // Hidden commands are revealed for the measurement pass, and that state never survives it.
-    expect(revealClass).toHaveBeenCalledWith('are-commands-revealed')
-    expect(wrapper.classes()).not.toContain('are-commands-revealed')
-
-    actionParts = [...wrapper.findAll('.oc-node-tail__action')]
-    vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(rect(220, 28))
-    for (const part of actionParts) {
-      vi.spyOn(part.element as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(10, 22))
-    }
-    resize([], {} as ResizeObserver)
-    await wrapper.vm.$nextTick()
-    expect(wrapper.findAllComponents(OcActionButton).map(button => button.props('action').key))
-      .toEqual(['__oc-tree-action-overflow__:root'])
-  })
-
-  it('trades the trailing text before trading the commands', async () => {
-    let resize: ResizeObserverCallback = () => undefined
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: ResizeObserverCallback) { resize = callback }
-      observe(): void {}
-      disconnect(): void {}
-    })
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Root',
-            tail: [
-              '2 weeks',
-              { key: 'top', title: 'Move to top', icon: 'tool.flip-to-front' },
-              { key: 'up', title: 'Move up', icon: 'nav.arrow-up' },
-            ],
-          }]],
-        }),
-      },
-    })
-    const row = wrapper.get('.oc-tree__row').element as HTMLElement
-    const label = wrapper.get('.oc-tree__label').element as HTMLElement
-    const tailText = wrapper.get('.oc-node-tail__text').element as HTMLElement
-    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 120 })
-    // The title needs 60px and holds 50px, but the 30px its trailing text still occupies already
-    // counts towards the room the title can get back, so no command has to be given up.
-    Object.defineProperty(label, 'scrollWidth', { configurable: true, value: 60 })
-    vi.spyOn(label, 'getBoundingClientRect').mockReturnValue(rect(50, 28))
-    vi.spyOn(tailText, 'getBoundingClientRect').mockReturnValue(rect(30, 20))
-    for (const part of wrapper.findAll('.oc-node-tail__action')) {
-      vi.spyOn(part.element as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(20, 22))
-    }
-
-    resize([], {} as ResizeObserver)
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.findAllComponents(OcActionButton).map(button => button.props('action').key))
-      .toEqual(['__oc-tree-action-overflow__:root'])
+  it('groups multiple commands without measuring labels or revealing other rows', async () => {
+    const wrapper = mount(OcTree, { props: {
+      data: createData({ items: [['root', { label: 'Readable label', tail: [
+        { key: 'top', title: 'Move to top', icon: 'tool.flip-to-front' },
+        { key: 'up', title: 'Move up', icon: 'nav.arrow-up' },
+      ] }]] }), actionOverflowTitle: 'Item actions',
+    } })
+    const measure = vi.spyOn(wrapper.get('.oc-tree__label').element, 'getBoundingClientRect')
+    await wrapper.get('.oc-tree__row').trigger('mouseenter')
+    await nextTick()
+    const menu = wrapper.getComponent(OcActionButton)
+    expect(menu.props('action')).toMatchObject({ title: 'Item actions', children: [{ key: 'top' }, { key: 'up' }] })
+    menu.vm.$emit('select', { key: 'up' })
+    expect(wrapper.emitted('action')).toContainEqual([{ key: 'root', actionKey: 'up', source: 'inline' }])
+    expect(measure).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('renders no action container when a node declares no commands', () => {
@@ -1096,10 +1059,11 @@ describe('OcTree', () => {
     Reflect.deleteProperty(document, 'elementFromPoint')
   })
 
-  it('warns about malformed collapsed topology in development', () => {
+  it('stops malformed visible topology without following cycles', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     mount(OcTree, {
       props: {
+        expandedKeys: ['root', 'child'],
         data: createData({
           roots: ['root'],
           items: [

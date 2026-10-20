@@ -1,3 +1,4 @@
+import { actionChildren } from '../../shared/ui/action/action.types'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -306,7 +307,7 @@ describe('CardDataTable', () => {
       'manage-fields', 'block-remove-divider', 'remove-block',
     ])
     const manageFields = menu.state.value.items[0]
-    expect(manageFields?.type !== 'divider' && manageFields.children?.map(item => item.key))
+    expect(manageFields?.type !== 'divider' && actionChildren(manageFields).map(item => item.key))
       .toEqual(['include-field:fontSize', 'create-field-divider', 'create-field'])
     menu.selectMenuItem('remove-block')
     expect(wrapper.emitted('remove-block')).toEqual([['text']])

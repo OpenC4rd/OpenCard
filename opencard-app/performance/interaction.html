@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>项目规模与界面交互</title>
+<body>
+  <button id="scroll" disabled>测量文件树滚动</button>
+  <button id="pan" disabled>测量画布平移</button>
+  <pre id="result">准备数据与真实组件…</pre>
+  <div id="app"></div>
+  <script type="module">
+    import { createApp, h, markRaw, nextTick, ref } from 'vue'
+    import { useWorkbenchFileTree } from '/src/features/shell/composables/useWorkbenchFileTree.ts'
+    import { createWorkbenchSection } from '/src/features/shell/sections/workbenchSection.ts'
+    import { PROJECT_FILES_LIST_KEY } from '/src/features/shell/shellSidebarConfig.ts'
+    import ShellSidebarContent from '/src/features/shell/components/ShellSidebarContent.vue'
+    import CardDesignEditor from '/src/features/card-designer/CardDesignEditor.vue'
+    import { createEditorSession } from '/src/features/editor-runtime/session/editorSession.ts'
+    import { createCardFace, createTextBlock } from '/src/entities/card/model.ts'
+    import { setOcTheme } from '/src/shared/ui/foundation/index.ts'
+    import { taskScheduler } from '/src/utils/taskScheduler.ts'
+    import { i18n } from '/src/i18n/index.ts'
+    import '/src/styles.css'
+
+    async function main() {
+      const count = Math.min(100000, Math.max(1, Number(new URL(location.href).searchParams.get('files')) || 10000))
+      const entries = markRaw(Array.from({ length: count }, (_, index) => ({
+        name: `file-${index}.png`, isDirectory: false, isFile: true, isSymlink: false,
+      })))
+      const front = createCardFace({ id: 'front' })
+      front.children = Array.from({ length: 40 }, (_, index) => ({
+        block: createTextBlock({ id: `block-${index}`, content: `Text ${index}` }),
+        location: { id: `location-${index}`, type: 'simple-container-location', anchor: 'lt',
+          x: `${index % 4 * 120}px`, y: `${Math.floor(index / 4) * 70}px` },
+      }))
+      const content = JSON.stringify({ type: 'card-document', id: 'document', name: 'Performance',
+        width: '540', height: '850', faces: { front, back: createCardFace({ id: 'back' }) }, instances: [] })
+      const session = createEditorSession({ id: 'performance', path: 'D:/Performance/card.ocdocument',
+        resourceKind: 'external', fileTypeId: 'opencard', editorId: 'card-designer', name: 'Performance',
+        savedContent: content, draftContent: content, isDirty: false, isPreview: false, mode: 'edit',
+      }, () => ({ history: 'structured' }))
+      const result = document.querySelector('#result')
+      const nextFrame = () => new Promise(requestAnimationFrame)
+      const noop = async () => {}
+      let updates = {}, translations = 0
+      taskScheduler.observeInteractions(window)
+      setOcTheme('dark')
+      createApp({ setup() {
+        const expanded = ref([])
+        const tree = useWorkbenchFileTree({ projectPath: ref('D:/Performance'), indexedEntries: ref(entries),
+          sessions: ref([session]), activeSession: ref(session), formatSessionTitle: value => value.state.name,
+          packagePaths: ref([]), isDirectoryExpanded: path => expanded.value.includes(path),
+          activateSession: noop, openPreviewFile: noop,
+          translate: (key, params) => { translations++; return i18n.global.t(key, params ?? {}) },
+        })
+        const common = { onSelectionChange: noop, onAction: noop, onAuxclick: noop, onExpansionChange: noop,
+          onNodeActivate: noop, onRenameCommit: noop, onMove: noop, onExternalDrop: noop, captureInstance: noop }
+        const sections = createWorkbenchSection({ translate: key => i18n.global.t(key), project: {
+          open: ref(true), path: ref('D:/Performance'), folderName: ref('Performance'),
+          openedEditors: { ...common, data: tree.openedEditorTreeData, selectedKeys: tree.openedEditorSelectedKeys },
+          management: { ...common, data: tree.projectManagementTreeData, selectedKeys: tree.selectedManagementKeys,
+            expandedKeys: tree.projectManagementExpandedKeys },
+          files: { ...common, data: tree.projectTreeData, selectedKeys: tree.selectedProjectEntryKeys, expandedKeys: expanded },
+        }, version: { ready: ref(false) } })
+        return () => h('div', { style: 'display:flex;height:700px;width:1200px' }, [
+          h('div', { style: 'width:320px;flex-shrink:0' }, [h(ShellSidebarContent, {
+            list: sections.value[0].lists.find(list => list.key === PROJECT_FILES_LIST_KEY),
+          })]), h(CardDesignEditor, { session, style: 'flex:1;min-width:0' }),
+        ])
+      } }).mixin({ updated() {
+        const name = this.$options.__name ?? this.$options.name ?? 'anonymous'
+        updates[name] = (updates[name] ?? 0) + 1
+      } }).use(i18n).mount('#app')
+      await nextTick()
+      const tree = document.querySelector('.oc-tree')
+      while (!tree.querySelector('.oc-tree__node')) await nextFrame()
+      result.textContent = JSON.stringify({ files: count, ready: true })
+
+      async function measure(kind) {
+        const buttons = [...document.querySelectorAll('button#scroll, button#pan')]
+        buttons.forEach(button => { button.disabled = true })
+        updates = {}; translations = 0
+        const intervals = [], publicationMs = []
+        const longFrames = []
+        const observer = PerformanceObserver.supportedEntryTypes.includes('long-animation-frame')
+          ? new PerformanceObserver(list => longFrames.push(...list.getEntries().map(entry => entry.toJSON())))
+          : null
+        observer?.observe({ type: 'long-animation-frame' })
+        const viewport = document.querySelector('.card-viewport')
+        if (kind === 'pan') viewport.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true, button: 1, clientX: 600, clientY: 350,
+        }))
+        let previous = performance.now()
+        for (let index = 0; index < 120; index++) {
+          await nextFrame()
+          const now = performance.now()
+          intervals.push(now - previous); previous = now
+          const started = performance.now()
+          if (kind === 'scroll') {
+            tree.scrollTop = index * 20
+            tree.dispatchEvent(new Event('scroll'))
+          } else viewport.dispatchEvent(new MouseEvent('mousemove', {
+            bubbles: true, buttons: 4, clientX: 600 + index * 2, clientY: 350 + index % 10,
+          }))
+          await nextTick()
+          publicationMs.push(performance.now() - started)
+        }
+        if (kind === 'pan') viewport.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 1 }))
+        await nextTick()
+        if (observer) {
+          longFrames.push(...observer.takeRecords().map(entry => entry.toJSON()))
+          observer.disconnect()
+        }
+        const sorted = [...intervals].sort((left, right) => left - right)
+        result.textContent = JSON.stringify({ files: count, kind, updates, translations, longFrames,
+          mountedRows: tree.querySelectorAll('.oc-tree__node').length,
+          frameP50: sorted[60], frameP95: sorted[114], frameMax: sorted[119],
+          framesOverBudget: intervals.filter(value => value > 16.7),
+          maxInputPublicationMs: Math.max(...publicationMs),
+        }, null, 2)
+        buttons.forEach(button => { button.disabled = false })
+      }
+      document.querySelector('#scroll').onclick = () => measure('scroll')
+      document.querySelector('#pan').onclick = () => measure('pan')
+      document.querySelectorAll('button#scroll, button#pan').forEach(button => { button.disabled = false })
+    }
+    main().catch(error => { document.querySelector('#result').textContent = String(error) })
+  </script>
+</body>
+</html>

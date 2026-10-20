@@ -40,6 +40,7 @@
         data-oc-tutorial="shell.sidebar"
         :collapsed="effectiveSidebarCollapsed"
         :width="sidebarWidth"
+        :tutorial-targets="tutorialTargets"
         :body-group="currentPage.sidebar.value[0]"
         :min-resize-width="SHELL_SIDEBAR_COLLAPSE_THRESHOLD"
         :max-resize-width="MAX_SIDEBAR_WIDTH"
@@ -199,9 +200,11 @@ const { isExpanded: isBottomPanelExpanded, height: bottomPanelHeight, previewHei
   isResizing: isBottomPanelResizing, previewPercentage: bottomPanelPreviewPercentage, startResize: handleBottomPanelResizeStart,
   minimum: bottomPanelMinimum, maximum: bottomPanelMaximum, measure: measureBottomPanel,
   resize: resizeBottomPanel, finishResize: finishBottomPanelResize,
+  animateLayoutChange: animateBottomPanelLayout,
 } = useShellBottomPanelLayout(pageStackRef)
 const isBottomPanelVisible = computed(() => isBottomPanelExpanded.value
   || tutorialTargets.value.includes('shell.bottom-panel'))
+watch(isBottomPanelVisible, animateBottomPanelLayout, { flush: 'pre' })
 const activeBottomTab = ref<ShellBottomPanelTab>('issues')
 const {
   sidebarCollapsed,
@@ -223,7 +226,8 @@ const {
   expandOnNarrowViewport: computed(() => currentPage.value.sidebarLayout?.expandOnNarrowViewport ?? false),
 })
 // 介绍时临时展示侧栏，结束后恢复原有布局，不改写用户的折叠记录。
-const effectiveSidebarCollapsed = computed(() => tutorialTargets.value.includes('shell.sidebar') ? false : layoutSidebarCollapsed.value)
+const effectiveSidebarCollapsed = computed(() => tutorialTargets.value.some(key => key === 'shell.sidebar'
+  || key.startsWith('workbench.') || key.startsWith('collaboration.')) ? false : layoutSidebarCollapsed.value)
 const shellMainStyle = computed(() => ({
   '--shell-sidebar-width': effectiveSidebarCollapsed.value ? '0px' : `${sidebarWidth.value}px`,
 }))

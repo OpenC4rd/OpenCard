@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, shallowRef, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { TutorialSession } from '../../shared/ui/tutorial/tutorial'
 import { activeDialogRoot, isWithinOverlayOwners, registerDialogRoot, resolveOverlayRoot } from '../../shared/ui/overlayScope'
 import { findTutorialSpace, tutorialConnector } from '../../shared/ui/tutorial/tutorialLayout'
 import OcButton from '../base/OcButton.vue'
+import OcIcon from '../base/OcIcon.vue'
 import OcInlineMarkup from './OcInlineMarkup.vue'
 import OcProgressBar from './OcProgressBar.vue'
 
@@ -19,9 +20,10 @@ const cardSurface = shallowRef<HTMLElement | null>(null)
 const owner = shallowRef<HTMLElement | null>(null)
 const missing = shallowRef(false)
 const holes = shallowRef<DOMRect[]>([])
+const interactiveHoles = computed(() => holes.value.filter((_, index) => isInteractiveTarget(highlighted[index]!)))
 const interactionShield = computed(() => [
   `M0 0H${window.innerWidth}V${window.innerHeight}H0Z`,
-  ...holes.value.filter((_, index) => isInteractiveTarget(highlighted[index]!))
+  ...interactiveHoles.value
     .map(hole => `M${hole.left} ${hole.top}h${hole.width}v${hole.height}h${-hole.width}Z`),
 ].join(' '))
 const cardBody = shallowRef<HTMLElement | null>(null)
@@ -40,6 +42,27 @@ const blocking = computed(() => Boolean(props.session?.step.blockInteraction ?? 
 const overlayRoot = computed(() => blocking.value ? document.body : resolveOverlayRoot(owner.value))
 const visible = computed(() => Boolean(props.session && (!activeDialogRoot.value
   || activeDialogRoot.value === layerRoot.value || activeDialogRoot.value.contains(owner.value))))
+
+function setFlight(layer: Element, bounds = space.value): void {
+  const offsets = [
+    { distance: bounds.left, x: -bounds.right - 8, y: 0 },
+    { distance: window.innerWidth - bounds.right, x: window.innerWidth - bounds.left + 8, y: 0 },
+    { distance: bounds.top, x: 0, y: -bounds.bottom - 8 },
+    { distance: window.innerHeight - bounds.bottom, x: 0, y: window.innerHeight - bounds.top + 8 },
+  ]
+  const nearest = offsets.reduce((closest, edge) => edge.distance < closest.distance ? edge : closest)
+  const root = layer as HTMLElement
+  root.style.setProperty('--oc-tutorial-flight-x', `${nearest.x}px`)
+  root.style.setProperty('--oc-tutorial-flight-y', `${nearest.y}px`)
+}
+function enterLayer(layer: Element): void {
+  // Wait for the content measurement to choose its final space before the first painted frame.
+  void nextTick(() => setFlight(layer))
+}
+function leaveLayer(layer: Element): void {
+  const rect = layer.querySelector('.oc-tutorial')?.getBoundingClientRect()
+  setFlight(layer, rect ?? space.value)
+}
 
 function measureCard(): void {
   const body = cardBody.value
@@ -161,6 +184,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport :to="overlayRoot">
+    <Transition name="oc-tutorial-overlay" appear @before-enter="setFlight" @enter="enterLayer" @before-leave="leaveLayer">
     <div v-if="session" v-show="visible" ref="layerRoot" class="oc-tutorial-layer">
     <svg v-if="visible" class="oc-tutorial__mask" :class="{ 'oc-tutorial__mask--blocking': blocking }" aria-hidden="true"
       @pointerdown.prevent.stop>
@@ -177,6 +201,12 @@ onBeforeUnmount(() => {
       <rect v-for="(hole, index) in holes" :key="index" :x="hole.left - 4" :y="hole.top - 4"
         :width="hole.width + 8" :height="hole.height + 8" rx="4" class="oc-tutorial__outline" />
     </svg>
+      <template v-if="visible && !blocking">
+        <span v-for="(hole, index) in interactiveHoles" :key="index" class="oc-tutorial__click-hint" aria-hidden="true"
+          :style="{ left: `${hole.right + 4}px`, top: `${hole.bottom + 4}px` }">
+          <OcIcon name="input.mouse-left-click" tone="accent" size="sm" />
+        </span>
+      </template>
       <div ref="cardSurface" class="oc-tutorial" :class="{ 'oc-tutorial--morphing': morphing }"
         :style="{ transform: `translate3d(${space.left}px, ${space.top}px, 0)`, width: `${space.right - space.left}px`, height: `${space.bottom - space.top}px` }"
         @transitionrun="trackMorph" :role="blocking ? 'dialog' : 'region'" :aria-modal="blocking || undefined"
@@ -208,11 +238,37 @@ onBeforeUnmount(() => {
     </div>
       </div>
     </div>
+    </Transition>
   </Teleport>
 </template>
 
 <style scoped>
 .oc-tutorial-layer { position: fixed; inset: 0; z-index: calc(var(--oc-z-popover) - 1); pointer-events: none; }
+.oc-tutorial-overlay-enter-active, .oc-tutorial-overlay-leave-active {
+  transition: opacity var(--oc-duration-layout) var(--oc-ease);
+}
+.oc-tutorial-overlay-enter-from, .oc-tutorial-overlay-leave-to { opacity: 0; }
+.oc-tutorial-overlay-enter-active .oc-tutorial,
+.oc-tutorial-overlay-leave-active .oc-tutorial {
+  transition: translate var(--oc-duration-layout) var(--oc-ease);
+}
+.oc-tutorial-overlay-enter-from .oc-tutorial,
+.oc-tutorial-overlay-leave-to .oc-tutorial {
+  translate: var(--oc-tutorial-flight-x) var(--oc-tutorial-flight-y);
+}
+.oc-tutorial-overlay-leave-active .oc-tutorial,
+.oc-tutorial-overlay-leave-active .oc-tutorial__mask,
+.oc-tutorial-overlay-leave-active .oc-tutorial__interaction-shield { pointer-events: none; }
+.oc-tutorial__click-hint {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  padding: var(--oc-space-xs);
+  background: var(--oc-bg-surface);
+  border: 1px solid var(--oc-accent);
+  border-radius: var(--oc-radius-control);
+}
+.oc-tutorial__click-hint, .oc-tutorial__click-hint :deep(*) { pointer-events: none; }
 .oc-tutorial {
   position: fixed;
   top: 0;
@@ -241,7 +297,10 @@ onBeforeUnmount(() => {
 .oc-tutorial-step-leave-active { position: absolute; left: 0; right: 0; pointer-events: none; }
 .oc-tutorial-step-enter-from, .oc-tutorial-step-leave-to { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .oc-tutorial--morphing, .oc-tutorial-step-enter-active, .oc-tutorial-step-leave-active { transition: none; }
+  .oc-tutorial--morphing, .oc-tutorial-step-enter-active, .oc-tutorial-step-leave-active,
+  .oc-tutorial-overlay-enter-active, .oc-tutorial-overlay-leave-active,
+  .oc-tutorial-overlay-enter-active .oc-tutorial,
+  .oc-tutorial-overlay-leave-active .oc-tutorial { transition: none; }
 }
 .oc-tutorial__heading, .oc-tutorial__actions {
   display: flex;

@@ -14,7 +14,7 @@
       @configure-composition="openCompositionDialog" />
 
     <ProjectRegistryRepairEditor v-else :model-value="editorState.draftContent ?? ''" :theme-id="themeId"
-      :theme-overrides="themeOverrides" :heading="t('fontRegistry.invalid')" :description="t('fontRegistry.repair')"
+      :theme-overrides="themeOverrides" :heading="t('fontRegistry.invalid')" :description="t('fontRegistry.repairDescription')"
       @update:model-value="updateRawSource" @save="save" />
 
     <ProjectFontRegistrationDialog :open="registrationDialogOpen" :registry="fontRegistry"

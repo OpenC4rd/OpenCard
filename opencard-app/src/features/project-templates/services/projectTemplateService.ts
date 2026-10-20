@@ -10,7 +10,7 @@ import { parseProjectMetadataText, serializeProjectMetadata } from '../../worksp
 import { parseProjectFontRegistryText } from '../../workspace/model/projectFontRegistry'
 import { parseProjectIconRegistryText } from '../../workspace/model/projectIconRegistry'
 import { parseProjectDictionaryText } from '../../workspace/model/projectDictionary'
-import { initializeProjectStructure } from '../../workspace/services/projectStructureService'
+import { writeProjectManagementFile } from '../../workspace/services/projectStructureService'
 import {
   PROJECT_DICTIONARY_FILE_NAME,
   PROJECT_FONT_REGISTRY_FILE_NAME,
@@ -395,7 +395,6 @@ export class ProjectTemplateService {
       if (await this.fs.fileExists(request.template.contentPath)) {
         await this.copyDirectory(request.template.contentPath, temporaryPath)
       }
-      await initializeProjectStructure(this.fs, temporaryPath, this.createId)
       if (selectedEntry) {
         const entryPath = await this.paths.join(temporaryPath, ...pathSegments(selectedEntry))
         if (!await this.fs.fileExists(entryPath)) {
@@ -408,7 +407,7 @@ export class ProjectTemplateService {
       const templateProfile = await this.fs.fileExists(projectFilePath)
         ? parseProjectMetadataText(await this.fs.readFile(projectFilePath))
         : null
-      await this.fs.writeFile(projectFilePath, serializeProjectMetadata({
+      await writeProjectManagementFile(this.fs, temporaryPath, PROJECT_PROFILE_FILE_NAME, serializeProjectMetadata({
         ...(templateProfile ?? {}),
         name: projectName,
       }))

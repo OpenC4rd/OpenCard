@@ -22,7 +22,7 @@ describe('NumberSliderPropertyField', () => {
 
     slider.vm.$emit('preview', 30)
     await nextTick()
-    expect(wrapper.get('.oc-slider__readout').text()).toBe('30')
+    expect(wrapper.get('.oc-slider__track').attributes('data-tooltip')).toBe('30')
     expect(wrapper.get('.oc-slider__track').attributes('aria-valuenow')).toBe('30')
     expect(wrapper.emitted('preview:value')).toEqual([['30']])
 

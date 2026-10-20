@@ -39,7 +39,7 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
     if (!options.projectOpen.value) {
       return [{
         key: 'version-control',
-        title: options.translate('sidebar.versionControlGroup', 'Version Control'),
+        title: options.translate('versionControl.title', 'Version Control'),
         icon: 'nav.collaboration',
         onAction: options.onAction,
         headButtons: [{
@@ -49,8 +49,8 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
         }],
         lists: [{
           key: 'collaboration-empty',
-          title: options.translate('sidebar.versionControlGroup', 'Version Control'),
-          placeholder: options.translate('sidebar.collaborationEmpty', 'Open a project to see changes and version history'),
+          title: options.translate('versionControl.title', 'Version Control'),
+          placeholder: options.translate('versionControl.empty', 'Open a project to see changes and version history'),
           actions: [],
           content: {
             type: 'tree' as const,
@@ -65,22 +65,24 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
     return [
       {
         key: 'version-control',
-        title: options.translate('sidebar.versionControlGroup', 'Version Control'),
+        title: options.translate('versionControl.title', 'Version Control'),
         icon: 'nav.collaboration',
         onAction: options.onAction,
         headButtons: options.version.needsInitialization.value
           ? [{
               key: 'initialize-repository',
+              tutorialKey: 'collaboration.initialize',
               icon: 'file.git',
-              title: options.translate('sidebar.initializeRepository', 'Initialize repository'),
+              title: options.translate('versionControl.initializeRepository', 'Initialize repository'),
               disabled: options.version.initializing.value,
             }]
           : options.version.ready.value
             ? [{
                 key: 'publish-version',
+                tutorialKey: 'collaboration.commit',
                 icon: 'action.publish',
-                title: options.translate('sidebar.commitVersion', 'Commit version'),
-                hoverTip: options.translate('sidebar.commitSelectedCount', { count: options.version.selectedChangeCount.value }),
+                title: options.translate('versionControl.commitVersion', 'Commit version'),
+                hoverTip: options.translate('versionControl.commitSelectedCount', { count: options.version.selectedChangeCount.value }),
                 badge: options.version.selectedChangeCount.value,
                 disabled: options.version.selectedChangeCount.value === 0 || options.version.committing.value,
               }]
@@ -89,8 +91,9 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
           ? [
               {
                 key: 'changes',
-                title: options.translate('sidebar.changes', 'Changes'),
-                placeholder: options.translate('sidebar.changesEmpty', 'Uncommitted project files appear here'),
+                tutorialKey: 'collaboration.changes',
+                title: options.translate('versionControl.changes', 'Changes'),
+                placeholder: options.translate('versionControl.changesEmpty', 'Uncommitted project files appear here'),
                 actions: [],
                 content: {
                   type: 'tree' as const,
@@ -109,8 +112,9 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
               },
               {
                 key: 'version-graph',
-                title: options.translate('sidebar.versionGraph', 'Version graph'),
-                placeholder: options.translate('sidebar.versionGraphEmpty', 'Project commits appear here'),
+                tutorialKey: 'collaboration.graph',
+                title: options.translate('versionControl.versionGraph', 'Version graph'),
+                placeholder: options.translate('versionControl.versionGraphEmpty', 'Project commits appear here'),
                 actions: [],
                 content: {
                   type: 'tree' as const,

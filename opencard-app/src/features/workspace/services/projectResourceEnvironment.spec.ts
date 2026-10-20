@@ -1,8 +1,10 @@
 import type { FileSystemService } from './fileSystemService'
-import { createSimpleContainerBlock } from '../../../entities/card/model'
+import { createSimpleContainerBlock, createCardFace, createImageBlock, type CardDocument } from '../../../entities/card/model'
+import { computed } from 'vue'
+import { prepareCardRender } from '../../card-rendering/renderPipeline'
 import { describe, expect, it, vi } from 'vitest'
 
-const watcherEvents = vi.hoisted(() => ({ listener: null as ((event: { payload: { id: string, root: string, paths: string[] } }) => void) | null }))
+const watcherEvents = vi.hoisted(() => ({ listener: null as ((event: { payload: { id: string, root: string, changes: import('../model/projectFileChange').ProjectFileChange[] } }) => void) | null }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: async (_: string, listener: typeof watcherEvents.listener) => { watcherEvents.listener = listener; return () => { watcherEvents.listener = null } } }))
 
 type ArchivedPackage = { manifestJson: string, fingerprint: string }
@@ -374,6 +376,39 @@ describe('ProjectResourceEnvironment', () => {
 })
 
 describe('resource environment lifecycle', () => {
+  it('updates used image diagnostics without preparing the document again', async () => {
+    const files = new Map<string, string>()
+    const environment = await createResourceEnvironment('/one', { watch: false, snapshotsRoot: SNAPSHOTS_ROOT, fs: memoryFileSystem(files) as unknown as FileSystemService })
+    const document: CardDocument = {
+      type: 'card-document', id: 'document', name: 'Document', version: '1.0.0', description: '', notes: '',
+      width: '540', height: '850', instances: [], faces: {
+        front: createCardFace({ id: 'front', children: [{
+          block: createImageBlock({ id: 'image', source: 'assets/image.png' }),
+          location: { id: 'location', type: 'simple-container-location', anchor: 'lt' },
+        }] }), back: createCardFace({ id: 'back' }),
+      },
+    }
+    let preparations = 0
+    const prepared = computed(() => {
+      preparations++
+      return prepareCardRender({ document, instance: null, resourceRootPath: '/one', sourceFilePath: '/one/card.ocdocument', environment: environment.renderEnvironment.value })
+    })
+    try {
+      const original = prepared.value
+      void original.issues
+      await environment.state.value.waitForResources!()
+      expect(original.issues).toContainEqual(expect.objectContaining({ type: 'card-designer.resource.file-missing' }))
+      files.set('/one/assets/image.png', 'image')
+      await environment.refresh(['/one/assets/image.png'])
+      void original.issues
+      await environment.state.value.waitForResources!()
+      expect(original.issues).not.toContainEqual(expect.objectContaining({ type: 'card-designer.resource.file-missing' }))
+      await environment.refresh(['/one/unrelated.txt'])
+      expect(prepared.value).toBe(original)
+      expect(preparations).toBe(1)
+    } finally { await environment.dispose() }
+  })
+
   it('drops registered templates when their parent directory is deleted', async () => {
     const source = '.opencard/blocks/cards/frame.ocblock'
     const files = new Map([
@@ -421,16 +456,16 @@ describe('resource environment lifecycle', () => {
     const fs = { ...memory,
       startWatching: async () => 'one', stopWatching: async (id: string) => { stopped.push(id) },
       fileExists: async (path: string) => {
-        if (opening) { opening = false; watcherEvents.listener?.({ payload: { id: 'one', root: '/one', paths: ['/one/new.png'] } }) }
+        if (opening) { opening = false; watcherEvents.listener?.({ payload: { id: 'one', root: '/one', changes: [{ path: '/one/new.png', kind: 'structure' }] } }) }
         return memory.fileExists(path)
       },
     } as unknown as FileSystemService
     let environment: Awaited<ReturnType<typeof createResourceEnvironment>> | undefined
     try {
-      environment = await createResourceEnvironment('/one', { watch: true, fs, snapshotsRoot: SNAPSHOTS_ROOT, onFilesChanged: paths => batches.push([...paths]) })
+      environment = await createResourceEnvironment('/one', { watch: true, fs, snapshotsRoot: SNAPSHOTS_ROOT, onFilesChanged: changes => batches.push(changes.map(change => change.path)) })
       await vi.advanceTimersByTimeAsync(150)
       expect(batches).toEqual([['/one/new.png']])
-      watcherEvents.listener?.({ payload: { id: 'other', root: '/two', paths: ['/two/file.png'] } })
+      watcherEvents.listener?.({ payload: { id: 'other', root: '/two', changes: [{ path: '/two/file.png', kind: 'content' }] } })
       await vi.advanceTimersByTimeAsync(150)
       expect(batches).toHaveLength(1)
       await environment.dispose(); await environment.dispose()

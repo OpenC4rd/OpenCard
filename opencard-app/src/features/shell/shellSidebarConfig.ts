@@ -30,6 +30,8 @@ export const USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY = 'resource-package.use-s
 export const DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY = 'resource-package.disable-selected'
 export const PROJECT_NEW_FILE_ACTION_KEY = 'project.new-file'
 export const PROJECT_NEW_OPENCARD_ACTION_KEY = 'project.new-file.ocdocument'
+export const PROJECT_NEW_MARKDOWN_ACTION_KEY = 'project.new-file.md'
+export const PROJECT_NEW_TEXT_ACTION_KEY = 'project.new-file.txt'
 export const PROJECT_NEW_FOLDER_ACTION_KEY = 'project.new-folder'
 export const PROJECT_REVEAL_ACTION_KEY = 'project.reveal'
 

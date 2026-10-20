@@ -48,11 +48,11 @@ export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) 
       if (!isResourceSnapshotDiffPath(path)) content = await fileSystemService.readFile(`${root}/${path}`)
     } else {
       const result = await readFileAtRevision(root, { revision: commitId, path })
-      if (!result.ok || !result.value) throw new Error(result.error?.message ?? t('sidebar.diffViewer.readRevisionFailed'))
-      if (result.value.binary && !isResourceSnapshotDiffPath(path)) throw new Error(t('sidebar.diffViewer.notTextFile'))
+      if (!result.ok || !result.value) throw new Error(result.error?.message ?? t('versionControl.diffViewer.readRevisionFailed'))
+      if (result.value.binary && !isResourceSnapshotDiffPath(path)) throw new Error(t('versionControl.diffViewer.notTextFile'))
       content = result.value.content
       const snapshot = await materializeRevision(root, { revision: commitId })
-      if (!snapshot.ok || !snapshot.value) throw new Error(snapshot.error?.message ?? t('sidebar.diffViewer.prepareResourcesFailed'))
+      if (!snapshot.ok || !snapshot.value) throw new Error(snapshot.error?.message ?? t('versionControl.diffViewer.prepareResourcesFailed'))
       resourceRootPath = snapshot.value.rootPath
       try { environment = await createResourceEnvironment(resourceRootPath, { watch: false, cacheIdentity: root }) }
       catch (error) { await releaseRevisionSnapshot(resourceRootPath); throw error }
@@ -62,18 +62,18 @@ export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) 
   }
   function selectComparison(beforeId: string | null, afterId: string | null): Promise<void> {
     if (closed) return Promise.resolve()
-    if (beforeId === afterId) { error.value = t('sidebar.diffViewer.sameVersion'); return Promise.resolve() }
+    if (beforeId === afterId) { error.value = t('versionControl.diffViewer.sameVersion'); return Promise.resolve() }
     const root = options.projectRoot.value
     const path = options.filePath.value
-    if (!root || !path) { error.value = t('sidebar.diffViewer.projectUnavailable'); return Promise.resolve() }
+    if (!root || !path) { error.value = t('versionControl.diffViewer.projectUnavailable'); return Promise.resolve() }
     const request = ++revision
     loading.value = true; error.value = null
     const acquired: typeof owned = []
     const labels = new Map(options.revisions.value.map(item => [item.commitId, item.label]))
     const work = (async () => {
       const sides = await Promise.allSettled([
-        load(root, path, beforeId, labels.get(beforeId) ?? t('sidebar.diffViewer.versionA'), acquired),
-        load(root, path, afterId, labels.get(afterId) ?? t('sidebar.diffViewer.versionB'), acquired),
+        load(root, path, beforeId, labels.get(beforeId) ?? t('versionControl.diffViewer.versionA'), acquired),
+        load(root, path, afterId, labels.get(afterId) ?? t('versionControl.diffViewer.versionB'), acquired),
       ])
       const failed = sides.find(side => side.status === 'rejected')
       if (closed || request !== revision || failed) {

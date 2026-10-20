@@ -184,8 +184,8 @@ function clear(): void {
   border-end-start-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   border-end-end-radius: calc(var(--oc-radius-control) - var(--oc-border-width));
   background: var(--oc-bg-glass);
-  -webkit-backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
-  backdrop-filter: blur(var(--oc-bg-glass-blur)) saturate(var(--oc-bg-glass-saturate));
+  -webkit-backdrop-filter: var(--oc-bg-glass-filter);
+  backdrop-filter: var(--oc-bg-glass-filter);
 }
 
 .project-cover-field__title {

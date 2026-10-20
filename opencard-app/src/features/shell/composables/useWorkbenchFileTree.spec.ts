@@ -33,7 +33,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     expect(openedEditorTreeData.value.items.get('session-1')?.label).toBe('card.ocdocument')
@@ -56,7 +55,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     expect(projectTreeData.value.items.get('D:/project/cards/main.ocdocument')).toMatchObject({
@@ -86,7 +84,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     expect(projectTreeData.value.rootKeys).toEqual([`${projectPath}/notes.txt`])
@@ -110,7 +107,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     expect(projectTreeData.value.rootKeys).toEqual([
@@ -124,7 +120,6 @@ describe('useWorkbenchFileTree opened editors', () => {
   it('provides fixed localized project-management entries that open managed files', async () => {
     const projectPath = 'D:/project'
     const openPreviewFile = vi.fn(async () => undefined)
-    const ensureProjectManagementStructure = vi.fn(async () => undefined)
     const result = useWorkbenchFileTree({
       projectPath: ref(projectPath),
       indexedEntries: ref([
@@ -140,7 +135,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile,
-      ensureProjectManagementStructure,
     })
 
     expect(result.projectManagementTreeData.value.rootKeys).toEqual([
@@ -176,7 +170,6 @@ describe('useWorkbenchFileTree opened editors', () => {
     expect(result.setProjectManagementEntryExpanded(fontRegistryKey, true)).toBe(false)
 
     await result.handleProjectManagementSelect([`${projectPath}/.opencard/fonts/fonts.json`])
-    expect(ensureProjectManagementStructure).toHaveBeenCalledOnce()
     expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/fonts/fonts.json`)
 
   })
@@ -194,7 +187,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile,
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     for (const fileName of [
@@ -224,7 +216,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     expect(result.projectManagementTreeData.value.children.size).toBe(0)
@@ -255,7 +246,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
     const selectedFiles = result.selectedProjectEntryKeys.value
     const selectedEditors = result.openedEditorSelectedKeys.value
@@ -280,7 +270,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile,
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     await result.handleFileTreeSelect([path])
@@ -296,7 +285,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       projectPath: ref('D:/project'), indexedEntries, sessions: ref([]), activeSession: ref(null),
       formatSessionTitle: session => session.state.name, translate: key => key,
       isDirectoryExpanded: () => false, activateSession: vi.fn(), openPreviewFile,
-      ensureProjectManagementStructure: async () => undefined,
     })
     await tree.handleFileTreeSelect(['D:/project/a.png', 'D:/project/b.png'])
     indexedEntries.value = [...indexedEntries.value, { name: 'c.png' }]
@@ -324,7 +312,6 @@ describe('useWorkbenchFileTree opened editors', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile: vi.fn(async () => undefined),
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
     })
 
     expect(result.projectTreeData.value.items.get(`${projectPath}/assets/fonts/Brand.otf`)).toMatchObject({

@@ -2,7 +2,7 @@
 <template>
   <div
     class="oc-slider"
-    :class="[{ 'is-disabled': disabled, 'is-dragging': dragging }, attrs.class]"
+    :class="[{ 'is-disabled': disabled }, attrs.class]"
     :style="attrs.style"
   >
     <div
@@ -15,6 +15,7 @@
       :aria-valuenow="draftValue"
       :aria-valuetext="valueText || undefined"
       :aria-disabled="disabled || undefined"
+      :data-tooltip="disabled ? undefined : valueText || undefined"
       v-bind="controlAttrs"
       @pointerdown="startDrag"
       @keydown="handleKeydown"
@@ -33,9 +34,6 @@
       </span>
       <span class="oc-slider__thumb" :style="{ left: anchorLeft }" />
     </div>
-    <span v-if="hasValueDisplay" class="oc-slider__readout" :style="{ left: anchorLeft }">
-      {{ valueText }}
-    </span>
   </div>
 </template>
 
@@ -78,8 +76,6 @@ const emit = defineEmits<{
 }>()
 
 const attrs = useAttrs()
-/** 悬停、拖动或键盘聚焦时在拇指上方显示当前值；平时不占位、不参与布局。 */
-const hasValueDisplay = computed(() => Boolean(props.valueText))
 const trackRef = ref<HTMLElement | null>(null)
 /** 滑轨实测宽度与显示缩放：把圆点放到设备像素上要用它们，量不到时退回百分比。 */
 const trackWidth = ref(0)
@@ -118,7 +114,7 @@ const tickMarks = computed(() => {
   }))
 })
 
-/** 圆点与数值读数的水平锚点：吸到设备像素上，半个像素的落点会把小圆的边糊掉。 */
+/** 圆点的水平锚点：吸到设备像素上，半个像素的落点会把小圆的边糊掉。 */
 const anchorLeft = computed(() => (trackWidth.value > 0
   ? `${snapToDevicePixel(percentage.value / 100 * trackWidth.value, pixelRatio.value)}px`
   : `${percentage.value}%`))
@@ -187,6 +183,7 @@ function startDrag(event: PointerEvent): void {
   event.preventDefault()
   dragging.value = true
   pointerId = event.pointerId
+  trackRef.value?.setPointerCapture?.(event.pointerId)
   updateFromPointer(event)
   document.addEventListener('pointermove', handlePointerMove)
   document.addEventListener('pointerup', handlePointerUp)
@@ -206,6 +203,9 @@ function handlePointerUp(event: PointerEvent): void {
 }
 
 function stopDrag(): void {
+  if (pointerId !== null && trackRef.value?.hasPointerCapture?.(pointerId)) {
+    trackRef.value.releasePointerCapture(pointerId)
+  }
   dragging.value = false
   pointerId = null
   document.removeEventListener('pointermove', handlePointerMove)
@@ -271,33 +271,6 @@ function handleKeydown(event: KeyboardEvent): void {
 
 .oc-slider.is-disabled .oc-slider__track {
   cursor: not-allowed;
-}
-
-/* 数值读数浮在拇指上方：平时隐藏且不接收指针，悬停、拖动或键盘聚焦时持续显示。 */
-.oc-slider__readout {
-  position: absolute;
-  bottom: calc(100% + var(--oc-space-2xs));
-  z-index: 1;
-  max-width: 100%;
-  padding: 0 var(--oc-space-2xs);
-  border: var(--oc-border-width) solid var(--oc-border-default);
-  border-radius: var(--oc-radius-control);
-  background: var(--oc-bg-surface);
-  box-shadow: var(--oc-shadow-sm);
-  color: var(--oc-fg-default);
-  font-size: var(--oc-text-sm);
-  line-height: 1.5;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-50%);
-  transition: opacity var(--oc-duration-quick) var(--oc-ease);
-}
-
-.oc-slider:hover .oc-slider__readout,
-.oc-slider.is-dragging .oc-slider__readout,
-.oc-slider__track:focus-visible ~ .oc-slider__readout {
-  opacity: 1;
 }
 
 .oc-slider__rail {

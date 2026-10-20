@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
   color: var(--oc-border-accent);
 }
 
-.oc-resize-handle:focus-visible::after {
+.oc-resize-handle--grip:focus-visible::after {
   box-shadow: var(--oc-control-focus-shadow, var(--oc-focus-ring));
 }
 

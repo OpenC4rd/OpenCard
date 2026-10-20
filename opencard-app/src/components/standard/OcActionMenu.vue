@@ -69,7 +69,7 @@
           被卸载，click 也就落空了。
         -->
         <OcFloatingLayer
-          v-if="hasActionChildren(entry)"
+          v-if="openChildKey === entry.key && hasActionChildren(entry)"
           :open="openChildKey === entry.key"
           :anchor="childAnchors.get(entry.key) ?? null"
           placement="right-start"
@@ -84,7 +84,7 @@
         >
           <OcActionMenu
             :ref="(element) => setChildMenu(entry.key, element)"
-            :actions="entry.children"
+            :actions="actionChildren(entry)"
             :branch-id="props.branchId"
             @select="emit('select', $event)"
             @keep-open="keepMenusOpen"
@@ -115,6 +115,7 @@ export function isActionMenuBranchEvent(event: Event, branchId: string): boolean
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, reactive, ref, type ComponentPublicInstance } from 'vue'
+import { actionChildren } from '../../shared/ui/action/action.types'
 import type {
   OcActionDefinition,
   OcActionDivider,
@@ -153,8 +154,8 @@ onBeforeUnmount(cancelChildClose)
 
 function hasActionChildren(
   action: OcActionDefinition,
-): action is OcActionDefinition & { children: readonly OcActionMenuEntry[] } {
-  return Array.isArray(action.children) && action.children.length > 0
+): boolean {
+  return typeof action.children === 'function' || Boolean(action.children?.length)
 }
 
 function isActionDivider(entry: OcActionMenuEntry): entry is OcActionDivider {

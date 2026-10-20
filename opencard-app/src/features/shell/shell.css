@@ -251,16 +251,14 @@
   top: 0;
   min-width: max-content;
   max-width: min(320px, 70vw);
-  padding: 8px 10px;
+  padding: var(--oc-space-2xs) var(--oc-space-sm);
   border-radius: var(--oc-radius-control);
-  background: var(--oc-bg-surface);
+  background: var(--oc-bg-raised);
   color: var(--oc-fg-default);
-  font-size: var(--oc-text-base);
+  font-size: var(--oc-text-sm);
   line-height: 1.4;
   text-align: left;
-  box-shadow:
-    var(--oc-shadow-lg),
-    inset 0 0 0 1px var(--oc-border-default);
+  box-shadow: var(--oc-shadow-sm);
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--oc-duration-quick) var(--oc-ease);

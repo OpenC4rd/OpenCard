@@ -47,7 +47,7 @@ export function createCreateProjectPage(lifecycle: ReturnType<typeof useAppProje
     tutorial.completeStep('welcome', 'details', run)
     const created = await form.createProject()
     if (created && run !== undefined && tutorial.completeStep('welcome', 'create-project', run)) {
-      notifySuccess(t('tutorial.welcome.completed'))
+      notifySuccess(t('tutorial.createProject.completed'))
     }
     return created
   } }

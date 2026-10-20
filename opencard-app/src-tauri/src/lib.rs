@@ -20,6 +20,7 @@ mod git_service;
 mod network_resource;
 mod resource_package;
 mod resource_package_builder;
+mod project_directory;
 
 /// 文件变化合并窗口：这段时间内的变化合成一次通知，避免一次提交/装包产生成百上千次前端回调。
 const FILE_CHANGE_BATCH_MS: u64 = 120;
@@ -137,33 +138,37 @@ fn watch_directory(
     // 为每个事件跑一遍扫描，主线程被占住数秒（实测打开项目卡 5 秒）。
     let app_handle_clone = app_handle.clone();
     std::thread::spawn(move || {
-        let mut pending: Vec<String> = Vec::new();
+        let mut pending = std::collections::BTreeMap::<String, serde_json::Value>::new();
         let mut last_emit = std::time::Instant::now();
-        let emit = |pending: &mut Vec<String>| {
+        let emit = |pending: &mut std::collections::BTreeMap<String, serde_json::Value>| {
             if pending.is_empty() {
                 return;
             }
-            let paths = std::mem::take(pending);
-            let payload = serde_json::json!({ "id": event_id, "root": root, "paths": paths });
+            let changes: Vec<_> = std::mem::take(pending).into_values().collect();
+            let payload = serde_json::json!({ "id": event_id, "root": root, "changes": changes });
             if let Err(e) = app_handle_clone.emit("file-changed", payload) {
                 eprintln!("发送事件失败: {}", e);
             }
         };
         loop {
             match rx.recv_timeout(std::time::Duration::from_millis(FILE_CHANGE_BATCH_MS)) {
-                Ok(Ok(event)) => match event.kind {
-                    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
-                        for path in &event.paths {
-                            let path = path.to_string_lossy().to_string();
-                            if is_ignored_change(&path) {
-                                continue;
-                            }
-                            if !pending.iter().any(|existing| existing == &path) {
-                                pending.push(path);
-                            }
-                        }
+                Ok(Ok(event)) => {
+                    let kind = match event.kind {
+                        EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(notify::event::ModifyKind::Name(_)) => "structure",
+                        EventKind::Modify(notify::event::ModifyKind::Data(_)) => "content",
+                        EventKind::Modify(_) | EventKind::Any | EventKind::Other => "unknown",
+                        _ => continue,
+                    };
+                    let renamed = matches!(event.kind, EventKind::Modify(notify::event::ModifyKind::Name(_))) && event.paths.len() == 2;
+                    for (index, path) in event.paths.iter().enumerate() {
+                        if renamed && index == 0 { continue; }
+                        let path = path.to_string_lossy().to_string();
+                        if is_ignored_change(&path) { continue; }
+                        let strongest = if pending.get(&path).is_some_and(|change| change["kind"] != "content") { "structure" } else { kind };
+                        let mut change = serde_json::json!({ "path": path, "kind": strongest });
+                        if renamed { change["oldPath"] = event.paths[0].to_string_lossy().to_string().into(); }
+                        pending.insert(path, change);
                     }
-                    _ => {}
                 },
                 Ok(Err(e)) => eprintln!("监听错误: {}", e),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -366,8 +371,9 @@ fn source_icon_path(_file_name: &str) -> Option<PathBuf> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder =
-        tauri::Builder::default().manage(external_open::ExternalOpenState::from_current_process());
+    let builder = tauri::Builder::default()
+        .manage(project_directory::DirectoryScans::default())
+        .manage(external_open::ExternalOpenState::from_current_process());
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
@@ -408,6 +414,8 @@ pub fn run() {
             list_system_font_families,
             list_system_fonts,
             watch_directory,
+            project_directory::read_project_directory,
+            project_directory::cancel_project_directory,
             stop_watching,
             trash_path,
             reveal_path,

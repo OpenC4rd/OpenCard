@@ -32,7 +32,7 @@ describe('globalTooltip warm groups', () => {
   it('waits once per group, swaps siblings instantly, bridges gaps and freezes the side', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     document.body.innerHTML = `
-      <div id="group" data-tooltip-group>
+      <div id="group" data-tooltip-group data-tooltip-anchor="target">
         <button id="first" data-tooltip="First">First</button>
         <div data-tooltip-placement="top"><button id="second" data-tooltip="Second">Second</button></div>
         <span id="gap">gap</span>

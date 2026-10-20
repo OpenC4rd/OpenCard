@@ -113,8 +113,11 @@ export function createAppSettingsStore(
     else if (key === 'appearance.glassIntensity') candidate.appearance.glassIntensity = value as number
     else if (key === 'appearance.baseFontSize') candidate.appearance.baseFontSize = value as number
     else if (key === 'appearance.phaseImageSpeed') candidate.appearance.phaseImageSpeed = value as number
+    else if (key === 'appearance.transitionSpeed') candidate.appearance.transitionSpeed = value as AppSettings['appearance']['transitionSpeed']
     else if (key === 'appearance.micaBackground') candidate.appearance.micaBackground = value === true
     else if (key === 'shell.titleBarNoticeHistoryLimit') candidate.shell.titleBarNoticeHistoryLimit = value as number
+    else if (key === 'shell.tipsEnabled') candidate.shell.tipsEnabled = value === true
+    else if (key === 'shell.tipsIntervalMinutes') candidate.shell.tipsIntervalMinutes = value as number
     else if (key === 'updates.showReleaseNotesAfterUpdate') {
       candidate.updates.showReleaseNotesAfterUpdate = value === true
     } else if (key === 'exporting.openCdeWorkbookAfterExport') {

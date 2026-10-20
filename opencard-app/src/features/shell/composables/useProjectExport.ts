@@ -238,7 +238,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
 
   function progressDetail(event: ExportProgressEvent): string | undefined {
     if (!event.current) return undefined
-    return options.translate(`app.exportProgress.phase.${event.phase}`, {
+    return options.translate(`projectExport.progress.phase.${event.phase}`, {
       path: event.current.sourcePath,
     })
   }
@@ -246,7 +246,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
   function reportProgress(event: ExportProgressEvent): void {
     setTask({
       key: PROJECT_EXPORT_PROGRESS_KEY,
-      title: options.translate('app.exportProgress.project'),
+      title: options.translate('projectExport.progress.title'),
       progress: event.totalUnits > 0 ? event.completedUnits / event.totalUnits : 0,
       weight: Math.max(1, event.totalUnits),
       detail: progressDetail(event),
@@ -255,7 +255,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
   }
 
   function reportResult(result: ExportRunResult): void {
-    const summary = options.translate('app.exportProgress.summary', {
+    const summary = options.translate('projectExport.progress.summary', {
       succeeded: result.succeeded,
       skipped: result.skipped,
       failed: result.failed,
@@ -277,7 +277,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
     start()
     setTask({
       key: PROJECT_EXPORT_PROGRESS_KEY,
-      title: options.translate('app.exportProgress.project'),
+      title: options.translate('projectExport.progress.title'),
       progress: 0,
       weight: Math.max(1, plan.entries.length * 2),
       cancellable: true,

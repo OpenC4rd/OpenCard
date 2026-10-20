@@ -55,14 +55,33 @@
 
 - The agent that implements a user-facing feature, fix, or removal must update `opencard-app/RELEASE_NOTES.md` for that specific change before handoff or commit.
 - Each implementing agent owns only the factual release-note entries for its own work. When behavior is removed or reverted, that agent must also remove or revise any now-stale entry.
+- Fixes made while an uncommitted or unreleased feature is still under development belong to that feature's entry, not to a separate fix entry. Create a standalone fix entry only for behavior users could obtain in a published version.
 - Review and release agents may check entries for accuracy, duplication, placement, and completeness, but must not reconstruct or author missing entries from the final diff.
-- If release notes are missing or inaccurate, the release agent must block the release and return the notes to the implementing agent or user for correction before running `scripts/release.ps1`.
+- If release notes are missing or inaccurate, the release agent must block the release and return the notes to the implementing agent or user for correction before running `opencard-app/scripts/release.ps1`.
 - Internal refactors and test-only changes do not require an entry unless they materially affect users.
-- Write release notes for end users, including non-developers. Lead with what changed in the product and the effect the user can observe.
-- Describe features as capabilities or workflow improvements. Describe fixes by the symptom that no longer occurs, not by the implementation cause.
-- Prefer visible UI vocabulary and natural Chinese. Avoid internal names and engineering terms such as component class names, provider, token, state-machine states, or schema fields unless the term is itself shown to users and is necessary for recognition.
-- Keep one bullet focused on one coherent user outcome. Merge supporting implementation details into that outcome, and omit intermediate attempts, reverted behavior, test details, and refactor history.
-- Treat fixes made while an uncommitted or unreleased feature is still under development as part of that feature, not as separate release-note fixes. Revise the feature entry when needed; create a standalone fix entry only for behavior that users could obtain in a published version.
-- Use `新增`, `改进`, and `修复` sections as applicable. Do not create empty sections.
-- Treat `opencard-app/RELEASE_NOTES.md` as the draft for the next release, not a cumulative changelog. It must contain only changes made after the most recently published version and must not repeat notes from an earlier release.
+- Use `新增`, `变更`, and `修复` sections as applicable. Do not create empty sections.
+- Treat `opencard-app/RELEASE_NOTES.md` as the draft for the next stable release, not a cumulative changelog. A preview release publishes the draft and leaves it open, so it accumulates every change made after the most recently published stable release; the stable release publishes that accumulated draft unchanged and then clears it.
 - Before release, check every statement against the actual behavior, remove stale or duplicated entries, and rewrite developer-facing wording into user-facing language. Do not advertise behavior that is incomplete or only planned.
+
+### Entry style
+
+An entry is a headline, not a description. The user's own entries are the reference: match their
+length and shape, and never expand, shorten, or translate a line the user has already written.
+
+```
+- 新增小贴士，可以在设置中控制开关和频率
+- 新增引导系统，初步新增两套引导：“界面介绍”和“创建第一个项目”
+- 提升了界面风格一致性
+```
+
+- Lead with the change itself: `新增…`, `提升…`, `修复…`. Never narrate the product ("现在可以…", "支持了…").
+- One change per line, one clause, no longer than the longest reference entry above (about 30 characters). A second change gets its own line, never an appended clause.
+- Do not list what a feature contains: no 介绍A、B、C, no 涵盖/包括…等. The feature's own name is the entry.
+- Name the capability and stop: no setting location, no steps to reach it, no explanation of what it is good for.
+- A `：` may introduce a short list of names, as in the guide example above. It may not introduce an explanation, and the line carries no `；` clause and no parentheses.
+- No trailing `。`.
+- Use the user's names for features and screens, and quote them with `“”` exactly where the user does.
+- State what changed, not why it is better: no 更…, 方便, 直观, 流畅, and no comparison with the previous behavior.
+- Write for end users: no component names, providers, tokens, state-machine states, schema fields, or file paths.
+- Describe a fix by the symptom that disappears, not by its cause.
+- Where the examples above and these rules disagree, the examples win.

@@ -178,8 +178,7 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
 
   function formatDiffRevisionLabel(snapshot: EditorSnapshotContext | undefined): string {
     if (!snapshot) return ''
-    const hash = snapshot.revisionId?.slice(0, 7)
-    return hash ? `${hash} ${snapshot.label}` : options.translate('sidebar.diffViewer.diskVersion')
+    return snapshot.revisionId?.slice(0, 7) || options.translate('versionControl.diffViewer.diskVersion')
   }
 
   const diffViewportComparison = computed<CardViewportComparison | undefined>(() => {
@@ -237,20 +236,20 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
           ? 'success'
           : beforeInstance && !afterInstance ? 'danger' : changed ? 'warning' : undefined,
         tail: afterInstance && !beforeInstance
-          ? { type: 'badge', icon: 'action.add', tone: 'success', label: options.translate('sidebar.diffViewer.added') }
+          ? { type: 'badge', icon: 'action.add', tone: 'success', label: options.translate('versionControl.diffViewer.added') }
           : beforeInstance && !afterInstance
             ? {
                 type: 'badge',
                 icon: 'action.minus',
                 tone: 'danger',
-                label: options.translate('sidebar.diffViewer.removed'),
+                label: options.translate('versionControl.diffViewer.removed'),
               }
             : changed
               ? {
                   type: 'badge',
                   icon: 'status.circle-medium',
                   tone: 'warning',
-                  label: options.translate('sidebar.diffViewer.changed'),
+                  label: options.translate('versionControl.diffViewer.changed'),
                 }
               : undefined,
       })
@@ -291,7 +290,7 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
           type: 'badge',
           icon: kind === 'added' ? 'action.add' : kind === 'removed' ? 'action.minus' : 'status.circle-medium',
           tone: kind === 'added' ? 'success' : kind === 'removed' ? 'danger' : 'warning',
-          label: options.translate(`sidebar.diffViewer.${kind}`),
+          label: options.translate(`versionControl.diffViewer.${kind}`),
         } : undefined,
       })
     }
@@ -534,7 +533,7 @@ function createDiffPropertyProjection(
           type: 'badge',
           icon: 'action.minus',
           tone: 'danger',
-          label: translate('sidebar.diffViewer.removed'),
+          label: translate('versionControl.diffViewer.removed'),
         },
       }
     }
@@ -548,7 +547,7 @@ function createDiffPropertyProjection(
           type: 'badge',
           icon: 'action.add',
           tone: 'success',
-          label: translate('sidebar.diffViewer.added'),
+          label: translate('versionControl.diffViewer.added'),
         },
       }
     }

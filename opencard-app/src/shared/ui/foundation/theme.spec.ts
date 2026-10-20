@@ -6,7 +6,9 @@ import {
   getOcTheme,
   getReadableForegroundColor,
   getReadableForegroundTone,
+  setOcGlassIntensity,
   setOcTheme,
+  setOcTransitionSpeed,
 } from './theme'
 
 const fileIconColorTokens = [
@@ -45,14 +47,47 @@ function testContrast(left: string, right: string): number {
 }
 
 afterEach(() => {
+  setOcTransitionSpeed('1x')
   document.documentElement.removeAttribute('style')
   delete document.documentElement.dataset.ocTheme
+  delete document.documentElement.dataset.ocGlassIntensity
   document.documentElement.classList.remove('oc-theme-transitioning')
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
 describe('OC theme runtime', () => {
+  it('scales transitions from base durations across speed and theme changes', () => {
+    const style = document.documentElement.style
+    setOcTheme('dark')
+    setOcTransitionSpeed('0.5x')
+    expect(style.getPropertyValue('--oc-duration')).toBe('300ms')
+    setOcTransitionSpeed('2x')
+    setOcTheme('light')
+    expect(['--oc-duration-quick', '--oc-duration', '--oc-duration-layout', '--oc-duration-theme']
+      .map(token => style.getPropertyValue(token))).toEqual(['50ms', '75ms', '110ms', '600ms'])
+    expect(style.getPropertyValue('--oc-skeleton-duration')).toBe('1200ms')
+    expect(style.getPropertyValue('--oc-welcome-cover-wall-duration')).toBe('240s')
+    setOcTransitionSpeed('off')
+    expect(['--oc-duration-quick', '--oc-duration', '--oc-duration-layout', '--oc-duration-theme']
+      .map(token => style.getPropertyValue(token))).toEqual(['0ms', '0ms', '0ms', '0ms'])
+    setOcTransitionSpeed('1x')
+    expect(style.getPropertyValue('--oc-duration')).toBe('150ms')
+  })
+
+  it('disables glass filters at zero and restores them above zero', () => {
+    const style = document.documentElement.style
+    setOcGlassIntensity(0)
+    expect(style.getPropertyValue('--oc-bg-glass-filter')).toBe('none')
+
+    setOcGlassIntensity(1)
+    expect(style.getPropertyValue('--oc-bg-glass-filter'))
+      .toBe('blur(0.24px) saturate(100.4%)')
+
+    setOcGlassIntensity(0)
+    expect(style.getPropertyValue('--oc-bg-glass-filter')).toBe('none')
+  })
+
   it('derives an accent neighbor at the configurable hue offset', () => {
     expect(deriveAccentNeighborColor('#FF0000')).toBe('#FF00D4')
     expect(deriveAccentNeighborColor('#FF0000', 50)).toBe('#FFD500')

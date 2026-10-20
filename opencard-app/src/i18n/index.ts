@@ -5,7 +5,7 @@
  * - 只碰 vue-i18n 实例和语言目录；设置文档由 settings store 负责，这里从不回写。
  *
  * 语言 id 见 `appLocale.ts`：内置两种不带扩展名，用户语言就是它的文件名（`fr-FR.json`）。
- * 用户语言以某一种内置语言为基底部分覆盖，没写的 key 保留基底的值。
+ * 用户语言以内置语言或完整 key 为基底部分覆盖，没写的 key 保留基底的值。
  */
 import { isTauri } from '@tauri-apps/api/core'
 import { computed, ref } from 'vue'
@@ -15,6 +15,7 @@ import { fileSystemService } from '../features/workspace/services/fileSystemServ
 import enUS from '../locales/en-US'
 import zhCN from '../locales/zh-CN'
 import { APP_LOCALE_DIRECTORY_NAME, resolveAppStoragePath } from '../shared/storage/appStoragePaths'
+import { isRecord } from '../shared/model/record'
 import {
   BUILTIN_APP_LOCALES,
   appLocaleLanguageTag,
@@ -30,6 +31,7 @@ import {
   mergeLocaleMessages,
   readUserLocaleFiles,
   type LocaleMessageObject,
+  type UserLocaleBase,
   type UserLocaleProblem,
 } from './userLocales'
 
@@ -38,7 +40,15 @@ const builtinMessages = {
   'zh-CN': zhCN,
 }
 
-function builtinMessagesOf(base: BuiltinAppLocaleId): LocaleMessageObject {
+function keyMessages(messages: LocaleMessageObject, prefix = ''): LocaleMessageObject {
+  return Object.fromEntries(Object.entries(messages).map(([key, value]) => {
+    const path = prefix ? `${prefix}.${key}` : key
+    return [key, isRecord(value) ? keyMessages(value, path) : path]
+  }))
+}
+
+function baseMessagesOf(base: UserLocaleBase): LocaleMessageObject {
+  if (base === 'keys') return keyMessages(enUS)
   return base === 'zh-CN' ? zhCN : enUS
 }
 
@@ -137,7 +147,7 @@ export async function reloadUserLocales(preference: AppLocale): Promise<void> {
       )
       problems.push({ file: file.id, reason: `${badKeys.length} message(s) cannot compile` })
     }
-    composer.setLocaleMessage(file.id, mergeLocaleMessages(builtinMessagesOf(file.base), usable))
+    composer.setLocaleMessage(file.id, mergeLocaleMessages(baseMessagesOf(file.base), usable))
     ids.push(file.id)
   }
 

@@ -83,17 +83,17 @@ export function decorateChangedPathTree(
   const items = new Map<OcNodeKey, OcNode>()
   const selectAction: OcNodeAction = {
     key: CHANGE_SELECT_ACTION_KEY,
-    title: t('sidebar.changesSelect'),
+    title: t('versionControl.changesSelect'),
     icon: 'action.checkbox-blank',
   }
   const deselectAction: OcNodeAction = {
     key: CHANGE_DESELECT_ACTION_KEY,
-    title: t('sidebar.changesDeselect'),
+    title: t('versionControl.changesDeselect'),
     icon: 'action.checkbox-marked',
   }
   const discardAction: OcNodeAction = {
     key: CHANGE_DISCARD_ACTION_KEY,
-    title: t('sidebar.changesDiscard'),
+    title: t('versionControl.changesDiscard'),
     icon: 'action.discard',
     iconTone: 'danger',
   }
@@ -113,7 +113,7 @@ export function decorateChangedPathTree(
       if (isNewChangePath(entries.get(key))) {
         contextActions.push({
           key: CHANGE_IGNORE_FILE_ACTION_KEY,
-          title: t('sidebar.changesIgnoreFile'),
+          title: t('versionControl.changesIgnoreFile'),
           icon: 'status.eye-off',
         })
       }
@@ -121,7 +121,7 @@ export function decorateChangedPathTree(
       if (extensionPattern) {
         contextActions.push({
           key: CHANGE_IGNORE_EXTENSION_ACTION_KEY,
-          title: t('sidebar.changesIgnoreExtension', { pattern: extensionPattern }),
+          title: t('versionControl.changesIgnoreExtension', { pattern: extensionPattern }),
           icon: 'status.eye-off',
         })
       }
@@ -130,7 +130,7 @@ export function decorateChangedPathTree(
     if (folderLevels.length > 0) {
       contextActions.push({
         key: CHANGE_IGNORE_FOLDER_ACTION_KEY,
-        title: t('sidebar.changesIgnoreFolder'),
+        title: t('versionControl.changesIgnoreFolder'),
         icon: 'status.eye-off',
         children: folderLevels.map(level => ({
           key: `${CHANGE_IGNORE_FOLDER_PREFIX}${level}`,

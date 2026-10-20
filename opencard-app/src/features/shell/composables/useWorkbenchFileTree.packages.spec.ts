@@ -35,9 +35,9 @@ describe('useWorkbenchFileTree package navigation', () => {
       isDirectoryExpanded: vi.fn(() => false),
       activateSession: vi.fn(),
       openPreviewFile,
-      ensureProjectManagementStructure: vi.fn(async () => undefined),
       translate: key => key,
       packageCoordinates: ref(new Map([[archivePath, 'alice/icons@1.0.0']])),
+      packagePaths: ref([archivePath, `${packagesRoot}/notes.txt`]),
     })
 
     // 项目里装了哪些包就是文件夹里有哪几个 `.ocpack`；别的文件不进这棵树。

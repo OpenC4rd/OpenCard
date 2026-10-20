@@ -46,7 +46,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   })
   creation = createCreateProjectPage(application.lifecycle)
   templateExport = createExportTemplatePage(workbench.templateTree)
-  function placeholder(key: 'export' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
+  function placeholder(key: 'export' | 'market' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
     return {
       key, navigation: { key, icon, labelKey: `app.shell.space.${key}` }, content: ComingSoonPageContent,
       contentProps: computed(() => ({ title: t(`app.shell.space.${key}`), icon })), sidebar: computed(() => []),

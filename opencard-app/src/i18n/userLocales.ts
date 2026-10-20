@@ -1,6 +1,6 @@
 /**
  * 模块说明：
- * - 读取并解释用户语言文件：`<名字>.json`，以某一种内置语言为基底做部分覆盖。
+ * - 读取并解释用户语言文件：`<名字>.json`，以内置语言或完整 key 为基底做部分覆盖。
  * 职责边界：
  * - 只做"文件内容 → 可用消息集"的纯变换和一次目录扫描；路径由调用方给出，
  *   应用消息、切换语言、提示用户都不属于这里。
@@ -23,10 +23,11 @@ export const MAX_USER_LOCALE_FILE_BYTES = 2 * 1024 * 1024
 export const MAX_USER_LOCALE_FILES = 64
 
 export type LocaleMessageObject = Record<string, unknown>
+export type UserLocaleBase = BuiltinAppLocaleId | 'keys'
 
 export interface UserLocaleFile {
   id: string
-  base: BuiltinAppLocaleId
+  base: UserLocaleBase
   messages: LocaleMessageObject
 }
 
@@ -44,7 +45,7 @@ export type UserLocaleParseResult =
   | { ok: true, locale: UserLocaleFile }
   | { ok: false, reason: string }
 
-/** 语言文件形状：`{ "base": "zh-CN", "messages": { …key 结构… } }`。 */
+/** base 可取内置语言 id，或以完整 key 显示缺省文案的 keys。 */
 export function parseUserLocaleFile(id: string, content: string): UserLocaleParseResult {
   let value: unknown
   try {
@@ -54,8 +55,8 @@ export function parseUserLocaleFile(id: string, content: string): UserLocalePars
   }
   if (!isRecord(value)) return { ok: false, reason: 'the root must be an object' }
   const base = value.base
-  if (typeof base !== 'string' || !isBuiltinAppLocaleId(base)) {
-    return { ok: false, reason: `base must be one of ${BUILTIN_APP_LOCALES.map(locale => locale.id).join(', ')}` }
+  if (typeof base !== 'string' || (base !== 'keys' && !isBuiltinAppLocaleId(base))) {
+    return { ok: false, reason: `base must be one of ${BUILTIN_APP_LOCALES.map(locale => locale.id).join(', ')}, keys` }
   }
   if (value.messages !== undefined && !isRecord(value.messages)) {
     return { ok: false, reason: 'messages must be an object' }

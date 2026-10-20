@@ -9,7 +9,9 @@ export {
   setOcMicaBackdrop,
   setOcPhaseImageSpeedMultiplier,
   setOcTheme,
+  setOcTransitionSpeed,
 } from './theme'
+export type { OcTransitionSpeed } from './theme'
 export { prefersReducedMotion, reducedMotionQuery } from './prefersReducedMotion'
 export {
   clampBaseFontSize,

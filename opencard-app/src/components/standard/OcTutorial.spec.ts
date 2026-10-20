@@ -9,6 +9,28 @@ import OcTutorial from './OcTutorial.vue'
 import OcDialog from './OcDialog.vue'
 import OcFloatingLayer from './OcFloatingLayer.vue'
 
+it('finishes the Git explanation without any target elements', async () => {
+  const tutorial = createTutorialStore(tutorials)
+  tutorial.start('versionControl')
+  for (const id of ['sidebar', 'graph', 'changes', 'commit']) tutorial.completeStep('versionControl', id)
+  const wrapper = mount(defineComponent({ setup: () => () => h(OcTutorial, {
+    session: tutorial.session.value,
+    onComplete: value => tutorial.completeStep(value.tutorialId, value.stepId, value.run),
+  }) }), { attachTo: document.body,
+    global: { plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })] },
+  })
+  try {
+    await flushPromises()
+    const card = document.querySelector<HTMLElement>('.oc-tutorial')!
+    expect(card.textContent).toContain('About Git')
+    expect(card.textContent).not.toContain(enUS.tutorial.targetMissing)
+    expect(document.querySelector('.oc-tutorial__outline')).toBeNull()
+    card.querySelector<HTMLButtonElement>('footer button:last-child')!.click()
+    await flushPromises()
+    expect(tutorial.session.value).toBeNull()
+  } finally { wrapper.unmount() }
+})
+
 it('runs a read-only welcome tour, blocks background shortcuts, and releases them after completion', async () => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 100, 30)] as unknown as DOMRectList)
   const toggle = vi.fn()
@@ -33,6 +55,7 @@ it('runs a read-only welcome tour, blocks background shortcuts, and releases the
     expect(card.getAttribute('aria-modal')).toBe('true')
     expect(card.textContent).toContain('Welcome to OpenCard')
     expect(document.querySelector('.oc-tutorial__mask--blocking')).not.toBeNull()
+    expect(document.querySelector('.oc-tutorial__click-hint')).toBeNull()
     const shortcut = new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true, cancelable: true })
     document.body.dispatchEvent(shortcut)
     expect(shortcut.defaultPrevented).toBe(true)
@@ -44,6 +67,7 @@ it('runs a read-only welcome tour, blocks background shortcuts, and releases the
     expect(document.activeElement).toBe(card.querySelector('footer button'))
     for (let index = 0; index < tutorials.overview.steps.length; index++) {
       if (tutorial.session.value?.step.id === 'sidebar-toggle') {
+        expect(document.querySelectorAll('.oc-tutorial__click-hint')).toHaveLength(1)
         expect(card.getAttribute('aria-modal')).toBeNull()
         const target = wrapper.get('[data-oc-tutorial="shell.sidebar-toggle"]')
         expect(target.element.closest('[inert]')).toBeNull()
@@ -120,6 +144,7 @@ it('restricts clicks to current targets and their teleported popovers, then rest
     tutorial.start('demo')
     await flushPromises()
     first.value!.click()
+    expect(document.querySelectorAll('.oc-tutorial__click-hint')).toHaveLength(1)
     second.value!.click()
     document.querySelector<HTMLButtonElement>('#first-option')!.click()
     document.querySelector<HTMLButtonElement>('#second-option')!.click()
@@ -134,9 +159,11 @@ it('restricts clicks to current targets and their teleported popovers, then rest
     document.querySelector<HTMLButtonElement>('#first-option')!.click()
     document.querySelector<HTMLButtonElement>('#second-option')!.click()
     expect(action.mock.calls.slice(2)).toEqual([['second'], ['second-option']])
+    expect(document.querySelectorAll('.oc-tutorial__click-hint')).toHaveLength(1)
     document.querySelector<HTMLButtonElement>('.oc-tutorial footer button')!.click()
     await flushPromises()
     first.value!.click()
     expect(action.mock.calls.slice(-1)[0]).toEqual(['first'])
+    expect(document.querySelector('.oc-tutorial__click-hint')).toBeNull()
   } finally { wrapper.unmount(); vi.restoreAllMocks() }
 })

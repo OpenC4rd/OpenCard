@@ -1,4 +1,5 @@
-import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, nextTick, onUnmounted, watch } from 'vue'
+import { taskScheduler } from '../../../utils/taskScheduler'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../../workspace/store/projectStore'
@@ -6,6 +7,7 @@ import { projectFontSources } from '../../workspace/model/projectFontRegistry'
 import { createDefaultOpenCardContent, createEditorSessionManager } from '../../workspace/store/editorSessionManager'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useTutorialStore } from '../../tutorials/tutorialStore'
 import { useStoredResourcePackageStore } from '../../workspace/store/storedResourcePackageStore'
 import type { AppSettingKey } from '../../settings/model/appSettings'
 import { getPathDirectory } from '../../../shared/model/filePath'
@@ -40,7 +42,7 @@ import WorkbenchPageContent from '../components/WorkbenchPageContent.vue'
 import WorkbenchOverlays from '../components/WorkbenchOverlays.vue'
 import { useWorkbenchKeyboardShortcuts } from './useWorkbenchKeyboardShortcuts'
 import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
-import { PROJECT_FILES_LIST_KEY, PROJECT_NEW_FOLDER_ACTION_KEY, PROJECT_NEW_OPENCARD_ACTION_KEY, PROJECT_REVEAL_ACTION_KEY, TIMELINE_LIST_KEY, TIMELINE_REFRESH_ACTION_KEY } from '../shellSidebarConfig'
+import { PROJECT_FILES_LIST_KEY, PROJECT_NEW_FOLDER_ACTION_KEY, PROJECT_NEW_OPENCARD_ACTION_KEY, PROJECT_NEW_MARKDOWN_ACTION_KEY, PROJECT_NEW_TEXT_ACTION_KEY, PROJECT_REVEAL_ACTION_KEY, TIMELINE_LIST_KEY, TIMELINE_REFRESH_ACTION_KEY } from '../shellSidebarConfig'
 
 /** 仅保留树公开的重命名能力，避免侧栏投影持有整个组件实例。 */
 function captureBeginRename(instance: unknown): { beginRename: (key: string) => Promise<void> } | null {
@@ -62,6 +64,8 @@ export function createWorkbenchPage(options: {
   const openSettingsAt = options.openSetting
   const resourcePackageStore = useStoredResourcePackageStore()
   const resourcePackageBuilderOpen = ref(false)
+  const resourcePackageBuilderEntries = shallowRef<readonly string[]>([])
+  let packageScan: AbortController | undefined
   const projectTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
   const projectManagementTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
   const exportRendererRef = ref<InstanceType<typeof CardFaceRenderer>>()
@@ -71,6 +75,15 @@ export function createWorkbenchPage(options: {
   watch(() => settingsStore.settings.value.workspace.historyEntryLimit, limit => editorHistoryManager.setEntryLimit(limit), { immediate: true })
   const projectStore = useProjectStore()
   const projectOpen = computed(() => Boolean(projectStore.projectPath.value))
+  const tutorial = useTutorialStore()
+  watch([shellPage, projectStore.projectPath], ([page, path], [, previousPath]) => {
+    if (path === previousPath && path && page === 'collaboration') tutorial.completeStep('workbench', 'collaboration')
+    if (tutorial.session.value?.tutorialId === 'workbench' && (page !== 'workbench' || path !== previousPath)) tutorial.exit()
+  })
+  watch(() => settingsStore.isReady.value && projectOpen.value && shellPage.value === 'workbench'
+    && !tutorial.session.value && !settingsStore.settings.value.tutorials.seen.includes('workbench'), ready => {
+    if (ready) tutorial.start('workbench')
+  }, { immediate: true })
   const {
     projectPath,
     projectProfile,
@@ -80,7 +93,6 @@ export function createWorkbenchPage(options: {
     renderEnvironment: projectRenderEnvironment,
     indexedEntries,
     fileChangeRevision,
-    ensureProjectManagementStructure,
     isDirectoryExpanded,
     readDirectoryEntries,
     readFile: readProjectFile,
@@ -267,7 +279,9 @@ export function createWorkbenchPage(options: {
   } = useWorkbenchIssues({ sessions, copyIssueLabel: t('app.problems.copyIssue') })
 
   watch(locale, clearAllSessionIssues, { flush: 'sync' })
-  watch(projectPath, (nextPath, previousPath) => { if (nextPath !== previousPath) clearAllSessionIssues() })
+  watch(projectPath, (nextPath, previousPath) => {
+    if (nextPath !== previousPath) { clearAllSessionIssues(); closeResourcePackageBuilder() }
+  })
 
   const {
     open: projectExportDialogOpen,
@@ -280,7 +294,13 @@ export function createWorkbenchPage(options: {
     submit: startProjectExport,
   } = useWorkbenchProjectExport({
     projectProfile,
-    indexedEntries,
+    listDocuments: async signal => {
+      const paths: string[] = []
+      await taskScheduler.forEach(await projectStore.scanProjectEntries(signal), entry => {
+        if (entry.isFile && entry.name.toLowerCase().endsWith('.ocdocument')) paths.push(entry.name)
+      }, signal)
+      return paths
+    },
     running: isProjectExportRunning,
     loadDocumentSnapshot,
     prepare: prepareProjectExport,
@@ -306,6 +326,7 @@ export function createWorkbenchPage(options: {
     projectPath,
     indexedEntries,
     hideDotFiles: computed(() => settingsStore.settings.value.workspace.hideDotFiles),
+    packagePaths: computed(() => [...projectStore.projectResourcePackageFiles.value, ...projectStore.unreadableProjectResourcePackages.value].map(pkg => pkg.archivePath)),
     packageCoordinates: computed(() => new Map(
       [...projectStore.projectResourcePackages.value.values()]
         .map(pkg => [pkg.archivePath.replace(/\\/g, '/'), formatPackageCoordinate(pkg.coordinate)] as const),
@@ -314,9 +335,10 @@ export function createWorkbenchPage(options: {
     formatSessionTitle,
     activeSession,
     isDirectoryExpanded,
+    expandedDirectories: projectStore.expandedDirectories,
+    getDirectoryState: path => projectStore.directoryStates.get(getRelativeProjectPath(path)),
     activateSession,
     openPreviewFile: (path: string) => openEditorSession(path, { preview: true }),
-    ensureProjectManagementStructure,
     translate: t,
     registeredFontSources: computed(() => fontRegistryReady.value
       ? projectFontFamilies.value.flatMap(projectFontSources)
@@ -440,9 +462,9 @@ export function createWorkbenchPage(options: {
     for (const side of ['before', 'after'] as const) {
       const id = session.state.diff?.[`${side}RevisionId`] ?? diffSessionState[side].value?.commitId ?? null
       const selected = revisions.find(option => option.commitId === id)
-      const title = t(side === 'before' ? 'sidebar.diffViewer.versionA' : 'sidebar.diffViewer.versionB')
-      actions.push(selected?.shortId ?? selected?.label ?? t('sidebar.diffViewer.diskVersion'), {
-        key: `diff.${side}`, icon: 'file.git', title,
+      const title = t(side === 'before' ? 'versionControl.diffViewer.versionA' : 'versionControl.diffViewer.versionB')
+      actions.push(selected?.shortId ?? selected?.label ?? t('versionControl.diffViewer.diskVersion'), {
+        key: `diff.${side}`, icon: side === 'before' ? 'action.version-before' : 'action.version-after', title,
         children: revisions.map(option => ({
           key: `diff.${side}:${option.commitId ?? 'current'}`,
           title: option.shortId ? `${option.label} ${option.shortId}` : option.label,
@@ -450,7 +472,7 @@ export function createWorkbenchPage(options: {
         })),
       })
     }
-    actions.push({ key: 'diff.exit', icon: 'nav.arrow-left', title: t('sidebar.diffViewer.exitComparison') })
+    actions.push({ key: 'diff.exit', icon: 'nav.arrow-left', title: t('versionControl.diffViewer.exitComparison') })
     return { actions, onAction: async (key: string) => {
       if (!isCurrent() || !isDiffMode.value) return
       if (key === 'diff.exit') { session.setMode('edit'); return }
@@ -469,14 +491,17 @@ export function createWorkbenchPage(options: {
     })
   }
 
-  async function createProjectEntry(kind: 'folder' | 'opencard'): Promise<void> {
+  async function createProjectEntry(kind: 'folder' | 'opencard' | 'markdown' | 'text'): Promise<void> {
     if (!projectPath.value) return
     const selectedKey = selectedProjectEntryKeys.value[0]
     const selectedEntry = selectedKey ? findProjectEntryByKey(selectedKey) : null
     const parentPath = selectedEntry?.isDirectory ? selectedEntry.key
       : selectedEntry ? getPathDirectory(selectedEntry.key) || projectPath.value : projectPath.value
     if (findProjectEntryByKey(parentPath)?.isDirectory) setDirectoryExpanded(parentPath, true)
-    const baseName = kind === 'folder' ? t('sidebar.fileActions.newFolderName') : t('sidebar.fileActions.newOpenCardName')
+    const baseName = t({
+      folder: 'sidebar.fileActions.newFolderName', opencard: 'sidebar.fileActions.newOpenCardName',
+      markdown: 'sidebar.fileActions.newMarkdownName', text: 'sidebar.fileActions.newTextName',
+    }[kind])
     const path = await createEntryWithAvailableName(parentPath, baseName, kind === 'folder' ? 'folder' : 'file', kind === 'opencard' ? createDefaultOpenCardContent(baseName) : '')
     selectedProjectEntryKeys.value = [path]
     await nextTick()
@@ -492,6 +517,8 @@ export function createWorkbenchPage(options: {
         return
       }
       if (actionKey === PROJECT_NEW_OPENCARD_ACTION_KEY) return createProjectEntry('opencard')
+      if (actionKey === PROJECT_NEW_MARKDOWN_ACTION_KEY) return createProjectEntry('markdown')
+      if (actionKey === PROJECT_NEW_TEXT_ACTION_KEY) return createProjectEntry('text')
       if (actionKey === PROJECT_NEW_FOLDER_ACTION_KEY) return createProjectEntry('folder')
     }
 
@@ -560,14 +587,29 @@ export function createWorkbenchPage(options: {
 
   async function openResourcePackageBuilder(): Promise<void> {
     if (!projectPath.value) return
-    await ensureProjectTreeLoaded()
-    // The package picker needs files below collapsed folders; the normal file tree stays lazy.
-    await readDirectoryEntries('', Number.POSITIVE_INFINITY)
-    resourcePackageBuilderOpen.value = true
+    packageScan?.abort()
+    const owner = new AbortController()
+    packageScan = owner
+    const root = projectPath.value
+    try {
+      const entries = await projectStore.scanProjectEntries(owner.signal)
+      const candidates: string[] = []
+      await taskScheduler.forEach(entries, entry => {
+        if (entry.isFile) candidates.push(entry.name.replace(/\\/g, '/'))
+      }, owner.signal)
+      if (owner.signal.aborted || projectPath.value !== root) return
+      resourcePackageBuilderEntries.value = candidates
+      resourcePackageBuilderOpen.value = true
+    } catch (error) {
+      if (!owner.signal.aborted && projectPath.value === root && !(error instanceof Error && error.name === 'AbortError')) throw error
+    } finally { if (packageScan === owner) packageScan = undefined }
   }
 
-  async function ensureProjectTreeLoaded(): Promise<void> {
-    if (projectPath.value) await readDirectoryEntries('')
+  function closeResourcePackageBuilder(): void {
+    packageScan?.abort()
+    packageScan = undefined
+    resourcePackageBuilderOpen.value = false
+    resourcePackageBuilderEntries.value = []
   }
 
   async function runWorkbenchAction(key: string): Promise<void> {
@@ -695,7 +737,7 @@ export function createWorkbenchPage(options: {
       projectExportDialogOpen: projectExportDialogOpen.value, projectExportDialogTask: projectExportDialogTask.value,
       projectExportDocumentCandidates: projectExportDocumentCandidates.value, isExportPreparing: isExportPreparing.value, isProjectExportRunning: isProjectExportRunning.value,
       exportPreparationIssues: exportPreparationIssues.value, resourcePackageBuilderOpen: resourcePackageBuilderOpen.value, projectPath: projectPath.value,
-      projectName: projectName.value, resourcePackageBuilderEntries: indexedEntries.value.filter(entry => entry.isFile).map(entry => entry.name.replace(/\\/g, '/')),
+      projectName: projectName.value, resourcePackageBuilderEntries: resourcePackageBuilderEntries.value,
       isUnsavedEditorsDialogOpen: isUnsavedEditorsDialogOpen.value, pendingCloseIntent: pendingCloseIntent.value,
       unsavedEditorDecisions: unsavedEditorDecisions.value, isUnsavedCloseBusy: isUnsavedCloseBusy.value, unsavedCloseError: unsavedCloseError.value,
       unsavedSelectedCount: unsavedSelectedCount.value, unsavedPendingCount: unsavedPendingCount.value, unsavedSaveCount: unsavedSaveCount.value,
@@ -703,13 +745,13 @@ export function createWorkbenchPage(options: {
       canConfirmUnsavedClose: canConfirmUnsavedClose.value,
       'onUpdate:projectExportDialogTask': (value: ProjectExportTask) => { projectExportDialogTask.value = value },
       onCloseProjectExport: closeProjectExportDialog, onSubmitProjectExport: startProjectExport,
-      onCloseResourcePackageBuilder: () => { resourcePackageBuilderOpen.value = false },
+      onCloseResourcePackageBuilder: closeResourcePackageBuilder,
       onSelectAllUnsaved: setAllUnsavedPendingSelected, onSelectUnsavedRow: setUnsavedRowSelected, onMarkUnsavedDiscard: markSelectedUnsavedDiscard,
       onMarkUnsavedSave: markSelectedUnsavedSave, onResetUnsavedDecision: resetUnsavedDecision, onCancelUnsavedClose: cancelUnsavedCloseRequest,
       onConfirmUnsavedClose: confirmUnsavedClose, onDiscardSingleUnsaved: discardSingleUnsavedEditor, onSaveSingleUnsaved: saveSingleUnsavedEditor,
     })),
   }
-  onUnmounted(() => { sessionManager.dispose(); void cancelExportsAndWait().then(() => projectStore.disposeResources()) })
+  onUnmounted(() => { closeResourcePackageBuilder(); sessionManager.dispose(); void cancelExportsAndWait() })
   return {
     page, versionControl, handleChangesNodeActivate, openProject: app.openProject,
     openFile: openFileFromPicker, open: openEditorSession,

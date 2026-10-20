@@ -45,6 +45,7 @@ describe('appSettingsStore', () => {
     store.updateSetting('appearance.glassIntensity', 75)
     store.updateSetting('appearance.baseFontSize', 14)
     store.updateSetting('appearance.phaseImageSpeed', 250)
+    store.updateSetting('appearance.transitionSpeed', '2x')
     store.updateThemeAngle('light', -72)
     store.updateThemeFont('light', 'serif')
     store.updateSetting('updates.showReleaseNotesAfterUpdate', false)
@@ -65,6 +66,7 @@ describe('appSettingsStore', () => {
         glassIntensity: 75,
         baseFontSize: 14,
         phaseImageSpeed: 250,
+        transitionSpeed: '2x',
         themes: {
           dark: { accentNeighborAngle: -50, fontFamily: 'system' },
           light: { accentNeighborAngle: -72, fontFamily: 'serif' },
@@ -106,16 +108,20 @@ describe('appSettingsStore', () => {
     })
   })
 
-  it('persists the title bar notice history limit', async () => {
+  it('persists the title bar notice history limit and the tip settings', async () => {
     const persistence = new MemoryJsonPersistence()
     const store = createAppSettingsStore(persistence)
     await store.initialize()
 
     store.updateSetting('shell.titleBarNoticeHistoryLimit', 64)
+    store.updateSetting('shell.tipsEnabled', false)
+    store.updateSetting('shell.tipsIntervalMinutes', 30)
     await store.flush()
 
     expect(store.settings.value.shell.titleBarNoticeHistoryLimit).toBe(64)
-    expect(await persistence.load()).toMatchObject({ shell: { titleBarNoticeHistoryLimit: 64 } })
+    expect(await persistence.load()).toMatchObject({
+      shell: { titleBarNoticeHistoryLimit: 64, tipsEnabled: false, tipsIntervalMinutes: 30 },
+    })
   })
 
   it('applies continuous previews without persisting until commit', async () => {

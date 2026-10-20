@@ -421,7 +421,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0;
   display: grid;
-  gap: var(--oc-welcome-cover-tile-gap);
+  gap: var(--oc-space-lg);
 }
 
 .welcome-cover-wall.is-running .welcome-cover-wall__plane {
@@ -430,7 +430,7 @@ onBeforeUnmount(() => {
 
 .welcome-cover-wall__row {
   display: flex;
-  gap: var(--oc-welcome-cover-tile-gap);
+  gap: var(--oc-space-lg);
 }
 
 .welcome-cover-wall__tile {

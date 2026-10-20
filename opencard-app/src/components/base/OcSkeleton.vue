@@ -39,7 +39,7 @@ const props = withDefaults(defineProps<OcSkeletonProps>(), {
     transparent
   );
   background-size: 200% 100%;
-  animation: oc-skeleton-shimmer var(--oc-duration-theme) linear infinite;
+  animation: oc-skeleton-shimmer var(--oc-skeleton-duration) linear infinite;
 }
 
 .oc-skeleton--width-sm { width: calc(var(--oc-size-lg) * 3); }

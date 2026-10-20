@@ -294,7 +294,7 @@ defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteract
   max-width: var(--oc-dialog-width-md);
   max-height: inherit;
   gap: var(--oc-space-xs);
-  padding: var(--oc-floating-surface-padding);
+  padding: var(--oc-space-2xs);
   overflow: auto;
 }
 

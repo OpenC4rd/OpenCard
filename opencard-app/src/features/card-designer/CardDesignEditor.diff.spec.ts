@@ -262,7 +262,7 @@ describe('CardDesignEditor diff mode', () => {
     expect(divider.classes()).not.toContain('is-static')
     expect(divider.attributes('aria-label'))
       .toBe('Adjust version divider [key]A[/key] left [key]S[/key] center [key]D[/key] right')
-    expect(viewport.get('.card-viewport-comparison-label--before').text()).toBe('a1b2c3d Version A')
+    expect(viewport.get('.card-viewport-comparison-label--before').text()).toBe('a1b2c3d')
     expect(viewport.get('.card-viewport-comparison-label--after').text()).toBe('Disk version')
   })
 

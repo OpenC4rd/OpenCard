@@ -8,6 +8,23 @@ function primaryGroup(lists: ShellList[], headButtons: ShellButton[] = []): Shel
 }
 
 describe('ShellSidebar', () => {
+  it('temporarily reveals a tutorial target without changing the saved layout', async () => {
+    const wrapper = mount(ShellSidebar, { props: {
+      collapsed: false, width: 260,
+      persistedLayout: { collapsedLists: ['files'], listWeights: { files: 2 } },
+      bodyGroup: primaryGroup([{ key: 'files', tutorialKey: 'workbench.files', title: 'Files', placeholder: '', actions: [] }]),
+    } })
+    const section = wrapper.get('[data-oc-tutorial="workbench.files"]')
+    expect(section.classes()).toContain('collapsed')
+    await wrapper.setProps({ tutorialTargets: ['workbench.files'] })
+    expect(section.classes()).not.toContain('collapsed')
+    expect(section.attributes('style')).toContain('flex-grow: 2')
+    await wrapper.setProps({ tutorialTargets: [] })
+    expect(section.classes()).toContain('collapsed')
+    expect(wrapper.emitted('layout-change')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   afterEach(() => {
     document.body.innerHTML = ''
   })

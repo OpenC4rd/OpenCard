@@ -35,6 +35,11 @@ export function notifyWarning(message: string, icon: IconToken = 'status.warning
   return addTitleBarNotice({ message, tone: 'warning', icon })
 }
 
+/** 小贴士：统一的警示色灯泡图标，让建议类消息和普通警告区分开。 */
+export function notifyTip(message: string, icon: IconToken = 'status.tip'): number {
+  return addTitleBarNotice({ message, tone: 'warning', icon })
+}
+
 export function notifyError(message: string, icon: IconToken = 'status.error'): number {
   return addTitleBarNotice({ message, tone: 'danger', icon })
 }

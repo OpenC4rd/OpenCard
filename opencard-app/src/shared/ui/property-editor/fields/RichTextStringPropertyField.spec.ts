@@ -20,6 +20,45 @@ afterEach(() => {
 })
 
 describe('RichTextStringPropertyField', () => {
+  it('opens empty content visually and preserves an empty source across handoff and saving', async () => {
+    const wrapper = mount(RichTextStringPropertyField, {
+      attachTo: document.body, global: { plugins: [i18n] },
+      props: { definition: { title: 'Content', fieldType: 'string', richText: true }, value: '' },
+    })
+    try {
+      await wrapper.get('.rich-text-string-field__preview').trigger('click')
+      expect(document.querySelector('[role="alert"]')).toBeNull()
+      expect(document.querySelector('[role="radio"][aria-label="富文本"]')?.getAttribute('aria-checked')).toBe('true')
+      const rich = wrapper.getComponent(OcRichTextEditor)
+      const { editor, getHtml } = rich.vm as unknown as { editor: Editor; getHtml: () => string }
+      expect(editor.isEmpty).toBe(true)
+      expect(getHtml()).toBe('')
+      document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="HTML 源码"]')!.click()
+      await nextTick()
+      const source = document.querySelector<HTMLTextAreaElement>('textarea')!
+      expect(source.value).toBe('')
+      source.value = '<p>Text</p>'
+      source.dispatchEvent(new Event('input', { bubbles: true }))
+      await nextTick()
+      document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="富文本"]')!.click()
+      await nextTick()
+      expect(editor.getText()).toBe('Text')
+      document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="HTML 源码"]')!.click()
+      await nextTick()
+      const clearedSource = document.querySelector<HTMLTextAreaElement>('textarea')!
+      clearedSource.value = ''
+      clearedSource.dispatchEvent(new Event('input', { bubbles: true }))
+      await nextTick()
+      document.querySelector<HTMLButtonElement>('[role="radio"][aria-label="富文本"]')!.click()
+      await nextTick()
+      expect(document.querySelector('textarea')).toBeNull()
+      expect(document.querySelector('[role="alert"]')).toBeNull()
+      expect(getHtml()).toBe('')
+      expect(editor.isEmpty).toBe(true)
+      document.querySelector<HTMLButtonElement>('[aria-label="保存富文本编辑"]')!.click()
+      expect(wrapper.emitted('update:value')).toBeUndefined()
+    } finally { wrapper.unmount() }
+  })
   it('reads paragraph alignment from its rendered context without making inherited styles explicit', async () => {
     const style = document.createElement('style')
     // jsdom does not resolve inherited UA table styles; exercise the real cascade with paragraph rules.

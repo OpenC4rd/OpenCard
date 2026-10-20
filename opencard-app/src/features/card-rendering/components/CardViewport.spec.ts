@@ -48,8 +48,11 @@ const snappingFace: RenderReadyCardFace = {
   ],
 }
 
+let layoutChange: (target: Element) => void
 class ResizeObserverMock {
-  constructor(private readonly callback: ResizeObserverCallback) {}
+  constructor(private readonly callback: ResizeObserverCallback) {
+    layoutChange = target => callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver)
+  }
 
   observe(target: Element): void {
     Object.defineProperties(target, {
@@ -63,6 +66,7 @@ class ResizeObserverMock {
   }
 
   disconnect(): void {}
+  unobserve(): void {}
 }
 
 describe('CardViewport wheel zoom API', () => {
@@ -108,9 +112,50 @@ describe('CardViewport wheel zoom API', () => {
         x += deltaX
         y += deltaY
         window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y, ...modifiers }))
+        for (const frame of animationFrames.splice(0)) frame(performance.now())
       },
     }
   }
+
+  it('coalesces pan input and moves the selected frame without measuring content again', async () => {
+    let selectedLeft = 250
+    const geometry = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const selected = this.getAttribute('data-block-id') === 'layer-block'
+      return { x: selected ? selectedLeft : 0, y: selected ? 150 : 0,
+        left: selected ? selectedLeft : 0, top: selected ? 150 : 0,
+        right: selected ? 350 : 1000, bottom: selected ? 190 : 800,
+        width: selected ? 100 : 1000, height: selected ? 40 : 800,
+        toJSON: () => ({}),
+      } as DOMRect
+    })
+    const wrapper = mount(CardViewport, { props: {
+      resourceContext, face: layeredFace, selectedBlockId: 'layer-block',
+      selectedLocationType: 'simple-container-location', selectedAnchor: 'lt',
+    } })
+    await flushPromises()
+    await flushAnimation()
+    const selected = wrapper.get('.selection-frame')
+    expect(selected.attributes('style')).toContain('translate3d(250px, 150px, 0)')
+    geometry.mockClear()
+    await wrapper.get('.card-viewport').trigger('mousedown', { button: 1, clientX: 400, clientY: 300 })
+    const before = wrapper.emitted('viewport-transform-change')?.length ?? 0
+    for (let index = 1; index <= 20; index++) {
+      await wrapper.get('.card-viewport').trigger('mousemove', { clientX: 400 + index * 5, clientY: 300 })
+    }
+    expect(wrapper.emitted('viewport-transform-change')?.length ?? 0).toBe(before)
+    await flushAnimation()
+    expect(wrapper.emitted('viewport-transform-change')?.length).toBe(before + 1)
+    expect(selected.attributes('style')).toContain('translate3d(350px, 150px, 0)')
+    expect(geometry).not.toHaveBeenCalled()
+    await wrapper.get('.card-viewport').trigger('mouseup', { button: 1 })
+    selectedLeft = 420
+    layoutChange(wrapper.get('[data-block-id="layer-block"]').element)
+    await flushPromises()
+    expect(geometry).toHaveBeenCalled()
+    expect(selected.attributes('style')).toContain('translate3d(420px, 150px, 0)')
+    wrapper.unmount()
+    geometry.mockRestore()
+  })
 
   it('zooms in around the supplied viewport anchor', async () => {
     const wrapper = mount(CardViewport, {
@@ -936,7 +981,7 @@ describe('CardViewport wheel zoom API', () => {
     await nextTick()
     expect(wrapper.get('.selection-alignment-guides line').attributes())
       .toMatchObject({ x1: '258', x2: '258', y1: '120', y2: '230' })
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('left: 158px')
+    expect(wrapper.get('.selection-frame').attributes('style')).toContain('translate3d(158px, 150px, 0)')
 
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('move-selection')?.[0]?.[0]).toEqual({
@@ -952,7 +997,7 @@ describe('CardViewport wheel zoom API', () => {
     unsnappedDrag.moveBy(5, 0)
     await nextTick()
     expect(wrapper.find('.selection-alignment-guides').exists()).toBe(false)
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('left: 155px')
+    expect(wrapper.get('.selection-frame').attributes('style')).toContain('translate3d(155px, 150px, 0)')
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('move-selection')?.[1]?.[0]).toEqual({
       blockId: 'selected',

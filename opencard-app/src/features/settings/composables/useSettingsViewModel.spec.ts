@@ -55,11 +55,19 @@ describe('useSettingsViewModel', () => {
       { type: 'icon', icon: 'tool.workspace' },
       { type: 'icon', icon: 'tool.collaboration' },
     ])
-    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'updates', 'tutorials', 'exporting', 'rendering', 'cache'])
+    expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'tips', 'updates', 'tutorials', 'exporting', 'rendering', 'cache'])
     expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([
       'appearance.locale',
       'shell.titleBarNoticeHistoryLimit',
     ])
+    const tips = cardOf(activeCategory.value, 'tips')
+    expect(tips.icon).toBe('status.tip')
+    expect(tips.items.map(item => item.key)).toEqual(['shell.tipsEnabled', 'shell.tipsIntervalMinutes'])
+    expect(editor(tips.items[0]!)).toMatchObject({ value: true, definition: { fieldType: 'boolean' } })
+    expect(editor(tips.items[1]!)).toMatchObject({
+      value: 5,
+      definition: { presentation: 'slider', min: 1, max: 120, step: 1, ticks: [1, 2, 5, 10, 15, 30, 60, 120] },
+    })
     expect(cardOf(activeCategory.value, 'updates').items.map(item => item.key)).toEqual([
       'updates.showReleaseNotesAfterUpdate',
     ])

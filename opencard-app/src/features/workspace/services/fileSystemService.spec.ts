@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -67,6 +67,7 @@ describe('fileSystemService native file actions', () => {
 })
 
 describe('fileSystemService recursive listing', () => {
+  afterEach(() => vi.unstubAllGlobals())
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.invoke.mockResolvedValue(undefined)
@@ -88,6 +89,27 @@ describe('fileSystemService recursive listing', () => {
       { name: 'coin.svg', isDirectory: false },
     ],
   }
+
+  it('pulls native pages sequentially and releases the cursor when aborted', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {})
+    const controller = new AbortController()
+    let completePage!: (page: { entries: unknown[]; done: boolean }) => void
+    let pageRequests = 0
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === 'cancel_project_directory') return Promise.resolve()
+      pageRequests++
+      return new Promise(resolve => { completePage = resolve })
+    })
+    const listing = fileSystemService.readDirectoryEntries('D:/Project', 1, '', { signal: controller.signal })
+    const cancelled = expect(listing).rejects.toMatchObject({ name: 'AbortError' })
+    expect(pageRequests).toBe(1)
+    controller.abort()
+    completePage({ entries: [{ name: 'stale.png', isDirectory: false, isFile: true, isSymlink: false }], done: false })
+    await cancelled
+    expect(pageRequests).toBe(1)
+    expect(mocks.readDir).not.toHaveBeenCalled()
+    expect(mocks.invoke).toHaveBeenCalledWith('cancel_project_directory', expect.objectContaining({ requestId: expect.any(String) }))
+  })
 
   it('lists a skipped directory without reading what is inside it', async () => {
     const readPaths: string[] = []

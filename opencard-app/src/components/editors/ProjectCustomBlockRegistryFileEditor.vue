@@ -14,7 +14,7 @@
         @close="settingsCollectionKey = null" @submit="saveCollectionSettings" />
     </template>
     <ProjectRegistryRepairEditor v-else :model-value="editorState.draftContent ?? ''" :theme-id="themeId"
-      :theme-overrides="themeOverrides" :heading="t('customBlockRegistry.invalid')" :description="t('customBlockRegistry.repair')"
+      :theme-overrides="themeOverrides" :heading="t('customBlockRegistry.invalid')" :description="t('customBlockRegistry.repairDescription')"
       @update:model-value="updateRawSource" @save="save" />
   </ProjectRegistryEditorShell>
 </template>

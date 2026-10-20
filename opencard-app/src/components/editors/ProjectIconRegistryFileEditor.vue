@@ -11,7 +11,7 @@
       @add-icons="openAddIconsDialog" />
 
     <ProjectRegistryRepairEditor v-else :model-value="editorState.draftContent ?? ''" :theme-id="themeId"
-      :theme-overrides="themeOverrides" :heading="t('iconRegistry.invalid')" :description="t('iconRegistry.repair')"
+      :theme-overrides="themeOverrides" :heading="t('iconRegistry.invalid')" :description="t('iconRegistry.repairDescription')"
       @update:model-value="updateRawSource" @save="save" />
 
     <OcDialog :open="Boolean(pendingRemovalSeries)" :title="t('projectConfig.icons.removeSeriesTitle')"

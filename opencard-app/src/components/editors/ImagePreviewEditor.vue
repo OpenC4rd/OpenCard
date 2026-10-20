@@ -561,7 +561,7 @@ defineExpose({ resetView, presentation })
 .image-preview-editor__controls {
   position: absolute;
   left: 50%;
-  bottom: var(--oc-floating-surface-gap);
+  bottom: var(--oc-space-xs);
   transform: translateX(-50%);
 }
 </style>

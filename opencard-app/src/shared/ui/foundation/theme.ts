@@ -1,5 +1,5 @@
 import { clampBaseFontSize } from './baseFontSize'
-import { DEFAULT_OC_THEME, OC_THEME_REGISTRY } from './themes'
+import { DEFAULT_OC_THEME, OC_SHARED_THEME_TOKENS, OC_THEME_REGISTRY } from './themes'
 import { prefersReducedMotion } from './prefersReducedMotion'
 import {
   OC_EDITABLE_THEME_COLOR_KEYS,
@@ -13,6 +13,19 @@ import {
 export type OcThemeTypography = {
   fontFamily?: string
   baseFontSize?: number
+}
+
+export type OcTransitionSpeed = '0.5x' | '1x' | '2x' | 'off'
+let currentTransitionSpeed: OcTransitionSpeed = '1x'
+
+export function setOcTransitionSpeed(speed: OcTransitionSpeed): void {
+  currentTransitionSpeed = speed
+  if (typeof document === 'undefined') return
+  const multiplier = speed === 'off' ? 0 : Number.parseFloat(speed)
+  for (const token of ['--oc-duration-quick', '--oc-duration', '--oc-duration-layout', '--oc-duration-theme'] as const) {
+    const baseDuration = Number.parseFloat(OC_SHARED_THEME_TOKENS[token])
+    document.documentElement.style.setProperty(token, `${multiplier === 0 ? 0 : baseDuration / multiplier}ms`)
+  }
 }
 
 function resolveFontStack(fontFamily: string | undefined, fallback: string): string {
@@ -289,6 +302,7 @@ function applyTheme(
   }
 
   root.style.colorScheme = themeId
+  setOcTransitionSpeed(currentTransitionSpeed)
   root.dataset.ocTheme = themeId
   currentTheme = themeId
   currentThemeColorSignature = colorSignature
@@ -313,8 +327,9 @@ export function setOcGlassIntensity(value: number): void {
 
   root.style.setProperty('--oc-bg-glass', `color-mix(in srgb, var(--oc-bg-surface) ${opacity}%, transparent)`)
   root.style.setProperty('--oc-bg-glass-blur', `${blur}px`)
-  root.style.setProperty('--oc-blur-glass', `${blur}px`)
-  root.style.setProperty('--oc-bg-glass-saturate', `${saturation}%`)
+  root.style.setProperty('--oc-bg-glass-filter', intensity === 0
+    ? 'none'
+    : `blur(${blur}px) saturate(${saturation}%)`)
   root.dataset.ocGlassIntensity = String(intensity)
 }
 

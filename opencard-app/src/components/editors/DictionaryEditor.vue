@@ -145,7 +145,7 @@
           <OcIcon name="status.error" tone="danger" />
           <div>
             <strong>{{ t('dictionaryEditor.invalid') }}</strong>
-            <OcText tone="muted" size="sm">{{ t('dictionaryEditor.repairHint') }}</OcText>
+            <OcText tone="muted" size="sm">{{ t('dictionaryEditor.repairDescription') }}</OcText>
           </div>
         </div>
         <div class="dictionary-editor__source">

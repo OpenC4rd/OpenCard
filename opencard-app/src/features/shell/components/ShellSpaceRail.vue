@@ -39,6 +39,7 @@ const emit = defineEmits<{
       <button
         v-for="space in group.spaces"
         :key="space.key"
+        :data-oc-tutorial="space.key === 'collaboration' ? 'shell.collaboration' : undefined"
         class="shell-space-rail__item"
         :class="{ 'is-active': space.key === props.activeSpace }"
         type="button"

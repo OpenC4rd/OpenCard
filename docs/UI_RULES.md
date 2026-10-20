@@ -351,6 +351,12 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 
 全局 tooltip 只由 `shared/ui/tooltip/globalTooltip.ts` 提供，方向由 `data-tooltip-placement` 声明：
 
+- 默认在鼠标旁显示并随鼠标移动（`data-tooltip-anchor="pointer"`），无需单独声明；靠近视口边缘时翻侧并限制在视口内，不使用 `data-tooltip-placement`。
+- 需要锚定控件时显式声明 `data-tooltip-anchor="target"`，提示实时跟随控件的位置与尺寸变化。
+- 锚点模式可在容器上声明，就近声明优先；键盘聚焦始终使用控件锚点与声明的方向。
+- 鼠标锚点的分隔拖动条与滑块（`role="separator"` / `role="slider"`）在按下时立即显示提示，拖动时使用指针移动事件跟随捕获中的指针；其他点击照常关闭提示。
+- 滑块数值复用全局 tooltip，显示期间的文案变化实时刷新，不另外创建数值浮层。
+
 | 方向 token | 含义 | 适用位置 |
 |------------|------|----------|
 | `top` | 锚点上方居中 | 纵向列表的行内操作（`OcTree` 节点尾部 action） |
@@ -376,7 +382,7 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 | 离开区域 / 点击 / Esc / 失焦 | 立即收起并结束热窗口，下次重新等待 | — |
 
 - 声明在容器元素上（`OcActionRail`、`OcTree`/`OcAlbum` 的 tail、侧边栏图标栏、标题栏左侧操作组）；不声明时每个控件自成一区，行为与逐控件延迟一致。
-- 一次热窗口内**冻结首个解析出的方向**（放不下时才让位给能放下的方向），否则同级切换时提示会左右跳动。
+- 控件锚点模式下一次热窗口内**冻结首个解析出的方向**（放不下时才让位给能放下的方向），鼠标模式持续跟随指针。
 - 热窗口按“最近一次显示”计时，不是按驻留时长；停留超过热窗口后再悬停同级控件需要重新等待。
 
 ---

@@ -52,7 +52,7 @@ export function createSettingsPage(cancelExportsAndWait: () => Promise<void>) {
       disabled: !settingsStore.dirty.value,
     },
     ...(isTauri()
-      ? [{ key: 'settings.open-file', icon: 'format.code-braces', title: t('settings.actions.openFile', 'Open settings file') }]
+      ? [{ key: 'settings.open-file', icon: 'format.code-braces', title: t('settings.actions.openFile', 'Open settings file') } satisfies PageHeaderAction]
       : []),
   ])
 

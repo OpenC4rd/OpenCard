@@ -8,7 +8,7 @@ export const CDE_OVERLAY_GEOMETRY_CONFIG: CdeOverlayGeometryConfig = {
   maxExtent: readThemePixels('--oc-card-editor-dock-max-width'),
   expandDragThreshold: readThemePixels('--oc-card-editor-dock-expand-threshold'),
   collapseDragThreshold: readThemePixels('--oc-card-editor-dock-collapse-threshold'),
-  floatingGap: readThemePixels('--oc-floating-surface-gap'),
+  floatingGap: readThemePixels('--oc-space-xs'),
 }
 
 export const CDE_OVERLAY_TOP_MIN_HEIGHT = readThemePixels('--oc-card-editor-dock-top-min-height')

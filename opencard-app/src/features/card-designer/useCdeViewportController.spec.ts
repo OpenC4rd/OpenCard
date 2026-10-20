@@ -122,8 +122,7 @@ describe('useCdeViewportController', () => {
     expect(controller.transformPreviewRendererStyle.value.transform).toBe('scale(0.5)')
     expect(controller.transformPreviewViewportStyle.value).toEqual({ width: '200px', height: '100px' })
     expect(controller.transformPreviewFrameStyle.value).toEqual({
-      left: '75px',
-      top: '37.5px',
+      transform: 'translate3d(75px, 37.5px, 0)',
       width: '50px',
       height: '25px',
     })
@@ -150,6 +149,9 @@ describe('useCdeViewportController', () => {
   })
 
   it('moves the viewport through preview pointer dragging', () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
     const { commits, controller, wrapper } = createHarness()
     resizeHost(controller.transformPreviewHostRef.value!, 200, 100)
     controller.handleViewportTransformChange({ x: 20, y: 10, scale: 1 })
@@ -170,11 +172,18 @@ describe('useCdeViewportController', () => {
     }) as unknown as PointerEvent
 
     controller.startPreviewViewportDrag(pointer(10, 10))
+    const before = commits.length
+    controller.handlePreviewViewportDrag(pointer(15, 12))
     controller.handlePreviewViewportDrag(pointer(20, 15))
-
+    expect(commits).toHaveLength(before)
+    expect(frames).toHaveLength(1)
+    frames.shift()!(0)
+    expect(commits).toHaveLength(before + 1)
     expect(commits[commits.length - 1]).toEqual({ x: 0, y: 0, scale: 1 })
     expect(controller.isPreviewViewportDragging.value).toBe(true)
-    controller.stopPreviewViewportDrag(pointer(20, 15))
+    controller.handlePreviewViewportDrag(pointer(30, 25))
+    controller.stopPreviewViewportDrag(pointer(30, 25))
+    expect(commits[commits.length - 1]).toEqual({ x: -20, y: -20, scale: 1 })
     expect(controller.isPreviewViewportDragging.value).toBe(false)
     wrapper.unmount()
   })

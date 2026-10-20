@@ -223,8 +223,8 @@ const panelStyles = computed<CSSProperties>(() => ({
 
 .oc-panel--tone-glass {
   background-color: var(--oc-bg-glass);
-  -webkit-backdrop-filter: blur(var(--oc-blur-glass));
-  backdrop-filter: blur(var(--oc-blur-glass));
+  -webkit-backdrop-filter: var(--oc-bg-glass-filter);
+  backdrop-filter: var(--oc-bg-glass-filter);
 }
 
 .oc-panel--tone-accent {
