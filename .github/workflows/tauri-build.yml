@@ -64,6 +64,7 @@ jobs:
           echo 'body<<OPENCARD_RELEASE_NOTES_EOF' >> "$GITHUB_OUTPUT"
           cat RELEASE_NOTES.md >> "$GITHUB_OUTPUT"
           echo 'OPENCARD_RELEASE_NOTES_EOF' >> "$GITHUB_OUTPUT"
+          node -e "const fs = require('node:fs'); const version = require('./package.json').version; fs.appendFileSync(process.env.GITHUB_OUTPUT, 'windows-bundle-args=' + (version.includes('-') ? '--bundles nsis' : '') + '\n')"
 
       - name: Build and publish Tauri release
         uses: tauri-apps/tauri-action@v1
@@ -73,6 +74,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: opencard-app
+          args: ${{ matrix.platform == 'windows-latest' && steps.release-notes.outputs.windows-bundle-args || '' }}
           tagName: v__VERSION__
           releaseName: OpenCard v__VERSION__
           releaseBody: ${{ steps.release-notes.outputs.body }}
