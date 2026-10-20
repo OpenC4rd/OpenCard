@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OpenCard",
-  "version": "0.4.9",
+  "version": "0.5.0-beta.1",
   "identifier": "per.yiguwang.opencard",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -137,7 +137,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE1NzYwNjI3MkVDQkU0QkEKUldTNjVNc3VKd1oycGZncGQveWlSUGUvZ1BDQk5IcndhYy9JMjE0bzF2Sll2aEN0dHFHR0xNOGgK",
       "endpoints": [
-        "https://github.com/OpenC4rd/OpenCard/releases/latest/download/latest.json"
+        "https://github.com/OpenC4rd/OpenCard/releases/download/preview/latest.json"
       ],
       "windows": {
         "installMode": "passive"
