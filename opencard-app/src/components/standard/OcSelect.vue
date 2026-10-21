@@ -36,7 +36,7 @@
         <OcIcon
           class="oc-select__chevron"
           :class="{ 'is-open': open }"
-          name="nav.chevron-down"
+          name="mdiChevronDown"
           size="sm"
           tone="muted"
         />
@@ -76,7 +76,7 @@
               :data-tooltip="option.label" data-tooltip-overflow>{{ option.label }}</span>
           </template>
           <template v-if="option.value === modelValue" #append>
-            <OcIcon name="action.check" size="sm" />
+            <OcIcon name="mdiCheck" size="sm" />
           </template>
         </OcRow>
         <div v-if="options.length === 0" class="oc-select__empty">{{ emptyText }}</div>

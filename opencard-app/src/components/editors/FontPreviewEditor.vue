@@ -9,7 +9,7 @@
       <div v-else-if="loadFailed" class="font-preview-editor__status">
         <OcText tone="danger" role="alert">{{ repairError || t('fontPreview.loadFailed') }}</OcText>
         <OcText tone="muted" size="sm">{{ t('fontPreview.repairDescription') }}</OcText>
-        <OcButton icon="action.refresh" variant="soft" :disabled="repairing" @click="attemptRepair">
+        <OcButton icon="mdiRefresh" variant="soft" :disabled="repairing" @click="attemptRepair">
           {{ repairing ? t('fontPreview.repairing') : t('fontPreview.attemptRepair') }}
         </OcButton>
       </div>
@@ -64,7 +64,7 @@ const displayName = computed(() => editorState.value.name || filePath.value.spli
 const presentation = computed<EditorPresentation>(() => ({
   title: displayName.value,
   description: t('fontPreview.subtitle'),
-  icon: 'file.font',
+  icon: 'mdiFormatFont',
 }))
 
 defineExpose({ presentation })

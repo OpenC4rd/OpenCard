@@ -1,7 +1,7 @@
 <template>
   <section class="project-registry-repair" role="alert">
     <div class="project-registry-repair__message">
-      <OcIcon name="status.error" tone="danger" />
+      <OcIcon name="mdiAlertCircleOutline" tone="danger" />
       <div>
         <strong>{{ heading }}</strong>
         <OcText tone="muted" size="sm">{{ description }}</OcText>

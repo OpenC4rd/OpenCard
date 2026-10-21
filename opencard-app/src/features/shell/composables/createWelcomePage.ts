@@ -25,7 +25,7 @@ export function createWelcomePage(): SpacePage {
   }, { immediate: true })
   return {
     key: 'welcome',
-    navigation: { key: 'welcome', icon: 'nav.welcome', labelKey: 'app.shell.space.welcome' },
+    navigation: { key: 'welcome', icon: 'mdiHumanGreeting', labelKey: 'app.shell.space.welcome' },
     content: WelcomePageContent,
     contentProps: computed(() => ({
       covers: feature.welcomeCoverWallCovers.value,

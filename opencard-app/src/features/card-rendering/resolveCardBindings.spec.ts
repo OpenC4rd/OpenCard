@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clearBlockFieldValue,
   createBlockAdditionalField,
   createTextBlock,
   createSimpleContainerBlock,
-  deleteBlockAdditionalField,
+  removeBlockAdditionalFieldDefinition,
   type CardDocument,
   type CardBlock,
   type CardInstanceRecord,
@@ -375,7 +376,7 @@ describe('card additional fields and bindings', () => {
     expect(resolveReferences(projected).document.faces.front.children[0]!.block).toMatchObject({ content: '24' })
   })
 
-  it('validates creation and clears instance overrides when deleting', () => {
+  it('validates creation and clears the stored value without deleting the definition', () => {
     const block = createTextBlock({ id: 'text' })
     const document = createDocument(block)
     document.instances = [{
@@ -391,19 +392,22 @@ describe('card additional fields and bindings', () => {
     expect(createBlockAdditionalField(block, 'score', { fieldType: 'number', title: 'Score' })).toBeNull()
     expect(block.additionalFieldDefinition?.score).toEqual({ fieldType: 'number', title: 'Score' })
     expect((block as unknown as Record<string, unknown>).score).toBe('0')
-    expect(deleteBlockAdditionalField(document, block, 'score')).toBe(1)
-    expect(block.additionalFieldDefinition).toBeUndefined()
+    clearBlockFieldValue(block, 'score')
+    expect(block.additionalFieldDefinition?.score).toEqual({ fieldType: 'number', title: 'Score' })
     expect((block as unknown as Record<string, unknown>).score).toBeUndefined()
+    expect(document.instances[0]!.data.text?.score).toBe('8')
+    expect(removeBlockAdditionalFieldDefinition(document, block, 'score')).toBe(true)
+    expect(block.additionalFieldDefinition).toBeUndefined()
     expect(document.instances[0]!.data.text).toBeUndefined()
   })
 
-  it('keeps existing expressions diagnostic after deleting their custom field', () => {
+  it('keeps existing expressions diagnostic after removing their custom field definition', () => {
     const block = createTextBlock({ id: 'text', content: '{{self:score}}' })
     block.additionalFieldDefinition = { score: { fieldType: 'number' } }
     ;(block as unknown as Record<string, unknown>).score = '10'
     const document = createDocument(block)
 
-    deleteBlockAdditionalField(document, block, 'score')
+    removeBlockAdditionalFieldDefinition(document, block, 'score')
     const result = resolveReferences(document)
 
     expect(result.issues).toEqual(expect.arrayContaining([

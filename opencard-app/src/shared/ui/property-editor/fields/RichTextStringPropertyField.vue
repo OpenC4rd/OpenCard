@@ -50,9 +50,9 @@
           @update:model-value="setEditorMode" />
       </template>
       <template #footer>
-        <OcButton size="md" icon-only icon="action.close" icon-tone="danger"
+        <OcButton size="md" icon-only icon="mdiClose" icon-tone="danger"
           :data-tooltip="tr('propertyEditor.richText.cancel', '取消')" :aria-label="tr('propertyEditor.richText.cancelEdit', '取消富文本编辑')" @click="cancelEditor" />
-        <OcButton size="md" icon-only icon="action.check" icon-tone="success" variant="soft" :disabled="saveBlocked"
+        <OcButton size="md" icon-only icon="mdiCheck" icon-tone="success" variant="soft" :disabled="saveBlocked"
           :data-tooltip="tr('propertyEditor.richText.save', '保存')" :aria-label="tr('propertyEditor.richText.saveEdit', '保存富文本编辑')" @click="saveEditor" />
       </template>
       <template #sidebar>
@@ -106,8 +106,8 @@ const session = useRichTextSession(richTextEditor, sourceEditor,
 const { open, mode: editorMode, initialHtml, source: sourceValue, diagnostics: sourceDiagnostics } = session
 const saveBlocked = computed(() => editorMode.value === 'source' && parseRichTextHtml(sourceValue.value).diagnostics.length > 0)
 const editorModeOptions = computed<readonly OcOption[]>(() => [
-  { value: 'rich', label: tr('propertyEditor.richText.richTextMode', '富文本'), icon: 'format.text-variant-outline' },
-  { value: 'source', label: tr('propertyEditor.richText.htmlSource', 'HTML 源码'), icon: 'format.xml' },
+  { value: 'rich', label: tr('propertyEditor.richText.richTextMode', '富文本'), icon: 'mdiFormatTextVariantOutline' },
+  { value: 'source', label: tr('propertyEditor.richText.htmlSource', 'HTML 源码'), icon: 'mdiXml' },
 ])
 
 function openEditor() { if (!props.definition.isReadonly && !open.value) return session.begin(stringValue.value) }

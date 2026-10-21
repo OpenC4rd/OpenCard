@@ -21,37 +21,37 @@
           :aria-controls="memberAutocompleteId" :aria-activedescendant="activeMemberOptionId"
           @focus="openMemberMenu" @input="updateMemberQuery" @blur="closeMemberMenu"
           @keydown="handleMemberKeydown" />
-        <OcButton type="button" icon-only variant="soft" icon="action.add" :disabled="!candidateMemberKey"
+        <OcButton type="button" icon-only variant="soft" icon="mdiPlus" :disabled="!candidateMemberKey"
           :aria-label="t('projectConfig.fonts.addMember')" :data-tooltip="t('projectConfig.fonts.addMember')"
           @click="addCandidateMember" />
       </div>
       <OcAutocompletePopover :id="memberAutocompleteId" :open="memberMenuOpen" :anchor="memberPickerRef"
         :items="memberSuggestions" :active-key="activeMemberKey" @select="selectMemberSuggestion" />
-      <OcButton type="button" variant="ghost" icon="tool.settings" @click="advancedOpen = !advancedOpen">
+      <OcButton type="button" variant="ghost" icon="mdiCogOutline" @click="advancedOpen = !advancedOpen">
         {{ t('projectConfig.fonts.advancedRanges') }}
       </OcButton>
       <div v-if="selectedMembers.length" class="project-font-set-dialog__selected">
         <div v-for="(member, index) in selectedMembers" :key="`${member.fontKey}:${index}`"
           class="project-font-set-dialog__member-row">
-          <span><OcIcon name="file.font" size="sm" />{{ entryLabel(member.fontKey) }}</span>
+          <span><OcIcon name="mdiFormatFont" size="sm" />{{ entryLabel(member.fontKey) }}</span>
           <span>
-            <OcButton type="button" icon-only size="sm" variant="ghost" icon="format.vertical-top"
+            <OcButton type="button" icon-only size="sm" variant="ghost" icon="mdiFormatVerticalAlignTop"
               :disabled="index === 0" :aria-label="t('projectConfig.fonts.moveMemberToTop')"
               :data-tooltip="t('projectConfig.fonts.moveMemberToTop')"
               @click="moveMember(index, 0)" />
-            <OcButton type="button" icon-only size="sm" variant="ghost" icon="nav.arrow-up" :disabled="index === 0"
+            <OcButton type="button" icon-only size="sm" variant="ghost" icon="mdiArrowUp" :disabled="index === 0"
               :aria-label="t('propertyEditor.arrays.moveUp')" :data-tooltip="t('propertyEditor.arrays.moveUp')"
               @click="moveMember(index, index - 1)" />
-            <OcButton type="button" icon-only size="sm" variant="ghost" icon="nav.arrow-down"
+            <OcButton type="button" icon-only size="sm" variant="ghost" icon="mdiArrowDown"
               :disabled="index === selectedMembers.length - 1" :aria-label="t('propertyEditor.arrays.moveDown')"
               :data-tooltip="t('propertyEditor.arrays.moveDown')"
               @click="moveMember(index, index + 1)" />
-            <OcButton type="button" icon-only size="sm" variant="ghost" icon="format.vertical-bottom"
+            <OcButton type="button" icon-only size="sm" variant="ghost" icon="mdiFormatVerticalAlignBottom"
               :disabled="index === selectedMembers.length - 1"
               :aria-label="t('projectConfig.fonts.moveMemberToBottom')"
               :data-tooltip="t('projectConfig.fonts.moveMemberToBottom')"
               @click="moveMember(index, selectedMembers.length - 1)" />
-            <OcButton type="button" icon-only size="sm" variant="ghost" icon="action.delete" icon-tone="danger"
+            <OcButton type="button" icon-only size="sm" variant="ghost" icon="mdiTrashCanOutline" icon-tone="danger"
               :aria-label="t('projectConfig.fonts.removeMember')"
               :data-tooltip="t('projectConfig.fonts.removeMember')" @click="removeMember(index)" />
           </span>
@@ -166,7 +166,7 @@ const memberSuggestions = computed(() => {
       key: entry.key,
       label: entry.name,
       detail: `font:${entry.key}`,
-      icon: 'file.font' as const,
+      icon: 'mdiFormatFont' as const,
     }))
 })
 const candidateMemberKey = computed(() => {

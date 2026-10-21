@@ -57,8 +57,7 @@ describe('AdditionalFieldCreateDialog', () => {
     expect(wrapper.emitted('submit')).toEqual([[{ fieldType: 'number', title: 'Score', min: 10, step: 2 }]])
   })
 
-  it('clears incompatible constraints after changing type', async () => {
-    const i18n = createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })
+  it('clears incompatible constraints after changing type', async () => {    const i18n = createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })
     const wrapper = mount(AdditionalFieldCreateDialog, {
       props: { open: true, fieldTypes: ['string', 'number'], fieldType: 'number', fieldKey: 'value', title: '' },
       global: { plugins: [i18n], stubs: { teleport: true } },
@@ -70,5 +69,29 @@ describe('AdditionalFieldCreateDialog', () => {
     await wrapper.setProps({ fieldType: 'string' })
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')).toEqual([[{ fieldType: 'string' }]])
+  })
+
+  it('locks the key, seeds constraints and offers removal when editing a definition', async () => {
+    const i18n = createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })
+    const wrapper = mount(AdditionalFieldCreateDialog, {
+      props: {
+        open: true, mode: 'edit', fieldTypes: ['string', 'number'], fieldType: 'number',
+        fieldKey: 'score', title: 'Points',
+        initialDefinition: { fieldType: 'number', title: 'Points', min: 3, step: 2 },
+      },
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    })
+
+    const keyInput = wrapper.findAll('input').find(input => (input.element as HTMLInputElement).value === 'score')
+    expect(keyInput?.attributes('readonly')).toBeDefined()
+    expect(wrapper.findComponent({ name: 'OcSelect' }).props('readonly')).toBe(true)
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')).toEqual([[{ fieldType: 'number', title: 'Points', min: 3, step: 2 }]])
+
+    const remove = wrapper.get('.additional-field-dialog__remove')
+    await remove.trigger('click')
+    expect(wrapper.emitted('remove')).toBeUndefined()
+    await remove.trigger('click')
+    expect(wrapper.emitted('remove')).toEqual([[]])
   })
 })

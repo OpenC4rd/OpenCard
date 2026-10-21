@@ -56,7 +56,7 @@
               size="md"
             />
             <OcIcon v-else
-              :name="'circle'"
+              :name="'mdiCircleMedium'"
               size="md"
               class="oc-tree__node-icon"
               :class="{ 'is-expanded': context.isExpandable(entry.key) && context.isExpanded(entry.key) }"

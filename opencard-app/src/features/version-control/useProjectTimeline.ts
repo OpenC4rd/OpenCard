@@ -48,18 +48,18 @@ export function useProjectTimeline(
     const titles = locale.value === 'zh-CN'
       ? { added: '新增', modified: '修改', deleted: '删除' }
       : { added: 'Added', modified: 'Modified', deleted: 'Deleted' }
-    if (file.status === 'added') return { type: 'badge', label: titles.added, icon: 'action.add', tone: 'success' }
-    if (file.status === 'deleted') return { type: 'badge', label: titles.deleted, icon: 'action.minus', tone: 'danger' }
-    return { type: 'badge', label: titles.modified, icon: 'status.circle-medium', tone: 'warning' }
+    if (file.status === 'added') return { type: 'badge', label: titles.added, icon: 'mdiPlus', tone: 'success' }
+    if (file.status === 'deleted') return { type: 'badge', label: titles.deleted, icon: 'mdiMinus', tone: 'danger' }
+    return { type: 'badge', label: titles.modified, icon: 'mdiCircleMedium', tone: 'warning' }
   }
 
   function statusTail(entry: GitStatusEntry): OcNodeBadge {
     const titles = locale.value === 'zh-CN'
       ? { added: '新增', modified: '修改', deleted: '删除' }
       : { added: 'Added', modified: 'Modified', deleted: 'Deleted' }
-    if (entry.indexDeleted || entry.worktreeDeleted) return { type: 'badge', label: titles.deleted, icon: 'action.minus', tone: 'danger' }
-    if (entry.indexNew || entry.worktreeNew) return { type: 'badge', label: titles.added, icon: 'action.add', tone: 'success' }
-    return { type: 'badge', label: titles.modified, icon: 'status.circle-medium', tone: 'warning' }
+    if (entry.indexDeleted || entry.worktreeDeleted) return { type: 'badge', label: titles.deleted, icon: 'mdiMinus', tone: 'danger' }
+    if (entry.indexNew || entry.worktreeNew) return { type: 'badge', label: titles.added, icon: 'mdiPlus', tone: 'success' }
+    return { type: 'badge', label: titles.modified, icon: 'mdiCircleMedium', tone: 'warning' }
   }
 
   function createCommitTree(
@@ -78,7 +78,7 @@ export function useProjectTimeline(
       items.set(key, {
         label: `${commit.summary.trim() || commit.shortId} ${commit.shortId}`,
         tail: [formatRelativeTime(commit.authoredAtSeconds * 1000, locale.value), ...actions],
-        visual: { type: 'icon', icon: 'file.git' },
+        visual: { type: 'icon', icon: 'mdiSourceBranch' },
       })
       const changedFiles = Array.isArray(commit.changedFiles) ? commit.changedFiles : []
       if (!includeChangedPaths || changedFiles.length === 0) continue
@@ -104,7 +104,7 @@ export function useProjectTimeline(
   const compareWithDiskAction = computed<OcNodeAction>(() => ({
     key: TIMELINE_COMPARE_WITH_DISK_ACTION_KEY,
     title: compareWithDiskLabel.value,
-    icon: 'action.file-arrow-up-down',
+    icon: 'mdiFileArrowUpDownOutline',
   }))
 
   const treeData = computed(() => createCommitTree(

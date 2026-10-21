@@ -52,7 +52,7 @@ const iconTone = {
 const defaultFileType: FileTypeDefinition = {
   id: 'unsupported',
   labelKey: 'fileTypes.unsupported',
-  icon: 'file.generic',
+  icon: 'mdiFileOutline',
   iconTone: 'muted',
   editorId: 'unsupported-file',
 }
@@ -62,7 +62,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'plaintext',
     labelKey: 'fileTypes.plaintext',
     extensions: ['txt'],
-    icon: 'file.text',
+    icon: 'mdiCardTextOutline',
     iconTone: 'muted',
     language: 'plaintext',
     editorId: 'monaco',
@@ -71,7 +71,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-project-profile',
     labelKey: 'fileTypes.opencardProjectProfile',
     patterns: ['.opencard/project.json'],
-    icon: 'file.opencard-project',
+    icon: 'mdiFileCogOutline',
     iconTone: iconTone.config,
     language: 'json',
     editorId: 'project-config',
@@ -81,7 +81,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-font-registry',
     labelKey: 'fileTypes.opencardFontRegistry',
     patterns: ['.opencard/fonts/fonts.json'],
-    icon: 'file.font',
+    icon: 'mdiFormatFont',
     iconTone: iconTone.config,
     language: 'json',
     editorId: 'font-registry',
@@ -91,7 +91,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-icon-registry',
     labelKey: 'fileTypes.opencardIconRegistry',
     patterns: ['.opencard/icons/icons.json'],
-    icon: 'file.project-icon',
+    icon: 'mdiStickerEmoji',
     iconTone: iconTone.config,
     language: 'json',
     editorId: 'icon-registry',
@@ -101,7 +101,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-custom-block-registry',
     labelKey: 'fileTypes.opencardCustomBlockRegistry',
     patterns: [PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME],
-    icon: 'entity.block-custom',
+    icon: 'mdiToyBrickOutline',
     iconTone: iconTone.config,
     language: 'json',
     editorId: 'custom-block-registry',
@@ -111,7 +111,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-dictionary',
     labelKey: 'fileTypes.opencardDictionary',
     patterns: ['.opencard/locale.json'],
-    icon: 'file.dictionary',
+    icon: 'mdiTranslate',
     iconTone: iconTone.config,
     language: 'json',
     editorId: 'dictionary',
@@ -121,7 +121,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-resource-package',
     labelKey: 'fileTypes.opencardResourcePackage',
     extensions: ['ocpack'],
-    icon: 'file.package',
+    icon: 'mdiPackageVariantClosed',
     iconTone: iconTone.opencard,
     editorId: 'package-manifest',
     previewable: true,
@@ -134,7 +134,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-package-directory',
     labelKey: 'fileTypes.opencardResourcePackage',
     patterns: [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`],
-    icon: 'file.package',
+    icon: 'mdiPackageVariantClosed',
     iconTone: iconTone.config,
     editorId: 'package-manager',
     previewable: true,
@@ -143,7 +143,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard',
     labelKey: 'fileTypes.opencard',
     extensions: [CARD_DOCUMENT_EXTENSION],
-    icon: 'file.opencard',
+    icon: 'mdiCardsOutline',
     iconTone: iconTone.opencard,
     language: 'json',
     editorId: 'card-designer',
@@ -153,7 +153,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'opencard-custom-block',
     labelKey: 'fileTypes.opencardCustomBlock',
     extensions: ['ocblock'],
-    icon: 'entity.block-custom',
+    icon: 'mdiToyBrickOutline',
     iconTone: 'block-simple-container',
     editorId: 'unsupported-file',
   },
@@ -163,7 +163,7 @@ const fileTypes: FileTypeDefinition[] = [
     extensions: ['json'],
     patterns: ['**/package.json'],
     fileNames: ['package-lock.json', 'tsconfig.json', 'jsconfig.json'],
-    icon: 'file.json',
+    icon: 'mdiCodeJson',
     iconTone: iconTone.json,
     language: 'json',
     editorId: 'monaco',
@@ -174,7 +174,7 @@ const fileTypes: FileTypeDefinition[] = [
     labelKey: 'fileTypes.markdown',
     extensions: ['md'],
     fileNames: ['readme.md'],
-    icon: 'file.markdown',
+    icon: 'mdiLanguageMarkdownOutline',
     iconTone: iconTone.markdown,
     language: 'markdown',
     editorId: 'monaco',
@@ -184,7 +184,7 @@ const fileTypes: FileTypeDefinition[] = [
     labelKey: 'fileTypes.typescript',
     extensions: ['ts', 'tsx'],
     fileNames: ['vite.config.ts'],
-    icon: 'file.typescript',
+    icon: 'mdiLanguageTypescript',
     iconTone: iconTone.typescript,
     language: 'typescript',
     editorId: 'monaco',
@@ -193,7 +193,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'javascript',
     labelKey: 'fileTypes.javascript',
     extensions: ['js', 'jsx', 'mjs', 'cjs'],
-    icon: 'file.javascript',
+    icon: 'mdiLanguageJavascript',
     iconTone: iconTone.javascript,
     language: 'javascript',
     editorId: 'monaco',
@@ -202,7 +202,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'vue',
     labelKey: 'fileTypes.vue',
     extensions: ['vue'],
-    icon: 'file.vue',
+    icon: 'mdiVuejs',
     iconTone: iconTone.vue,
     language: 'vue',
     editorId: 'monaco',
@@ -211,7 +211,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'html',
     labelKey: 'fileTypes.html',
     extensions: ['html'],
-    icon: 'file.html',
+    icon: 'mdiLanguageHtml5',
     iconTone: iconTone.html,
     language: 'html',
     editorId: 'monaco',
@@ -220,7 +220,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'css',
     labelKey: 'fileTypes.css',
     extensions: ['css', 'scss', 'sass', 'less'],
-    icon: 'file.css',
+    icon: 'mdiLanguageCss3',
     iconTone: iconTone.css,
     language: 'css',
     editorId: 'monaco',
@@ -229,7 +229,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'font',
     labelKey: 'fileTypes.font',
     extensions: ['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc'],
-    icon: 'file.font',
+    icon: 'mdiFormatFont',
     iconTone: 'active',
     editorId: 'font-preview',
   },
@@ -237,7 +237,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'image',
     labelKey: 'fileTypes.image',
     extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
-    icon: 'file.image',
+    icon: 'mdiFileImageOutline',
     iconTone: iconTone.image,
     editorId: 'image-preview',
   },
@@ -245,7 +245,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'env',
     labelKey: 'fileTypes.env',
     fileNames: ['.env', '.env.local', '.env.development', '.env.production'],
-    icon: 'file.env',
+    icon: 'mdiFileKeyOutline',
     iconTone: 'warning',
     language: 'plaintext',
     editorId: 'monaco',
@@ -254,7 +254,7 @@ const fileTypes: FileTypeDefinition[] = [
     id: 'gitignore',
     labelKey: 'fileTypes.git',
     fileNames: ['.gitignore', '.gitattributes'],
-    icon: 'file.git',
+    icon: 'mdiSourceBranch',
     iconTone: 'danger',
     language: 'plaintext',
     editorId: 'monaco',
@@ -358,7 +358,7 @@ export function resolveFileTypeById(fileTypeId: string | null | undefined): File
 
 export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryIconPresentation {
   return {
-    icon: isExpanded ? 'folder.open' : 'folder.generic',
+    icon: isExpanded ? 'mdiFolderOpen' : 'mdiFolder',
     tone: 'folder',
   }
 }
@@ -368,8 +368,8 @@ export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryI
  * 包在 `.opencard/packages/<作者>/<包名>/<版本>` 的作者层，图标集合在 `.opencard/icons/<Key>`。
  */
 const MANAGED_DIRECTORY_PRESENTATIONS: readonly (readonly [string, EntryIconPresentation])[] = [
-  [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`, { icon: 'file.package', tone: iconTone.config }],
-  [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_ICON_DIRECTORY}`, { icon: 'file.project-icon', tone: iconTone.config }],
+  [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`, { icon: 'mdiPackageVariantClosed', tone: iconTone.config }],
+  [`${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_ICON_DIRECTORY}`, { icon: 'mdiStickerEmoji', tone: iconTone.config }],
 ]
 
 /**
@@ -410,7 +410,7 @@ export function resolveEntryIcon(
     && registeredFontSources
     && !isRegisteredManagedSource(path, projectRoot, registeredFontSources)) {
     return {
-      icon: 'file.font',
+      icon: 'mdiFormatFont',
       tone: 'muted',
     }
   }
@@ -418,7 +418,7 @@ export function resolveEntryIcon(
     && projectRoot
     && registeredIconSources
     && !isRegisteredManagedSource(path, projectRoot, registeredIconSources)) {
-    return { icon: 'file.image', tone: 'muted' }
+    return { icon: 'mdiFileImageOutline', tone: 'muted' }
   }
   return {
     icon: fileType.icon,

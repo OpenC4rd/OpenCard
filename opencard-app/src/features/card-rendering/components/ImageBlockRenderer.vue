@@ -19,7 +19,7 @@
             :aria-label="imageLoadState === 'error' ? tr('cardRenderer.imageFailed', '图片加载失败') : tr('cardRenderer.imageUnset', '未配置图片')"
         >
             <OcIcon
-                :name="imageLoadState === 'error' ? 'status.warning' : 'file.media'"
+                :name="imageLoadState === 'error' ? 'mdiAlertOutline' : 'mdiFileImageOutline'"
                 :tone="imageLoadState === 'error' ? 'warning' : 'muted'"
                 size="lg"
             />

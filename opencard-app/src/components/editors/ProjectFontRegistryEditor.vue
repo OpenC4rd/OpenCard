@@ -71,7 +71,7 @@
         </OcFloatingLayer>
       </template>
       <div v-else class="project-font-registry-workbench__placeholder">
-        <OcIcon :name="activePage === 'families' ? 'file.font' : 'data.layers'" size="lg" tone="muted" />
+        <OcIcon :name="activePage === 'families' ? 'mdiFormatFont' : 'mdiLayersOutline'" size="lg" tone="muted" />
         <OcEmpty tone="muted" inset="none">
           {{ activePage === 'families' ? t('projectConfig.fonts.noFontSelected') : t('projectConfig.fonts.noSetSelected') }}
         </OcEmpty>
@@ -150,22 +150,22 @@ const referencedFamilyKeys = computed(() => new Set(
 ))
 const treeData = computed<OcNodeCollection>(() => {
   const addFamilyAction: OcNodeAction = {
-    key: 'add-family', title: t('projectConfig.fonts.addFont'), icon: 'action.add',
+    key: 'add-family', title: t('projectConfig.fonts.addFont'), icon: 'mdiPlus',
   }
   const addCompositionAction: OcNodeAction = {
-    key: 'add-composition', title: t('projectConfig.fonts.addSet'), icon: 'action.add',
+    key: 'add-composition', title: t('projectConfig.fonts.addSet'), icon: 'mdiPlus',
   }
   const configureFamilyAction: OcNodeAction = {
-    key: 'configure-family', title: t('projectConfig.fonts.configure'), icon: 'tool.settings',
+    key: 'configure-family', title: t('projectConfig.fonts.configure'), icon: 'mdiCogOutline',
   }
   const removeFamilyAction: OcNodeAction = {
-    key: 'delete-family', title: t('projectConfig.fonts.remove'), icon: 'action.delete', iconTone: 'danger',
+    key: 'delete-family', title: t('projectConfig.fonts.remove'), icon: 'mdiTrashCanOutline', iconTone: 'danger',
   }
   const configureCompositionAction: OcNodeAction = {
-    key: 'configure-composition', title: t('projectConfig.fonts.configureSet'), icon: 'tool.settings',
+    key: 'configure-composition', title: t('projectConfig.fonts.configureSet'), icon: 'mdiCogOutline',
   }
   const removeCompositionAction: OcNodeAction = {
-    key: 'delete-composition', title: t('projectConfig.fonts.removeSet'), icon: 'action.delete', iconTone: 'danger',
+    key: 'delete-composition', title: t('projectConfig.fonts.removeSet'), icon: 'mdiTrashCanOutline', iconTone: 'danger',
   }
   const familyKeys = props.families.length
     ? props.families.map(entry => treeKey('families', entry.key))
@@ -176,13 +176,13 @@ const treeData = computed<OcNodeCollection>(() => {
   const items = new Map<string, OcNode>([
     ['families', {
       label: t('projectConfig.fonts.projectFonts'),
-      visual: { type: 'icon', icon: 'file.font' },
+      visual: { type: 'icon', icon: 'mdiFormatFont' },
       tail: [addFamilyAction],
       contextActions: [addFamilyAction],
     }],
     ['compositions', {
       label: t('projectConfig.fonts.compositions'),
-      visual: { type: 'icon', icon: 'data.layers' },
+      visual: { type: 'icon', icon: 'mdiLayersOutline' },
       tail: [addCompositionAction],
       contextActions: [addCompositionAction],
     }],
@@ -191,7 +191,7 @@ const treeData = computed<OcNodeCollection>(() => {
       return [treeKey('families', entry.key), {
         label: entry.name,
         labelFont: JSON.stringify(createProjectFontCssFamily(entry.key)),
-        visual: { type: 'icon', icon: 'file.font' },
+        visual: { type: 'icon', icon: 'mdiFormatFont' },
         tail: referenced ? [configureFamilyAction] : [configureFamilyAction, removeFamilyAction],
         contextActions: referenced ? [configureFamilyAction] : [
           configureFamilyAction,
@@ -203,7 +203,7 @@ const treeData = computed<OcNodeCollection>(() => {
     ...props.compositions.map((entry): [string, OcNode] => [treeKey('compositions', entry.key), {
       label: entry.name,
       labelFont: compositionLabelFont(entry),
-      visual: { type: 'icon', icon: 'data.layers' },
+      visual: { type: 'icon', icon: 'mdiLayersOutline' },
       tail: [configureCompositionAction, removeCompositionAction],
       contextActions: [
         configureCompositionAction,
@@ -340,7 +340,7 @@ function treeKey(page: 'families' | 'compositions', key: string): string { retur
 const GROUP_EMPTY_KEY = { families: 'families:empty', compositions: 'compositions:empty' } as const
 /** 占位子项禁用它自己：它不是一个能点开的字体条目，只是这一组的空状态（与「预装的包」树同一种做法）。 */
 function emptyPlaceholder(label: string): OcNode {
-  return { label, visual: { type: 'icon', icon: 'file.generic' }, disabled: true }
+  return { label, visual: { type: 'icon', icon: 'mdiFileOutline' }, disabled: true }
 }
 /** 字体组合没有自己的字面，按成员回退顺序拼成一套 font-family，标签就用它自己的组合顺序绘制。 */
 function compositionLabelFont(composition: ProjectFontComposition): string | undefined {

@@ -91,7 +91,7 @@ describe('property field editor modes', () => {
       useRawStringEditor: 'Use raw string editor',
     })).toMatchObject({
       key: USE_RAW_STRING_EDITOR_ACTION_KEY,
-      icon: 'data.code-string',
+      icon: 'mdiCursorText',
     })
 
     modes.preserveRawString('width')
@@ -101,7 +101,7 @@ describe('property field editor modes', () => {
       useRawStringEditor: 'Use raw string editor',
     })).toMatchObject({
       key: USE_FIELD_EDITOR_ACTION_KEY,
-      icon: 'data.symbol-number',
+      icon: 'mdiNumeric',
     })
   })
 })

@@ -5,13 +5,13 @@
       {{ t('packageManifest.unavailable') }}
     </OcEmpty>
     <div v-else class="package-manifest-editor">
-      <OcCard v-if="coverSrc" :title="t('packageManifest.cover')" icon="file.image">
+      <OcCard v-if="coverSrc" :title="t('packageManifest.cover')" icon="mdiFileImageOutline">
         <div class="package-manifest-editor__cover">
           <OcCover :visual="{ type: 'image', src: coverSrc, label: t('packageManifest.coverAlt') }" />
         </div>
       </OcCard>
 
-      <OcCard :title="t('packageManifest.information')" icon="file.package">
+      <OcCard :title="t('packageManifest.information')" icon="mdiPackageVariantClosed">
         <OcRow v-for="row in identityRows" :key="row.key" as="button" type="button"
           :aria-label="t('packageManifest.copyRow', { label: row.label, value: row.value })"
           @click="copyRowValue(row)">
@@ -24,7 +24,7 @@
         </OcRow>
       </OcCard>
 
-      <OcCard :title="t('packageManifest.fonts')" icon="data.symbol-string">
+      <OcCard :title="t('packageManifest.fonts')" icon="mdiFormatText">
         <OcEmpty v-if="manifest.public.fonts.length === 0" tone="muted" inset="compact">
           {{ t('packageManifest.noFonts') }}
         </OcEmpty>
@@ -36,7 +36,7 @@
         </OcRow>
       </OcCard>
 
-      <OcCard :title="t('packageManifest.iconSeries')" icon="file.project-icon">
+      <OcCard :title="t('packageManifest.iconSeries')" icon="mdiStickerEmoji">
         <OcEmpty v-if="manifest.public.iconSeries.length === 0" tone="muted" inset="compact">
           {{ t('packageManifest.noIconSeries') }}
         </OcEmpty>
@@ -49,7 +49,7 @@
         </OcRow>
       </OcCard>
 
-      <OcCard :title="t('packageManifest.blocks')" icon="entity.block-custom">
+      <OcCard :title="t('packageManifest.blocks')" icon="mdiToyBrickOutline">
         <OcEmpty v-if="!(manifest.public.blockCollections?.length)" tone="muted" inset="compact">
           {{ t('packageManifest.noBlocks') }}
         </OcEmpty>
@@ -141,7 +141,7 @@ const presentation = computed<EditorPresentation>(() => ({
   // 不是"你打开的是哪一个文件"。
   title: getPathBasename(filePath.value),
   description: coordinate.value || t('packageManifest.description'),
-  icon: 'file.package',
+  icon: 'mdiPackageVariantClosed',
 }))
 
 defineExpose({ presentation })

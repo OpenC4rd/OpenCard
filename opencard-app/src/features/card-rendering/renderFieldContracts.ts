@@ -13,7 +13,6 @@ export type RenderFieldKind =
 export type RenderFieldContract = {
   kind: RenderFieldKind
   defaultValue: unknown
-  required?: boolean
   min?: number
   max?: number
   options?: readonly string[]
@@ -41,8 +40,8 @@ const imageSourceContract: RenderFieldContract = {
 
 function baseBlockContracts(type: string): Record<string, RenderFieldContract> {
   return {
-    id: { kind: 'string', defaultValue: '', required: true },
-    type: { kind: 'option', defaultValue: type, required: true, options: [type] },
+    id: { kind: 'string', defaultValue: '' },
+    type: { kind: 'option', defaultValue: type, options: [type] },
     name: { kind: 'string', defaultValue: '' },
     notes: { kind: 'string', defaultValue: '' },
     visible: { kind: 'boolean', defaultValue: 'true' },
@@ -86,84 +85,84 @@ function textContracts(type: 'text-block' | 'markdown-text-block'): Record<strin
 
 const contractsByType: Readonly<Record<string, Readonly<Record<string, RenderFieldContract>>>> = {
   'card-document': {
-    type: { kind: 'option', defaultValue: 'card-document', required: true, options: ['card-document'] },
-    id: { kind: 'string', defaultValue: '', required: true },
+    type: { kind: 'option', defaultValue: 'card-document', options: ['card-document'] },
+    id: { kind: 'string', defaultValue: '' },
     name: { kind: 'string', defaultValue: '' },
-    version: { kind: 'string', defaultValue: '1.0.0', required: true },
+    version: { kind: 'string', defaultValue: '1.0.0' },
     description: { kind: 'string', defaultValue: '' },
     notes: { kind: 'string', defaultValue: '' },
-    width: { kind: 'number', defaultValue: '540', required: true, min: 0 },
-    height: { kind: 'number', defaultValue: '850', required: true, min: 0 },
+    width: { kind: 'number', defaultValue: '540', min: 0 },
+    height: { kind: 'number', defaultValue: '850', min: 0 },
   },
   'card-face': {
-    type: { kind: 'option', defaultValue: 'card-face', required: true, options: ['card-face'] },
-    id: { kind: 'string', defaultValue: '', required: true },
-    background: { kind: 'string', defaultValue: '#FFFFFF', required: true },
-    children: { kind: 'array', defaultValue: [], required: true, itemShape: 'root-child' },
+    type: { kind: 'option', defaultValue: 'card-face', options: ['card-face'] },
+    id: { kind: 'string', defaultValue: '' },
+    background: { kind: 'string', defaultValue: '#FFFFFF' },
+    children: { kind: 'array', defaultValue: [], itemShape: 'root-child' },
   },
   'text-block': textContracts('text-block'),
   'markdown-text-block': textContracts('markdown-text-block'),
   'image-block': {
     ...baseBlockContracts('image-block'),
-    source: imageSourceContract,
-    maskSource: { ...imageSourceContract, required: false },
-    fit: { kind: 'option', defaultValue: 'cover', required: true, options: ['cover', 'contain', 'fill'] },
+    source: { ...imageSourceContract, displayFieldKey: 'imageSource' },
+    maskSource: { ...imageSourceContract, displayFieldKey: 'maskSource' },
+    fit: { kind: 'option', defaultValue: 'cover', options: ['cover', 'contain', 'fill'] },
     maskFit: { kind: 'option', defaultValue: 'contain', options: ['cover', 'contain', 'fill'] },
   },
   'qrcode-block': {
     ...baseBlockContracts('qrcode-block'),
-    content: { kind: 'string', defaultValue: '', required: true },
-    errorCorrection: { kind: 'option', defaultValue: 'M', required: true, options: ['L', 'M', 'Q', 'H'] },
-    foreground: { kind: 'color', defaultValue: '#000000', required: true },
-    backgroundColor: { kind: 'color', defaultValue: '#FFFFFF', required: true },
-    quietZone: { kind: 'number', defaultValue: '4', required: true, min: 0, max: 16 },
+    content: { kind: 'string', defaultValue: '' },
+    errorCorrection: { kind: 'option', defaultValue: 'M', options: ['L', 'M', 'Q', 'H'] },
+    foreground: { kind: 'color', defaultValue: '#000000' },
+    backgroundColor: { kind: 'color', defaultValue: '#FFFFFF' },
+    quietZone: { kind: 'number', defaultValue: '4', min: 0, max: 16 },
   },
   'shape-block': {
     ...baseBlockContracts('shape-block'),
     shape: {
-      kind: 'option', defaultValue: 'rectangle', required: true,
+      kind: 'option', defaultValue: 'rectangle',
       options: ['rectangle', 'ellipse', 'line', 'triangle', 'diamond'],
     },
-    fill: { kind: 'color', defaultValue: '#7C6CFF', required: true },
-    stroke: { kind: 'color', defaultValue: '#000000', required: true },
-    strokeWidth: { kind: 'number', defaultValue: '0', required: true, min: 0 },
-    strokeStyle: { kind: 'option', defaultValue: 'solid', required: true, options: borderStyleOptions },
+    fill: { kind: 'color', defaultValue: '#7C6CFF' },
+    stroke: { kind: 'color', defaultValue: '#000000' },
+    strokeWidth: { kind: 'number', defaultValue: '0', min: 0 },
+    strokeStyle: { kind: 'option', defaultValue: 'solid', options: borderStyleOptions },
     strokeAlignment: {
-      kind: 'option', defaultValue: 'center', required: true, options: ['inside', 'center', 'outside'],
+      kind: 'option', defaultValue: 'center', options: ['inside', 'center', 'outside'],
     },
-    strokeJoin: { kind: 'option', defaultValue: 'miter', required: true, options: ['miter', 'round', 'bevel'] },
-    strokeCap: { kind: 'option', defaultValue: 'butt', required: true, options: ['butt', 'round', 'square'] },
-    strokeMiterLimit: { kind: 'number', defaultValue: '4', required: true, min: 1 },
+    strokeJoin: { kind: 'option', defaultValue: 'miter', options: ['miter', 'round', 'bevel'] },
+    strokeCap: { kind: 'option', defaultValue: 'butt', options: ['butt', 'round', 'square'] },
+    strokeMiterLimit: { kind: 'number', defaultValue: '4', min: 1 },
   },
   'simple-container-block': {
     ...baseBlockContracts('simple-container-block'),
-    clip: { kind: 'boolean', defaultValue: 'false', required: true },
-    children: { kind: 'array', defaultValue: [], required: true, itemShape: 'root-child' },
+    clip: { kind: 'boolean', defaultValue: 'false' },
+    children: { kind: 'array', defaultValue: [], itemShape: 'root-child' },
   },
   'flow-container-block': {
     ...baseBlockContracts('flow-container-block'),
-    clip: { kind: 'boolean', defaultValue: 'false', required: true },
-    direction: { kind: 'option', defaultValue: 'lr', required: true, options: flowDirectionOptions },
-    gap: { kind: 'css-length', defaultValue: '10px', required: true },
-    children: { kind: 'array', defaultValue: [], required: true, itemShape: 'root-child' },
+    clip: { kind: 'boolean', defaultValue: 'false' },
+    direction: { kind: 'option', defaultValue: 'lr', options: flowDirectionOptions },
+    gap: { kind: 'css-length', defaultValue: '10px' },
+    children: { kind: 'array', defaultValue: [], itemShape: 'root-child' },
   },
   'simple-container-location': {
-    id: { kind: 'string', defaultValue: '', required: true },
+    id: { kind: 'string', defaultValue: '' },
     type: {
-      kind: 'option', defaultValue: 'simple-container-location', required: true,
+      kind: 'option', defaultValue: 'simple-container-location',
       options: ['simple-container-location'],
     },
-    anchor: { kind: 'option', defaultValue: 'lt', required: true, options: anchorOptions },
+    anchor: { kind: 'option', defaultValue: 'lt', options: anchorOptions },
     x: { kind: 'css-length', defaultValue: '0px' },
     y: { kind: 'css-length', defaultValue: '0px' },
   },
   'flow-container-location': {
-    id: { kind: 'string', defaultValue: '', required: true },
+    id: { kind: 'string', defaultValue: '' },
     type: {
-      kind: 'option', defaultValue: 'flow-container-location', required: true,
+      kind: 'option', defaultValue: 'flow-container-location',
       options: ['flow-container-location'],
     },
-    index: { kind: 'number', defaultValue: '0', required: true, min: 0 },
+    index: { kind: 'number', defaultValue: '0', min: 0 },
     align: { kind: 'option', defaultValue: 'start', options: alignOptions },
   },
 }

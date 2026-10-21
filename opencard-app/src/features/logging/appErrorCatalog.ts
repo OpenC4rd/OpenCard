@@ -88,7 +88,7 @@ export const APP_ERROR_CATALOG = {
   'OC-E3006': {
     area: '项目与资源',
     meaning: { 'zh-CN': '项目配置草稿无效', 'en-US': 'The project profile draft is invalid' },
-    solution: '撤销最近的项目配置修改，检查必填字段和数据格式后再次保存。',
+    solution: '撤销最近的项目配置修改，检查必填属性和数据格式后再次保存。',
   },
   'OC-E3007': {
     area: '项目与资源',

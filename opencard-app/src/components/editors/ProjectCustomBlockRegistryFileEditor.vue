@@ -218,13 +218,13 @@ async function save(): Promise<void> { await props.session.save().catch(error =>
 const presentation = computed<EditorPresentation>(() => ({
   title: t('customBlockRegistry.title'),
   description: t('customBlockRegistry.description'),
-  icon: 'entity.block-custom',
+  icon: 'mdiToyBrickOutline',
 }))
 
 const WORKSPACE_ADD_COLLECTION_ACTION_KEY = 'custom-block-registry.add-collection'
 const headerActions = computed<OcActionDefinition[]>(() => [{
   key: WORKSPACE_ADD_COLLECTION_ACTION_KEY,
-  icon: 'action.add',
+  icon: 'mdiPlus',
   title: t('customBlockRegistry.addCollection'),
   disabled: !document.value || importing.value,
 }])

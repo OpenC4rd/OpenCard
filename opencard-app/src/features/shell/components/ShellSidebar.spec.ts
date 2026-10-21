@@ -42,7 +42,7 @@ describe('ShellSidebar', () => {
           placeholder: 'Empty',
           actions: [{
             key: 'project.new-file',
-            icon: 'action.file-plus',
+            icon: 'mdiFilePlusOutline',
             hoverTip: 'New File',
             children: [
               { key: 'project.new-file.ocdocument', title: 'OpenCard (.ocdocument)' },
@@ -128,7 +128,7 @@ describe('ShellSidebar', () => {
             type: 'tree',
             data: {
               rootKeys: ['file'],
-              items: new Map([['file', { label: 'Card', icon: 'file.opencard' }]]),
+              items: new Map([['file', { label: 'Card', icon: 'mdiCardsOutline' }]]),
               children: new Map(),
             },
             role: 'tree',
@@ -221,7 +221,7 @@ describe('ShellSidebar', () => {
       props: {
         collapsed: false,
         width: 260,
-        bodyGroup: primaryGroup([], [{ key: 'open', title: 'Open', icon: 'status.folder-open' }]),
+        bodyGroup: primaryGroup([], [{ key: 'open', title: 'Open', icon: 'mdiFolderOpenOutline' }]),
       },
     })
 

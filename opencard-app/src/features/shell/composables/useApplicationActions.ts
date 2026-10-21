@@ -87,8 +87,8 @@ export function useApplicationActions(options: {
       case 'check-for-updates': {
         const state = await services.checkForUpdate()
         if (state === 'failed') notifyWarning(t('app.updater.checkFailed'))
-        else if (state === 'up-to-date') notifySuccess(t('app.updater.upToDate'), 'action.check')
-        else if (state === 'available') notifySuccess(t('app.updater.updateFound', { version: services.updateVersion.value }), 'action.download')
+        else if (state === 'up-to-date') notifySuccess(t('app.updater.upToDate'), 'mdiCheck')
+        else if (state === 'available') notifySuccess(t('app.updater.updateFound', { version: services.updateVersion.value }), 'mdiDownload')
         return true
       }
       case 'new-project': await newProject(); return true

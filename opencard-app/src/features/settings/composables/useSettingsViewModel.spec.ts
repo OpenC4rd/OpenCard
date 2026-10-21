@@ -50,10 +50,10 @@ describe('useSettingsViewModel', () => {
     // Every category row shows its own icon: the tree paints a row's leading visual from `visual`,
     // and a node that carries none falls back to the expand chevron.
     expect(categoryTreeData.value.rootKeys.map(key => categoryTreeData.value.items.get(key)?.visual)).toEqual([
-      { type: 'icon', icon: 'tool.settings' },
-      { type: 'icon', icon: 'data.symbol-color' },
-      { type: 'icon', icon: 'tool.workspace' },
-      { type: 'icon', icon: 'tool.collaboration' },
+      { type: 'icon', icon: 'mdiCogOutline' },
+      { type: 'icon', icon: 'mdiPaletteOutline' },
+      { type: 'icon', icon: 'mdiPencilRulerOutline' },
+      { type: 'icon', icon: 'mdiAccountGroupOutline' },
     ])
     expect(activeCategory.value.cards.map(card => card.key)).toEqual(['interface', 'tips', 'updates', 'tutorials', 'exporting', 'rendering', 'cache'])
     expect(cardOf(activeCategory.value, 'interface').items.map(item => item.key)).toEqual([
@@ -61,7 +61,7 @@ describe('useSettingsViewModel', () => {
       'shell.titleBarNoticeHistoryLimit',
     ])
     const tips = cardOf(activeCategory.value, 'tips')
-    expect(tips.icon).toBe('status.tip')
+    expect(tips.icon).toBe('mdiLightbulbOnOutline')
     expect(tips.items.map(item => item.key)).toEqual(['shell.tipsEnabled', 'shell.tipsIntervalMinutes'])
     expect(editor(tips.items[0]!)).toMatchObject({ value: true, definition: { fieldType: 'boolean' } })
     expect(editor(tips.items[1]!)).toMatchObject({
@@ -260,7 +260,7 @@ describe('useSettingsViewModel', () => {
     })
     expect(publisherKey.content).toHaveLength(1)
     expect(cardOf(activeCategory.value, 'identity').actions).toMatchObject([
-      { key: 'identity.regenerate', icon: 'action.refresh', disabled: false },
+      { key: 'identity.regenerate', icon: 'mdiRefresh', disabled: false },
     ])
 
     expect(cardOf(activeCategory.value, 'committer').items.map(item => item.key)).toEqual([

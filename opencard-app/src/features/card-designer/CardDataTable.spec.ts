@@ -34,15 +34,16 @@ const faceGroups: CdeDataTableFaceGroup[] = [{
       key: 'content',
       title: 'Content',
       definition: { title: 'Content', fieldType: 'string' },
-      deletable: true,
+      resettable: true,
+      definitionEditable: false,
       cells: [
         {
-          identity: '__blueprint__\0text\0content', cardId: '__blueprint__', value: 'Blueprint',
-          readonly: false, inherited: false, overridden: false,
+          identity: '__blueprint__\0text\0content', cardId: '__blueprint__', kind: 'blueprint',
+          value: 'Blueprint', readonly: false, inherited: false, overridden: false,
         },
         {
-          identity: 'instance\0text\0content', cardId: 'instance', value: 'Override',
-          readonly: false, inherited: false, overridden: true,
+          identity: 'instance\0text\0content', cardId: 'instance', kind: 'instance',
+          value: 'Override', readonly: false, inherited: false, overridden: true,
         },
       ],
     }],
@@ -65,7 +66,8 @@ catalogFaceGroups[0]!.blocks[0]!.fields.push({
   key: 'fontSize',
   title: 'Font Size',
   definition: { title: 'Font Size', fieldType: 'string' },
-  deletable: false,
+  resettable: false,
+  definitionEditable: false,
 })
 catalogFaceGroups[0]!.blocks.push({
   key: 'image',
@@ -119,7 +121,7 @@ describe('CardDataTable', () => {
     const removeBlockAction = wrapper.findAllComponents(OcActionButton)
       .find(action => action.props('action').key === 'remove-block')!
     expect(removeBlockAction.props('action')).toMatchObject({
-      icon: 'action.close',
+      icon: 'mdiClose',
       title: 'cardDesigner.dataTable.stopEditingBlock',
     })
     removeBlockAction.vm.$emit('select', { key: 'remove-block' })
@@ -127,8 +129,8 @@ describe('CardDataTable', () => {
 
     await wrapper.get('button[aria-label="cardDesigner.dataTable.stopEditingField"]').trigger('click')
     expect(wrapper.emitted('exclude-field')).toEqual([['text', 'content']])
-    await wrapper.get('button[aria-label="cardDesigner.dataTable.deleteField"]').trigger('click')
-    expect(wrapper.emitted('delete-field')).toEqual([['text', 'content']])
+    await wrapper.get('[data-card-id="__blueprint__"] [data-action-key="reset-field"] button').trigger('click')
+    expect(wrapper.emitted('reset-field')).toEqual([['text', 'content']])
 
     const blueprintInput = wrapper.get('[data-card-id="__blueprint__"] input')
     await blueprintInput.setValue('Changed')
@@ -136,6 +138,22 @@ describe('CardDataTable', () => {
     expect(updates[updates.length - 1]).toEqual([{
       cardId: '__blueprint__', blockId: 'text', fieldKey: 'content', value: 'Changed',
     }])
+  })
+
+  it('offers definition editing only for custom fields', async () => {
+    const plain = mount(CardDataTable, {
+      props: { columns, catalogFaceGroups, faceGroups },
+    })
+    expect(plain.find('button[aria-label="cardDesigner.dataTable.editFieldDefinition"]').exists()).toBe(false)
+
+    const customGroups = structuredClone(faceGroups)
+    customGroups[0]!.blocks[0]!.fields[0]!.definitionEditable = true
+    const wrapper = mount(CardDataTable, {
+      props: { columns, catalogFaceGroups, faceGroups: customGroups },
+    })
+
+    await wrapper.get('button[aria-label="cardDesigner.dataTable.editFieldDefinition"]').trigger('click')
+    expect(wrapper.emitted('edit-field-definition')).toEqual([['text', 'content']])
   })
 
   it('keeps Block and Field indentation fixed regardless of Block depth', () => {
@@ -191,7 +209,7 @@ describe('CardDataTable', () => {
     const columnActions = wrapper.findAllComponents(OcActionButton)
       .filter(action => action.element.closest('thead'))
     expect(columnActions).toHaveLength(2)
-    expect(columnActions[0]!.props('action').icon).toBe('action.add')
+    expect(columnActions[0]!.props('action').icon).toBe('mdiPlus')
 
     columnActions[0]!.vm.$emit('select', { key: 'duplicate' })
     expect(wrapper.emitted('duplicate-card')).toEqual([['__blueprint__']])
@@ -313,9 +331,7 @@ describe('CardDataTable', () => {
     expect(wrapper.emitted('remove-block')).toEqual([['text']])
 
     await wrapper.get('.card-data-table__field-heading').trigger('contextmenu')
-    expect(menu.state.value.items.map(item => item.key)).toEqual([
-      'exclude-field', 'field-delete-divider', 'delete-field',
-    ])
+    expect(menu.state.value.items.map(item => item.key)).toEqual(['exclude-field'])
     menu.selectMenuItem('exclude-field')
     expect(wrapper.emitted('exclude-field')).toEqual([['text', 'content']])
   })

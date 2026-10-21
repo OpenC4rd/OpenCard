@@ -61,10 +61,10 @@ function createAppPages(destroyWindow: () => Promise<void>) {
       version: workbench.versionControl, activateChange: workbench.handleChangesNodeActivate,
       openProject: workbench.openProject,
     }),
-    export: placeholder('export', 'nav.export'),
-    market: { ...placeholder('market', 'nav.market'), navigation: { key: 'market', icon: 'nav.market', labelKey: 'app.shell.space.market', railGroup: 'secondary' } },
+    export: placeholder('export', 'mdiPrinter'),
+    market: { ...placeholder('market', 'mdiStorefront'), navigation: { key: 'market', icon: 'mdiStorefront', labelKey: 'app.shell.space.market', railGroup: 'secondary' } },
     settings: settings.page,
-    test: placeholder('test', 'nav.test'),
+    test: placeholder('test', 'mdiCheckerboard'),
     'create-project': creation.page, 'export-template': templateExport.page, about: createAboutPage(services),
   }
   const currentPage = computed(() => pages[navigation.page.value])

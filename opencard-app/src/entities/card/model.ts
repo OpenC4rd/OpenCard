@@ -309,25 +309,39 @@ export function createBlockAdditionalField(
     return null
 }
 
-export function deleteBlockAdditionalField(
+export function updateBlockAdditionalFieldDefinition(
+    block: CardBlock,
+    fieldKey: string,
+    definition: AdditionalFieldDefinition,
+): boolean {
+    const definitions = block.additionalFieldDefinition
+    const current = definitions?.[fieldKey]
+    if (!definitions || !current || current.fieldType !== definition.fieldType) return false
+    definitions[fieldKey] = structuredClone(definition)
+    return true
+}
+
+export function clearBlockFieldValue(block: CardBlock, fieldKey: string): void {
+    delete (block as unknown as Record<string, unknown>)[fieldKey]
+}
+
+export function removeBlockAdditionalFieldDefinition(
     document: CardDocument,
     block: CardBlock,
     fieldKey: string,
-): number {
-    if (!block.additionalFieldDefinition?.[fieldKey]) return 0
-    delete (block as unknown as Record<string, unknown>)[fieldKey]
+): boolean {
+    if (!block.additionalFieldDefinition?.[fieldKey]) return false
     delete block.additionalFieldDefinition[fieldKey]
     if (Object.keys(block.additionalFieldDefinition).length === 0) delete block.additionalFieldDefinition
+    clearBlockFieldValue(block, fieldKey)
 
-    let removedOverrides = 0
     for (const instance of document.instances ?? []) {
         const instanceBlockData = instance.data[block.id]
         if (!instanceBlockData || !Object.prototype.hasOwnProperty.call(instanceBlockData, fieldKey)) continue
         delete instanceBlockData[fieldKey]
-        removedOverrides += 1
         if (Object.keys(instanceBlockData).length === 0) delete instance.data[block.id]
     }
-    return removedOverrides
+    return true
 }
 
 // Internal helper types for block factory functions. Attribute keys are intentionally

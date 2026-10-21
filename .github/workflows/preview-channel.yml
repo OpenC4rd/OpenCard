@@ -13,38 +13,38 @@ concurrency:
 
 jobs:
   move-pointer:
-    name: Point the preview channel at the newest release
+    name: Point the preview channel at the newest preview release
+    if: github.event.release.prerelease
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Mirror latest.json into the preview channel release
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # GitHub resolves no URL to the newest prerelease, so preview builds read the
+      # updater document from this branch instead of a release asset.
+      - name: Commit latest.json to the preview channel branch
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          CHANNEL_BRANCH: preview-update
         run: |
           set -euo pipefail
 
-          # This job publishes the rolling channel release itself, so that release's
-          # own event must not recurse into another pointer move.
-          if [ "$RELEASE_TAG" = 'preview' ]; then
-            echo 'The preview channel release itself does not move the pointer.'
-            exit 0
-          fi
-
-          mkdir -p incoming pointer
+          mkdir -p incoming
           if ! gh release download "$RELEASE_TAG" --pattern latest.json --dir incoming --clobber; then
             echo "Release $RELEASE_TAG publishes no latest.json, so the preview channel stays unchanged."
             exit 0
           fi
 
-          # Preview builds must reach newer stable releases and stable builds must
-          # never see a preview, so the pointer follows every published release and
-          # only ever moves forward.
-          if gh release download preview --pattern latest.json --dir pointer --clobber 2>/dev/null; then
+          # The channels never cross, so the pointer follows preview releases only
+          # and only ever moves forward.
+          if git fetch --depth=1 --quiet origin "refs/heads/$CHANNEL_BRANCH" 2>/dev/null; then
+            git show "FETCH_HEAD:latest.json" > incoming/pointer.json
             guard=0
-            python3 - pointer/latest.json incoming/latest.json <<'PY' || guard=$?
+            python3 - incoming/pointer.json incoming/latest.json <<'PY' || guard=$?
           import json, re, sys
 
 
@@ -82,9 +82,16 @@ jobs:
             esac
           fi
 
-          gh release view preview >/dev/null 2>&1 || gh release create preview \
-            --prerelease \
-            --title 'Preview channel' \
-            --notes '预览版更新指针，由发行流程自动维护，请勿下载此处的文件。'
-          gh release upload preview incoming/latest.json --clobber
+          # One root commit, rewritten on every move, so the branch never accumulates
+          # history. The local branch is a staging name; only the branch it points at
+          # is pushed.
+          git checkout --orphan channel-root
+          git read-tree --empty
+          find . -mindepth 1 -maxdepth 1 -not -name .git -not -name incoming -exec rm -rf {} +
+          mv incoming/latest.json latest.json
+          git add latest.json
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "Update the preview channel to $RELEASE_TAG"
+          git push --force origin "HEAD:refs/heads/$CHANNEL_BRANCH"
           echo "The preview channel now points at $RELEASE_TAG."

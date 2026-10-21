@@ -2,8 +2,8 @@
   <OcDialog :open="open" :title="isCreating ? t('customBlockRegistry.addCollection') : t('customBlockRegistry.configureCollection')" as="form" size="sm"
     close-on-backdrop @request-close="emit('close')" @submit="submit">
     <div v-if="isCreating" class="collection-settings__sources">
-      <OcButton type="button" icon="nav.files" @click="pickSources(false)">{{ t('customBlockRegistry.chooseFiles') }}</OcButton>
-      <OcButton type="button" icon="folder.open" @click="pickSources(true)">{{ t('customBlockRegistry.chooseFolder') }}</OcButton>
+      <OcButton type="button" icon="mdiFileMultipleOutline" @click="pickSources(false)">{{ t('customBlockRegistry.chooseFiles') }}</OcButton>
+      <OcButton type="button" icon="mdiFolderOpen" @click="pickSources(true)">{{ t('customBlockRegistry.chooseFolder') }}</OcButton>
       <OcText size="sm" tone="muted">{{ t('customBlockRegistry.blockCount', { count: sources.length }) }}</OcText>
     </div>
     <label class="collection-settings__field">

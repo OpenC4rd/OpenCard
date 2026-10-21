@@ -41,13 +41,13 @@ export function useExportTemplatePageState(options: {
   ))
   const expandedKeys = computed(() => [...options.projectTreeData.value.children.keys()])
   const entryTreeData = computed(() => createExportSelectionTreeData(
-    selection.value.entries, TEMPLATE_ENTRY_TREE_PREFIX, 'file.opencard',
-    { key: TEMPLATE_ENTRY_REMOVE_ACTION_KEY, title: options.translate('templateExport.tree.removeEntry'), icon: 'action.file-minus' },
+    selection.value.entries, TEMPLATE_ENTRY_TREE_PREFIX, 'mdiCardsOutline',
+    { key: TEMPLATE_ENTRY_REMOVE_ACTION_KEY, title: options.translate('templateExport.tree.removeEntry'), icon: 'mdiFileMinusOutline' },
     selection.value.entryNames,
   ))
   const coverTreeData = computed(() => createExportSelectionTreeData(
-    selection.value.covers, TEMPLATE_COVER_TREE_PREFIX, 'file.image',
-    { key: TEMPLATE_COVER_REMOVE_ACTION_KEY, title: options.translate('templateExport.tree.removeCover'), icon: 'action.image-minus' },
+    selection.value.covers, TEMPLATE_COVER_TREE_PREFIX, 'mdiFileImageOutline',
+    { key: TEMPLATE_COVER_REMOVE_ACTION_KEY, title: options.translate('templateExport.tree.removeCover'), icon: 'mdiImageMinusOutline' },
   ))
   function handleProjectAction(event: OcNodeActionEvent): void {
     const path = relativePath(event.key)

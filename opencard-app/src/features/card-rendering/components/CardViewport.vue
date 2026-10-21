@@ -320,7 +320,7 @@ type SelectionFrame = {
 type DiffOverlayHighlight = SelectionFrame & {
   key: string
   kind: CardDiffHighlight['kind']
-  icon: 'action.add' | 'action.minus' | 'status.circle-medium'
+  icon: 'mdiPlus' | 'mdiMinus' | 'mdiCircleMedium'
   side: 'before' | 'after'
   style: Record<string, string>
 }
@@ -774,22 +774,22 @@ const selectionQuickActions = computed<OcActionDefinition[]>(() => {
       ...(!props.widthLocked || !props.heightLocked ? [{
         key: 'fill-parent',
         title: props.selectionActionLabels.fillParent,
-        icon: 'layout.fill',
+        icon: 'mdiFitToPageOutline',
       } as OcActionDefinition] : []),
       {
         key: 'center',
         title: props.selectionActionLabels.centerInParent,
-        icon: 'layout.center',
+        icon: 'mdiImageFilterCenterFocus',
       },
       ...(!props.widthLocked || !props.heightLocked ? [{
         key: 'inset',
         title: props.selectionActionLabels.inset,
-        icon: 'layout.inset',
+        icon: 'mdiArrowCollapse',
       },
       {
         key: 'outset',
         title: props.selectionActionLabels.outset,
-        icon: 'layout.outset',
+        icon: 'mdiArrowExpand',
       }] as OcActionDefinition[] : []),
     ]
   }
@@ -801,12 +801,12 @@ const selectionQuickActions = computed<OcActionDefinition[]>(() => {
       ...(!(horizontalFlow ? props.heightLocked : props.widthLocked) ? [{
         key: 'fill-cross-axis',
         title: props.selectionActionLabels.fillCrossAxis,
-        icon: horizontalFlow ? 'layout.fill-vertical' : 'layout.fill-horizontal',
+        icon: horizontalFlow ? 'mdiArrowExpandVertical' : 'mdiArrowExpandHorizontal',
       } as OcActionDefinition] : []),
       {
         key: 'center-cross-axis',
         title: props.selectionActionLabels.centerCrossAxis,
-        icon: 'format.align-center',
+        icon: 'mdiFormatAlignCenter',
       },
     ]
   }
@@ -1438,7 +1438,7 @@ function syncDiffOverlayHighlights(): void {
         ...frame,
         key: `${side}:${highlight.blockId}`,
         kind: highlight.kind,
-        icon: highlight.kind === 'added' ? 'action.add' : highlight.kind === 'removed' ? 'action.minus' : 'status.circle-medium',
+        icon: highlight.kind === 'added' ? 'mdiPlus' : highlight.kind === 'removed' ? 'mdiMinus' : 'mdiCircleMedium',
         side,
         style: {
           left: `${frame.left}px`, top: `${frame.top}px`, width: `${frame.width}px`, height: `${frame.height}px`,

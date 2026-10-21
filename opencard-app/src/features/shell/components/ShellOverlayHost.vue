@@ -1,7 +1,7 @@
 <template>
   <div v-if="isExternalFileDragActive && !isExternalFileDragOverZone" class="shell-file-drop-overlay"
     role="status" aria-live="polite">
-    <OcIcon name="file.generic" size="lg" tone="file-opencard" />
+    <OcIcon name="mdiFileOutline" size="lg" tone="file-opencard" />
     <span>{{ t('app.shell.dropFilesToOpen') }}</span>
   </div>
 

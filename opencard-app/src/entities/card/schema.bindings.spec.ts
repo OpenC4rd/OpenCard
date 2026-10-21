@@ -66,9 +66,6 @@ describe('property binding schema policy', () => {
       categoryId: 'general',
       multiline: true,
     })
-    expect(schema.name?.deletable).toBeUndefined()
-    expect(schema.description?.deletable).toBeUndefined()
-    expect(schema.notes?.deletable).toBeUndefined()
     for (const fieldKey of ['name', 'description', 'notes', 'version', 'width', 'height']) {
       expect(schema[fieldKey]?.bindingScopes).toEqual(['project'])
     }
@@ -165,11 +162,9 @@ describe('property binding schema policy', () => {
       'simple-container-block': { ...commonBlock, container: ['clip'] },
       'flow-container-block': { ...commonBlock, container: ['clip', 'direction', 'gap'] },
       'simple-container-location': {
-        advanced: ['id', 'type'],
         position: ['anchor', 'x', 'y'],
       },
       'flow-container-location': {
-        advanced: ['id', 'type'],
         position: ['index', 'align'],
       },
     }
@@ -240,7 +235,7 @@ describe('property binding schema policy', () => {
       multiline: true,
     })
     expect(getTypePropertyEditorSchema('markdown-text-block').content?.richText).toBeUndefined()
-    expect(getTypePropertyEditorSchema('text-block').content?.required).toBeUndefined()
-    expect(getTypePropertyEditorSchema('markdown-text-block').content?.required).toBeUndefined()
+    expect(getTypePropertyEditorSchema('text-block').content?.unremovable).toBeUndefined()
+    expect(getTypePropertyEditorSchema('markdown-text-block').content?.unremovable).toBeUndefined()
   })
 })

@@ -57,7 +57,7 @@
             <div v-if="remoteResourceMode === 'allowlist'" class="project-profile-editor__host-list">
               <div class="project-profile-editor__field-caption">
                 <OcText as="span" size="sm">{{ t('projectConfig.remoteResources.allowedHosts') }}</OcText>
-                <OcButton icon-only size="sm" variant="ghost" icon="status.unknown"
+                <OcButton icon-only size="sm" variant="ghost" icon="mdiHelpCircleOutline"
                   :data-tooltip="t('projectConfig.remoteResources.hostHelp')"
                   :aria-label="t('projectConfig.remoteResources.hostHelp')" />
               </div>
@@ -66,11 +66,11 @@
                 <OcFieldInput full-width mono :value="host"
                   :aria-label="t('projectConfig.remoteResources.allowedHosts')"
                   :aria-invalid="!isRemoteHostValid(host)" @input="updateRemoteHost(index, $event)" />
-                <OcButton icon-only size="md" variant="ghost" icon="action.delete" icon-tone="danger"
+                <OcButton icon-only size="md" variant="ghost" icon="mdiTrashCanOutline" icon-tone="danger"
                   :data-tooltip="t('projectConfig.remoteResources.removeHost')"
                   :aria-label="t('projectConfig.remoteResources.removeHost')" @click="removeRemoteHost(index)" />
               </div>
-              <OcButton class="project-profile-editor__add-host" size="sm" variant="ghost" icon="action.add"
+              <OcButton class="project-profile-editor__add-host" size="sm" variant="ghost" icon="mdiPlus"
                 @click="addRemoteHost">
                 {{ t('projectConfig.remoteResources.addHost') }}
               </OcButton>
@@ -92,7 +92,7 @@
 
       <section v-else class="project-profile-editor__repair" role="alert">
         <div class="project-profile-editor__diagnostic">
-          <OcIcon name="status.error" tone="danger" />
+          <OcIcon name="mdiAlertCircleOutline" tone="danger" />
           <div>
             <strong>{{ t('projectConfig.invalid') }}</strong>
             <OcText tone="muted" size="sm">{{ t('projectConfig.repairDescription') }}</OcText>
@@ -175,7 +175,7 @@ let sectionObserver: IntersectionObserver | null = null
 const presentation = computed<EditorPresentation>(() => ({
   title: t('projectConfig.title'),
   description: t('projectConfig.description'),
-  icon: 'file.opencard-project',
+  icon: 'mdiFileCogOutline',
 }))
 
 type ProjectProfileSectionKey = 'information' | 'remote-resources' | 'export'

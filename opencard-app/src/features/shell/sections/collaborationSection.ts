@@ -40,11 +40,11 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
       return [{
         key: 'version-control',
         title: options.translate('versionControl.title', 'Version Control'),
-        icon: 'nav.collaboration',
+        icon: 'mdiAccountGroup',
         onAction: options.onAction,
         headButtons: [{
           key: 'open-project',
-          icon: 'status.folder-open',
+          icon: 'mdiFolderOpenOutline',
           title: options.translate('sidebar.openProject', 'Open Project Folder'),
         }],
         lists: [{
@@ -66,13 +66,13 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
       {
         key: 'version-control',
         title: options.translate('versionControl.title', 'Version Control'),
-        icon: 'nav.collaboration',
+        icon: 'mdiAccountGroup',
         onAction: options.onAction,
         headButtons: options.version.needsInitialization.value
           ? [{
               key: 'initialize-repository',
               tutorialKey: 'collaboration.initialize',
-              icon: 'file.git',
+              icon: 'mdiSourceBranch',
               title: options.translate('versionControl.initializeRepository', 'Initialize repository'),
               disabled: options.version.initializing.value,
             }]
@@ -80,7 +80,7 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
             ? [{
                 key: 'publish-version',
                 tutorialKey: 'collaboration.commit',
-                icon: 'action.publish',
+                icon: 'mdiRocketLaunchOutline',
                 title: options.translate('versionControl.commitVersion', 'Commit version'),
                 hoverTip: options.translate('versionControl.commitSelectedCount', { count: options.version.selectedChangeCount.value }),
                 badge: options.version.selectedChangeCount.value,

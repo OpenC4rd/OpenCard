@@ -27,7 +27,7 @@ function unusableCatalogItem(warning: { path: string; reason: string }, remove?:
   return {
     label: warning.path.split(/[/\\]/).filter(Boolean).pop() ?? warning.path,
     tone: 'danger', disabled: true, disabledReason: warning.reason,
-    visual: { type: 'icon', icon: 'status.error', iconTone: 'danger' },
+    visual: { type: 'icon', icon: 'mdiAlertCircleOutline', iconTone: 'danger' },
     ...(remove ? { tail: [remove] } : {}),
   }
 }
@@ -46,22 +46,22 @@ export function createTemplateTreeData(
     [groups.builtin, builtinTemplates, false, 'projectTemplates.status.noBuiltinTemplates'],
     [groups.user, userTemplates, true, 'projectTemplates.status.noUserTemplates'],
   ] as const) {
-    items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.userTemplates'), visual: { type: 'icon', icon: 'file.template' } })
+    items.set(groupKey, { label: translate(groupKey === groups.builtin ? 'projectTemplates.sections.builtinTemplates' : 'projectTemplates.sections.userTemplates'), visual: { type: 'icon', icon: 'mdiZipBoxOutline' } })
     const unusable = removable ? warnings : []
     if (!templates.length && !unusable.length) {
       const emptyKey = `${groupKey}:empty`
-      items.set(emptyKey, { label: translate(emptyLabel), visual: { type: 'icon', icon: 'file.generic' }, disabled: true })
+      items.set(emptyKey, { label: translate(emptyLabel), visual: { type: 'icon', icon: 'mdiFileOutline' }, disabled: true })
       children.set(groupKey, [emptyKey])
       continue
     }
     children.set(groupKey, [...templates.map(template => template.key), ...unusable.map(warning => warning.path)])
     for (const warning of unusable) items.set(warning.path, unusableCatalogItem(warning, {
-      key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'action.delete', iconTone: 'danger', alwaysVisible: true,
+      key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'mdiTrashCanOutline', iconTone: 'danger', alwaysVisible: true,
     }))
     for (const template of templates) items.set(template.key, {
       label: resolveProjectTemplateName(template, locale),
-      visual: { type: 'icon', icon: 'file.template' },
-      ...(removable ? { tail: [{ key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'action.delete', iconTone: 'danger' } satisfies OcNodeAction] } : {}),
+      visual: { type: 'icon', icon: 'mdiZipBoxOutline' },
+      ...(removable ? { tail: [{ key: TEMPLATE_REMOVE_ACTION_KEY, title: translate('projectTemplates.actions.delete'), icon: 'mdiTrashCanOutline', iconTone: 'danger' } satisfies OcNodeAction] } : {}),
     })
   }
   return { rootKeys: [groups.builtin, groups.user], items, children }
@@ -78,14 +78,14 @@ export function createRecentProjectTreeData(
     const key = recentProjectKey(path)
     const isMissing = availability.get(key) === false
     const actions: OcNodeAction[] = [isMissing
-      ? { key: RECENT_PROJECT_RELOCATE_ACTION_KEY, title: translate('sidebar.relocateRecentProject'), icon: 'status.folder-open' }
-      : { key: RECENT_PROJECT_OPEN_ACTION_KEY, title: translate('sidebar.openRecentProject'), icon: 'action.play', iconTone: 'success' }]
-    if (!isMissing) actions.push({ key: RECENT_PROJECT_REVEAL_ACTION_KEY, title: translate('sidebar.fileActions.reveal'), icon: 'status.folder-open' })
-    actions.push({ key: RECENT_PROJECT_REMOVE_ACTION_KEY, title: translate('sidebar.removeRecentProject'), icon: 'action.close' })
+      ? { key: RECENT_PROJECT_RELOCATE_ACTION_KEY, title: translate('sidebar.relocateRecentProject'), icon: 'mdiFolderOpenOutline' }
+      : { key: RECENT_PROJECT_OPEN_ACTION_KEY, title: translate('sidebar.openRecentProject'), icon: 'mdiPlayOutline', iconTone: 'success' }]
+    if (!isMissing) actions.push({ key: RECENT_PROJECT_REVEAL_ACTION_KEY, title: translate('sidebar.fileActions.reveal'), icon: 'mdiFolderOpenOutline' })
+    actions.push({ key: RECENT_PROJECT_REMOVE_ACTION_KEY, title: translate('sidebar.removeRecentProject'), icon: 'mdiClose' })
     items.set(key, {
       label: path.split(/[/\\]/).filter(Boolean).pop() || path,
       tail: [path, ...actions],
-      visual: { type: 'icon', icon: isMissing ? 'status.folder-alert' : 'status.folder-open', ...(isMissing ? { iconTone: 'warning' as const } : {}) },
+      visual: { type: 'icon', icon: isMissing ? 'mdiFolderAlertOutline' : 'mdiFolderOpenOutline', ...(isMissing ? { iconTone: 'warning' as const } : {}) },
     })
     return key
   })
@@ -102,16 +102,16 @@ export function createResourcePackageTreeData(
 ): OcNodeCollection {
   const items = new Map<string, OcNode>()
   const children = new Map<string, readonly string[]>()
-  const removeAction: OcNodeAction = { key: REMOVE_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.removeResourcePackage'), icon: 'action.delete', iconTone: 'danger' }
+  const removeAction: OcNodeAction = { key: REMOVE_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.removeResourcePackage'), icon: 'mdiTrashCanOutline', iconTone: 'danger' }
   for (const [groupKey, label, packs, removable] of [
     [groups.builtin, translate('projectTemplates.sections.builtinPackages'), builtinPacks, false],
     [groups.stored, translate('projectTemplates.sections.storedPackages'), storedPacks, true],
   ] as const) {
-    items.set(groupKey, { label, visual: { type: 'icon', icon: 'file.package' } })
+    items.set(groupKey, { label, visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } })
     const unusable = removable ? warnings.stored : warnings.builtin
     if (packs.length === 0 && unusable.length === 0) {
       const emptyKey = `${groupKey}:empty`
-      items.set(emptyKey, { label: translate(removable ? 'projectTemplates.status.noStoredResourcePackages' : 'projectTemplates.status.noBuiltinResourcePackages'), visual: { type: 'icon', icon: 'file.generic' }, disabled: true })
+      items.set(emptyKey, { label: translate(removable ? 'projectTemplates.status.noStoredResourcePackages' : 'projectTemplates.status.noBuiltinResourcePackages'), visual: { type: 'icon', icon: 'mdiFileOutline' }, disabled: true })
       children.set(groupKey, [emptyKey])
       continue
     }
@@ -121,10 +121,10 @@ export function createResourcePackageTreeData(
       const isAttached = attachedPaths.includes(pack.path)
       items.set(pack.path, {
         label: pack.title,
-        visual: { type: 'icon', icon: 'file.package' },
+        visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
         tail: [isAttached
-          ? { key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.detachResourcePackage'), icon: 'action.check', iconTone: 'success', alwaysVisible: true }
-          : { key: ATTACH_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.attachResourcePackage'), icon: 'action.add', alwaysVisible: true },
+          ? { key: ATTACHED_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.detachResourcePackage'), icon: 'mdiCheck', iconTone: 'success', alwaysVisible: true }
+          : { key: ATTACH_RESOURCE_PACKAGE_ACTION_KEY, title: translate('projectTemplates.actions.attachResourcePackage'), icon: 'mdiPlus', alwaysVisible: true },
         ...(removable ? [removeAction] : [])],
       })
     }
@@ -166,17 +166,17 @@ export function createExportTemplateTreeData(
     if (!isProjectFile && !isRuntimeCache) actions.push({
       key: isExcluded ? TEMPLATE_INCLUDE_ACTION_KEY : TEMPLATE_EXCLUDE_ACTION_KEY,
       title: translate(isExcluded ? 'templateExport.tree.include' : 'templateExport.tree.exclude'),
-      icon: isExcluded ? 'status.eye' : 'status.eye-off',
+      icon: isExcluded ? 'mdiEyeOutline' : 'mdiEyeOffOutline',
     })
     if (!isExcluded && fileType(key) === 'image') actions.push({
       key: selection.covers.includes(path) ? TEMPLATE_COVER_REMOVE_ACTION_KEY : TEMPLATE_COVER_ADD_ACTION_KEY,
       title: translate(selection.covers.includes(path) ? 'templateExport.tree.removeCover' : 'templateExport.tree.addCover'),
-      icon: selection.covers.includes(path) ? 'action.image-minus' : 'action.image-plus',
+      icon: selection.covers.includes(path) ? 'mdiImageMinusOutline' : 'mdiImagePlusOutline',
     })
     if (!isExcluded && path.toLowerCase().endsWith(cardSuffix)) actions.push({
       key: selection.entries.includes(path) ? TEMPLATE_ENTRY_REMOVE_ACTION_KEY : TEMPLATE_ENTRY_ADD_ACTION_KEY,
       title: translate(selection.entries.includes(path) ? 'templateExport.tree.removeEntry' : 'templateExport.tree.addEntry'),
-      icon: selection.entries.includes(path) ? 'action.file-minus' : 'action.file-plus',
+      icon: selection.entries.includes(path) ? 'mdiFileMinusOutline' : 'mdiFilePlusOutline',
     })
     items.set(key, {
       ...item,

@@ -229,7 +229,7 @@ function createPathCompletionResult(
       items: [{
         key: `clear-file:${normalizedValue}`,
         label: t('propertyEditor.filePath.clearSelection'),
-        icon: 'action.close',
+        icon: 'mdiClose',
         insertText: directory ? `${directory.replace(/\/+$/, '')}/` : '',
         keepOpen: true,
       }],
@@ -268,7 +268,7 @@ function toPathCompletionItem(entry: FilePathDirectoryEntry, directory: string) 
   return {
     key: `path:${path}`,
     label,
-    icon: entry.icon ?? (isDirectory ? 'folder.generic' as const : 'file.generic' as const),
+    icon: entry.icon ?? (isDirectory ? 'mdiFolder' as const : 'mdiFileOutline' as const),
     insertText: isDirectory && !path.endsWith('#') && !path.endsWith(':') ? `${path}/` : path,
     keepOpen: true,
     isDirectory,
@@ -281,7 +281,7 @@ function createParentCompletionItem(directory: string): PropertyCompletionItem |
   return {
     key: `parent:${directory}`,
     label: '..',
-    icon: 'nav.arrow-up',
+    icon: 'mdiArrowUp',
     insertText: parent ? `${parent}/` : '',
     keepOpen: true,
   }

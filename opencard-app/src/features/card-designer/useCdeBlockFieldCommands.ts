@@ -1,9 +1,11 @@
 import type { Ref } from 'vue'
 import {
+  clearBlockFieldValue,
   createBlockAdditionalField,
-  deleteBlockAdditionalField,
   isCardStoredValue,
+  removeBlockAdditionalFieldDefinition,
   setCardFieldValue,
+  updateBlockAdditionalFieldDefinition,
   type AdditionalFieldKeyError,
   type AdditionalFieldDefinition,
   type CardBlock,
@@ -12,6 +14,7 @@ import {
 import { getDefault, getTypePropertyEditorSchema } from '../../entities/card/schema'
 import { isBlockContainer } from '../../entities/card/tree'
 import { isInstanceBlockFieldOverridable } from '../../entities/card/instance'
+import { isPropertyRemovable } from '../../shared/ui/property-editor/propertyRemovability'
 import { resetInstanceOverrideField } from './cdeInstanceOverride'
 import type { CdeDocumentChangeMode } from './useCdeDocumentState'
 
@@ -113,28 +116,41 @@ export function useCdeBlockFieldCommands(options: UseCdeBlockFieldCommandsOption
     return null
   }
 
-  function deleteField(target: CdeBlockFieldTarget): boolean {
+  function updateFieldDefinition(target: CdeBlockFieldTarget, definition: AdditionalFieldDefinition): boolean {
+    if (target.cardId !== options.blueprintCardId) return false
+    const { block } = resolveTarget(target)
+    if (!block || !updateBlockAdditionalFieldDefinition(block, target.fieldKey, definition)) return false
+    options.refreshDocumentState()
+    options.markDocumentChanged('action')
+    return true
+  }
+
+  function removeFieldDefinition(target: CdeBlockFieldTarget): boolean {
+    if (target.cardId !== options.blueprintCardId) return false
+    const { document, block } = resolveTarget(target)
+    if (!document || !block || !removeBlockAdditionalFieldDefinition(document, block, target.fieldKey)) return false
+    options.refreshDocumentState()
+    options.markDocumentChanged('action')
+    return true
+  }
+
+  function resetBlueprintField(target: CdeBlockFieldTarget): boolean {
     if (target.cardId !== options.blueprintCardId) return false
     const { document, block } = resolveTarget(target)
     if (!document || !block) return false
 
-    if (block.additionalFieldDefinition?.[target.fieldKey]) {
-      deleteBlockAdditionalField(document, block, target.fieldKey)
-    } else {
-      const definition = getTypePropertyEditorSchema(block.type)[target.fieldKey]
-      const record = block as unknown as Record<string, unknown>
-      if (!definition || definition.required === true || definition.isReadonly === true
-        || !Object.prototype.hasOwnProperty.call(record, target.fieldKey)) return false
-      delete record[target.fieldKey]
-      for (const instance of document.instances ?? []) {
-        resetInstanceOverrideField(instance.data, block.id, target.fieldKey)
-      }
-    }
+    // 重置只清掉这块自己的值，定义保留：面板按值渲染，所以该行会消失，
+    // 属性回到分类标题的“+”里等待重新添加；实例的覆写数据不受影响。
+    const definition = block.additionalFieldDefinition?.[target.fieldKey]
+      ?? getTypePropertyEditorSchema(block.type)[target.fieldKey]
+    if (!definition || !isPropertyRemovable(definition)) return false
+    if (!Object.prototype.hasOwnProperty.call(block, target.fieldKey)) return false
+    clearBlockFieldValue(block, target.fieldKey)
 
     options.refreshDocumentState()
     options.markDocumentChanged('action')
     return true
   }
 
-  return { updateField, resetField, createField, deleteField }
+  return { updateField, resetField, createField, updateFieldDefinition, removeFieldDefinition, resetBlueprintField }
 }

@@ -415,7 +415,7 @@ async function navigate(token: SessionNavigationToken): Promise<EditorNavigation
 const presentation = computed<EditorPresentation>(() => ({
   title: t('fontRegistry.title'),
   description: t('fontRegistry.description'),
-  icon: 'file.font',
+  icon: 'mdiFormatFont',
 }))
 
 defineExpose({ canSave, navigate, presentation })

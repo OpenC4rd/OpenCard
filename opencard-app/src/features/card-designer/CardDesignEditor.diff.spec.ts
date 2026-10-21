@@ -359,11 +359,11 @@ describe('CardDesignEditor diff mode', () => {
     })
     expect(blockInput.fields['content@old']).toMatchObject({
       isReadonly: true,
-      tail: { type: 'badge', icon: 'action.minus', tone: 'danger', label: 'Removed' },
+      tail: { type: 'badge', icon: 'mdiMinus', tone: 'danger', label: 'Removed' },
     })
     expect(blockInput.fields['content@new']).toMatchObject({
       isReadonly: true,
-      tail: { type: 'badge', icon: 'action.add', tone: 'success', label: 'Added' },
+      tail: { type: 'badge', icon: 'mdiPlus', tone: 'success', label: 'Added' },
     })
 
     // Only the field that actually differs is projected.
@@ -374,7 +374,7 @@ describe('CardDesignEditor diff mode', () => {
     expect(layoutInput.record).toEqual({ 'x@new': '12px' })
     expect(layoutInput.fields['x@new']).toMatchObject({
       isReadonly: true,
-      tail: { type: 'badge', icon: 'action.add', tone: 'success', label: 'Added' },
+      tail: { type: 'badge', icon: 'mdiPlus', tone: 'success', label: 'Added' },
     })
 
     // A blank canvas click clears the diff selection without touching the edit-mode selection.

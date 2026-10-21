@@ -6,7 +6,7 @@
       role="img"
       :aria-label="renderState === 'error' ? tr('cardRenderer.qrCodeFailed', '二维码生成失败') : tr('cardRenderer.qrCodeUnset', '未配置二维码内容')"
     >
-      <OcIcon :name="renderState === 'error' ? 'status.warning' : 'entity.block-qrcode'"
+      <OcIcon :name="renderState === 'error' ? 'mdiAlertOutline' : 'mdiQrcode'"
         :tone="renderState === 'error' ? 'warning' : 'muted'" size="lg" />
     </div>
     <div v-else class="qrcode-block__graphic" role="img" :aria-label="block.name" v-html="svgMarkup" />

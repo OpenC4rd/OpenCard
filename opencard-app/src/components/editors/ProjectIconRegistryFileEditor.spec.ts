@@ -187,7 +187,7 @@ describe('ProjectIconRegistryFileEditor', () => {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({ iconSeries: [{ name: 'Status icons', key: 'status', source: 'status.png', icons: [] }] }) }),  },
     })
 
-    expect(wrapper.vm.presentation).toMatchObject({ title: 'iconRegistry.title', icon: 'file.project-icon' })
+    expect(wrapper.vm.presentation).toMatchObject({ title: 'iconRegistry.title', icon: 'mdiStickerEmoji' })
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(false)
 
     await wrapper.vm.onHeaderAction('project-icon-registry.create-collection')

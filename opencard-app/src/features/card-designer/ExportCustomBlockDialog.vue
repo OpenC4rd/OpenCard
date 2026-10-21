@@ -16,7 +16,7 @@
       action-visibility="always" tab-navigation="none" :data="treeData" @action="handleTreeAction" />
     <template #footer>
       <OcButton type="button" @click="emit('close')">{{ t('cardDesigner.customBlock.cancel') }}</OcButton>
-      <OcButton type="submit" variant="solid" icon="entity.block-custom">
+      <OcButton type="submit" variant="solid" icon="mdiToyBrickOutline">
         {{ t('cardDesigner.customBlock.exportConfirm') }}
       </OcButton>
     </template>
@@ -55,13 +55,13 @@ const treeData = computed<OcNodeCollection>(() => ({
   items: new Map(fields.value.map(field => {
     const checked = selectedKeys.value.includes(field.key)
     const action: OcNodeAction = checked
-      ? { key: 'deselect', title: t('cardDesigner.customBlock.deselectField'), icon: 'action.checkbox-marked' }
-      : { key: 'select', title: t('cardDesigner.customBlock.selectField'), icon: 'action.checkbox-blank' }
+      ? { key: 'deselect', title: t('cardDesigner.customBlock.deselectField'), icon: 'mdiCheckboxMarkedOutline' }
+      : { key: 'select', title: t('cardDesigner.customBlock.selectField'), icon: 'mdiCheckboxBlankOutline' }
     return [field.key, {
       label: field.title,
       tail: [field.key, action],
       contextActions: [action],
-      visual: { type: 'icon', icon: 'data.symbol-key', iconTone: checked ? 'active' : 'muted' },
+      visual: { type: 'icon', icon: 'mdiKeyOutline', iconTone: checked ? 'active' : 'muted' },
     }]
   })),
   children: new Map(),

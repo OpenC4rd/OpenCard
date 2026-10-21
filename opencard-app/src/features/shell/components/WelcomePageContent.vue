@@ -61,10 +61,10 @@ const { t } = useI18n()
       </h1>
       <p>{{ t('app.welcome.subtitle') }}</p>
       <div class="page-empty-state__actions">
-        <OcButton data-oc-tutorial="welcome.new-project" icon="action.add" variant="solid" size="lg" @click="emit('new-project')">
+        <OcButton data-oc-tutorial="welcome.new-project" icon="mdiPlus" variant="solid" size="lg" @click="emit('new-project')">
           {{ t('app.menu.newProject') }}
         </OcButton>
-        <OcButton icon="status.folder-open" variant="outline" size="lg" @click="emit('open-project')">
+        <OcButton icon="mdiFolderOpenOutline" variant="outline" size="lg" @click="emit('open-project')">
           {{ t('sidebar.openProject') }}
         </OcButton>
       </div>
@@ -72,7 +72,7 @@ const { t } = useI18n()
     <!-- 左下角的小按钮：控制背景封面墙显隐；开关状态由浅色底表达，同时通过 aria-pressed 暴露给辅助技术。 -->
     <OcButton
       class="page-empty-state__wall-toggle"
-      icon="tool.background"
+      icon="mdiPanoramaVariantOutline"
       icon-only
       :variant="props.backgroundVisible ? 'soft' : 'ghost'"
       :aria-pressed="props.backgroundVisible"

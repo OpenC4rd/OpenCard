@@ -72,8 +72,39 @@ describe('useCdeBlockFieldCommands', () => {
     expect(document.instances[0]!.data.text).toBeUndefined()
     expect(document.instances[1]!.data.text?.score).toBe('20')
 
-    expect(commands.deleteField({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'score' })).toBe(true)
+    expect(commands.resetBlueprintField({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'score' })).toBe(true)
+    expect(block.additionalFieldDefinition?.score).toBeDefined()
+    expect((block as unknown as Record<string, unknown>).score).toBeUndefined()
+    expect(document.instances[1]!.data.text?.score).toBe('20')
+
+    expect(commands.removeFieldDefinition({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'score' })).toBe(true)
     expect(block.additionalFieldDefinition).toBeUndefined()
     expect(document.instances[1]!.data.text).toBeUndefined()
+  })
+
+  it('updates a custom field definition in place and removes it with its value', () => {
+    const { block, document, commands } = createHarness()
+    expect(commands.createField({
+      cardId: '__blueprint__', blockId: 'text', fieldKey: 'score',
+      definition: { fieldType: 'number', title: 'Score', min: 5, max: 100, step: 5 },
+    })).toBeNull()
+    commands.updateField({ cardId: 'one', blockId: 'text', fieldKey: 'score' }, '10')
+    const blueprintValue = (block as unknown as Record<string, unknown>).score
+
+    expect(commands.updateFieldDefinition({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'score' },
+      { fieldType: 'number', title: 'Points', min: 0, max: 10 })).toBe(true)
+    expect(block.additionalFieldDefinition?.score).toEqual({
+      fieldType: 'number', title: 'Points', min: 0, max: 10,
+    })
+    expect((block as unknown as Record<string, unknown>).score).toBe(blueprintValue)
+    expect(document.instances[0]!.data.text?.score).toBe('10')
+
+    expect(commands.updateFieldDefinition({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'score' },
+      { fieldType: 'string', title: 'Points' })).toBe(false)
+
+    expect(commands.removeFieldDefinition({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'score' })).toBe(true)
+    expect(block.additionalFieldDefinition).toBeUndefined()
+    expect((block as unknown as Record<string, unknown>).score).toBeUndefined()
+    expect(document.instances[0]!.data.text).toBeUndefined()
   })
 })

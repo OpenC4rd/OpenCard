@@ -22,7 +22,7 @@ describe('editor mount ownership', () => {
     const { host, activeSession, session, reportIssues } = createHost()
     const oldMount = host.mount.value!
     const onHeaderAction = vi.fn()
-    oldMount.capture({ presentation: { title: 'Card', description: '', icon: 'file.opencard' },
+    oldMount.capture({ presentation: { title: 'Card', description: '', icon: 'mdiCardsOutline' },
       headerActions: [{ key: 'local', title: 'Local' }], onHeaderAction })
     await nextTick()
     expect(session.state.presentation?.title).toBe('Card')

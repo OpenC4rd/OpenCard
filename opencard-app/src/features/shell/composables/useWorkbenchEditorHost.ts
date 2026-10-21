@@ -101,7 +101,7 @@ export function useWorkbenchEditorHost(options: {
     try {
       const result = await session.save()
       const name = session.state.name
-      if (result === 'saved') notifySuccess(options.translate('app.notifications.saved', { name }), 'action.save')
+      if (result === 'saved') notifySuccess(options.translate('app.notifications.saved', { name }), 'mdiContentSaveOutline')
       else notifyWarning(options.translate(result === 'cancelled' ? 'app.notifications.saveCancelled' : 'app.notifications.saveSkipped', { name }))
     } catch (error) { notifyAppError('OC-E4002', error) }
   }

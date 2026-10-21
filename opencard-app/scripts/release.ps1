@@ -16,9 +16,10 @@ A release belongs to one channel, and the channel decides the updater endpoint
 written into tauri.conf.json, so a build only ever searches the channel it was
 released on. A stable version such as 0.5.0 is a stable release, and stable
 builds update only to newer stable releases. A version with a prerelease suffix
-such as 0.5.0-beta.1 is a preview release, and preview builds update to newer
-preview and stable releases. Installing a stable release moves that installation
-onto the stable channel.
+such as 0.5.0-beta.1 is a preview release, and preview builds update only to
+newer preview releases. The channels never cross: a preview installation never
+receives a stable release and a stable installation never receives a preview, so
+switching channels means installing a build of that channel.
 
 A preview release publishes the change since the previous release and keeps the
 draft, so each preview carries everything new since the last stable release. The
@@ -342,8 +343,10 @@ if ($repositoryTopLevel -ne $repoRoot) {
 }
 
 $repository = Get-GitHubRepositorySlug -RepositoryRoot $repoRoot
+# GitHub resolves no URL to the newest prerelease, so preview builds read a pointer
+# file that .github/workflows/preview-channel.yml keeps at the tip of its own branch.
 $updaterEndpoint = if ($channel -eq 'Preview') {
-  "https://github.com/$repository/releases/download/preview/latest.json"
+  "https://raw.githubusercontent.com/$repository/preview-update/latest.json"
 }
 else {
   "https://github.com/$repository/releases/latest/download/latest.json"

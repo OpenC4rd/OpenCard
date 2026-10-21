@@ -62,7 +62,7 @@ describe('PackageManifestEditor', () => {
 
     expect(wrapper.vm.presentation?.title).toBe('alice@theme@1.2.3.ocpack')
     expect(wrapper.vm.presentation?.description).toBe('alice/theme@1.2.3')
-    expect(wrapper.vm.presentation?.icon).toBe('file.package')
+    expect(wrapper.vm.presentation?.icon).toBe('mdiPackageVariantClosed')
     expect(wrapper.findComponent(ProjectRegistryEditorShell).exists()).toBe(true)
     expect(wrapper.text()).toContain('alice/theme@1.2.3')
     expect(wrapper.text()).toContain('Theme Package')

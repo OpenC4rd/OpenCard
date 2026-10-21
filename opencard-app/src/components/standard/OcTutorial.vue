@@ -204,7 +204,7 @@ onBeforeUnmount(() => {
       <template v-if="visible && !blocking">
         <span v-for="(hole, index) in interactiveHoles" :key="index" class="oc-tutorial__click-hint" aria-hidden="true"
           :style="{ left: `${hole.right + 4}px`, top: `${hole.bottom + 4}px` }">
-          <OcIcon name="input.mouse-left-click" tone="accent" size="sm" />
+          <OcIcon name="mdiMouseLeftClick" tone="accent" size="sm" />
         </span>
       </template>
       <div ref="cardSurface" class="oc-tutorial" :class="{ 'oc-tutorial--morphing': morphing }"

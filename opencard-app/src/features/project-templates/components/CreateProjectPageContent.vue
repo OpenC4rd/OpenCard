@@ -72,7 +72,7 @@
               <OcFieldFrame full-width readonly>
                 <OcFieldInput variant="plain" full-width mono readonly :value="parentPath" :aria-label="t('projectTemplates.fields.location')" />
               </OcFieldFrame>
-              <OcButton type="button" size="md" variant="outline" icon="status.folder-open" :disabled="isBusy" @click="chooseParentDirectory">
+              <OcButton type="button" size="md" variant="outline" icon="mdiFolderOpenOutline" :disabled="isBusy" @click="chooseParentDirectory">
                 {{ t('projectTemplates.actions.browse') }}
               </OcButton>
             </div>
@@ -83,7 +83,7 @@
           </OcPanel>
         </fieldset>
         <div class="create-project__form-actions">
-          <OcButton data-oc-tutorial="create-project.submit" type="submit" variant="solid" icon="action.folder-plus" :disabled="!canCreate">
+          <OcButton data-oc-tutorial="create-project.submit" type="submit" variant="solid" icon="mdiFolderPlusOutline" :disabled="!canCreate">
             {{ isCreating ? t('projectTemplates.status.creating') : t('projectTemplates.actions.create') }}
           </OcButton>
         </div>

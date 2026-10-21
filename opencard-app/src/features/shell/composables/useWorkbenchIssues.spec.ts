@@ -54,12 +54,12 @@ describe('workspace issue projection', () => {
     const issueKey = projection.treeData.children.get('workspace-issue-session:a')?.[0]
     expect(projection.treeData.items.get(issueKey!)).toMatchObject({
       label: 'Card A / title: invalid issue',
-      visual: { type: 'icon', icon: 'status.error', iconTone: 'danger' },
+      visual: { type: 'icon', icon: 'mdiAlertCircleOutline', iconTone: 'danger' },
     })
     expect(normalizeNodeTail(projection.treeData.items.get(issueKey!)?.tail)).toEqual([{
       key: 'copy-issue',
       title: COPY_ISSUE_LABEL,
-      icon: 'action.copy',
+      icon: 'mdiContentCopy',
       iconTone: 'muted',
     }])
     expect(projection.navigationTargets.get(issueKey!)).toEqual({

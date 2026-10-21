@@ -119,10 +119,10 @@ const treeData = computed<OcNodeCollection>(() => {
     items.set(family.name, {
       label: family.name,
       labelFont: previewFamilyNames.value.get(family.name),
-      visual: { type: 'icon', icon: 'file.font' },
+      visual: { type: 'icon', icon: 'mdiFormatFont' },
       tail: [{
         key: TOGGLE_FAMILY_ACTION_KEY,
-        icon: selected ? 'action.checkbox-marked' : 'action.checkbox-blank',
+        icon: selected ? 'mdiCheckboxMarkedOutline' : 'mdiCheckboxBlankOutline',
         iconTone: selected ? 'accent' : 'muted',
         title: selected ? t('projectConfig.fonts.systemFontDeselect') : t('projectConfig.fonts.systemFontSelect'),
       }],
@@ -131,7 +131,7 @@ const treeData = computed<OcNodeCollection>(() => {
     for (const face of family.faces) {
       items.set(faceKey(face), {
         label: face.faceName || family.name,
-        visual: { type: 'icon', icon: 'file.font' },
+        visual: { type: 'icon', icon: 'mdiFormatFont' },
         tail: [`${face.weight}`, face.italic ? t('projectConfig.fonts.styleItalic') : t('projectConfig.fonts.styleNormal')],
       })
     }

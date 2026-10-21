@@ -202,7 +202,7 @@ const toolbarItems = computed(() => [
   { type: 'divider' as const, key: 'image-options' },
   {
     key: 'toggle-pixelated',
-    icon: 'tool.pixelated' as const,
+    icon: 'mdiCubeUnfolded' as const,
     title: pixelatedLabel.value,
     active: pixelated.value,
     variant: pixelated.value ? 'soft' as const : 'ghost' as const,
@@ -468,7 +468,7 @@ onBeforeUnmount(() => {
 const presentation = computed<EditorPresentation>(() => ({
   title: fileName.value,
   description: '',
-  icon: 'file.image',
+  icon: 'mdiFileImageOutline',
 }))
 
 defineExpose({ resetView, presentation })

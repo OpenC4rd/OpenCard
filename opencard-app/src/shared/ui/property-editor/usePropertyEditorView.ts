@@ -76,7 +76,7 @@ function buildCategories(
       inputKey: source.key,
       key: 'a-z',
       title: 'A-Z',
-      icon: 'data.list-selection',
+      icon: 'mdiFormatListBulletedSquare',
       entries,
       addableFields: missing,
     }]
@@ -150,7 +150,7 @@ function ensureCategory(
       inputKey,
       key,
       title: definition.title,
-      icon: definition.icon ?? 'data.list-tree',
+      icon: definition.icon ?? 'mdiFileTreeOutline',
       entries: [],
       addableFields: [],
     }

@@ -7,7 +7,7 @@ function createData(options: {
   roots?: string[]
   items?: Array<[string, OcNode]>
 } = {}): OcNodeCollection {
-  const items = options.items ?? [['root', { label: 'Root', visual: { type: 'icon', icon: 'file.package' } }]]
+  const items = options.items ?? [['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } }]]
   return {
     rootKeys: options.roots ?? items.map(([key]) => key),
     items: new Map(items),
@@ -26,9 +26,9 @@ describe('OcAlbum', () => {
         data: {
           rootKeys: ['root', 'second'],
           items: new Map<string, OcNode>([
-            ['root', { label: 'Root', visual: { type: 'icon', icon: 'file.package' } }],
-            ['second', { label: 'Second', visual: { type: 'icon', icon: 'file.package' } }],
-            ['nested', { label: 'Nested', visual: { type: 'icon', icon: 'file.package' } }],
+            ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } }],
+            ['second', { label: 'Second', visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } }],
+            ['nested', { label: 'Nested', visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } }],
           ]),
           children: new Map([['root', ['nested']]]),
         },
@@ -45,7 +45,7 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['root', {
             label: 'Theme',
-            visual: { type: 'icon', icon: 'file.package' },
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
             cover: { type: 'image', src: 'asset://cover.png', label: 'Theme cover' },
           }]],
         }),
@@ -69,7 +69,7 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['root', {
             label: 'Theme',
-            visual: { type: 'icon', icon: 'file.package' },
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
             cover: { type: 'image', src: 'asset://missing.png' },
           }]],
         }),
@@ -90,7 +90,7 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['root', {
             label: 'Theme',
-            visual: { type: 'icon', icon: 'file.package' },
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
             cover: { type: 'image', src: 'asset://broken.png' },
           }]],
         }),
@@ -104,7 +104,7 @@ describe('OcAlbum', () => {
       data: createData({
         items: [['root', {
           label: 'Theme',
-          visual: { type: 'icon', icon: 'file.package' },
+          visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
           cover: { type: 'image', src: 'asset://replaced.png' },
         }]],
       }),
@@ -119,8 +119,8 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['root', {
             label: 'Theme',
-            visual: { type: 'icon', icon: 'file.package' },
-            tail: ['Local', { type: 'badge', label: 'Missing', icon: 'status.warning', tone: 'warning' }],
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
+            tail: ['Local', { type: 'badge', label: 'Missing', icon: 'mdiAlertOutline', tone: 'warning' }],
           }]],
         }),
       },
@@ -139,8 +139,8 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['root', {
             label: 'Theme@1.0.0',
-            visual: { type: 'icon', icon: 'file.package' },
-            tail: ['Local', { key: 'remove', title: 'Remove', icon: 'action.delete' }],
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
+            tail: ['Local', { key: 'remove', title: 'Remove', icon: 'mdiTrashCanOutline' }],
           }]],
         }),
       },
@@ -161,8 +161,8 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['theme', {
             label: 'Theme@1.0.0',
-            visual: { type: 'icon', icon: 'file.package' },
-            tail: ['Local', { key: 'remove', title: 'No longer needed', icon: 'action.delete' }],
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
+            tail: ['Local', { key: 'remove', title: 'No longer needed', icon: 'mdiTrashCanOutline' }],
           }]],
         }),
       },
@@ -184,11 +184,11 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['theme', {
             label: 'Theme',
-            visual: { type: 'icon', icon: 'file.package' },
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
             tail: [{
               key: 'remove',
               title: 'No longer needed',
-              icon: 'action.delete',
+              icon: 'mdiTrashCanOutline',
               iconTone: 'danger',
             }],
           }]],
@@ -209,11 +209,11 @@ describe('OcAlbum', () => {
         data: createData({
           items: [['theme', {
             label: 'Theme',
-            visual: { type: 'icon', icon: 'file.package' },
+            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
             tail: [{
               key: 'remove',
               title: 'Remove',
-              icon: 'action.delete',
+              icon: 'mdiTrashCanOutline',
               disabled: true,
               disabledReason: 'Required',
             }],
@@ -233,8 +233,8 @@ describe('OcAlbum', () => {
       props: {
         data: createData({
           items: [
-            ['first', { label: 'First', visual: { type: 'icon', icon: 'file.package' } }],
-            ['second', { label: 'Second', visual: { type: 'icon', icon: 'file.package' } }],
+            ['first', { label: 'First', visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } }],
+            ['second', { label: 'Second', visual: { type: 'icon', icon: 'mdiPackageVariantClosed' } }],
           ],
         }),
         selectedKeys: ['first'],

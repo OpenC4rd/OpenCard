@@ -13,7 +13,7 @@
           icon-only
           size="sm"
           variant="ghost"
-          icon="nav.arrow-up"
+          icon="mdiArrowUp"
           :data-tooltip="moveUpText"
           :aria-label="moveUpText"
           :disabled="definition.isReadonly || index === 0"
@@ -23,7 +23,7 @@
           icon-only
           size="sm"
           variant="ghost"
-          icon="nav.arrow-down"
+          icon="mdiArrowDown"
           :data-tooltip="moveDownText"
           :aria-label="moveDownText"
           :disabled="definition.isReadonly || index === items.length - 1"
@@ -33,7 +33,7 @@
           icon-only
           size="sm"
           variant="ghost"
-          icon="action.delete"
+          icon="mdiTrashCanOutline"
           :data-tooltip="deleteText"
           :aria-label="deleteText"
           :disabled="definition.isReadonly"
@@ -45,7 +45,7 @@
       class="array-property-field__add"
       size="sm"
       variant="ghost"
-      icon="action.add"
+      icon="mdiPlus"
       :disabled="definition.isReadonly"
       @click="addItem"
     >

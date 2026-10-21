@@ -51,12 +51,12 @@ function issueLabel(issue: EditorIssue): string {
 
 function issueTreeItem(issue: EditorIssue, copyAction: OcNodeAction): OcNode {
   if (issue.severity === 'error') {
-    return { label: issueLabel(issue), visual: { type: 'icon', icon: 'status.error', iconTone: 'danger' }, tail: [copyAction] }
+    return { label: issueLabel(issue), visual: { type: 'icon', icon: 'mdiAlertCircleOutline', iconTone: 'danger' }, tail: [copyAction] }
   }
   if (issue.severity === 'warning') {
-    return { label: issueLabel(issue), visual: { type: 'icon', icon: 'status.warning', iconTone: 'warning' }, tail: [copyAction] }
+    return { label: issueLabel(issue), visual: { type: 'icon', icon: 'mdiAlertOutline', iconTone: 'warning' }, tail: [copyAction] }
   }
-  return { label: issueLabel(issue), visual: { type: 'icon', icon: 'status.unknown', iconTone: 'muted' }, tail: [copyAction] }
+  return { label: issueLabel(issue), visual: { type: 'icon', icon: 'mdiHelpCircleOutline', iconTone: 'muted' }, tail: [copyAction] }
 }
 
 function dedupeIssues(issues: readonly EditorIssue[]): readonly EditorIssue[] {
@@ -85,7 +85,7 @@ export function buildWorkspaceIssueProjection(
   const copyAction: OcNodeAction = {
     key: COPY_ISSUE_ACTION_KEY,
     title: copyIssueLabel,
-    icon: 'action.copy',
+    icon: 'mdiContentCopy',
     iconTone: 'muted',
   }
   const rootKeys: string[] = []

@@ -375,13 +375,13 @@ describe('CardLayerView', () => {
         shortcutLegendLabel: 'Layer view shortcuts',
         shortcutHints: [
           {
-            keys: [{ icon: 'input.mouse-scroll-wheel' }, { separator: 'or' }, '↑ / ↓'],
+            keys: [{ icon: 'mdiMouseScrollWheel' }, { separator: 'or' }, '↑ / ↓'],
             label: 'Step through planes',
           },
           {
             keys: [
-              { icon: 'input.keyboard-shift' },
-              { icon: 'input.mouse-scroll-wheel' },
+              { icon: 'mdiAppleKeyboardShift' },
+              { icon: 'mdiMouseScrollWheel' },
               { separator: 'or' },
               '↑ / ↓',
             ],
@@ -402,7 +402,7 @@ describe('CardLayerView', () => {
     expect(legend.findAllComponents(OcIcon).map(
       (icon: VueWrapper) => (icon.props() as { name: string }).name,
     ))
-      .toEqual(['input.mouse-scroll-wheel', 'input.keyboard-shift', 'input.mouse-scroll-wheel'])
+      .toEqual(['mdiMouseScrollWheel', 'mdiAppleKeyboardShift', 'mdiMouseScrollWheel'])
     expect(legend.findAll('.card-layer-view__shortcut-label').map(label => label.text()))
       .toEqual(['Step through planes', 'Jump between layers'])
   })

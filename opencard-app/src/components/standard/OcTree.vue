@@ -489,7 +489,7 @@ function resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNode
     overflowPlaced = true
     return [{
       key: `__oc-tree-action-overflow__:${key}`,
-      icon: 'nav.more',
+      icon: 'mdiDotsHorizontal',
       title: props.actionOverflowTitle,
       children: actions,
     }]

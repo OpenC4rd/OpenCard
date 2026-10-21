@@ -43,7 +43,7 @@ const CONFIRM_REMOVE_ACTION_KEY = 'package-manager.confirm-remove'
 const REVEAL_ACTION: OcNodeAction = {
   key: REVEAL_ACTION_KEY,
   title: t('packageManager.reveal'),
-  icon: 'status.folder-open',
+  icon: 'mdiFolderOpenOutline',
 }
 
 /**
@@ -54,11 +54,11 @@ function removeAction(name: string): OcNodeAction {
   return {
     key: REMOVE_ACTION_KEY,
     title: t('packageManager.remove'),
-    icon: 'action.delete',
+    icon: 'mdiTrashCanOutline',
     children: [{
       key: CONFIRM_REMOVE_ACTION_KEY,
       title: t('packageManager.confirmRemove', { name }),
-      icon: 'action.delete',
+      icon: 'mdiTrashCanOutline',
       iconTone: 'danger',
     }],
   }
@@ -84,7 +84,7 @@ const treeData = computed<OcNodeCollection>(() => {
     const coordinate = pkg ? formatPackageCoordinate(pkg.coordinate) : ''
     items.set(file.archivePath, {
       label: title,
-      visual: { type: 'icon', icon: 'file.package', iconTone: 'file-opencard' },
+      visual: { type: 'icon', icon: 'mdiPackageVariantClosed', iconTone: 'file-opencard' },
       // 封面是包解开之后的资源：没解开的包没有封面，媒体区留空。
       ...(pkg?.cover ? { cover: { type: 'image' as const, src: pkg.cover.src, label: `${coordinate || title} ${t('packageManifest.coverAlt')}` } } : {}),
       tail: [...(coordinate ? [coordinate] : []), REVEAL_ACTION, removeAction(title)],
@@ -94,7 +94,7 @@ const treeData = computed<OcNodeCollection>(() => {
     const title = getPathBasename(broken.archivePath)
     items.set(broken.archivePath, {
       label: title,
-      visual: { type: 'icon', icon: 'file.package', iconTone: 'danger' },
+      visual: { type: 'icon', icon: 'mdiPackageVariantClosed', iconTone: 'danger' },
       // 读不出来的归档更要能从这里清掉：它当不了包，留在文件夹里只会每次打开都报一遍。
       tail: [t('packageManager.unreadable'), broken.reason, REVEAL_ACTION, removeAction(title)],
     })
@@ -119,7 +119,7 @@ function handleNodeAction(event: OcNodeActionEvent): void {
 const presentation = computed<EditorPresentation>(() => ({
   title: t('packageManager.title'),
   description: t('packageManager.description'),
-  icon: 'file.package',
+  icon: 'mdiPackageVariantClosed',
 }))
 
 defineExpose({ presentation })

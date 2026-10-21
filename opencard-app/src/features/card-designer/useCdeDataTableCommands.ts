@@ -50,7 +50,7 @@ type UseCdeDataTableCommandsOptions = {
   createBlockField: (
     target: BlockFieldCreateTarget,
   ) => AdditionalFieldKeyError | 'invalid-target' | null
-  deleteBlockField: (target: BlockFieldTarget) => boolean
+  resetBlueprintField: (target: BlockFieldTarget) => boolean
 }
 
 export function useCdeDataTableCommands(options: UseCdeDataTableCommandsOptions) {
@@ -232,25 +232,12 @@ export function useCdeDataTableCommands(options: UseCdeDataTableCommandsOptions)
     return result
   }
 
-  function deleteField(blockId: string, fieldKey: string): boolean {
-    const previous = fieldSelection.value
-    const current = previous[blockId]
-    if (current?.includes(fieldKey)) {
-      writeFieldSelection({
-        ...previous,
-        [blockId]: current.filter(candidate => candidate !== fieldKey),
-      })
-    }
-    const deleted = options.deleteBlockField({
+  function resetBlueprintField(blockId: string, fieldKey: string): boolean {
+    return options.resetBlueprintField({
       cardId: options.blueprintCardId,
       blockId,
       fieldKey,
     })
-    if (!deleted) {
-      writeFieldSelection(previous)
-      options.refreshDocumentState()
-    }
-    return deleted
   }
 
   function commitFieldSelection(value: Readonly<Record<string, readonly string[]>>): boolean {
@@ -275,7 +262,6 @@ export function useCdeDataTableCommands(options: UseCdeDataTableCommandsOptions)
 
   return {
     createField,
-    deleteField,
     excludeField,
     exportInstanceIds,
     applyWorkbookImport,
@@ -284,6 +270,7 @@ export function useCdeDataTableCommands(options: UseCdeDataTableCommandsOptions)
     includeBlock,
     includeField,
     removeBlock,
+    resetBlueprintField,
     resetCell,
     setInstanceExported,
     updateCell,

@@ -284,7 +284,7 @@ function createFontCompletionProvider(
       ],
       ...(scope ? {
         parent: {
-          key: 'font-scope:parent', label: '..', icon: 'nav.arrow-up' as const,
+          key: 'font-scope:parent', label: '..', icon: 'mdiArrowUp' as const,
           insertText: insertionPrefix, keepOpen: true,
         },
       } : {}),

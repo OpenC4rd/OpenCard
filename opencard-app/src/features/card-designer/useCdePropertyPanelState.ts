@@ -29,6 +29,7 @@ import {
 } from '../../entities/card/schema'
 import type { CdeDocumentChangeMode } from './useCdeDocumentState'
 import { findCdeBlock, useCdeBlockFieldCommands } from './useCdeBlockFieldCommands'
+import { isPropertyRemovable } from '../../shared/ui/property-editor/propertyRemovability'
 import { isInstanceBlockFieldOverridable } from '../../entities/card/instance'
 import {
   resolveCardPropertyFields,
@@ -95,6 +96,8 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
   const blockFieldCommands = useCdeBlockFieldCommands(options)
   const additionalFieldCreateDialogOpen = ref(false)
   const additionalFieldTargetBlockId = ref<string | null>(null)
+  const additionalFieldDialogMode = ref<'create' | 'edit'>('create')
+  const additionalFieldEditDefinition = ref<AdditionalFieldDefinition | null>(null)
   const additionalFieldCreateDraft = ref<CdeAdditionalFieldCreateDraft>({
     fieldKey: '',
     fieldType: additionalFieldTypes[0] ?? 'string',
@@ -113,6 +116,7 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     if (!additionalFieldTypes.includes(additionalFieldCreateDraft.value.fieldType)) {
       return 'unsupported-field-type'
     }
+    if (additionalFieldDialogMode.value === 'edit') return null
     return validateAdditionalFieldKey(block, additionalFieldCreateDraft.value.fieldKey)
   })
   const selectedDocumentEditorRecord = computed<Record<string, unknown> & { type?: string } | null>(() => {
@@ -211,7 +215,6 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     excludedKeys: ReadonlySet<string> = new Set(),
   ): Record<string, CardPropertyFieldDefinition> {
     const fields = resolveCardPropertyFields(record, {
-      allowDelete: options.selectedCardId.value === options.blueprintCardId,
       translate: options.translate,
       hasMessage: options.hasMessage,
       override,
@@ -244,7 +247,6 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
         : {}
       const resolvedWithCustomFields = selectedBlock.type === 'custom-block'
         ? resolveCardPropertyFields(blockRecord, {
-            allowDelete: options.selectedCardId.value === options.blueprintCardId,
             translate: options.translate,
             hasMessage: options.hasMessage,
             override: { ...customFields, ...blockInputOverride.value },
@@ -528,6 +530,8 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     if (!blockId || cardId !== options.blueprintCardId || !options.cardDoc.value
       || !findCdeBlock(options.cardDoc.value, blockId)) return false
     additionalFieldTargetBlockId.value = blockId
+    additionalFieldDialogMode.value = 'create'
+    additionalFieldEditDefinition.value = null
     additionalFieldCreateDraft.value = {
       fieldKey: '',
       fieldType: additionalFieldTypes[0] ?? 'string',
@@ -537,9 +541,28 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     return true
   }
 
+  function openAdditionalFieldEditDialog(blockId: string, fieldKey: string): boolean {
+    if (options.selectedCardId.value !== options.blueprintCardId || !options.cardDoc.value) return false
+    const block = findCdeBlock(options.cardDoc.value, blockId)
+    const definition = block?.additionalFieldDefinition?.[fieldKey]
+    if (!block || !definition) return false
+    additionalFieldTargetBlockId.value = blockId
+    additionalFieldDialogMode.value = 'edit'
+    additionalFieldEditDefinition.value = definition
+    additionalFieldCreateDraft.value = {
+      fieldKey,
+      fieldType: definition.fieldType,
+      title: definition.title ?? '',
+    }
+    additionalFieldCreateDialogOpen.value = true
+    return true
+  }
+
   function closeAdditionalFieldCreateDialog(): void {
     additionalFieldCreateDialogOpen.value = false
     additionalFieldTargetBlockId.value = null
+    additionalFieldDialogMode.value = 'create'
+    additionalFieldEditDefinition.value = null
   }
 
   function submitAdditionalFieldCreate(definition: AdditionalFieldDefinition): AdditionalFieldKeyError | 'invalid-target' | null {
@@ -558,15 +581,46 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     return result
   }
 
+  function submitAdditionalFieldEdit(definition: AdditionalFieldDefinition): boolean {
+    if (!additionalFieldTargetBlockId.value) return false
+    const updated = blockFieldCommands.updateFieldDefinition({
+      cardId: options.blueprintCardId,
+      blockId: additionalFieldTargetBlockId.value,
+      fieldKey: additionalFieldCreateDraft.value.fieldKey,
+    }, definition)
+    if (updated) closeAdditionalFieldCreateDialog()
+    return updated
+  }
+
+  function removeAdditionalFieldDefinition(): boolean {
+    if (!additionalFieldTargetBlockId.value) return false
+    const removed = blockFieldCommands.removeFieldDefinition({
+      cardId: options.blueprintCardId,
+      blockId: additionalFieldTargetBlockId.value,
+      fieldKey: additionalFieldCreateDraft.value.fieldKey,
+    })
+    if (removed) closeAdditionalFieldCreateDialog()
+    return removed
+  }
+
   function deleteProperty({ key, fieldKey }: CdePropertyDeleteMutation): boolean {
     const document = options.cardDoc.value
     const block = options.selectedBlock.value
-    if (!document || options.selectedCardId.value !== options.blueprintCardId) {
-      return false
+    if (!document) return false
+
+    const selectedCardId = options.selectedCardId.value
+    if (selectedCardId !== options.blueprintCardId) {
+      // 实例上能删的只有覆写：删掉后该属性回到继承蓝图值。
+      if (!selectedCardId || block?.id !== key) return false
+      return blockFieldCommands.resetField({
+        cardId: selectedCardId,
+        blockId: key,
+        fieldKey,
+      })
     }
 
     if (block?.id === key) {
-      return blockFieldCommands.deleteField({
+      return blockFieldCommands.resetBlueprintField({
         cardId: options.blueprintCardId,
         blockId: key,
         fieldKey,
@@ -597,7 +651,7 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
   function deleteOptionalSchemaField(record: Record<string, unknown>, fieldKey: string): boolean {
     const typeName = typeof record.type === 'string' ? record.type : undefined
     const definition = getTypePropertyEditorSchema(typeName)[fieldKey]
-    if (!definition || definition.required === true || definition.isReadonly === true
+    if (!definition || !isPropertyRemovable(definition)
       || !Object.prototype.hasOwnProperty.call(record, fieldKey)) {
       return false
     }
@@ -613,14 +667,19 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     additionalFieldCreateDialogOpen,
     additionalFieldCreateDraft,
     additionalFieldCreateError,
+    additionalFieldDialogMode,
+    additionalFieldEditDefinition,
     additionalFieldTypeOptions: additionalFieldTypes,
     updateProperty,
     addProperty,
     resetProperty,
     createAdditionalField,
     openAdditionalFieldCreateDialog,
+    openAdditionalFieldEditDialog,
     closeAdditionalFieldCreateDialog,
     submitAdditionalFieldCreate,
+    submitAdditionalFieldEdit,
+    removeAdditionalFieldDefinition,
     deleteProperty,
   }
 }

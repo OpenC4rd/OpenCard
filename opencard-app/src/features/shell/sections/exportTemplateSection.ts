@@ -40,7 +40,7 @@ export function createExportTemplateSection(options: ExportTemplateSectionOption
       title: '',
       headButtons: [{
         key: 'return-primary-page',
-        icon: 'nav.arrow-left',
+        icon: 'mdiArrowLeft',
         title: options.translate('app.shell.back'),
         disabled: options.busy.value,
       }],

@@ -181,9 +181,9 @@ describe('ShellTitleBar', () => {
         menuGroups: [],
         nativeMacosControls: true,
         windowControls: [
-          { key: 'fullscreen', icon: 'window.fullscreen', group: 'app' },
-          { key: 'minimize', icon: 'window.minimize', group: 'window' },
-          { key: 'restore', icon: 'window.restore', group: 'window' },
+          { key: 'fullscreen', icon: 'mdiFullscreen', group: 'app' },
+          { key: 'minimize', icon: 'mdiWindowMinimize', group: 'window' },
+          { key: 'restore', icon: 'mdiWindowRestore', group: 'window' },
         ],
       },
     })
@@ -202,7 +202,7 @@ describe('ShellTitleBar', () => {
         menuGroups: [{ key: 'help', label: 'Help', actions: [] }],
         appActions: [{
           key: 'install-update',
-          icon: 'action.download',
+          icon: 'mdiDownload',
           hoverTip: 'Downloading 42%',
         }],
       },

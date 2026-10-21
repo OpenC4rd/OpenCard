@@ -32,7 +32,7 @@
               <div v-else class="card-data-table__column-heading" tabindex="0"
                 @contextmenu="openColumnContextMenu($event, column)"
                 @keydown="openColumnKeyboardMenu($event, column)">
-                <OcIcon :name="column.kind === 'blueprint' ? 'entity.card-blueprint' : 'entity.card-instance'"
+                <OcIcon :name="column.kind === 'blueprint' ? 'mdiViewDashboard' : 'mdiViewDashboardEditOutline'"
                   size="md" tone="muted" />
                 <span>{{ column.title }}</span>
                 <OcButton
@@ -40,7 +40,7 @@
                   icon-only
                   size="sm"
                   variant="ghost"
-                  :icon="column.exported ? 'status.eye' : 'status.eye-off'"
+                  :icon="column.exported ? 'mdiEyeOutline' : 'mdiEyeOffOutline'"
                   :icon-tone="column.exported ? 'accent' : 'muted'"
                   :data-tooltip="column.exported
                     ? t('cardDesigner.dataTable.excludeInstanceFromExport')
@@ -60,7 +60,7 @@
                 @resize-keydown="handleColumnResizeKeydown($event, column.key)" />
             </th>
             <th class="card-data-table__add-column oc-data-grid__tail" scope="col">
-              <OcButton v-if="!props.readonly" icon-only size="sm" variant="ghost" icon="action.add"
+              <OcButton v-if="!props.readonly" icon-only size="sm" variant="ghost" icon="mdiPlus"
                 :data-tooltip="t('cardDesigner.dataTable.addInstance')"
                 :aria-label="t('cardDesigner.dataTable.addInstance')" @click="emit('add-instance')" />
             </th>
@@ -74,7 +74,7 @@
                   :tabindex="faceCommands(face).length > 0 ? 0 : undefined"
                   @contextmenu="openFaceContextMenu($event, face)"
                   @keydown="openFaceKeyboardMenu($event, face)">
-                  <OcIcon name="file.opencard" size="md" tone="muted" />
+                  <OcIcon name="mdiCardsOutline" size="md" tone="muted" />
                   <span>{{ face.title }}</span>
                   <OcActionButton v-if="!props.readonly && faceBlockAction(face)" :action="faceBlockAction(face)!"
                     size="sm" variant="ghost" @select="emit('add-block', $event.key)" />
@@ -109,9 +109,9 @@
                   :style="{ paddingInlineStart: 'calc(var(--oc-indent-step) * 2)' }"
                   @contextmenu="openFieldContextMenu($event, block, field)"
                   @keydown="openFieldKeyboardMenu($event, block, field)">
-                  <OcIcon :name="getPropertyFieldIcon(field.definition.fieldType)" size="sm" tone="muted" />
+                  <OcIcon :name="getPropertyFieldIcon(field.definition)" size="sm" tone="muted" />
                   <span>{{ field.title }}</span>
-                  <OcActionButton v-if="!props.readonly && field.deletable" :action="deleteFieldAction()"
+                  <OcActionButton v-if="!props.readonly && field.definitionEditable" :action="editFieldDefinitionAction()"
                     size="sm" variant="ghost"
                     @select="handleFieldAction(block.key, field.key, $event.key)" />
                   <OcActionButton v-if="!props.readonly" :action="excludeFieldAction()" size="sm" variant="ghost"
@@ -219,7 +219,8 @@ const emit = defineEmits<{
   'include-field': [blockId: string, fieldKey: string]
   'exclude-field': [blockId: string, fieldKey: string]
   'create-field': [blockId: string]
-  'delete-field': [blockId: string, fieldKey: string]
+  'reset-field': [blockId: string, fieldKey: string]
+  'edit-field-definition': [blockId: string, fieldKey: string]
   'update-cell': [payload: CdeBlockFieldTarget & { value: unknown }]
   'reset-cell': [payload: CdeBlockFieldTarget]
   'cell-select': [payload: CdeDataTableCellSelection]
@@ -312,6 +313,7 @@ function resolveCellActions(
     },
   )
   return [
+    ...(props.readonly || !(cell.kind === 'blueprint' && field.resettable) ? [] : [resetFieldAction()]),
     ...(modeAction ? [modeAction] : []),
     ...(cell.overridden ? [resetCellAction()] : []),
   ]
@@ -335,6 +337,10 @@ function handleCellAction(
   actionKey: string,
 ): void {
   if (fieldEditorModes.select(cell.identity, actionKey)) return
+  if (actionKey === 'reset-field') {
+    emit('reset-field', blockId, field.key)
+    return
+  }
   if (actionKey === 'reset-cell') {
     emit('reset-cell', { cardId: cell.cardId, blockId, fieldKey: field.key })
   }
@@ -356,14 +362,14 @@ function handleCellValueUpdate(
 function columnCommands(column: CdeDataTableColumn): OcActionMenuEntry[] {
   if (column.kind === 'blueprint') return [{
     key: 'duplicate',
-    icon: 'action.add',
+    icon: 'mdiPlus',
     title: t('cardDesigner.dataTable.duplicateBlueprint'),
   }]
   return [
-    { key: 'rename', icon: 'action.edit', title: t('cardDesigner.dataTable.renameInstance') },
-    { key: 'duplicate', icon: 'action.copy', title: t('cardDesigner.dataTable.duplicateInstance') },
+    { key: 'rename', icon: 'mdiPencilOutline', title: t('cardDesigner.dataTable.renameInstance') },
+    { key: 'duplicate', icon: 'mdiContentCopy', title: t('cardDesigner.dataTable.duplicateInstance') },
     { type: 'divider', key: 'column-danger-divider' },
-    { key: 'delete', icon: 'action.delete', iconTone: 'danger', title: t('cardDesigner.dataTable.deleteInstance') },
+    { key: 'delete', icon: 'mdiTrashCanOutline', iconTone: 'danger', title: t('cardDesigner.dataTable.deleteInstance') },
   ]
 }
 
@@ -372,7 +378,7 @@ function columnAction(column: CdeDataTableColumn): OcActionDefinition {
   if (column.kind === 'blueprint') return commands[0] as OcActionDefinition
   return {
     key: 'more',
-    icon: 'nav.more',
+    icon: 'mdiDotsHorizontal',
     title: t('cardDesigner.dataTable.instanceActions'),
     children: commands,
   }
@@ -403,7 +409,7 @@ function faceBlockAction(face: CdeDataTableFaceGroup): OcActionDefinition | null
   if (commands.length === 0) return null
   return {
     key: 'add-block',
-    icon: 'action.add',
+    icon: 'mdiPlus',
     title: t('cardDesigner.dataTable.addBlock'),
     children: commands,
   }
@@ -418,13 +424,13 @@ function blockFieldCommands(block: CdeDataTableBlockCatalogEntry): OcActionMenuE
   return [
     ...availableFields.map(field => ({
       key: `${INCLUDE_FIELD_PREFIX}${field.key}`,
-      icon: getPropertyFieldIcon(field.definition.fieldType),
+      icon: getPropertyFieldIcon(field.definition),
       title: field.title,
     })),
     ...(availableFields.length > 0 ? [{ type: 'divider' as const, key: 'create-field-divider' }] : []),
     {
       key: 'create-field',
-      icon: 'action.add',
+      icon: 'mdiPlus',
       title: t('cardDesigner.dataTable.createField'),
     },
   ]
@@ -433,7 +439,7 @@ function blockFieldCommands(block: CdeDataTableBlockCatalogEntry): OcActionMenuE
 function blockFieldAction(block: CdeDataTableBlockCatalogEntry): OcActionDefinition {
   return {
     key: 'manage-fields',
-    icon: 'action.add',
+    icon: 'mdiPlus',
     title: t('cardDesigner.dataTable.editBlockFields'),
     children: blockFieldCommands(block),
   }
@@ -442,24 +448,31 @@ function blockFieldAction(block: CdeDataTableBlockCatalogEntry): OcActionDefinit
 function removeBlockAction(): OcActionDefinition {
   return {
     key: 'remove-block',
-    icon: 'action.close',
+    icon: 'mdiClose',
     title: t('cardDesigner.dataTable.stopEditingBlock'),
   }
 }
 
-function deleteFieldAction(): OcActionDefinition {
+function resetFieldAction(): OcActionDefinition {
   return {
-    key: 'delete-field',
-    icon: 'action.delete',
-    iconTone: 'danger',
-    title: t('cardDesigner.dataTable.deleteField'),
+    key: 'reset-field',
+    icon: 'mdiUndoVariant',
+    title: t('cardDesigner.dataTable.resetBlueprintValue'),
+  }
+}
+
+function editFieldDefinitionAction(): OcActionDefinition {
+  return {
+    key: 'edit-field-definition',
+    icon: 'mdiPencilOutline',
+    title: t('cardDesigner.dataTable.editFieldDefinition'),
   }
 }
 
 function excludeFieldAction(): OcActionDefinition {
   return {
     key: 'exclude-field',
-    icon: 'action.close',
+    icon: 'mdiClose',
     title: t('cardDesigner.dataTable.stopEditingField'),
   }
 }
@@ -467,7 +480,7 @@ function excludeFieldAction(): OcActionDefinition {
 function resetCellAction(): OcActionDefinition {
   return {
     key: 'reset-cell',
-    icon: 'action.discard',
+    icon: 'mdiUndoVariant',
     title: t('cardDesigner.dataTable.resetOverride'),
   }
 }
@@ -489,11 +502,11 @@ function handleBlockAction(blockId: string, actionKey: string): void {
 
 function fieldCommands(field: CdeDataTableFieldRow): OcActionMenuEntry[] {
   return [
-    excludeFieldAction(),
-    ...(field.deletable ? [
-      { type: 'divider' as const, key: 'field-delete-divider' },
-      deleteFieldAction(),
+    ...(field.definitionEditable ? [
+      editFieldDefinitionAction(),
+      { type: 'divider' as const, key: 'field-definition-divider' },
     ] : []),
+    excludeFieldAction(),
   ]
 }
 
@@ -523,7 +536,7 @@ function openBlockKeyboardMenu(event: KeyboardEvent, block: CdeDataTableBlockCat
 
 function handleFieldAction(blockId: string, fieldKey: string, actionKey: string): void {
   if (actionKey === 'exclude-field') emit('exclude-field', blockId, fieldKey)
-  else if (actionKey === 'delete-field') emit('delete-field', blockId, fieldKey)
+  else if (actionKey === 'edit-field-definition') emit('edit-field-definition', blockId, fieldKey)
 }
 
 function openFieldContextMenu(

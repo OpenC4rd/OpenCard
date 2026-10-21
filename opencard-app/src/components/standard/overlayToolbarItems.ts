@@ -27,9 +27,9 @@ export function createViewportToolbarItems(
   labels: OcViewportToolbarLabels,
 ): OcOverlayToolbarItem[] {
   return [
-    { key: 'viewport.zoom-out', icon: 'tool.zoom-out', title: labels.zoomOut },
+    { key: 'viewport.zoom-out', icon: 'mdiMagnifyMinusOutline', title: labels.zoomOut },
     scaleLabel,
-    { key: 'viewport.fit', icon: 'tool.fit-screen', title: labels.fit },
-    { key: 'viewport.zoom-in', icon: 'tool.zoom-in', title: labels.zoomIn },
+    { key: 'viewport.fit', icon: 'mdiFitToScreenOutline', title: labels.fit },
+    { key: 'viewport.zoom-in', icon: 'mdiMagnifyPlusOutline', title: labels.zoomIn },
   ]
 }

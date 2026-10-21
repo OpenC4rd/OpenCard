@@ -199,7 +199,7 @@ export function createProjectIconCompletionProvider(
       .map(source => ({
         key: `project-icon-package:${source.packageKey}`,
         label: source.label,
-        icon: 'file.package' as const,
+        icon: 'mdiPackageVariantClosed' as const,
         insertText: qualify(source.packageKey, 'icon:'),
         keepOpen: true,
       }))

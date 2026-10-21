@@ -27,7 +27,7 @@
               <OcText id="resource-package-summary-title" as="h3" size="sm">{{ t('resourcePackage.packagePreview') }}</OcText>
               <OcText size="xs" tone="muted">{{ t('resourcePackage.packagePreviewDescription') }}</OcText>
             </div>
-            <OcIcon name="file.package" size="lg" tone="file-opencard" />
+            <OcIcon name="mdiPackageVariantClosed" size="lg" tone="file-opencard" />
           </div>
           <div class="resource-package-builder__fields">
             <label>
@@ -71,7 +71,7 @@
     </div>
     <template #footer>
       <OcButton type="button" :disabled="busy" @click="close">{{ t('resourcePackage.cancel') }}</OcButton>
-      <OcButton type="submit" variant="solid" icon="file.package" :disabled="busy || buildTaskBusy || !canBuild">
+      <OcButton type="submit" variant="solid" icon="mdiPackageVariantClosed" :disabled="busy || buildTaskBusy || !canBuild">
         {{ busy ? t('resourcePackage.building') : t('resourcePackage.build') }}
       </OcButton>
     </template>
@@ -227,8 +227,8 @@ const treeData = computed<OcNodeCollection>(() => {
   const items = new Map<string, OcNode>()
   const children = new Map<string, string[]>()
   const rootKeys: string[] = []
-  const selectAction: OcNodeAction = { key: 'select', title: t('resourcePackage.select'), icon: 'action.checkbox-blank' }
-  const deselectAction: OcNodeAction = { key: 'deselect', title: t('resourcePackage.deselect'), icon: 'action.checkbox-marked' }
+  const selectAction: OcNodeAction = { key: 'select', title: t('resourcePackage.select'), icon: 'mdiCheckboxBlankOutline' }
+  const deselectAction: OcNodeAction = { key: 'deselect', title: t('resourcePackage.deselect'), icon: 'mdiCheckboxMarkedOutline' }
   const toggleSelection = (selected: boolean): readonly OcNodeAction[] => [selected ? deselectAction : selectAction]
   const addChild = (parentKey: string, childKey: string): void => {
     const existing = children.get(parentKey) ?? []
@@ -242,13 +242,13 @@ const treeData = computed<OcNodeCollection>(() => {
     const compositionGroupKey = 'font-group:compositions'
     rootKeys.push(categoryKey)
     items.set(categoryKey, {
-      label: t('resourcePackage.fonts'), visual: { type: 'icon', icon: 'file.font', iconTone: 'file-config' },
+      label: t('resourcePackage.fonts'), visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'file-config' },
     })
     items.set(familyGroupKey, {
-      label: t('resourcePackage.projectFonts'), visual: { type: 'icon', icon: 'file.font' },
+      label: t('resourcePackage.projectFonts'), visual: { type: 'icon', icon: 'mdiFormatFont' },
     })
     items.set(compositionGroupKey, {
-      label: t('resourcePackage.fontCompositions'), visual: { type: 'icon', icon: 'data.layers' },
+      label: t('resourcePackage.fontCompositions'), visual: { type: 'icon', icon: 'mdiLayersOutline' },
     })
     children.set(categoryKey, [familyGroupKey, compositionGroupKey])
     children.set(familyGroupKey, families.map(family => {
@@ -256,7 +256,7 @@ const treeData = computed<OcNodeCollection>(() => {
       const selected = selectedFamilyKeys.value.has(family.key)
       items.set(key, {
         label: family.name, tail: [family.key, ...toggleSelection(selected)],
-        visual: { type: 'icon', icon: 'file.font', iconTone: selected ? 'active' : 'muted' },
+        visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: selected ? 'active' : 'muted' },
         contextActions: toggleSelection(selected),
       })
       return key
@@ -266,7 +266,7 @@ const treeData = computed<OcNodeCollection>(() => {
       const selected = selectedCompositionKeys.value.has(composition.key)
       items.set(key, {
         label: composition.name, tail: [composition.key, ...toggleSelection(selected)],
-        visual: { type: 'icon', icon: 'data.layers', iconTone: selected ? 'active' : 'muted' },
+        visual: { type: 'icon', icon: 'mdiLayersOutline', iconTone: selected ? 'active' : 'muted' },
         contextActions: toggleSelection(selected),
       })
       return key
@@ -277,14 +277,14 @@ const treeData = computed<OcNodeCollection>(() => {
     const categoryKey = 'category:icons'
     rootKeys.push(categoryKey)
     items.set(categoryKey, {
-      label: t('resourcePackage.icons'), visual: { type: 'icon', icon: 'file.project-icon', iconTone: 'file-config' },
+      label: t('resourcePackage.icons'), visual: { type: 'icon', icon: 'mdiStickerEmoji', iconTone: 'file-config' },
     })
     children.set(categoryKey, iconSeries.map(series => {
       const key = `icon-series:${series.key}`
       const selected = selectedIconSeriesKeys.value.has(series.key)
       items.set(key, {
         label: series.name, tail: [series.key, ...toggleSelection(selected)],
-        visual: { type: 'icon', icon: 'file.project-icon', iconTone: selected ? 'active' : 'muted' },
+        visual: { type: 'icon', icon: 'mdiStickerEmoji', iconTone: selected ? 'active' : 'muted' },
         contextActions: toggleSelection(selected),
       })
       return key
@@ -294,14 +294,14 @@ const treeData = computed<OcNodeCollection>(() => {
   {
     const categoryKey = 'category:custom-blocks'
     rootKeys.push(categoryKey)
-    items.set(categoryKey, { label: t('resourcePackage.customBlocks'), visual: { type: 'icon', icon: 'entity.block-custom', iconTone: 'file-config' } })
+    items.set(categoryKey, { label: t('resourcePackage.customBlocks'), visual: { type: 'icon', icon: 'mdiToyBrickOutline', iconTone: 'file-config' } })
     children.set(categoryKey, customBlockCollections.map(collection => {
       const collectionKey = collection.key
       const key = `custom-block-collection:${collectionKey}`
       const selected = selectedCustomBlockKeys.value.has(collectionKey)
       items.set(key, {
         label: collection.name, tail: [t('resourcePackage.blockCount', { count: collection.blocks.length }), ...toggleSelection(selected)],
-        visual: { type: 'icon', icon: 'entity.block-custom', iconTone: selected ? 'active' : 'muted' },
+        visual: { type: 'icon', icon: 'mdiToyBrickOutline', iconTone: selected ? 'active' : 'muted' },
         contextActions: toggleSelection(selected),
       })
       return key
@@ -310,7 +310,7 @@ const treeData = computed<OcNodeCollection>(() => {
   {
     const categoryKey = 'category:other-files'
     rootKeys.push(categoryKey)
-    items.set(categoryKey, { label: t('resourcePackage.otherFiles'), visual: { type: 'icon', icon: 'file.generic', iconTone: 'file-config' } })
+    items.set(categoryKey, { label: t('resourcePackage.otherFiles'), visual: { type: 'icon', icon: 'mdiFileOutline', iconTone: 'file-config' } })
     for (const entry of otherCandidates.value) {
       const segments = (entry.detail ?? entry.label).split('/')
       let parentKey = categoryKey
@@ -318,7 +318,7 @@ const treeData = computed<OcNodeCollection>(() => {
       for (const segment of segments.slice(0, -1)) {
         folderPath = folderPath ? `${folderPath}/${segment}` : segment
         const folderKey = `folder:other-files:${folderPath}`
-        if (!items.has(folderKey)) items.set(folderKey, { label: segment, visual: { type: 'icon', icon: 'folder.generic', iconTone: 'muted' } })
+        if (!items.has(folderKey)) items.set(folderKey, { label: segment, visual: { type: 'icon', icon: 'mdiFolder', iconTone: 'muted' } })
         addChild(parentKey, folderKey)
         parentKey = folderKey
       }

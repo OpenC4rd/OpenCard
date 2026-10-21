@@ -20,8 +20,8 @@ export function createWelcomeSection(options: WelcomeSectionOptions): ComputedRe
     transitionKey: 'space:welcome:none',
     title: '',
     headButtons: [
-      { key: 'new-project', icon: 'action.folder-plus', title: options.translate('app.menu.newProject') },
-      { key: 'open-project', icon: 'status.folder-open', title: options.translate('sidebar.openProject') },
+      { key: 'new-project', icon: 'mdiFolderPlusOutline', title: options.translate('app.menu.newProject') },
+      { key: 'open-project', icon: 'mdiFolderOpenOutline', title: options.translate('sidebar.openProject') },
     ],
     lists: [{
       key: RECENT_PROJECTS_LIST_KEY,

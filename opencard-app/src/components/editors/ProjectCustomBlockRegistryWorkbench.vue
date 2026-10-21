@@ -13,7 +13,7 @@
         :action-overflow-title="t('customBlockRegistry.blockActions')"
         @selection-change="selectBlock" @action="handleBlockAction" />
       <div v-else class="custom-block-registry-workbench__empty">
-        <OcIcon name="entity.block-custom" size="lg" tone="muted" />
+        <OcIcon name="mdiToyBrickOutline" size="lg" tone="muted" />
         <OcEmpty tone="muted" inset="none">{{ t('customBlockRegistry.selectCollection') }}</OcEmpty>
       </div>
     </section>
@@ -23,7 +23,7 @@
           <div class="custom-block-registry-workbench__viewport">
             <CardViewport v-if="preview" ref="previewViewport" :key="selectedEntry.source" :face="preview.document.faces.front"
               :resource-context="preview.resources" readonly :show-info="false" />
-            <OcIcon v-else name="entity.block-custom" size="lg" tone="muted" />
+            <OcIcon v-else name="mdiToyBrickOutline" size="lg" tone="muted" />
           </div>
           <OcText as="strong">{{ selectedBlockName }}</OcText>
           <OcText size="sm" tone="muted">{{ selectedEntry.source }}</OcText>
@@ -33,7 +33,7 @@
           sort-mode="category" @update-property="updateProperty" />
       </template>
       <div v-else class="custom-block-registry-workbench__empty">
-        <OcIcon name="entity.block-custom" size="lg" tone="muted" />
+        <OcIcon name="mdiToyBrickOutline" size="lg" tone="muted" />
         <OcEmpty tone="muted" inset="none">{{ t('customBlockRegistry.noBlockSelected') }}</OcEmpty>
       </div>
     </section>
@@ -120,8 +120,8 @@ watch(selectedCollectionKey, () => {
 })
 
 const categories = computed<ReadonlyMap<string, PropertyEditorCategoryDefinition>>(() => new Map([
-  ['identity', { title: t('customBlockRegistry.identity'), icon: 'data.symbol-class' }],
-  ['source', { title: t('customBlockRegistry.sourceCategory'), icon: 'entity.block-custom' }],
+  ['identity', { title: t('customBlockRegistry.identity'), icon: 'mdiCodeBraces' }],
+  ['source', { title: t('customBlockRegistry.sourceCategory'), icon: 'mdiToyBrickOutline' }],
 ]))
 const propertyInputs = computed<PropertyEditorInput[]>(() => {
   const entry = selectedEntry.value
@@ -131,8 +131,8 @@ const propertyInputs = computed<PropertyEditorInput[]>(() => {
     title: entry.key,
     record: entry,
     fields: {
-      key: { title: t('customBlockRegistry.key'), fieldType: 'string', category: 'identity', order: 1, required: true, commitMode: 'blur' },
-      source: { title: t('customBlockRegistry.source'), fieldType: 'string', category: 'source', order: 1, required: true, commitMode: 'blur' },
+      key: { title: t('customBlockRegistry.key'), fieldType: 'string', category: 'identity', order: 1, unremovable: true, commitMode: 'blur' },
+      source: { title: t('customBlockRegistry.source'), fieldType: 'string', category: 'source', order: 1, unremovable: true, commitMode: 'blur' },
     },
   }]
 })
@@ -140,7 +140,7 @@ const collectionTree = computed<OcNodeCollection>(() => ({
   rootKeys: props.collections.map(item => item.key),
   items: new Map(props.collections.map((item): [string, OcNode] => [item.key, {
     label: item.name,
-    visual: { type: 'icon', icon: 'entity.block-custom' },
+    visual: { type: 'icon', icon: 'mdiToyBrickOutline' },
     tail: [t('customBlockRegistry.blockCount', { count: item.blocks.length }), ...collectionActions()],
   }])),
   children: new Map(),
@@ -149,17 +149,17 @@ const blockTree = computed<OcNodeCollection>(() => ({
   rootKeys: selectedCollection.value?.blocks.map(item => item.key) ?? [],
   items: new Map((selectedCollection.value?.blocks ?? []).map((item): [string, OcNode] => [item.key, {
     label: item.key,
-    visual: { type: 'icon', icon: 'entity.block-custom' },
-    tail: [{ key: 'remove', title: t('customBlockRegistry.remove'), icon: 'action.delete', iconTone: 'danger' }],
+    visual: { type: 'icon', icon: 'mdiToyBrickOutline' },
+    tail: [{ key: 'remove', title: t('customBlockRegistry.remove'), icon: 'mdiTrashCanOutline', iconTone: 'danger' }],
   }])),
   children: new Map(),
 }))
 
 function collectionActions(): OcNodeAction[] {
   return [
-    { key: 'add-block', title: t('customBlockRegistry.add'), icon: 'action.add' },
-    { key: 'configure', title: t('customBlockRegistry.configure'), icon: 'tool.settings' },
-    { key: 'remove', title: t('customBlockRegistry.removeCollection'), icon: 'action.delete', iconTone: 'danger' },
+    { key: 'add-block', title: t('customBlockRegistry.add'), icon: 'mdiPlus' },
+    { key: 'configure', title: t('customBlockRegistry.configure'), icon: 'mdiCogOutline' },
+    { key: 'remove', title: t('customBlockRegistry.removeCollection'), icon: 'mdiTrashCanOutline', iconTone: 'danger' },
   ]
 }
 function selectCollection(event: OcNodeSelectionEvent): void {

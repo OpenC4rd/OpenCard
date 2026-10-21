@@ -101,7 +101,8 @@
               @delete-instance="deleteInstance" @set-instance-exported="setDataTableInstanceExported"
               @add-block="includeDataTableBlock" @remove-block="removeDataTableBlock"
               @include-field="includeDataTableField" @exclude-field="excludeDataTableField"
-              @create-field="openDataTableFieldDialog" @delete-field="deleteDataTableField"
+              @create-field="openDataTableFieldDialog" @reset-field="resetDataTableField"
+              @edit-field-definition="openAdditionalFieldEditDialog"
               @update-cell="updateDataTableCell" @reset-cell="resetDataTableCell"
               @cell-select="handleDataTableCellSelect" />
           </div>
@@ -200,7 +201,8 @@
                   :inputs="editorState.mode === 'diff' ? diffPropertyInputs : propertyEditorInputs"
                   :categories="propertyCategories" :sort-mode="propertySortMode"
                   :allow-raw-string-editor="true"
-                  :binding-interpreter="propertyBindingInterpreter" :delete-mode="propertyDeleteMode"
+                  :binding-interpreter="propertyBindingInterpreter"
+                  :delete-mode="editorState.mode === 'diff' ? false : propertyDeleteMode"
                   :field-warnings="propertyFieldWarnings" @update-property="updateBlockProp"
                   @add-property="addBlockProp" @reset-property="resetBlockProp" @delete-property="deleteProperty" />
               </OcPanel>
@@ -215,11 +217,13 @@
     </div>
 
     <AdditionalFieldCreateDialog :open="additionalFieldCreateDialogOpen" :field-types="additionalFieldTypeOptions"
+      :mode="additionalFieldDialogMode" :initial-definition="additionalFieldEditDefinition"
       :field-type="additionalFieldCreateDraft.fieldType" :field-key="additionalFieldCreateDraft.fieldKey"
       :title="additionalFieldCreateDraft.title" :error-text="additionalFieldCreateErrorText"
       :invalid="Boolean(additionalFieldCreateError)" @update-field-type="updateAdditionalFieldType"
       @update-field-key="updateAdditionalFieldKey" @update-title="updateAdditionalFieldTitle"
-      @close="closeAdditionalFieldDialog" @submit="submitAdditionalFieldDialog" />
+      @close="closeAdditionalFieldDialog" @remove="removeAdditionalFieldDefinition"
+      @submit="submitAdditionalFieldDialog" />
     <ExportCustomBlockDialog :open="Boolean(exportCustomBlockTarget)" :fields="exportCustomBlockFields"
       @close="closeExportCustomBlockDialog" @submit="confirmExportCustomBlock" />
     <DataTableWorkbookImportDialog :result="pendingDataTableWorkbookImport" @cancel="cancelDataTableWorkbookImport"
@@ -343,10 +347,10 @@ import {
 const BLUEPRINT_CARD_ID = '__blueprint__'
 const EDIT_RICH_TEXT_ACTION_KEY = 'content.edit-rich-text'
 const FLOW_DIRECTION_ACTIONS = [
-  { key: 'flow.direction.left', direction: 'rl', icon: 'nav.arrow-left', titleKey: 'flowLeft' },
-  { key: 'flow.direction.up', direction: 'bt', icon: 'nav.arrow-up', titleKey: 'flowUp' },
-  { key: 'flow.direction.down', direction: 'tb', icon: 'nav.arrow-down', titleKey: 'flowDown' },
-  { key: 'flow.direction.right', direction: 'lr', icon: 'nav.arrow-right', titleKey: 'flowRight' },
+  { key: 'flow.direction.left', direction: 'rl', icon: 'mdiArrowLeft', titleKey: 'flowLeft' },
+  { key: 'flow.direction.up', direction: 'bt', icon: 'mdiArrowUp', titleKey: 'flowUp' },
+  { key: 'flow.direction.down', direction: 'tb', icon: 'mdiArrowDown', titleKey: 'flowDown' },
+  { key: 'flow.direction.right', direction: 'lr', icon: 'mdiArrowRight', titleKey: 'flowRight' },
 ] as const satisfies readonly {
   key: string
   direction: FlowDirection
@@ -492,7 +496,7 @@ function commitViewState(): void {
 
 const clipAction = computed<OcActionDefinition>(() => ({
   key: 'toggle-face-clip',
-  icon: clipToFace.value ? 'tool.box-cutter' : 'tool.box-cutter-off',
+  icon: clipToFace.value ? 'mdiBoxCutter' : 'mdiBoxCutterOff',
   title: `${clipToFace.value
     ? t('cardDesigner.view.disableClip')
     : t('cardDesigner.view.enableClip')} ${formatCdeShortcutMarkup('view.toggle-clip')}`,
@@ -500,7 +504,7 @@ const clipAction = computed<OcActionDefinition>(() => ({
 
 const alignmentSnappingAction = computed<OcActionDefinition>(() => ({
   key: 'toggle-alignment-snapping',
-  icon: alignmentSnappingEnabled.value ? 'tool.snap-grid-on' : 'tool.snap-grid',
+  icon: alignmentSnappingEnabled.value ? 'mdiMagnetOn' : 'mdiMagnet',
   title: `${alignmentSnappingEnabled.value
     ? t('cardDesigner.view.disableAlignmentSnapping')
     : t('cardDesigner.view.enableAlignmentSnapping')} ${formatCdeShortcutMarkup('view.toggle-snapping')}`,
@@ -509,8 +513,8 @@ const alignmentSnappingAction = computed<OcActionDefinition>(() => ({
 const faceSwitchAction = computed<OcActionDefinition>(() => ({
   key: 'switch-face',
   icon: activeFaceKey.value === 'front'
-    ? 'tool.flip-to-front'
-    : 'tool.flip-to-back',
+    ? 'mdiFlipToFront'
+    : 'mdiFlipToBack',
   title: `${activeFaceKey.value === 'front'
     ? t('cardDesigner.view.switchToBack')
     : t('cardDesigner.view.switchToFront')} ${formatCdeShortcutMarkup('view.switch-face')}`,
@@ -537,7 +541,7 @@ const faceToolbarItems = computed<readonly OcOverlayToolbarItem[]>(() => [
 ])
 const diffViewModeAction = computed<OcOverlayToolbarItem>(() => ({
   key: 'toggle-diff-view-mode',
-  icon: 'layout.columns',
+  icon: 'mdiLandRowsVertical',
   title: diffViewMode.value === 'split'
     ? `${t('versionControl.diffViewer.switchToSideBySide')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`
     : `${t('versionControl.diffViewer.switchToSplit')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`,
@@ -563,7 +567,7 @@ function toggleFaceClip(): void {
   clipToFace.value = !clipToFace.value
   commitViewState()
   cardViewportRef.value?.flashStatus?.({
-    icon: clipToFace.value ? 'tool.box-cutter' : 'tool.box-cutter-off',
+    icon: clipToFace.value ? 'mdiBoxCutter' : 'mdiBoxCutterOff',
     message: clipToFace.value
       ? t('cardDesigner.viewportStatus.clipEnabled')
       : t('cardDesigner.viewportStatus.clipDisabled'),
@@ -574,7 +578,7 @@ function toggleAlignmentSnapping(): void {
   alignmentSnappingEnabled.value = !alignmentSnappingEnabled.value
   commitViewState()
   cardViewportRef.value?.flashStatus?.({
-    icon: alignmentSnappingEnabled.value ? 'tool.snap-grid-on' : 'tool.snap-grid',
+    icon: alignmentSnappingEnabled.value ? 'mdiMagnetOn' : 'mdiMagnet',
     message: alignmentSnappingEnabled.value
       ? t('cardDesigner.viewportStatus.snappingEnabled')
       : t('cardDesigner.viewportStatus.snappingDisabled'),
@@ -586,7 +590,7 @@ function toggleActiveFace(): void {
   forceStructureTreeReveal.value = false
   commitViewState()
   cardViewportRef.value?.flashStatus?.({
-    icon: activeFaceKey.value === 'front' ? 'tool.flip-to-front' : 'tool.flip-to-back',
+    icon: activeFaceKey.value === 'front' ? 'mdiFlipToFront' : 'mdiFlipToBack',
     message: activeFaceKey.value === 'front'
       ? t('cardDesigner.viewportStatus.switchedToFront')
       : t('cardDesigner.viewportStatus.switchedToBack'),
@@ -710,7 +714,7 @@ async function confirmExportCustomBlock(fieldKeys: readonly string[]): Promise<v
 const {
   createField: createDataTableField,
   applyWorkbookImport: applyDataTableWorkbookImport,
-  deleteField: deleteDataTableField,
+  resetBlueprintField: resetDataTableField,
   excludeField: excludeDataTableField,
   fieldSelection: dataTableFields,
   exportInstanceIds: dataTableExportInstanceIds,
@@ -729,7 +733,7 @@ const {
   updateBlockField: blockFieldCommands.updateField,
   resetBlockField: blockFieldCommands.resetField,
   createBlockField: blockFieldCommands.createField,
-  deleteBlockField: blockFieldCommands.deleteField,
+  resetBlueprintField: blockFieldCommands.resetBlueprintField,
 })
 
 const {
@@ -808,6 +812,10 @@ function closeAdditionalFieldDialog(): void {
 }
 
 function submitAdditionalFieldDialog(definition: AdditionalFieldDefinition): void {
+  if (additionalFieldDialogMode.value === 'edit') {
+    submitAdditionalFieldEdit(definition)
+    return
+  }
   const blockId = dataTableCustomFieldTargetBlockId.value
   if (!blockId) {
     submitAdditionalFieldCreate(definition)
@@ -845,18 +853,18 @@ function handleInstanceTreeAction(event: OcNodeActionEvent): void {
 const instanceCardActions = computed<OcCardAction[]>(() => [
   {
     key: 'add-instance',
-    icon: 'action.add',
+    icon: 'mdiPlus',
     title: t('cardDesigner.dataTable.addInstance'),
   },
   {
     key: 'duplicate-instance',
-    icon: 'action.copy',
+    icon: 'mdiContentCopy',
     title: t('cardDesigner.dataTable.duplicateInstance'),
     disabled: !canMutateSelectedInstance.value,
   },
   {
     key: 'delete-instance',
-    icon: 'action.delete',
+    icon: 'mdiTrashCanOutline',
     title: t('cardDesigner.dataTable.deleteInstance'),
     disabled: !canMutateSelectedInstance.value,
   },
@@ -868,21 +876,21 @@ const propertyCardActions = computed<OcCardAction[]>(() => {
     ...(canCreateAdditionalField.value
       ? [{
         key: 'additional-field.create',
-        icon: 'action.add' as const,
+        icon: 'mdiPlus' as const,
         title: t('propertyEditor.customFields.create'),
       }]
       : []),
     {
       key: 'toggle-property-delete-mode',
-      icon: 'action.delete',
+      icon: 'mdiTrashCanOutline',
       iconTone: propertyDeleteMode.value ? 'danger' : 'default',
       title: t('propertyEditor.actions.delete'),
     },
     {
       key: 'toggle-property-sort',
       icon: propertySortMode.value === 'category'
-        ? 'action.sort-alphabetical-ascending'
-        : 'action.sort-category',
+        ? 'mdiSortAlphabeticalAscending'
+        : 'mdiFormatListGroup',
       title: propertySortMode.value === 'category'
         ? t('propertyEditor.actions.switchToAlphabetical')
         : t('propertyEditor.actions.switchToCategory'),
@@ -1034,20 +1042,20 @@ function toggleBlockExpansion(key: string, expanded: boolean): void {
 const structureTreeCardActions = computed<OcCardAction[]>(() => [
   {
     key: 'add-root',
-    icon: 'action.add',
+    icon: 'mdiPlus',
     title: t('cardDesigner.blockActions.addRoot'),
     children: createBlockAddActions(messageKey => t(messageKey)),
   },
   {
     key: 'duplicate-selected',
-    icon: 'action.copy',
+    icon: 'mdiContentCopy',
     title: t('cardDesigner.blockActions.duplicateSelected'),
     shortcut: getCdeShortcutParts('block.duplicate'),
     disabled: !selectedBlock.value,
   },
   {
     key: 'delete-selected',
-    icon: 'action.delete',
+    icon: 'mdiTrashCanOutline',
     title: t('cardDesigner.blockActions.deleteSelected'),
     shortcut: getCdeShortcutParts('block.delete'),
     disabled: selectedBlockKeys.value.length === 0,
@@ -1062,13 +1070,18 @@ const {
   additionalFieldCreateDialogOpen,
   additionalFieldCreateDraft,
   additionalFieldCreateError,
+  additionalFieldDialogMode,
+  additionalFieldEditDefinition,
   additionalFieldTypeOptions,
   updateProperty: updateBlockProp,
   addProperty: addBlockProp,
   resetProperty: resetBlockProp,
   openAdditionalFieldCreateDialog,
+  openAdditionalFieldEditDialog,
   closeAdditionalFieldCreateDialog,
   submitAdditionalFieldCreate,
+  submitAdditionalFieldEdit,
+  removeAdditionalFieldDefinition,
   deleteProperty,
 } = useCdePropertyPanelState({
   cardDoc,
@@ -1210,7 +1223,7 @@ const selectionCommandActions = computed<OcActionDefinition[]>(() => {
 
   actions.push({
     key: EDIT_RICH_TEXT_ACTION_KEY,
-    icon: 'format.text-variant-outline',
+    icon: 'mdiFormatTextVariantOutline',
     title: t('cardDesigner.selectionActions.editRichText'),
   })
   return actions
@@ -1239,7 +1252,7 @@ async function handleSelectionCommand(intent: CardViewportSelectionCommand): Pro
 const layerViewShortcutHints = computed(() => [
   {
     keys: [
-      { icon: 'input.mouse-scroll-wheel' as const },
+      { icon: 'mdiMouseScrollWheel' as const },
       { separator: t('cardDesigner.layerView.shortcutOr') },
       '↑ / ↓',
     ],
@@ -1247,8 +1260,8 @@ const layerViewShortcutHints = computed(() => [
   },
   {
     keys: [
-      { icon: 'input.keyboard-shift' as const },
-      { icon: 'input.mouse-scroll-wheel' as const },
+      { icon: 'mdiAppleKeyboardShift' as const },
+      { icon: 'mdiMouseScrollWheel' as const },
       { separator: t('cardDesigner.layerView.shortcutOr') },
       '↑ / ↓',
     ],
@@ -1259,17 +1272,17 @@ const layerViewShortcutHints = computed(() => [
     label: t('cardDesigner.layerView.cycleByInitial'),
   },
   {
-    keys: [{ icon: 'input.keyboard-shift' as const }, 'A-Z'],
+    keys: [{ icon: 'mdiAppleKeyboardShift' as const }, 'A-Z'],
     label: t('cardDesigner.layerView.cycleCurrentLayer'),
   },
   {
-    keys: [{ icon: 'input.keyboard-space' as const }],
+    keys: [{ icon: 'mdiKeyboardSpace' as const }],
     label: t('cardDesigner.layerView.selectFocused'),
   },
   {
     keys: [
-      { icon: 'input.keyboard-space' as const },
-      { icon: 'input.mouse-scroll-wheel' as const },
+      { icon: 'mdiKeyboardSpace' as const },
+      { icon: 'mdiMouseScrollWheel' as const },
       { separator: t('cardDesigner.layerView.shortcutOr') },
       '↑ / ↓',
     ],
@@ -1277,9 +1290,9 @@ const layerViewShortcutHints = computed(() => [
   },
   {
     keys: [
-      { icon: 'input.keyboard-shift' as const },
-      { icon: 'input.keyboard-space' as const },
-      { icon: 'input.mouse-scroll-wheel' as const },
+      { icon: 'mdiAppleKeyboardShift' as const },
+      { icon: 'mdiKeyboardSpace' as const },
+      { icon: 'mdiMouseScrollWheel' as const },
       { separator: t('cardDesigner.layerView.shortcutOr') },
       '↑ / ↓',
     ],
@@ -1860,15 +1873,15 @@ let disposed = false
 onScopeDispose(() => { disposed = true })
 const headerActions = computed<OcActionDefinition[]>(() => {
   const mode = {
-    key: 'card-designer.toggle-mode', icon: workspaceMode.value === 'data-table' ? 'file.opencard' : 'data.table',
+    key: 'card-designer.toggle-mode', icon: workspaceMode.value === 'data-table' ? 'mdiCardsOutline' : 'mdiTableLarge',
     title: t(workspaceMode.value === 'data-table' ? 'cardDesigner.dataTable.switchToDesignMode' : 'cardDesigner.dataTable.switchToTableMode'),
   } satisfies OcActionDefinition
   if (workspaceMode.value === 'data-table') return [
-    { key: 'card-designer.data-table.import', icon: 'action.import', title: t('cardDesigner.dataTable.importWorkbook'), disabled: dataTableWorkbookBusy.value },
-    { key: 'card-designer.data-table.export', icon: 'action.export', title: t('cardDesigner.dataTable.exportWorkbook'), disabled: dataTableWorkbookBusy.value || !canExportDataTableWorkbook.value }, mode,
+    { key: 'card-designer.data-table.import', icon: 'mdiImport', title: t('cardDesigner.dataTable.importWorkbook'), disabled: dataTableWorkbookBusy.value },
+    { key: 'card-designer.data-table.export', icon: 'mdiExport', title: t('cardDesigner.dataTable.exportWorkbook'), disabled: dataTableWorkbookBusy.value || !canExportDataTableWorkbook.value }, mode,
   ]
   return [{
-    key: 'card-designer.render-image', icon: 'action.image-plus', title: t('cardDesigner.renderImage.title'),
+    key: 'card-designer.render-image', icon: 'mdiImagePlusOutline', title: t('cardDesigner.renderImage.title'),
     disabled: imageExporting.value || props.imageExportBusy || !props.renderCardImages || !renderPipelineResult.value,
     children: ['current', 'both'].map(face => ({
       key: `render.${face}`, title: t(`cardDesigner.renderImage.${face}`),
@@ -1907,7 +1920,7 @@ const presentation = computed<EditorPresentation>(() => ({
     || filePath.value.split(/[\\/]/).filter(Boolean).pop()
     || filePath.value,
   description: '',
-  icon: 'file.opencard',
+  icon: 'mdiCardsOutline',
 }))
 
 const canSave = computed(() => Boolean(cardDoc.value))

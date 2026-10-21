@@ -11,10 +11,10 @@
       </template>
       <OcText v-else tone="muted" size="sm">{{ t('projectConfig.fonts.chooseFilesHint') }}</OcText>
       <div class="project-font-dialog__summary-actions">
-        <OcButton type="button" icon="nav.files" variant="outline" :disabled="busy" @click="pickFiles(true)">
+        <OcButton type="button" icon="mdiFileMultipleOutline" variant="outline" :disabled="busy" @click="pickFiles(true)">
           {{ selectedSourceCount ? t('projectConfig.fonts.chooseAgain') : t('projectConfig.fonts.chooseFiles') }}
         </OcButton>
-        <OcButton v-if="selectedSourceCount" type="button" variant="ghost" icon="tool.settings"
+        <OcButton v-if="selectedSourceCount" type="button" variant="ghost" icon="mdiCogOutline"
           @click="advancedOpen = !advancedOpen">
           {{ advancedOpen ? t('projectConfig.fonts.simpleSettings') : t('projectConfig.fonts.advancedFace') }}
         </OcButton>
@@ -49,7 +49,7 @@
                       ? slotSourceLabel(slotFor(weight, style)!)
                       : fallbackLabel(slotKey(weight, style)) || t('projectConfig.fonts.chooseFiles') }}
                   </OcButton>
-                  <OcButton v-if="slotFor(weight, style)" type="button" variant="ghost" icon="action.delete"
+                  <OcButton v-if="slotFor(weight, style)" type="button" variant="ghost" icon="mdiTrashCanOutline"
                     icon-only :aria-label="t('projectConfig.fonts.removeFace')"
                     :data-tooltip="t('projectConfig.fonts.removeFace')" @click="clearSlot(slotKey(weight, style))" />
                 </div>
@@ -141,8 +141,8 @@ const systemFontsError = ref('')
 const selectedFamilies = ref<readonly SystemFontFamily[]>([])
 const editing = computed(() => Boolean(props.originalKey))
 const importModeOptions = computed<OcOption[]>(() => [
-  { value: 'files', label: t('projectConfig.fonts.importFiles'), icon: 'nav.files' },
-  { value: 'system', label: t('projectConfig.fonts.importSystem'), icon: 'action.import' },
+  { value: 'files', label: t('projectConfig.fonts.importFiles'), icon: 'mdiFileMultipleOutline' },
+  { value: 'system', label: t('projectConfig.fonts.importSystem'), icon: 'mdiImport' },
 ])
 const selectedSourceCount = computed(() => new Set(Object.values(draft.value.slots).map(slot => slot?.sourcePath)).size)
 const generatedKey = computed(() => createAvailableKey(draft.value.name, [...Object.keys(props.registry), ...props.reservedKeys], 'font'))

@@ -8,8 +8,8 @@ it('returns opaque nested action keys to the header owner and keeps disabled act
     attachTo: document.body,
     slots: { default: '<div class="page-content">Content</div>' },
     props: { header: { title: 'Page', titleLoading: false, onAction, actions: [
-      { key: 'blocked', icon: 'action.save', title: 'Blocked', disabled: true },
-      { key: 'local', icon: 'action.export', title: 'Local', children: [{ key: 'page.custom-token', title: 'Child' }] },
+      { key: 'blocked', icon: 'mdiContentSaveOutline', title: 'Blocked', disabled: true },
+      { key: 'local', icon: 'mdiExport', title: 'Local', children: [{ key: 'page.custom-token', title: 'Child' }] },
     ] } },
   })
   try {

@@ -16,7 +16,7 @@
       @mouseleave="isToggleHovered = false"
       @click="togglePinned"
     >
-      <OcIcon :name="isToggleHovered ? (pinned ? 'tool.pin-off' : 'tool.pin') : (expanded ? 'nav.chevron-down' : 'nav.chevron-up')" size="sm" />
+      <OcIcon :name="isToggleHovered ? (pinned ? 'mdiPinOffOutline' : 'mdiPinOutline') : (expanded ? 'mdiChevronDown' : 'mdiChevronUp')" size="sm" />
     </button>
 
     <div

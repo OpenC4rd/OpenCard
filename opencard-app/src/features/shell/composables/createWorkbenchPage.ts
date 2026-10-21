@@ -127,7 +127,7 @@ export function createWorkbenchPage(options: {
       void Promise.all(sessions.value.filter(session => session.state.isDirty && session.state.path).map(async session => {
         return await session.save() === 'saved' ? session.state.name : null
       }))
-        .then(names => names.filter(name => name !== null).forEach(name => notifySuccess(t('app.notifications.saved', { name }), 'action.save')))
+        .then(names => names.filter(name => name !== null).forEach(name => notifySuccess(t('app.notifications.saved', { name }), 'mdiContentSaveOutline')))
         .catch(error => notifyError(error instanceof Error ? error.message : t('app.notifications.autoSaveFailed')))
     }, workspaceSettings.autoSaveIntervalSeconds * 1000)
   }
@@ -464,15 +464,15 @@ export function createWorkbenchPage(options: {
       const selected = revisions.find(option => option.commitId === id)
       const title = t(side === 'before' ? 'versionControl.diffViewer.versionA' : 'versionControl.diffViewer.versionB')
       actions.push(selected?.shortId ?? selected?.label ?? t('versionControl.diffViewer.diskVersion'), {
-        key: `diff.${side}`, icon: side === 'before' ? 'action.version-before' : 'action.version-after', title,
+        key: `diff.${side}`, icon: side === 'before' ? 'mdiSeed' : 'mdiSprout', title,
         children: revisions.map(option => ({
           key: `diff.${side}:${option.commitId ?? 'current'}`,
           title: option.shortId ? `${option.label} ${option.shortId}` : option.label,
-          icon: option.commitId === id ? 'action.check' : 'file.git',
+          icon: option.commitId === id ? 'mdiCheck' : 'mdiSourceBranch',
         })),
       })
     }
-    actions.push({ key: 'diff.exit', icon: 'nav.arrow-left', title: t('versionControl.diffViewer.exitComparison') })
+    actions.push({ key: 'diff.exit', icon: 'mdiArrowLeft', title: t('versionControl.diffViewer.exitComparison') })
     return { actions, onAction: async (key: string) => {
       if (!isCurrent() || !isDiffMode.value) return
       if (key === 'diff.exit') { session.setMode('edit'); return }
@@ -651,44 +651,44 @@ export function createWorkbenchPage(options: {
       {
         key: 'save-active-editor',
         title: t('app.menu.save'),
-        icon: 'action.save',
+        icon: 'mdiContentSaveOutline',
         shortcut: options.shortcuts.save,
         disabled: !options.editor,
       },
       {
         key: 'save-active-editor-as',
         title: t('app.menu.saveAs'),
-        icon: 'action.save',
+        icon: 'mdiContentSaveOutline',
         disabled: !options.editor,
       },
       {
         key: 'save-all-editors',
         title: t('app.menu.saveAll'),
-        icon: 'action.save',
+        icon: 'mdiContentSaveOutline',
         disabled: !options.editor,
       },
       {
         key: 'toggle-auto-save',
         title: options.autoSave ? t('app.menu.disableAutoSave') : t('app.menu.enableAutoSave'),
-        icon: options.autoSave ? 'action.save-off' : 'action.save',
+        icon: options.autoSave ? 'mdiContentSaveOffOutline' : 'mdiContentSaveOutline',
       },
       { type: 'divider', key: 'file-export-divider' },
-      { key: options.buildResourcePackageActionKey, title: t('resourcePackage.buildTitle'), icon: 'file.package', disabled: !options.projectPath },
-      { key: 'export-project-template', title: t('templateExport.menu'), icon: 'action.export', disabled: !options.projectPath },
-      { key: 'export-card-documents', title: t('app.menu.exportCardDocuments'), icon: 'action.export', disabled: !options.projectPath },
+      { key: options.buildResourcePackageActionKey, title: t('resourcePackage.buildTitle'), icon: 'mdiPackageVariantClosed', disabled: !options.projectPath },
+      { key: 'export-project-template', title: t('templateExport.menu'), icon: 'mdiExport', disabled: !options.projectPath },
+      { key: 'export-card-documents', title: t('app.menu.exportCardDocuments'), icon: 'mdiExport', disabled: !options.projectPath },
 
     ], edit: [
       {
         key: 'undo-active-editor',
         title: t('app.menu.undo'),
-        icon: 'action.undo',
+        icon: 'mdiUndoVariant',
         shortcut: options.shortcuts.undo,
         disabled: !options.editor || options.editor.isDiff || !options.editor.canUndo,
       },
       {
         key: 'redo-active-editor',
         title: t('app.menu.redo'),
-        icon: 'action.redo',
+        icon: 'mdiRedoVariant',
         shortcut: options.shortcuts.redo,
         disabled: !options.editor || options.editor.isDiff || !options.editor.canRedo,
       },
@@ -700,7 +700,7 @@ export function createWorkbenchPage(options: {
   const page: SpacePage = {
     menuContribution,
     key: 'workbench',
-    navigation: { key: 'workbench', icon: 'nav.workbench', labelKey: 'app.shell.space.workbench' },
+    navigation: { key: 'workbench', icon: 'mdiPencilRuler', labelKey: 'app.shell.space.workbench' },
     content: WorkbenchPageContent,
     contentProps: computed(() => {
       const session = activeSession.value

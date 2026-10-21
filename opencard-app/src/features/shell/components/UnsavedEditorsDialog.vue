@@ -89,7 +89,7 @@
           <OcButton
             class="unsaved-editors-dialog__discard-button"
             variant="soft"
-            icon="action.delete"
+            icon="mdiTrashCanOutline"
             icon-tone="danger"
             :disabled="busy || selectedCount === 0"
             @click="emit('mark-discard')"
@@ -98,7 +98,7 @@
           </OcButton>
           <OcButton
             variant="soft"
-            icon="action.save"
+            icon="mdiContentSaveOutline"
             icon-tone="success"
             :disabled="busy || selectedCount === 0"
             @click="emit('mark-save')"
@@ -201,9 +201,9 @@ const description = computed(() => singleRow.value
 const singleError = computed(() => singleRow.value?.error || props.globalError)
 
 function decisionIcon(decision: UnsavedDecision): IconToken {
-  if (decision === 'save') return 'action.save'
-  if (decision === 'discard') return 'status.error'
-  return 'status.warning'
+  if (decision === 'save') return 'mdiContentSaveOutline'
+  if (decision === 'discard') return 'mdiAlertCircleOutline'
+  return 'mdiAlertOutline'
 }
 
 function decisionTone(decision: UnsavedDecision): IconTone {

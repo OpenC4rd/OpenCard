@@ -202,34 +202,34 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     const rename: OcNodeAction = {
       key: PROJECT_ENTRY_RENAME_ACTION_KEY,
       title: projectEntryLabels.value.rename,
-      icon: 'action.edit',
+      icon: 'mdiPencilOutline',
       disabled: selectionCount > 1,
     }
     const reveal: OcNodeAction = {
       key: PROJECT_ENTRY_REVEAL_ACTION_KEY,
       title: projectEntryLabels.value.reveal,
-      icon: 'status.folder-open',
+      icon: 'mdiFolderOpenOutline',
     }
     const copyRelativePath: OcNodeAction = {
       key: PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY,
       title: projectEntryLabels.value.copyRelativePath,
-      icon: 'action.copy',
+      icon: 'mdiContentCopy',
     }
     const copyAbsolutePath: OcNodeAction = {
       key: PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY,
       title: projectEntryLabels.value.copyAbsolutePath,
-      icon: 'action.copy',
+      icon: 'mdiContentCopy',
     }
     const moveToTrash: OcNodeAction = {
       key: PROJECT_ENTRY_DELETE_ACTION_KEY,
       title: projectEntryLabels.value.delete,
-      icon: 'action.delete',
+      icon: 'mdiTrashCanOutline',
       children: [{
         key: PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY,
         title: selectionCount > 1
           ? projectEntryLabels.value.confirmDeleteSelected
           : options.translate('sidebar.fileActions.confirmDeleteFile', { fileName: entry.label }),
-        icon: 'action.delete',
+        icon: 'mdiTrashCanOutline',
         iconTone: 'danger',
       }],
     }
@@ -251,7 +251,7 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       get loading() { return entry.isDirectory && options.getDirectoryState?.(entry.key)?.status === 'loading' },
       get disabledReason() { return options.getDirectoryState?.(entry.key)?.error },
       renamable: true, draggable: true,
-      tail: [{ key: PROJECT_ENTRY_MORE_ACTION_KEY, get title() { return projectEntryLabels.value.more }, icon: 'nav.more', children: () => menus().inline }],
+      tail: [{ key: PROJECT_ENTRY_MORE_ACTION_KEY, get title() { return projectEntryLabels.value.more }, icon: 'mdiDotsHorizontal', children: () => menus().inline }],
       contextActions: () => menus().context,
     })
   }
@@ -280,7 +280,7 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     const rootKeys = PROJECT_MANAGEMENT_ENTRIES.map((entry) => {
       const key = normalizeShellPath(`${options.projectPath.value}/${entry.path}`)
       const presentation = entry.packageDirectory
-        ? { icon: 'file.package' as IconToken, tone: 'file-config' as const }
+        ? { icon: 'mdiPackageVariantClosed' as IconToken, tone: 'file-config' as const }
         : resolveEntryIcon(key, false, false, options.projectPath.value)
       items.set(key, {
         label: options.translate(entry.labelKey),
@@ -288,7 +288,7 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
           ? [entry.path, {
             key: PROJECT_PACKAGE_ADD_ACTION_KEY,
             title: options.translate('packageManager.add'),
-            icon: 'action.add',
+            icon: 'mdiPlus',
           }]
           : entry.path,
         visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
@@ -393,7 +393,7 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     const closeAction: OcNodeAction = {
       key: OPENED_EDITOR_CLOSE_ACTION_KEY,
       title: options.translate('sidebar.closeEditor'),
-      icon: 'action.close',
+      icon: 'mdiClose',
     }
     const items = new Map<string, OcNode>()
     for (const session of options.sessions.value) {

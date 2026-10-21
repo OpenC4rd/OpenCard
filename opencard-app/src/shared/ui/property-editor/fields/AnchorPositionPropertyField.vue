@@ -22,15 +22,15 @@ import type { OcOption } from '../../../../components/standard/OcOptionGroup.vue
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 
 const anchorOptions: OcOption[] = [
-  { value: 'lt', label: 'Left Top', icon: 'format.anchor-top-left' },
-  { value: 'ct', label: 'Center Top', icon: 'format.anchor-top' },
-  { value: 'rt', label: 'Right Top', icon: 'format.anchor-top-right' },
-  { value: 'lc', label: 'Left Center', icon: 'format.anchor-left' },
-  { value: 'cc', label: 'Center Center', icon: 'format.anchor-center' },
-  { value: 'rc', label: 'Right Center', icon: 'format.anchor-right' },
-  { value: 'lb', label: 'Left Bottom', icon: 'format.anchor-bottom-left' },
-  { value: 'cb', label: 'Center Bottom', icon: 'format.anchor-bottom' },
-  { value: 'rb', label: 'Right Bottom', icon: 'format.anchor-bottom-right' },
+  { value: 'lt', label: 'Left Top', icon: 'mdiArrowTopLeftThin' },
+  { value: 'ct', label: 'Center Top', icon: 'mdiArrowUpThin' },
+  { value: 'rt', label: 'Right Top', icon: 'mdiArrowTopRightThin' },
+  { value: 'lc', label: 'Left Center', icon: 'mdiArrowLeftThin' },
+  { value: 'cc', label: 'Center Center', icon: 'mdiCircleMedium' },
+  { value: 'rc', label: 'Right Center', icon: 'mdiArrowRightThin' },
+  { value: 'lb', label: 'Left Bottom', icon: 'mdiArrowBottomLeftThin' },
+  { value: 'cb', label: 'Center Bottom', icon: 'mdiArrowDownThin' },
+  { value: 'rb', label: 'Right Bottom', icon: 'mdiArrowBottomRightThin' },
 ]
 
 const props = defineProps<{

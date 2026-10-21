@@ -11,7 +11,7 @@
       <div class="export-template__preview-content">
         <article class="export-template__details">
           <div class="export-template__details-heading">
-            <OcIcon name="file.opencard" size="lg" />
+            <OcIcon name="mdiCardsOutline" size="lg" />
             <div>
               <strong>{{ name.trim() || t('templateExport.unnamed') }}</strong>
               <p>{{ description.trim() || t('templateExport.previewDescription') }}</p>
@@ -77,7 +77,7 @@
       </div>
 
       <footer class="export-template__footer">
-        <OcButton type="submit" size="lg" variant="solid" icon="action.export" :disabled="!canExport">
+        <OcButton type="submit" size="lg" variant="solid" icon="mdiExport" :disabled="!canExport">
           {{ isExporting ? t('templateExport.status.exporting') : t('templateExport.actions.export') }}
         </OcButton>
       </footer>

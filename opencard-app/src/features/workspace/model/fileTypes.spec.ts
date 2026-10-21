@@ -34,55 +34,55 @@ describe('project metadata file types', () => {
 describe('workspace entry icon tokens', () => {
   it('uses closed and open folder glyphs with the same folder tone', () => {
     expect(resolveDirectoryIcon('D:/Cards/src', false)).toEqual({
-      icon: 'folder.generic',
+      icon: 'mdiFolder',
       tone: 'folder',
     })
     expect(resolveDirectoryIcon('D:/Cards/src', true)).toEqual({
-      icon: 'folder.open',
+      icon: 'mdiFolderOpen',
       tone: 'folder',
     })
   })
 
   it('uses the generic fallback token for unknown folders', () => {
     expect(resolveDirectoryIcon('D:/Cards/custom', false)).toEqual({
-      icon: 'folder.generic',
+      icon: 'mdiFolder',
       tone: 'folder',
     })
   })
 
   it('uses the opencard tone for a package archive, wherever it sits', () => {
     expect(resolveEntryIcon('D:/Cards/.opencard/packages/alice-icons-1.0.0.ocpack', false, false, 'D:/Cards')).toEqual({
-      icon: 'file.package',
+      icon: 'mdiPackageVariantClosed',
       tone: 'file-opencard',
     })
     // 文件叫什么名字、放在哪都不改变它是什么。
     expect(resolveEntryIcon('D:/Cards/downloads/whatever.ocpack', false, false, 'D:/Cards')).toEqual({
-      icon: 'file.package',
+      icon: 'mdiPackageVariantClosed',
       tone: 'file-opencard',
     })
   })
 
   it('uses folder glyphs for the managed root directories', () => {
     expect(resolveEntryIcon('D:/Cards/.opencard/packages', true, false, 'D:/Cards')).toEqual({
-      icon: 'folder.generic',
+      icon: 'mdiFolder',
       tone: 'folder',
     })
     expect(resolveEntryIcon('D:/Cards/.opencard/icons', true, true, 'D:/Cards')).toEqual({
-      icon: 'folder.open',
+      icon: 'mdiFolderOpen',
       tone: 'folder',
     })
   })
 
   it('uses the project icon glyph for the project icon registry', () => {
     expect(resolveEntryIcon('D:/Cards/.opencard/icons/icons.json', false, false, 'D:/Cards')).toEqual({
-      icon: 'file.project-icon',
+      icon: 'mdiStickerEmoji',
       tone: 'file-config',
     })
   })
 
   it('uses the translate icon for the project dictionary', () => {
     expect(resolveEntryIcon('D:/Cards/.opencard/locale.json', false, false, 'D:/Cards')).toEqual({
-      icon: 'file.dictionary',
+      icon: 'mdiTranslate',
       tone: 'file-config',
     })
   })
@@ -93,7 +93,7 @@ describe('workspace entry icon tokens', () => {
       editorId: 'font-preview',
     })
     expect(resolveEntryIcon('D:/Cards/assets/fonts/Brand.ttf', false)).toEqual({
-      icon: 'file.font',
+      icon: 'mdiFormatFont',
       tone: 'active',
     })
   })
@@ -108,7 +108,7 @@ describe('workspace entry icon tokens', () => {
       'D:/Cards',
       registeredSources,
     )).toEqual({
-      icon: 'file.font',
+      icon: 'mdiFormatFont',
       tone: 'active',
     })
     expect(resolveEntryIcon(
@@ -118,7 +118,7 @@ describe('workspace entry icon tokens', () => {
       'D:/Cards',
       registeredSources,
     )).toEqual({
-      icon: 'file.font',
+      icon: 'mdiFormatFont',
       tone: 'muted',
     })
     expect(resolveEntryIcon(
@@ -128,7 +128,7 @@ describe('workspace entry icon tokens', () => {
       'D:/Cards',
       registeredSources,
     )).toEqual({
-      icon: 'file.font',
+      icon: 'mdiFormatFont',
       tone: 'active',
     })
   })
@@ -140,7 +140,7 @@ describe('workspace entry icon tokens', () => {
     ).tone).not.toBe('muted')
     expect(resolveEntryIcon(
       'D:/Cards/.opencard/icons/unused.png', false, false, 'D:/Cards', undefined, registeredSources,
-    )).toEqual({ icon: 'file.image', tone: 'muted' })
+    )).toEqual({ icon: 'mdiFileImageOutline', tone: 'muted' })
   })
 
   it('keeps known text files editable and routes unknown extensions to the unsupported-file session', () => {

@@ -8,7 +8,7 @@
         :data-tooltip="collapsed ? expandLabel : collapseLabel"
         :aria-expanded="!collapsed" :aria-controls="contentId" @click="emit('toggle')">
         <template #icon>
-          <OcIcon class="project-config-section__chevron" name="tree.chevron-right" size="action" />
+          <OcIcon class="project-config-section__chevron" name="mdiChevronRight" size="action" />
         </template>
       </OcButton>
       <span class="project-config-section__heading">

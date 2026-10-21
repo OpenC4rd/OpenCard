@@ -7,9 +7,9 @@ describe('OcActionMenu', () => {
     const wrapper = mount(OcActionMenu, {
       props: {
         actions: [
-          { key: 'save', title: 'Save', icon: 'action.save', shortcut: ['Ctrl', 'S'] },
+          { key: 'save', title: 'Save', icon: 'mdiContentSaveOutline', shortcut: ['Ctrl', 'S'] },
           { type: 'divider', key: 'file-export-divider' },
-          { key: 'export', title: 'Export', icon: 'action.export' },
+          { key: 'export', title: 'Export', icon: 'mdiExport' },
         ],
       },
     })
@@ -53,7 +53,7 @@ describe('OcActionMenu', () => {
 
   it('renders marked-up titles while deriving a plain accessible label', () => {
     const wrapper = mount(OcActionMenu, {
-      props: { actions: [{ key: 'fill', title: '[b]Fill[/b] [key]F[/key] [icon:layout.fill]' }] },
+      props: { actions: [{ key: 'fill', title: '[b]Fill[/b] [key]F[/key] [icon:mdiArrowExpandAll]' }] },
     })
 
     expect(wrapper.get('.oc-action-menu__label strong').text()).toBe('Fill')

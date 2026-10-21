@@ -79,22 +79,22 @@ export function createBlockAddActions(translate: (messageKey: string) => string)
 }
 
 function createBlockActions(translate: (messageKey: string) => string): BlockActionSet {
-  const copyBlock = cdeNodeAction('copy-block', 'action.copy', translate('cardDesigner.treeActions.copyBlock'), { shortcut: 'block.copy' })
-  const pasteBlock = cdeNodeAction('paste-block', 'action.copy', translate('cardDesigner.treeActions.pasteBlock'), { shortcut: 'block.paste' })
-  const rename = cdeNodeAction('rename', 'action.edit', translate('cardDesigner.treeActions.rename'), { shortcut: 'block.rename' })
-  const duplicate = cdeNodeAction('duplicate', 'action.copy', translate('cardDesigner.treeActions.duplicate'), { shortcut: 'block.duplicate' })
-  const remove = cdeNodeAction('delete', 'action.delete', translate('cardDesigner.treeActions.delete'), { shortcut: 'block.delete' })
-  const add = cdeNodeAction('add', 'action.add', translate('cardDesigner.treeActions.addChild'), { children: createBlockAddActions(translate) })
-  const pack = cdeNodeAction('package', 'entity.block-package', translate('cardDesigner.treeActions.package'))
-  const unpack = cdeNodeAction('unpackage', 'entity.block-package', translate('cardDesigner.treeActions.unpackage'))
-  const exportCustomBlock = cdeNodeAction('export-custom-block', 'entity.block-custom', translate('cardDesigner.treeActions.exportCustomBlock'))
+  const copyBlock = cdeNodeAction('copy-block', 'mdiContentCopy', translate('cardDesigner.treeActions.copyBlock'), { shortcut: 'block.copy' })
+  const pasteBlock = cdeNodeAction('paste-block', 'mdiContentCopy', translate('cardDesigner.treeActions.pasteBlock'), { shortcut: 'block.paste' })
+  const rename = cdeNodeAction('rename', 'mdiPencilOutline', translate('cardDesigner.treeActions.rename'), { shortcut: 'block.rename' })
+  const duplicate = cdeNodeAction('duplicate', 'mdiContentCopy', translate('cardDesigner.treeActions.duplicate'), { shortcut: 'block.duplicate' })
+  const remove = cdeNodeAction('delete', 'mdiTrashCanOutline', translate('cardDesigner.treeActions.delete'), { shortcut: 'block.delete' })
+  const add = cdeNodeAction('add', 'mdiPlus', translate('cardDesigner.treeActions.addChild'), { children: createBlockAddActions(translate) })
+  const pack = cdeNodeAction('package', 'mdiPackageVariantClosed', translate('cardDesigner.treeActions.package'))
+  const unpack = cdeNodeAction('unpackage', 'mdiPackageVariantClosed', translate('cardDesigner.treeActions.unpackage'))
+  const exportCustomBlock = cdeNodeAction('export-custom-block', 'mdiToyBrickOutline', translate('cardDesigner.treeActions.exportCustomBlock'))
   const more = (key: string, children: readonly OcNodeAction[]): OcNodeAction => (
-    cdeNodeAction(key, 'nav.more', translate('cardDesigner.treeActions.more'), { children })
+    cdeNodeAction(key, 'mdiDotsHorizontal', translate('cardDesigner.treeActions.more'), { children })
   )
 
   return {
-    show: cdeNodeAction('show-block', 'status.eye-off', translate('cardDesigner.treeActions.show')),
-    hide: cdeNodeAction('hide-block', 'status.eye', translate('cardDesigner.treeActions.hide')),
+    show: cdeNodeAction('show-block', 'mdiEyeOffOutline', translate('cardDesigner.treeActions.show')),
+    hide: cdeNodeAction('hide-block', 'mdiEyeOutline', translate('cardDesigner.treeActions.hide')),
     copyBlock,
     pasteBlock,
     rename,
@@ -169,7 +169,7 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
         label: getBlockProperty<string>(block, 'name')?.trim() || block.id,
         visual: {
           type: 'icon',
-          icon: packaged ? 'entity.block-package' : presentation.icon,
+          icon: packaged ? 'mdiPackageVariantClosed' : presentation.icon,
           iconTone: visibility === 'hidden' ? 'muted' : presentation.iconTone,
         },
         renamable: true,

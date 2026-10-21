@@ -5,6 +5,7 @@
       v-for="action in actions"
       :key="action.key"
       :action="action"
+      :data-action-key="action.key"
       size="sm"
       variant="ghost"
       @select="emit('action', $event.key)"

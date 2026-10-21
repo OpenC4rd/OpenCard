@@ -42,22 +42,27 @@ const RichTextStringPropertyField = defineAsyncComponent(
 )
 
 const propertyFieldEditorMap: Record<BasePropertyFieldType, PropertyFieldEditorRegistration> = {
-  string: { component: StringPropertyField, icon: 'data.symbol-string', readonlyPresenter: formatReadonlyValue },
-  anchorPosition: { component: AnchorPositionPropertyField, icon: 'nav.compass', readonlyPresenter: formatReadonlyValue },
-  alignPosition: { component: AlignPositionPropertyField, icon: 'data.list-selection', readonlyPresenter: formatReadonlyValue },
-  verticalAlignPosition: { component: VerticalAlignPositionPropertyField, icon: 'data.layers', readonlyPresenter: formatReadonlyValue },
-  flowDirection: { component: FlowDirectionPropertyField, icon: 'nav.arrow-right', readonlyPresenter: formatReadonlyValue },
-  number: { component: NumberPropertyField, icon: 'data.symbol-number', readonlyPresenter: formatReadonlyValue },
-  boolean: { component: BooleanPropertyField, icon: 'data.symbol-boolean', readonlyPresenter: formatReadonlyBoolean },
-  color: { component: ColorPropertyField, icon: 'data.symbol-color', readonlyPresenter: formatReadonlyValue },
-  filePath: { component: FilePathPropertyField, icon: 'file.generic', readonlyPresenter: formatReadonlyValue },
-  object: { component: ObjectPropertyField, icon: 'data.symbol-class', readonlyPresenter: formatReadonlyValue },
+  string: { component: StringPropertyField, icon: 'mdiFormatText', readonlyPresenter: formatReadonlyValue },
+  anchorPosition: { component: AnchorPositionPropertyField, icon: 'mdiCompassOutline', readonlyPresenter: formatReadonlyValue },
+  alignPosition: { component: AlignPositionPropertyField, icon: 'mdiFormatListBulletedSquare', readonlyPresenter: formatReadonlyValue },
+  verticalAlignPosition: { component: VerticalAlignPositionPropertyField, icon: 'mdiLayersOutline', readonlyPresenter: formatReadonlyValue },
+  flowDirection: { component: FlowDirectionPropertyField, icon: 'mdiArrowRight', readonlyPresenter: formatReadonlyValue },
+  number: { component: NumberPropertyField, icon: 'mdiNumeric', readonlyPresenter: formatReadonlyValue },
+  boolean: { component: BooleanPropertyField, icon: 'mdiToggleSwitchOutline', readonlyPresenter: formatReadonlyBoolean },
+  color: { component: ColorPropertyField, icon: 'mdiPaletteOutline', readonlyPresenter: formatReadonlyValue },
+  filePath: { component: FilePathPropertyField, icon: 'mdiFileOutline', readonlyPresenter: formatReadonlyValue },
+  object: { component: ObjectPropertyField, icon: 'mdiCodeBraces', readonlyPresenter: formatReadonlyValue },
 }
 
-export function getPropertyFieldIcon(fieldType: PropertyFieldType): IconToken {
-  const resolvedType = isArrayPropertyFieldType(fieldType)
-    ? getArrayElementFieldType(fieldType)
-    : fieldType
+/** 字段定义自带的 icon 优先，缺省时才按类型注册表取。 */
+export function getPropertyFieldIcon(definition: {
+  fieldType: PropertyFieldType
+  icon?: IconToken
+}): IconToken {
+  if (definition.icon) return definition.icon
+  const resolvedType = isArrayPropertyFieldType(definition.fieldType)
+    ? getArrayElementFieldType(definition.fieldType)
+    : definition.fieldType
   return (propertyFieldEditorMap[resolvedType] ?? propertyFieldEditorMap.string).icon
 }
 

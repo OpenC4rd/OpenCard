@@ -3,7 +3,7 @@
     @keydown="handleGridKeydown">
     <div class="dictionary-editor__content">
       <div v-if="dictionary && missingActiveLanguage" class="dictionary-editor__notice" role="status">
-        <OcIcon name="status.warning" tone="warning" />
+        <OcIcon name="mdiAlertOutline" tone="warning" />
         <OcText size="sm">{{ t('dictionaryEditor.missingActive', { language: dictionary.active }) }}</OcText>
       </div>
       <section v-if="dictionary" class="dictionary-editor__grid oc-data-grid">
@@ -40,7 +40,7 @@
                   <div v-else class="dictionary-editor__column-heading">
                     <span>{{ column.kind === 'base' ? t('dictionaryEditor.columns.base') : column.sourceKey }}</span>
                     <span class="dictionary-editor__column-actions">
-                      <OcButton icon-only size="sm" variant="ghost" icon="action.check"
+                      <OcButton icon-only size="sm" variant="ghost" icon="mdiCheck"
                         :active="column.active"
                         :data-tooltip="column.kind === 'base'
                           ? t('dictionaryEditor.actions.useBase')
@@ -69,7 +69,7 @@
                       @blur="finishLanguageCreate"
                       @keydown.esc.stop.prevent="cancelLanguageCreate" />
                   </form>
-                  <OcButton v-else icon-only size="sm" variant="ghost" icon="action.add"
+                  <OcButton v-else icon-only size="sm" variant="ghost" icon="mdiPlus"
                     :data-tooltip="t('dictionaryEditor.actions.addLanguage')"
                     :aria-label="t('dictionaryEditor.actions.addLanguage')" @click="beginLanguageCreate" />
                 </th>
@@ -130,7 +130,7 @@
                       @blur="finishRecordCreate"
                       @keydown.esc.stop.prevent="cancelRecordCreate" />
                   </form>
-                  <OcButton v-else size="sm" variant="ghost" icon="action.add"
+                  <OcButton v-else size="sm" variant="ghost" icon="mdiPlus"
                     @click="beginRecordCreate">{{ t('dictionaryEditor.actions.addRecord') }}</OcButton>
                 </th>
                 <td :colspan="grid.columns.length + 1" />
@@ -142,7 +142,7 @@
 
       <section v-else class="dictionary-editor__repair" role="alert">
         <div class="dictionary-editor__diagnostic">
-          <OcIcon name="status.error" tone="danger" />
+          <OcIcon name="mdiAlertCircleOutline" tone="danger" />
           <div>
             <strong>{{ t('dictionaryEditor.invalid') }}</strong>
             <OcText tone="muted" size="sm">{{ t('dictionaryEditor.repairDescription') }}</OcText>
@@ -353,7 +353,7 @@ function resetOverride(language: string, recordKey: string) {
 }
 
 function resetOverrideAction(): OcActionDefinition {
-  return { key: 'reset-override', icon: 'action.undo', title: t('dictionaryEditor.actions.resetOverride') }
+  return { key: 'reset-override', icon: 'mdiUndoVariant', title: t('dictionaryEditor.actions.resetOverride') }
 }
 
 function setActiveLanguage(language: string | undefined) {
@@ -431,17 +431,17 @@ async function copyDictionaryKey(key: string, kind: 'record' | 'language'): Prom
 
 function recordCommands(): OcActionMenuEntry[] {
   return [
-    { key: 'copy', icon: 'action.copy', title: t('dictionaryEditor.actions.copyRecordKey') },
-    { key: 'rename', icon: 'action.edit', title: t('dictionaryEditor.actions.renameRecord') },
+    { key: 'copy', icon: 'mdiContentCopy', title: t('dictionaryEditor.actions.copyRecordKey') },
+    { key: 'rename', icon: 'mdiPencilOutline', title: t('dictionaryEditor.actions.renameRecord') },
     { type: 'divider', key: 'record-delete-divider' },
     {
       key: 'delete',
-      icon: 'action.delete',
+      icon: 'mdiTrashCanOutline',
       iconTone: 'danger',
       title: t('dictionaryEditor.actions.deleteRecords', { count: 1 }),
       children: [{
         key: 'confirm-delete',
-        icon: 'action.delete',
+        icon: 'mdiTrashCanOutline',
         iconTone: 'danger',
         title: t('dictionaryEditor.actions.confirmDeleteRecords', { count: 1 }),
       }],
@@ -452,7 +452,7 @@ function recordCommands(): OcActionMenuEntry[] {
 function recordAction(): OcActionDefinition {
   return {
     key: 'more',
-    icon: 'nav.more',
+    icon: 'mdiDotsHorizontal',
     title: t('dictionaryEditor.actions.recordActions'),
     children: recordCommands(),
   }
@@ -468,18 +468,18 @@ function handleRecordAction(recordKey: string, actionKey: string): void {
 
 function languageCommands(): OcActionMenuEntry[] {
   return [
-    { key: 'copy', icon: 'action.copy', title: t('dictionaryEditor.actions.copyLanguage') },
-    { key: 'set-active', icon: 'action.check', title: t('dictionaryEditor.actions.setActive') },
-    { key: 'rename', icon: 'action.edit', title: t('dictionaryEditor.actions.renameLanguage') },
+    { key: 'copy', icon: 'mdiContentCopy', title: t('dictionaryEditor.actions.copyLanguage') },
+    { key: 'set-active', icon: 'mdiCheck', title: t('dictionaryEditor.actions.setActive') },
+    { key: 'rename', icon: 'mdiPencilOutline', title: t('dictionaryEditor.actions.renameLanguage') },
     { type: 'divider', key: 'language-delete-divider' },
     {
       key: 'delete',
-      icon: 'action.delete',
+      icon: 'mdiTrashCanOutline',
       iconTone: 'danger',
       title: t('dictionaryEditor.actions.deleteLanguages', { count: 1 }),
       children: [{
         key: 'confirm-delete',
-        icon: 'action.delete',
+        icon: 'mdiTrashCanOutline',
         iconTone: 'danger',
         title: t('dictionaryEditor.actions.confirmDeleteLanguages', { count: 1 }),
       }],
@@ -490,7 +490,7 @@ function languageCommands(): OcActionMenuEntry[] {
 function languageAction(): OcActionDefinition {
   return {
     key: 'more',
-    icon: 'nav.more',
+    icon: 'mdiDotsHorizontal',
     title: t('dictionaryEditor.actions.languageActions'),
     children: languageCommands(),
   }
@@ -616,12 +616,12 @@ onBeforeUnmount(finishColumnResize)
 const presentation = computed<EditorPresentation>(() => ({
   title: t('dictionaryEditor.title'),
   description: t('dictionaryEditor.description'),
-  icon: 'file.dictionary',
+  icon: 'mdiTranslate',
 }))
 
 const headerActions = computed<OcActionDefinition[]>(() => [
-  { key: 'dictionary.workbook.import', icon: 'action.import', title: t('dictionaryEditor.workbook.import'), disabled: dictionaryWorkbookBusy.value },
-  { key: 'dictionary.workbook.export', icon: 'action.export', title: t('dictionaryEditor.workbook.export'), disabled: dictionaryWorkbookBusy.value || !canExportDictionaryWorkbook.value },
+  { key: 'dictionary.workbook.import', icon: 'mdiImport', title: t('dictionaryEditor.workbook.import'), disabled: dictionaryWorkbookBusy.value },
+  { key: 'dictionary.workbook.export', icon: 'mdiExport', title: t('dictionaryEditor.workbook.export'), disabled: dictionaryWorkbookBusy.value || !canExportDictionaryWorkbook.value },
 ])
 async function onHeaderAction(key: string): Promise<void> {
   if (key === 'dictionary.workbook.import') await importDictionaryWorkbook()

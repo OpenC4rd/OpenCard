@@ -52,7 +52,7 @@ describe('validateRenderResources', () => {
         documentId: 'document', instanceId: 'instance', faceKey: 'front',
         owner: { kind: 'block', id: 'image' }, blockId: 'image', blockPath: 'Portrait', fieldKey: 'source',
       }),
-      parameters: { fieldName: 'source' },
+      parameters: { fieldName: 'imageSource' },
       details: { url: 'https://images.example.com/portrait.png' },
     })])
   })

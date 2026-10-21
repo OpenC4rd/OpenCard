@@ -49,7 +49,7 @@ export function createCreateProjectSection(options: CreateProjectSectionOptions)
     title: '',
     headButtons: [{
       key: 'return-primary-page',
-      icon: 'nav.arrow-left',
+      icon: 'mdiArrowLeft',
       title: options.translate('app.shell.back'),
       disabled: options.busy.value,
     }],
@@ -61,7 +61,7 @@ export function createCreateProjectSection(options: CreateProjectSectionOptions)
         placeholder: '',
         actions: [{
           key: IMPORT_TEMPLATE_ACTION_KEY,
-          icon: 'action.import',
+          icon: 'mdiImport',
           hoverTip: options.translate('projectTemplates.actions.import'),
           disabled: options.busy.value,
         }],
@@ -88,20 +88,20 @@ export function createCreateProjectSection(options: CreateProjectSectionOptions)
         actions: [
           {
             key: IMPORT_RESOURCE_PACKAGE_ACTION_KEY,
-            icon: 'action.import',
+            icon: 'mdiImport',
             hoverTip: options.translate('projectTemplates.actions.importResourcePackage'),
             disabled: options.busy.value || options.resourcePackageStore.isLoading.value,
           },
           {
             key: USE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
-            icon: 'action.check',
+            icon: 'mdiCheck',
             hoverTip: options.translate('projectTemplates.actions.useSelectedResourcePackages'),
             disabled: options.busy.value || options.resourcePackageStore.isLoading.value
               || options.resourcePackageSelection?.canUse.value !== true,
           },
           {
             key: DISABLE_SELECTED_RESOURCE_PACKAGES_ACTION_KEY,
-            icon: 'action.close',
+            icon: 'mdiClose',
             hoverTip: options.translate('projectTemplates.actions.disableSelectedResourcePackages'),
             disabled: options.busy.value || options.resourcePackageStore.isLoading.value
               || options.resourcePackageSelection?.canDisable.value !== true,

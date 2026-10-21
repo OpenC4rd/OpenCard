@@ -19,7 +19,6 @@ export type CardPropertyEditorInput = Omit<PropertyEditorInput, 'fields'> & {
 }
 
 export type CardPropertyFieldDefinitionOptions = {
-  allowDelete: boolean
   translate: (messageKey: string) => string
   hasMessage: (messageKey: string) => boolean
   override?: Readonly<Record<string, Partial<EditorPropertyDefinition>>>
@@ -55,9 +54,6 @@ export function resolveCardPropertyFields(
       title,
       category: customKeys.has(fieldKey) ? 'customFields' : definition.categoryId,
       order,
-      deletable: options.allowDelete
-        && definition.isReadonly !== true
-        && (definition.deletable === true || definition.required !== true),
       ...(definition.fieldType === 'string' && definition.autocomplete?.length
         ? {
             completion: {

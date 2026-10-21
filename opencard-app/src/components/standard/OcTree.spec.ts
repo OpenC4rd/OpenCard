@@ -40,7 +40,7 @@ function createData(options: {
   return {
     rootKeys: options.roots ?? ['root'],
     items: new Map(options.items ?? [
-      ['root', { label: 'Root', visual: { type: 'icon', icon: 'data.collection' }, renamable: true }],
+      ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiDatabaseOutline' }, renamable: true }],
     ]),
     children: new Map(options.children ?? []),
   }
@@ -104,7 +104,7 @@ describe('OcTree', () => {
         data: createData({
           items: [['root', {
             label: 'A long changed file name',
-            tail: { type: 'badge', label: 'Added', icon: 'action.add', tone: 'success' },
+            tail: { type: 'badge', label: 'Added', icon: 'mdiPlus', tone: 'success' },
           }]],
         }),
       },
@@ -314,7 +314,7 @@ describe('OcTree', () => {
     const wrapper = mount(OcTree, { props: {
       data: createData({ roots: keys, items: keys.map(key => [key, {
         label: key,
-        get visual() { presentations++; readsByKey.set(key, (readsByKey.get(key) ?? 0) + 1); return { type: 'icon' as const, icon: 'data.collection' as const } },
+        get visual() { presentations++; readsByKey.set(key, (readsByKey.get(key) ?? 0) + 1); return { type: 'icon' as const, icon: 'mdiDatabaseOutline' as const } },
       }]) }),
       virtualized: true,
     }, attrs: { style: '--oc-size-md: 30px; --oc-space-2xs: 2px' } })
@@ -340,7 +340,7 @@ describe('OcTree', () => {
       props: {
         data: createData({
           items: [
-            ['root', { label: 'Root', visual: { type: 'icon', icon: 'data.collection' } }],
+            ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiDatabaseOutline' } }],
             ['child', { label: 'Child' }],
           ],
           children: [['root', ['child']]],
@@ -366,8 +366,8 @@ describe('OcTree', () => {
         data: createData({
           roots: ['root', 'child'],
           items: [
-            ['root', { label: 'Root', tail: [{ key: 'move', title: 'Move', icon: 'action.drag' }] }],
-            ['child', { label: 'Child', tail: [{ key: 'move', title: 'Move', icon: 'action.drag' }] }],
+            ['root', { label: 'Root', tail: [{ key: 'move', title: 'Move', icon: 'mdiDragVariant' }] }],
+            ['child', { label: 'Child', tail: [{ key: 'move', title: 'Move', icon: 'mdiDragVariant' }] }],
           ],
         }),
         tabNavigation: 'none',
@@ -390,7 +390,7 @@ describe('OcTree', () => {
       props: {
         data: createData({
           items: [
-            ['root', { label: 'Root', visual: { type: 'icon', icon: 'data.collection' } }],
+            ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiDatabaseOutline' } }],
             ...childKeys.map((key): [string, OcNode] => [key, { label: key }]),
           ],
           children: [['root', childKeys]],
@@ -407,8 +407,8 @@ describe('OcTree', () => {
       props: {
         data: createData({
           items: [
-            ['root', { label: 'Root', visual: { type: 'icon', icon: 'data.collection' } }],
-            ['root:empty', { label: 'Nothing yet', visual: { type: 'icon', icon: 'file.generic' }, disabled: true }],
+            ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiDatabaseOutline' } }],
+            ['root:empty', { label: 'Nothing yet', visual: { type: 'icon', icon: 'mdiFileOutline' }, disabled: true }],
           ],
           children: [['root', ['root:empty']]],
         }),
@@ -648,7 +648,7 @@ describe('OcTree', () => {
           items: [['root', {
             label: 'Root',
             renamable: true,
-            tail: [{ key: 'rename', title: 'Rename', icon: 'action.edit' }],
+            tail: [{ key: 'rename', title: 'Rename', icon: 'mdiPencilOutline' }],
           }]],
         }),
       },
@@ -787,8 +787,8 @@ describe('OcTree', () => {
             label: 'Root',
             tail: [
               'Metadata',
-              { key: 'duplicate', title: 'Duplicate', icon: 'action.copy' },
-              { key: 'delete', title: 'Delete', icon: 'action.delete', disabled: true, disabledReason: 'Protected' },
+              { key: 'duplicate', title: 'Duplicate', icon: 'mdiContentCopy' },
+              { key: 'delete', title: 'Delete', icon: 'mdiTrashCanOutline', disabled: true, disabledReason: 'Protected' },
             ],
           }]],
         }),
@@ -813,8 +813,8 @@ describe('OcTree', () => {
   it('groups multiple commands without measuring labels or revealing other rows', async () => {
     const wrapper = mount(OcTree, { props: {
       data: createData({ items: [['root', { label: 'Readable label', tail: [
-        { key: 'top', title: 'Move to top', icon: 'tool.flip-to-front' },
-        { key: 'up', title: 'Move up', icon: 'nav.arrow-up' },
+        { key: 'top', title: 'Move to top', icon: 'mdiFlipToFront' },
+        { key: 'up', title: 'Move up', icon: 'mdiArrowUp' },
       ] }]] }), actionOverflowTitle: 'Item actions',
     } })
     const measure = vi.spyOn(wrapper.get('.oc-tree__label').element, 'getBoundingClientRect')
@@ -847,7 +847,7 @@ describe('OcTree', () => {
         data: createData({
           items: [['root', {
             label: 'Root',
-            tail: ['2 weeks', { key: 'move', title: 'Move up', icon: 'nav.arrow-up' }],
+            tail: ['2 weeks', { key: 'move', title: 'Move up', icon: 'mdiArrowUp' }],
           }]],
         }),
         actionVisibility: 'always',
@@ -897,16 +897,16 @@ describe('OcTree', () => {
               key: 'more',
               title: 'More',
               children: [
-                { key: 'rename', title: 'Rename', icon: 'action.edit' },
-                { key: 'delete', title: 'Delete', icon: 'action.delete' },
+                { key: 'rename', title: 'Rename', icon: 'mdiPencilOutline' },
+                { key: 'delete', title: 'Delete', icon: 'mdiTrashCanOutline' },
               ],
             }],
             contextActions: [
               { type: 'divider', key: 'leading' },
-              { key: 'rename', title: 'Rename', icon: 'action.edit' },
+              { key: 'rename', title: 'Rename', icon: 'mdiPencilOutline' },
               { type: 'divider', key: 'danger' },
               { type: 'divider', key: 'duplicate-divider' },
-              { key: 'delete', title: 'Delete', icon: 'action.delete' },
+              { key: 'delete', title: 'Delete', icon: 'mdiTrashCanOutline' },
               { type: 'divider', key: 'trailing' },
             ],
           }]],

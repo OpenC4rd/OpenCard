@@ -38,7 +38,7 @@ describe('ProjectConfigEditor', () => {
     expect(wrapper.vm.presentation).toEqual({
       title: 'projectConfig.title',
       description: 'projectConfig.description',
-      icon: 'file.opencard-project',
+      icon: 'mdiFileCogOutline',
     })
     expect(wrapper.find('[data-field-key="extends"]').exists()).toBe(false)
     expect(wrapper.find('[data-field-key="globalvariables"]').exists()).toBe(false)

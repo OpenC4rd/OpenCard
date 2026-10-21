@@ -105,7 +105,7 @@ async function bootstrap(): Promise<void> {
       const themeName = i18n.global.t(`settings.values.${theme}`);
       addTitleBarNotice({
         message: i18n.global.t("app.notifications.themeChanged", { theme: themeName }),
-        icon: "data.symbol-color",
+        icon: "mdiPaletteOutline",
       });
     }
     lastAppliedTheme = theme;

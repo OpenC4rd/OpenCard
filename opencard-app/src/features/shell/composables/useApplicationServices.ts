@@ -122,7 +122,7 @@ export function useApplicationServices(options: {
 
     return [{
       key: 'install-update',
-      icon: downloaded ? 'action.restart' : 'action.download',
+      icon: downloaded ? 'mdiRestart' : 'mdiDownload',
       disabled,
       hoverTip: downloaded
         ? isPreview

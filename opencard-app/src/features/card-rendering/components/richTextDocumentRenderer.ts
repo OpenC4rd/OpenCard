@@ -35,7 +35,7 @@ export default defineComponent({
             mode: 'inline',
             readDimensions: context.resources.resolveIconDimensions,
           })
-        : h(OcIcon, { name: 'status.warning', tone: 'warning', size: 'md' })
+        : h(OcIcon, { name: 'mdiAlertOutline', tone: 'warning', size: 'md' })
     }
     const renderDocument = () => renderRichTextDocument(props.prepared.document.children, {
       resolveFont: reference => {
@@ -51,7 +51,7 @@ export default defineComponent({
     return () => props.prepared.valid
       ? h('div', { class: 'rich-text-document' }, renderDocument())
       : h('div', { class: 'rich-text-document rich-text-document--invalid' }, [
-          h(OcIcon, { name: 'status.warning', tone: 'warning', size: 'md' }),
+          h(OcIcon, { name: 'mdiAlertOutline', tone: 'warning', size: 'md' }),
         ])
   },
 })

@@ -23,7 +23,7 @@
             <header v-if="row.kind === 'source'" class="property-editor__source-header"
               :style="indentStyle(row.level)">
               <span class="property-editor__icon-slot" aria-hidden="true">
-                <OcIcon name="data.symbol-class" size="md" tone="muted" />
+                <OcIcon name="mdiCodeBraces" size="md" tone="muted" />
               </span>
               <OcText class="property-editor__source-title" :truncate="true">{{ row.title }}</OcText>
             </header>
@@ -50,9 +50,9 @@
               :class="{ 'is-revealed': revealedFieldIdentity === fieldIdentity(row.category.inputKey, row.entry.key) }"
               :data-input-key="row.category.inputKey" :data-field-key="row.entry.key">
               <div class="property-editor__row-label">
-                <OcIcon :name="getPropertyFieldIcon(row.entry.definition.fieldType)" tone="muted" size="md" />
+                <OcIcon :name="getPropertyFieldIcon(row.entry.definition)" tone="muted" size="md" />
                 <OcIcon v-if="fieldWarnings?.has(fieldIdentity(row.category.inputKey, row.entry.key))"
-                  name="status.warning" tone="warning" size="sm"
+                  name="mdiAlertOutline" tone="warning" size="sm"
                   :data-tooltip="fieldWarnings.get(fieldIdentity(row.category.inputKey, row.entry.key))" />
                 <button type="button" class="property-editor__field-key-button"
                   :data-tooltip="t('propertyEditor.actions.copyFieldKeyTooltip', { key: row.entry.key })"
@@ -113,6 +113,7 @@ import type {
   PropertyEditorMutation,
   PropertyEditorSortMode,
 } from './propertyEditor.types'
+import { isPropertyRemovable } from './propertyRemovability'
 import {
   usePropertyEditorView,
   type PropertyEditorCategoryView,
@@ -159,25 +160,13 @@ const props = withDefaults(defineProps<{
   allowRawStringEditor: false,
 })
 
-const { t, te } = useI18n()
+const { t } = useI18n()
 const { openContextMenu } = useFloatingMenu()
 const fieldEditorModes = usePropertyFieldEditorModes()
 
-function resolveLocalizedText(messageKey: string, fallback: string): string {
-  if (te(messageKey)) {
-    return t(messageKey)
-  }
-
-  return fallback
-}
-
-const addFieldActionText = computed(() =>
-  resolveLocalizedText('propertyEditor.actions.addField', 'Add Field')
-)
-const resetFieldActionText = computed(() =>
-  resolveLocalizedText('propertyEditor.actions.reset', 'Reset')
-)
-const deleteFieldActionText = computed(() => resolveLocalizedText('propertyEditor.actions.delete', 'Delete'))
+const addFieldActionText = computed(() => t('propertyEditor.actions.addField'))
+const resetFieldActionText = computed(() => t('propertyEditor.actions.reset'))
+const deleteFieldActionText = computed(() => t('propertyEditor.actions.delete'))
 const ADD_PROPERTY_ACTION_KEY = 'add-property'
 const ADD_PROPERTY_FIELD_ACTION_PREFIX = 'add-property:'
 const propertyEditorRoot = ref<HTMLElement | null>(null)
@@ -204,8 +193,8 @@ const { displaySources } = usePropertyEditorView({
   categories: computed(() => props.categories ?? new Map()),
   sortMode: toRef(props, 'sortMode'),
   otherCategory: computed(() => ({
-    title: resolveLocalizedText('propertyEditor.categories.other', 'Other'),
-    icon: 'data.list-tree',
+    title: t('propertyEditor.categories.uncategorized'),
+    icon: 'mdiFileTreeOutline',
   })),
 })
 
@@ -294,12 +283,12 @@ function resolveFieldActions(inputKey: string, entry: PropertyEditorEntry): OcAc
   )
   if (modeAction) actions.push(modeAction)
   if (entry.definition.resettable) {
-    actions.push({ key: 'reset-property', icon: 'action.discard', title: resetFieldActionText.value })
+    actions.push({ key: 'reset-property', icon: 'mdiUndoVariant', title: resetFieldActionText.value })
   }
-  if (props.deleteMode && entry.definition.deletable) {
+  if (props.deleteMode && isPropertyRemovable(entry.definition)) {
     actions.push({
       key: 'delete-property',
-      icon: 'action.delete',
+      icon: 'mdiTrashCanOutline',
       iconTone: 'danger',
       title: deleteFieldActionText.value,
     })
@@ -328,11 +317,11 @@ function resolveCategoryActions(category: PropertyEditorCategoryView): OcActionD
   if (category.addableFields.length > 0) {
     actions.push({
       key: ADD_PROPERTY_ACTION_KEY,
-      icon: 'action.add',
+      icon: 'mdiPlus',
       title: `${addFieldActionText.value} (${category.addableFields.length})`,
       children: category.addableFields.map((field) => ({
         key: `${ADD_PROPERTY_FIELD_ACTION_PREFIX}${field.key}`,
-        icon: getPropertyFieldIcon(field.definition.fieldType),
+        icon: getPropertyFieldIcon(field.definition),
         title: field.label,
       })),
     })

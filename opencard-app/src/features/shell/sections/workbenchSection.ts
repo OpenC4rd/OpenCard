@@ -85,10 +85,10 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
       return [{
         key: 'workspace',
         title: options.translate('sidebar.workspaceGroup', 'Workspace'),
-        icon: 'status.folder-open',
+        icon: 'mdiFolderOpenOutline',
         headButtons: [{
           key: 'open-project',
-          icon: 'status.folder-open',
+          icon: 'mdiFolderOpenOutline',
           title: options.translate('sidebar.openProject', 'Open Project Folder'),
         }],
         lists: [{
@@ -163,32 +163,32 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
         actions: [
           {
             key: PROJECT_REVEAL_ACTION_KEY,
-            icon: 'status.folder-open',
+            icon: 'mdiFolderOpenOutline',
             hoverTip: options.translate('sidebar.fileActions.reveal'),
             disabled: !options.project.path.value,
           },
           {
             key: PROJECT_NEW_FILE_ACTION_KEY,
-            icon: 'action.file-plus',
+            icon: 'mdiFilePlusOutline',
             hoverTip: options.translate('sidebar.fileActions.newFile'),
             disabled: !options.project.path.value,
             children: [{
               key: PROJECT_NEW_OPENCARD_ACTION_KEY,
               title: options.translate('sidebar.fileActions.newOpenCard'),
-              icon: 'file.opencard',
+              icon: 'mdiCardsOutline',
             }, {
               key: PROJECT_NEW_MARKDOWN_ACTION_KEY,
               title: options.translate('sidebar.fileActions.newMarkdown'),
-              icon: 'file.markdown',
+              icon: 'mdiLanguageMarkdownOutline',
             }, {
               key: PROJECT_NEW_TEXT_ACTION_KEY,
               title: options.translate('sidebar.fileActions.newText'),
-              icon: 'file.text',
+              icon: 'mdiCardTextOutline',
             }],
           },
           {
             key: PROJECT_NEW_FOLDER_ACTION_KEY,
-            icon: 'action.folder-plus',
+            icon: 'mdiFolderPlusOutline',
             hoverTip: options.translate('sidebar.fileActions.newFolder'),
             disabled: !options.project.path.value,
           },
@@ -221,7 +221,7 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
         placeholder: options.version.timeline.placeholder.value,
         actions: [{
           key: TIMELINE_REFRESH_ACTION_KEY,
-          icon: 'action.refresh',
+          icon: 'mdiRefresh',
           hoverTip: options.translate('versionControl.timelineRefresh'),
           disabled: !options.version.timeline.filePath.value || options.version.timeline.loading.value,
         }],
@@ -241,8 +241,8 @@ export function createWorkbenchSection(options: WorkbenchSectionOptions): Comput
       {
         key: 'workspace',
         title: options.translate('sidebar.workspaceGroup', 'Workspace'),
-        icon: 'status.folder-open',
-        headButtons: [{ key: 'new-open-card', icon: 'action.file-plus', title: options.translate('app.menu.newOpenCard') }],
+        icon: 'mdiFolderOpenOutline',
+        headButtons: [{ key: 'new-open-card', icon: 'mdiFilePlusOutline', title: options.translate('app.menu.newOpenCard') }],
         lists: projectLists,
       },
 

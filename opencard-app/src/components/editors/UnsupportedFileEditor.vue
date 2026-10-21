@@ -12,10 +12,10 @@
     <h1>{{ t('unsupportedFile.title') }}</h1>
     <p>{{ t('unsupportedFile.description', { name: displayName }) }}</p>
     <div class="unsupported-file-editor__actions">
-      <OcButton icon="status.eye" variant="solid" @click="openAsReadonlyText">
+      <OcButton icon="mdiEyeOutline" variant="solid" @click="openAsReadonlyText">
         {{ t('unsupportedFile.openReadonly') }}
       </OcButton>
-      <OcButton icon="status.folder-open" variant="outline" @click="openWithSystem">
+      <OcButton icon="mdiFolderOpenOutline" variant="outline" @click="openWithSystem">
         {{ t('unsupportedFile.openWithSystem') }}
       </OcButton>
     </div>

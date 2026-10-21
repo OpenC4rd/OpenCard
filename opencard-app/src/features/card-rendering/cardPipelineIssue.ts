@@ -35,7 +35,6 @@ export type CardRenderParseIssueType =
   | 'card-designer.render-parse.conversion-failed'
   | 'card-designer.render-parse.invalid-option'
   | 'card-designer.render-parse.out-of-range'
-  | 'card-designer.render-parse.required'
   | 'card-designer.render-parse.invalid-color'
   | 'card-designer.render-parse.invalid-css-length'
   | 'card-designer.render-parse.invalid-file-path'
@@ -63,7 +62,6 @@ const cardIssueMessageKeys: Readonly<Record<CardIssueType, string>> = {
   'card-designer.render-parse.conversion-failed': 'app.problems.renderCodes.CONVERSION_FAILED',
   'card-designer.render-parse.invalid-option': 'app.problems.renderCodes.INVALID_OPTION',
   'card-designer.render-parse.out-of-range': 'app.problems.renderCodes.OUT_OF_RANGE',
-  'card-designer.render-parse.required': 'app.problems.renderCodes.REQUIRED',
   'card-designer.render-parse.invalid-color': 'app.problems.renderCodes.INVALID_COLOR',
   'card-designer.render-parse.invalid-css-length': 'app.problems.renderCodes.INVALID_CSS_LENGTH',
   'card-designer.render-parse.invalid-file-path': 'app.problems.renderCodes.INVALID_FILE_PATH',

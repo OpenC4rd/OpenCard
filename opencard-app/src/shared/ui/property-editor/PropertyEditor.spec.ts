@@ -184,7 +184,7 @@ describe('PropertyEditor records protocol', () => {
     wrapper.unmount()
   })
 
-  it('shows deletable fields only in delete mode and emits on the first click', async () => {
+  it('shows the delete action only in delete mode and emits on the first click', async () => {
     const wrapper = mount(PropertyEditor, {
       props: {
         sortMode: 'category',
@@ -192,7 +192,7 @@ describe('PropertyEditor records protocol', () => {
           key: 'block',
           record: { score: 10 },
           fields: {
-            score: { title: 'Score', fieldType: 'number', deletable: true },
+            score: { title: 'Score', fieldType: 'number' },
           },
         }],
       },
@@ -238,16 +238,17 @@ describe('PropertyEditor records protocol', () => {
     ]])
   })
 
-  it('does not expose delete mode for required fields', () => {
+  it('does not expose the delete action for unremovable or readonly fields', () => {
     const wrapper = mount(PropertyEditor, {
       props: {
         sortMode: 'category',
         deleteMode: true,
         inputs: [{
           key: 'block',
-          record: { score: 10 },
+          record: { score: 10, label: 'A' },
           fields: {
-            score: { title: 'Score', fieldType: 'number' },
+            score: { title: 'Score', fieldType: 'number', unremovable: true },
+            label: { title: 'Label', fieldType: 'string', isReadonly: true },
           },
         }],
       },
@@ -283,10 +284,10 @@ describe('PropertyEditor records protocol', () => {
     expect(wrapper.find('.reference-string-field').exists()).toBe(false)
     const rawToggle = () => wrapper.findAllComponents(OcActionButton)
       .find(button => button.props('action').key.startsWith('field-editor.'))!
-    expect(rawToggle().props('action').icon).toBe('data.code-string')
+    expect(rawToggle().props('action').icon).toBe('mdiCursorText')
     await wrapper.get('button[aria-label="propertyEditor.bindings.useRawEditor"]').trigger('click')
     expect(wrapper.find('.reference-string-field').exists()).toBe(true)
-    expect(rawToggle().props('action').icon).toBe('data.symbol-number')
+    expect(rawToggle().props('action').icon).toBe('mdiNumeric')
     await wrapper.get('.reference-string-field input').setValue('{{self:score}}')
     expect(wrapper.emitted('update-property')).toEqual([[
       { key: 'block', fieldKey: 'opacity', value: '{{self:score}}' },
@@ -306,7 +307,7 @@ describe('PropertyEditor records protocol', () => {
       },
     })
     const warning = wrapper.get('[data-tooltip="The current value has a rendering warning"]')
-    expect(warning.getComponent(OcIcon).props()).toMatchObject({ name: 'status.warning', tone: 'warning' })
+    expect(warning.getComponent(OcIcon).props()).toMatchObject({ name: 'mdiAlertOutline', tone: 'warning' })
   })
 
   it('shows an existing binding in the raw string editor without the legacy binding field', () => {

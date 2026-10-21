@@ -133,13 +133,13 @@ describe('RichTextStringPropertyField', () => {
       vm.editor.commands.setTextSelection({ from: 1, to: 3 })
       await nextTick()
       const reset = async (field: string) => {
-        await wrapper.getComponent(PropertyEditor).get(`[data-field-key="${field}"] button[aria-label="重置"]`).trigger('pointerdown')
-        await wrapper.getComponent(PropertyEditor).get(`[data-field-key="${field}"] button[aria-label="重置"]`).trigger('click')
+        await wrapper.getComponent(PropertyEditor).get(`[data-field-key="${field}"] [data-action-key="reset-property"] button`).trigger('pointerdown')
+        await wrapper.getComponent(PropertyEditor).get(`[data-field-key="${field}"] [data-action-key="reset-property"] button`).trigger('click')
       }
       await reset('fontSize')
       expect(vm.getHtml()).not.toContain('font-size')
       expect(vm.getHtml()).toContain('color: red')
-      expect(wrapper.getComponent(PropertyEditor).find('[data-field-key="fontSize"] button[aria-label="重置"]').exists()).toBe(false)
+      expect(wrapper.getComponent(PropertyEditor).find('[data-field-key="fontSize"] [data-action-key="reset-property"] button').exists()).toBe(false)
       await reset('foregroundColor')
       await reset('textAlign')
       expect(vm.getHtml()).toBe('<p>ab</p>')
@@ -162,7 +162,7 @@ describe('RichTextStringPropertyField', () => {
       const panel = wrapper.getComponent(PropertyEditor)
       panel.vm.$emit('update-property', { key: 'rich-text-selection', fieldKey: 'fontSize', value: '12' })
       await nextTick()
-      await panel.get('[data-field-key="fontSize"] button[aria-label="重置"]').trigger('click')
+      await panel.get('[data-field-key="fontSize"] [data-action-key="reset-property"] button').trigger('click')
       expect(editor.state.doc.firstChild!.firstChild!.marks[0]!.attrs.fontSize).toBe('24px')
       editor.view.dispatch(editor.state.tr.insertText('X'))
       expect(editor.state.doc.firstChild!.lastChild!.text).toBe('X')
@@ -188,12 +188,12 @@ describe('RichTextStringPropertyField', () => {
       await raw.setValue('red')
       await raw.trigger('keydown', { key: 'Enter' })
       expect(vm.editor.getAttributes('textStyle').color).toBe('red')
-      await panel.get('[data-field-key="foregroundColor"] button[aria-label="使用字段编辑器"]').trigger('click')
+      await panel.get('[data-field-key="foregroundColor"] button[aria-label="使用属性编辑器"]').trigger('click')
       expect(panel.find('[data-field-key="foregroundColor"] .oc-color-picker').exists()).toBe(true)
-      await panel.get('[data-field-key="shadowOffsetX"] button[aria-label="重置"]').trigger('click')
+      await panel.get('[data-field-key="shadowOffsetX"] [data-action-key="reset-property"] button').trigger('click')
       expect(vm.getHtml()).not.toContain('data-oc-shadow-offset-x')
       expect(vm.getHtml()).toContain('data-oc-shadow-offset-y="5px"')
-      await panel.get('[data-field-key="shadowColor"] button[aria-label="重置"]').trigger('click')
+      await panel.get('[data-field-key="shadowColor"] [data-action-key="reset-property"] button').trigger('click')
       const saved = sanitizeRichTextHtml(vm.getHtml())
       expect(saved).not.toContain('data-oc-shadow-color')
       expect(saved).toContain('data-oc-shadow-offset-y="5px"')
@@ -322,7 +322,7 @@ describe('RichTextStringPropertyField', () => {
       await chooseFill('图片')
       expect(editor.getAttributes('highlight').color).toBe(background)
       expect(dialog.querySelector('[data-field-key="backgroundColor"] input')).not.toBeNull()
-      dialog.querySelector<HTMLButtonElement>('[data-field-key="foregroundType"] button[aria-label="重置"]')!.click()
+      dialog.querySelector<HTMLButtonElement>('[data-field-key="foregroundType"] [data-action-key="reset-property"] button')!.click()
       await nextTick()
       expect(editor.getAttributes('highlight').color).toBe(background)
       expect(editor.getAttributes('textStyle')).toEqual({})
@@ -703,8 +703,8 @@ describe('RichTextStringPropertyField', () => {
     await wrapper.get('.rich-text-string-field__preview').trigger('click')
     await nextTick()
     expect(wrapper.getComponent(OcOptionGroup).props('options')).toEqual([
-      { value: 'rich', label: '富文本', icon: 'format.text-variant-outline' },
-      { value: 'source', label: 'HTML 源码', icon: 'format.xml' },
+      { value: 'rich', label: '富文本', icon: 'mdiFormatTextVariantOutline' },
+      { value: 'source', label: 'HTML 源码', icon: 'mdiXml' },
     ])
     expect(wrapper.getComponent(OcOptionGroup).props('appearance')).toBe('sliding-outline')
 

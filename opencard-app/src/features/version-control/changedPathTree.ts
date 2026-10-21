@@ -92,7 +92,7 @@ export function createChangedPathTree(
       groups.set(groupKey, { folder, entries: [], keys: [] })
       items.set(groupKey, {
         label: folder,
-        visual: { type: 'icon', icon: 'folder.open' },
+        visual: { type: 'icon', icon: 'mdiFolderOpen' },
       })
       rootKeys.push(groupKey)
     }

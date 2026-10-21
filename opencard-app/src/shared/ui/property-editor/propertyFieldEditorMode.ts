@@ -89,13 +89,13 @@ export function createPropertyFieldEditorModeAction(
   if (state.switchTarget === 'raw-string') {
     return {
       key: USE_RAW_STRING_EDITOR_ACTION_KEY,
-      icon: 'data.code-string',
+      icon: 'mdiCursorText',
       title: labels.useRawStringEditor,
     }
   }
   return {
     key: USE_FIELD_EDITOR_ACTION_KEY,
-    icon: getPropertyFieldIcon(definition.fieldType),
+    icon: getPropertyFieldIcon(definition),
     title: labels.useFieldEditor,
   }
 }

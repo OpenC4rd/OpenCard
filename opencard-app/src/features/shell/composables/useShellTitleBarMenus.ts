@@ -31,7 +31,7 @@ function createDeveloperModeActions(options: ShellTitleBarMenuOptions): readonly
     title: options.developerMode
       ? options.translate('app.updater.disableDeveloperMode')
       : options.translate('app.updater.enableDeveloperMode'),
-    icon: options.developerMode ? 'action.check' : 'format.code-braces',
+    icon: options.developerMode ? 'mdiCheck' : 'mdiCodeBraces',
   }]
 }
 
@@ -47,16 +47,16 @@ export function createShellTitleBarMenus(options: ShellTitleBarMenuOptions): She
         {
           key: 'new-project',
           title: options.projectPath ? t('app.menu.closeAndNewProject') : t('app.menu.newProject'),
-          icon: 'action.folder-plus',
+          icon: 'mdiFolderPlusOutline',
           shortcut: options.shortcuts.newProject,
         },
         { type: 'divider', key: 'file-open-divider' },
-        { key: 'open-project', title: t('sidebar.openProject'), icon: 'status.folder-open' },
-        { key: 'open-file', title: t('app.menu.openFile'), icon: 'nav.files' },
+        { key: 'open-project', title: t('sidebar.openProject'), icon: 'mdiFolderOpenOutline' },
+        { key: 'open-file', title: t('app.menu.openFile'), icon: 'mdiFileMultipleOutline' },
         {
           key: 'close-project-and-welcome',
           title: t('app.menu.closeProjectFolder'),
-          icon: 'nav.compass',
+          icon: 'mdiCompassOutline',
           disabled: !options.projectPath,
         },
         ...(options.contributions?.file?.actions ?? []),
@@ -68,7 +68,7 @@ export function createShellTitleBarMenus(options: ShellTitleBarMenuOptions): She
       actions: [
         ...(options.contributions?.edit?.actions ?? []),
         { type: 'divider', key: 'edit-settings-divider' },
-        { key: 'open-settings', title: t('settings.title'), icon: 'tool.settings' },
+        { key: 'open-settings', title: t('settings.title'), icon: 'mdiCogOutline' },
       ],
     },
     {
@@ -79,18 +79,18 @@ export function createShellTitleBarMenus(options: ShellTitleBarMenuOptions): She
         {
           key: 'toggle-sidebar',
           title: options.sidebarCollapsed ? t('app.shell.expandSidebar') : t('app.shell.collapseSidebar'),
-          icon: options.sidebarCollapsed ? 'nav.sidebar-expand' : 'nav.sidebar-collapse',
+          icon: options.sidebarCollapsed ? 'mdiArrowExpandRight' : 'mdiArrowCollapseLeft',
         },
         {
           key: 'toggle-bottom-panel',
           title: options.bottomPanelExpanded ? t('app.shell.collapseBottomPanel') : t('app.shell.expandBottomPanel'),
-          icon: options.bottomPanelExpanded ? 'nav.chevron-down' : 'nav.chevron-up',
+          icon: options.bottomPanelExpanded ? 'mdiChevronDown' : 'mdiChevronUp',
         },
         { type: 'divider', key: 'view-window-divider' },
         {
           key: 'toggle-fullscreen',
           title: options.windowFullscreen ? t('app.shell.exitFullscreen') : t('app.shell.enterFullscreen'),
-          icon: options.windowFullscreen ? 'window.fullscreen-exit' : 'window.fullscreen',
+          icon: options.windowFullscreen ? 'mdiFullscreenExit' : 'mdiFullscreen',
           shortcut: options.shortcuts.fullscreen,
         },
       ],
@@ -106,7 +106,7 @@ export function createShellTitleBarMenus(options: ShellTitleBarMenuOptions): She
         {
           key: 'check-for-updates',
           title: options.checkingForUpdate ? t('app.updater.checking') : t('app.updater.check'),
-          icon: 'action.refresh',
+          icon: 'mdiRefresh',
           disabled: options.checkingForUpdate
             || options.downloadingUpdate
             || options.updateDownloaded
@@ -115,18 +115,18 @@ export function createShellTitleBarMenus(options: ShellTitleBarMenuOptions): She
         ...developerModeActions,
         ...(options.contributions?.help?.actions ?? []),
         { type: 'divider', key: 'help-feedback-divider' },
-        { key: 'send-feedback', title: t('app.menu.sendFeedback'), icon: 'action.edit' },
+        { key: 'send-feedback', title: t('app.menu.sendFeedback'), icon: 'mdiPencilOutline' },
         {
           key: 'view-feedback',
           title: t('app.menu.viewFeedback'),
-          icon: 'data.list-selection',
+          icon: 'mdiFormatListBulletedSquare',
           badge: options.unreadFeedbackReplyCount,
           badgeLabel: options.unreadFeedbackReplyCount > 0
             ? t('app.feedback.unreadReplies', { count: options.unreadFeedbackReplyCount })
             : undefined,
         },
         { type: 'divider', key: 'help-about-divider' },
-        { key: 'about-opencard', title: t('app.menu.aboutOpenCard'), icon: 'status.unknown' },
+        { key: 'about-opencard', title: t('app.menu.aboutOpenCard'), icon: 'mdiHelpCircleOutline' },
       ],
     },
   ]

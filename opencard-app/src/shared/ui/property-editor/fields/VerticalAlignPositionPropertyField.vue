@@ -17,9 +17,9 @@ import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 import OcOptionGroup, { type OcOption } from '../../../../components/standard/OcOptionGroup.vue'
 
 const verticalAlignOptions: OcOption[] = [
-  { value: 'top', label: 'Top', icon: 'format.vertical-top' },
-  { value: 'center', label: 'Center', icon: 'format.vertical-center' },
-  { value: 'bottom', label: 'Bottom', icon: 'format.vertical-bottom' },
+  { value: 'top', label: 'Top', icon: 'mdiFormatVerticalAlignTop' },
+  { value: 'center', label: 'Center', icon: 'mdiFormatVerticalAlignCenter' },
+  { value: 'bottom', label: 'Bottom', icon: 'mdiFormatVerticalAlignBottom' },
 ]
 
 const props = defineProps<{

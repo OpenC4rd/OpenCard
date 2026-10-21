@@ -13,7 +13,7 @@
 
 ```vue
 <OcPanel tone="glass" border="default" radius="md" shadow="md" />
-<OcButton variant="solid" size="lg" icon="action.save" />
+<OcButton variant="solid" size="lg" icon="mdiContentSaveOutline" />
 <OcText tone="muted" size="sm" truncate />
 ```
 
@@ -41,7 +41,7 @@ tone?: string
 
 唯一例外：`icon` prop 接受 `IconToken` 类型（本身也是有限注册集）。
 
-`IconToken` 是稳定的语义名称，glyph 是图标注册模块的内置实现细节；`IconTone` 独立描述颜色语义。相同 glyph 不表示语义 token 必须合并。
+`IconToken` 就是 `@mdi/js` 的导出名，注册表只声明本应用打包了哪些图标，不再维护一层语义别名；`IconTone` 独立描述颜色语义。
 
 ### 铁律 3 — 组件签名稳定，新增 prop 只追加不修改
 
@@ -63,7 +63,7 @@ tone?: string
 slot 命名必须是名词，表示"这个位置放什么"：
 
 ```vue
-<OcCard title="面板" icon="action.settings" :actions="actions" @action="onAction">
+<OcCard title="面板" icon="mdiCog" :actions="actions" @action="onAction">
   <OcFieldInput v-model="width" />
 </OcCard>
 
@@ -144,7 +144,7 @@ Agent 新增 token 时，必须在该组件的枚举常量中定义，并同步�
 ```vue
 <!-- 声明式组合：用户只关心"是什么"，不关心"怎么排" -->
 <OcPanel direction="vertical" gap="2" padding="3" tone="surface" border="default">
-  <OcBar title="Block Properties" icon="editor.properties" />
+  <OcBar title="Block Properties" icon="mdiCogOutline" />
   <label>
     <span>Width</span>
     <OcFieldFrame>
@@ -412,8 +412,8 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 
 ```vue
 <OcButton variant="solid" size="md">保存</OcButton>
-<OcButton variant="ghost" icon="action.close" icon-only />
-<OcButton variant="outline" icon="action.add" icon-side="left">新增</OcButton>
+<OcButton variant="ghost" icon="mdiClose" icon-only />
+<OcButton variant="outline" icon="mdiPlus" icon-side="left">新增</OcButton>
 <OcButton variant="soft" :active="isSelected">选项 A</OcButton>
 ```
 
@@ -429,8 +429,8 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 内容走默认 slot；头部操作通过 `actions` + `@action`，payload 是 `{ key }`。
 
 ```vue
-<OcCard title="属性" icon="editor.properties" variant="surface"
-        :actions="[{ key: 'reset', icon: 'action.refresh', title: '重置' }]"
+<OcCard title="属性" icon="mdiCogOutline" variant="surface"
+        :actions="[{ key: 'reset', icon: 'mdiRefresh', title: '重置' }]"
         @action="handleAction">
   <OcFieldInput v-model="width" full-width mono />
 </OcCard>

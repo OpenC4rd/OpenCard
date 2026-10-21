@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
         :data-tooltip="props.collapsed ? props.expandTooltip || null : props.collapseTooltip || null"
         @click="emit('toggle-sidebar')"
       >
-        <OcIcon :name="props.collapsed ? 'nav.sidebar-expand' : 'nav.sidebar-collapse'" size="sm" />
+        <OcIcon :name="props.collapsed ? 'mdiArrowExpandRight' : 'mdiArrowCollapseLeft'" size="sm" />
       </button>
 
       <div
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
             <span class="titlebar-task-row__title">{{ task.title }}</span>
             <span class="titlebar-task-row__actions">
               <span class="titlebar-task-row__value">{{ taskProgressPercent(task) }}%</span>
-              <OcButton v-if="task.cancellable" icon-only size="sm" variant="ghost" icon="action.close"
+              <OcButton v-if="task.cancellable" icon-only size="sm" variant="ghost" icon="mdiClose"
                 :aria-label="props.cancelTaskLabel || 'Cancel task'"
                 :data-tooltip="props.cancelTaskLabel || 'Cancel task'"
                 @click="emit('cancel-task', task.key)" />

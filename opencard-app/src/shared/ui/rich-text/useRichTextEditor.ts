@@ -126,10 +126,10 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     icon: IconToken
     title: string
   }>>(() => [
-    { value: 'left', icon: 'format.align-start', title: tr('propertyEditor.richText.alignLeft', '左对齐') },
-    { value: 'center', icon: 'format.align-center', title: tr('propertyEditor.richText.alignCenter', '居中') },
-    { value: 'right', icon: 'format.align-end', title: tr('propertyEditor.richText.alignRight', '右对齐') },
-    { value: 'justify', icon: 'format.align-justify', title: tr('propertyEditor.richText.alignJustify', '两端对齐') },
+    { value: 'left', icon: 'mdiFormatAlignLeft', title: tr('propertyEditor.richText.alignLeft', '左对齐') },
+    { value: 'center', icon: 'mdiFormatAlignCenter', title: tr('propertyEditor.richText.alignCenter', '居中') },
+    { value: 'right', icon: 'mdiFormatAlignRight', title: tr('propertyEditor.richText.alignRight', '右对齐') },
+    { value: 'justify', icon: 'mdiFormatAlignJustify', title: tr('propertyEditor.richText.alignJustify', '两端对齐') },
   ])
 
   const foregroundColor = computed(() => formatting.value('foregroundColor'))
@@ -212,7 +212,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     return catalog.series.map(series => ({
       key: `project-icon-series:${packageKey ?? ''}:${series.key}`,
       title: series.name,
-      icon: 'file.project-icon' as const,
+      icon: 'mdiStickerEmoji' as const,
       children: catalog.entries
         .filter(entry => entry.seriesKey.toLocaleLowerCase() === series.key.toLocaleLowerCase())
         .map(entry => ({
@@ -247,7 +247,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       .map(source => ({
         key: `project-icon-package:${source.packageKey}`,
         title: source.label,
-        icon: 'file.package' as const,
+        icon: 'mdiPackageVariantClosed' as const,
         children: projectIconSeriesGroups(source.packageKey, source.catalog),
       }))
       .filter(group => group.children.length > 0)
@@ -257,7 +257,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     toolbarRevision.value
     return {
       key: 'project-icon',
-      icon: 'action.project-icon-plus',
+      icon: 'mdiStickerEmoji',
       title: hasSelectedProjectIcon()
         ? tr('propertyEditor.richText.replaceProjectIcon', '替换项目图标')
         : tr('propertyEditor.richText.insertProjectIcon', '插入项目图标'),
@@ -269,21 +269,21 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     toolbarRevision.value
     return {
       key: 'table-actions',
-      icon: 'data.table',
+      icon: 'mdiTableLarge',
       title: tr('propertyEditor.richText.tableActions', '表格操作'),
       children: [
-        { key: 'table.add-row-before', icon: 'nav.arrow-up', title: tr('propertyEditor.richText.addRowBefore', '在上方插入行') },
-        { key: 'table.add-row-after', icon: 'nav.arrow-down', title: tr('propertyEditor.richText.addRowAfter', '在下方插入行') },
-        { key: 'table.add-column-before', icon: 'nav.arrow-left', title: tr('propertyEditor.richText.addColumnBefore', '在左侧插入列') },
-        { key: 'table.add-column-after', icon: 'nav.arrow-right', title: tr('propertyEditor.richText.addColumnAfter', '在右侧插入列') },
-        { key: 'table.toggle-header', icon: 'layout.rows', title: tr('propertyEditor.richText.toggleHeader', '切换表头行') },
-        { key: 'table.toggle-header-column', icon: 'data.table', title: tr('propertyEditor.richText.toggleHeaderColumn', '切换表头列') },
-        { key: 'table.toggle-header-cell', icon: 'data.table', title: tr('propertyEditor.richText.toggleHeaderCell', '切换表头单元格') },
-        { key: 'table.merge-cells', icon: 'data.table', title: tr('propertyEditor.richText.mergeCells', '合并单元格'), disabled: !editor.value?.can().mergeCells() },
-        { key: 'table.split-cell', icon: 'data.table', title: tr('propertyEditor.richText.splitCell', '拆分单元格'), disabled: !editor.value?.can().splitCell() },
-        { key: 'table.delete-row', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteRow', '删除当前行') },
-        { key: 'table.delete-column', icon: 'action.delete', iconTone: 'danger', title: tr('propertyEditor.richText.deleteColumn', '删除当前列') },
-        { key: 'table.delete', icon: 'action.discard', iconTone: 'danger', title: tr('propertyEditor.richText.deleteTable', '删除整个表格') },
+        { key: 'table.add-row-before', icon: 'mdiArrowUp', title: tr('propertyEditor.richText.addRowBefore', '在上方插入行') },
+        { key: 'table.add-row-after', icon: 'mdiArrowDown', title: tr('propertyEditor.richText.addRowAfter', '在下方插入行') },
+        { key: 'table.add-column-before', icon: 'mdiArrowLeft', title: tr('propertyEditor.richText.addColumnBefore', '在左侧插入列') },
+        { key: 'table.add-column-after', icon: 'mdiArrowRight', title: tr('propertyEditor.richText.addColumnAfter', '在右侧插入列') },
+        { key: 'table.toggle-header', icon: 'mdiLandRowsHorizontal', title: tr('propertyEditor.richText.toggleHeader', '切换表头行') },
+        { key: 'table.toggle-header-column', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.toggleHeaderColumn', '切换表头列') },
+        { key: 'table.toggle-header-cell', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.toggleHeaderCell', '切换表头单元格') },
+        { key: 'table.merge-cells', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.mergeCells', '合并单元格'), disabled: !editor.value?.can().mergeCells() },
+        { key: 'table.split-cell', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.splitCell', '拆分单元格'), disabled: !editor.value?.can().splitCell() },
+        { key: 'table.delete-row', icon: 'mdiTrashCanOutline', iconTone: 'danger', title: tr('propertyEditor.richText.deleteRow', '删除当前行') },
+        { key: 'table.delete-column', icon: 'mdiTrashCanOutline', iconTone: 'danger', title: tr('propertyEditor.richText.deleteColumn', '删除当前列') },
+        { key: 'table.delete', icon: 'mdiUndoVariant', iconTone: 'danger', title: tr('propertyEditor.richText.deleteTable', '删除整个表格') },
       ],
     }
   })

@@ -30,12 +30,12 @@ describe('OcCard', () => {
   it('renders the header only once a title, an icon or an action exists', () => {
     expect(mount(OcCard).find('.oc-card__header').exists()).toBe(false)
 
-    const titled = mount(OcCard, { props: { title: 'Layers', icon: 'action.play' } })
+    const titled = mount(OcCard, { props: { title: 'Layers', icon: 'mdiPlayOutline' } })
     expect(titled.get('.oc-card__header .oc-bar__title').text()).toBe('Layers')
     expect(titled.get('.oc-card__header .oc-bar__icon svg').classes()).toContain('oc-icon')
     expect(titled.get('.oc-card__header .oc-bar__append .oc-action-rail').findAll('button')).toHaveLength(0)
 
-    const iconOnly = mount(OcCard, { props: { icon: 'action.play' } })
+    const iconOnly = mount(OcCard, { props: { icon: 'mdiPlayOutline' } })
     expect(iconOnly.find('.oc-card__header').exists()).toBe(true)
     expect(iconOnly.find('.oc-card__header .oc-bar__title').exists()).toBe(false)
   })
@@ -45,7 +45,7 @@ describe('OcCard', () => {
       props: {
         title: 'Layers',
         actions: [
-          { key: 'add', icon: 'action.play', title: 'Add' },
+          { key: 'add', icon: 'mdiPlayOutline', title: 'Add' },
           { key: 'remove', title: 'Remove' },
         ],
       },

@@ -51,7 +51,7 @@ describe('useProjectTimeline', () => {
     expect(tree.children.size).toBe(0)
     expect(tree.items.get('.opencard/')?.label).toBe('.opencard')
     expect(tree.items.get('assets/')?.label).toBe('assets')
-    expect(tree.items.get('.opencard/')?.visual).toMatchObject({ icon: 'folder.generic' })
+    expect(tree.items.get('.opencard/')?.visual).toMatchObject({ icon: 'mdiFolder' })
   })
 
   it('stays empty without a current project', async () => {
@@ -93,9 +93,9 @@ describe('useProjectTimeline', () => {
     expect(childKeys.map(key => state.projectTreeData.value.items.get(key)?.label))
       .toEqual(['main.ocdocument', 'cover.png', 'old.md'])
     expect(childKeys.map(key => state.projectTreeData.value.items.get(key)?.tail)).toEqual([
-      { type: 'badge', label: 'Added', icon: 'action.add', tone: 'success' },
-      { type: 'badge', label: 'Modified', icon: 'status.circle-medium', tone: 'warning' },
-      { type: 'badge', label: 'Deleted', icon: 'action.minus', tone: 'danger' },
+      { type: 'badge', label: 'Added', icon: 'mdiPlus', tone: 'success' },
+      { type: 'badge', label: 'Modified', icon: 'mdiCircleMedium', tone: 'warning' },
+      { type: 'badge', label: 'Deleted', icon: 'mdiMinus', tone: 'danger' },
     ])
     expect(state.treeData.value.children.size).toBe(0)
   })
@@ -117,8 +117,8 @@ describe('useProjectTimeline', () => {
     expect(state.statusEntries.value.find(entry => entry.path === 'cards/index.ocdocument')?.indexNew).toBe(true)
     expect(state.statusUpdatedAt.value).not.toBeNull()
     expect(state.statusStale.value).toBe(false)
-    expect(state.changesTreeData.value.items.get('cards/worktree.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Modified', icon: 'status.circle-medium', tone: 'warning' })
-    expect(state.changesTreeData.value.items.get('cards/index.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Added', icon: 'action.add', tone: 'success' })
+    expect(state.changesTreeData.value.items.get('cards/worktree.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Modified', icon: 'mdiCircleMedium', tone: 'warning' })
+    expect(state.changesTreeData.value.items.get('cards/index.ocdocument')?.tail).toEqual({ type: 'badge', label: 'Added', icon: 'mdiPlus', tone: 'success' })
     const historyCalls = mocks.readHistory.mock.calls.length
     mocks.readStatus.mockResolvedValueOnce(ok({
       entries: [statusEntry('cards/new.ocdocument', { worktreeNew: true })],
@@ -165,7 +165,7 @@ describe('useProjectTimeline', () => {
       .filter(isNodeTailAction)).toEqual([{
       key: 'timeline.compare-with-disk',
       title: 'Compare with disk',
-      icon: 'action.file-arrow-up-down',
+      icon: 'mdiFileArrowUpDownOutline',
     }])
     expect(normalizeNodeTail(state.projectTreeData.value.items.get('project-timeline:project1')?.tail)
       .filter(isNodeTailAction)).toEqual([])

@@ -47,18 +47,18 @@ export function createSettingsPage(cancelExportsAndWait: () => Promise<void>) {
   const headerActions = computed<readonly PageHeaderAction[]>(() => [
     {
       key: 'settings.save',
-      icon: 'action.save',
+      icon: 'mdiContentSaveOutline',
       title: t('settings.actions.save', 'Save'),
       disabled: !settingsStore.dirty.value,
     },
     ...(isTauri()
-      ? [{ key: 'settings.open-file', icon: 'format.code-braces', title: t('settings.actions.openFile', 'Open settings file') } satisfies PageHeaderAction]
+      ? [{ key: 'settings.open-file', icon: 'mdiCodeBraces', title: t('settings.actions.openFile', 'Open settings file') } satisfies PageHeaderAction]
       : []),
   ])
 
   const page: SpacePage = {
     key: 'settings',
-    navigation: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'nav.settings', railGroup: 'secondary' },
+    navigation: { key: 'settings', labelKey: 'app.shell.space.settings', icon: 'mdiCog', railGroup: 'secondary' },
     content: SettingsPageContent,
     contentProps: computed(() => ({
       viewModel: feature.activeCategory.value,

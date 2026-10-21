@@ -235,21 +235,21 @@ const shellMainStyle = computed(() => ({
 const windowControls = computed<ShellTitleBarWindowControl[]>(() => [
   {
     key: 'toggle-fullscreen',
-    icon: isWindowFullscreen.value ? 'window.fullscreen-exit' : 'window.fullscreen',
+    icon: isWindowFullscreen.value ? 'mdiFullscreenExit' : 'mdiFullscreen',
     group: 'app',
     hoverTip: isWindowFullscreen.value
       ? t('app.shell.exitFullscreen')
       : t('app.shell.enterFullscreen'),
   },
   ...(!usesNativeMacosWindowControls ? [
-    { key: 'minimize', icon: 'window.minimize', group: 'window', hoverTip: t('app.shell.minimize') },
+    { key: 'minimize', icon: 'mdiWindowMinimize', group: 'window', hoverTip: t('app.shell.minimize') },
     {
       key: 'toggle-maximize',
-      icon: isWindowMaximized.value ? 'window.restore' : 'window.maximize',
+      icon: isWindowMaximized.value ? 'mdiWindowRestore' : 'mdiWindowMaximize',
       group: 'window',
       hoverTip: isWindowMaximized.value ? t('app.shell.restore') : t('app.shell.maximize'),
     },
-    { key: 'close', icon: 'action.close', group: 'window', hoverTip: t('app.shell.close'), danger: true },
+    { key: 'close', icon: 'mdiClose', group: 'window', hoverTip: t('app.shell.close'), danger: true },
   ] satisfies ShellTitleBarWindowControl[] : []),
 ])
 

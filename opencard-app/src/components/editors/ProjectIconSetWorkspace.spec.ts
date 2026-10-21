@@ -60,8 +60,8 @@ describe('ProjectIconSetWorkspace', () => {
     expect(nodeActions(wrapper, 'icon:0').map(action => action.key)).toEqual([
       'duplicate', 'move-top', 'move-up', 'move-down', 'move-bottom', 'delete',
     ])
-    expect(nodeActions(wrapper, 'icon:0').find(action => action.key === 'move-top')?.icon).toBe('format.vertical-top')
-    expect(nodeActions(wrapper, 'icon:0').find(action => action.key === 'move-bottom')?.icon).toBe('format.vertical-bottom')
+    expect(nodeActions(wrapper, 'icon:0').find(action => action.key === 'move-top')?.icon).toBe('mdiFormatVerticalAlignTop')
+    expect(nodeActions(wrapper, 'icon:0').find(action => action.key === 'move-bottom')?.icon).toBe('mdiFormatVerticalAlignBottom')
     expect(disabledActionEntries('icon:0')).toEqual([
       ['move-top', 'projectConfig.icons.alreadyAtTop'],
       ['move-up', 'projectConfig.icons.alreadyAtTop'],

@@ -7,11 +7,11 @@ function createView(inputs: PropertyEditorInput[]) {
   return usePropertyEditorView({
     inputs: ref(inputs),
     categories: ref(new Map([
-      ['identity', { title: 'Identity', icon: 'data.symbol-key' as const }],
-      ['content', { title: 'Content', icon: 'data.symbol-string' as const }],
+      ['identity', { title: 'Identity', icon: 'mdiKeyOutline' as const }],
+      ['content', { title: 'Content', icon: 'mdiFormatText' as const }],
     ])),
     sortMode: ref<'category' | 'alphabetical'>('category'),
-    otherCategory: ref({ title: 'Other', icon: 'data.list-tree' }),
+    otherCategory: ref({ title: 'Other', icon: 'mdiFileTreeOutline' }),
   })
 }
 
@@ -29,9 +29,9 @@ describe('usePropertyEditorView', () => {
 
     expect(displaySources.value[0]?.categories.map((category) => [category.title, category.icon]))
       .toEqual([
-        ['Identity', 'data.symbol-key'],
-        ['Content', 'data.symbol-string'],
-        ['Other', 'data.list-tree'],
+        ['Identity', 'mdiKeyOutline'],
+        ['Content', 'mdiFormatText'],
+        ['Other', 'mdiFileTreeOutline'],
       ])
   })
 

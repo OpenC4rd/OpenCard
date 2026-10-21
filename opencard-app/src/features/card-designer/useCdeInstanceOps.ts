@@ -21,11 +21,11 @@ type InstanceActionSet = {
 }
 
 function createInstanceActions(translate: (messageKey: string) => string): InstanceActionSet {
-  const rename = cdeNodeAction('rename', 'action.edit', translate('cardDesigner.treeActions.rename'), { shortcut: 'block.rename' })
-  const duplicate = cdeNodeAction('duplicate-instance', 'action.copy', translate('cardDesigner.dataTable.duplicateInstance'), { shortcut: 'instance.duplicate' })
-  const remove = cdeNodeAction('delete-instance', 'action.delete', translate('cardDesigner.dataTable.deleteInstance'), { shortcut: 'instance.delete' })
+  const rename = cdeNodeAction('rename', 'mdiPencilOutline', translate('cardDesigner.treeActions.rename'), { shortcut: 'block.rename' })
+  const duplicate = cdeNodeAction('duplicate-instance', 'mdiContentCopy', translate('cardDesigner.dataTable.duplicateInstance'), { shortcut: 'instance.duplicate' })
+  const remove = cdeNodeAction('delete-instance', 'mdiTrashCanOutline', translate('cardDesigner.dataTable.deleteInstance'), { shortcut: 'instance.delete' })
   return {
-    more: cdeNodeAction('instance-more', 'nav.more', translate('cardDesigner.treeActions.more'), { children: [rename, duplicate, remove] }),
+    more: cdeNodeAction('instance-more', 'mdiDotsHorizontal', translate('cardDesigner.treeActions.more'), { children: [rename, duplicate, remove] }),
     rename,
     duplicate,
     remove,
@@ -58,7 +58,7 @@ export function useCdeInstanceOps(options: UseCdeInstanceOpsOptions) {
 
     items.set(options.blueprintCardId, {
       label: options.translate('cardDesigner.dataTable.blueprint'),
-      visual: { type: 'icon', icon: 'entity.card-blueprint' },
+      visual: { type: 'icon', icon: 'mdiViewDashboard' },
     })
 
     for (const [index, instance] of (options.cardDoc.value?.instances ?? []).entries()) {
@@ -66,7 +66,7 @@ export function useCdeInstanceOps(options: UseCdeInstanceOpsOptions) {
       rootKeys.push(key)
       items.set(key, {
         label: instance.name?.trim() || key,
-        visual: { type: 'icon', icon: 'entity.card-instance' },
+        visual: { type: 'icon', icon: 'mdiViewDashboardEditOutline' },
         renamable: true,
         draggable: true,
         tail: [actions.more],

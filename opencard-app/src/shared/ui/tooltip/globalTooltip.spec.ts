@@ -11,7 +11,7 @@ describe('globalTooltip', () => {
     document.body.innerHTML = `
       <button id="first" data-tooltip="First tooltip">First</button>
       <button id="second" data-tooltip="Second tooltip">Second</button>
-      <button id="rich" data-tooltip="[b]Before[/b][br][i]Now[/i] [code]copy[/code] [icon:action.copy] [key]Alt[/key]">Rich</button>
+      <button id="rich" data-tooltip="[b]Before[/b][br][i]Now[/i] [code]copy[/code] [icon:mdiContentCopy] [key]Alt[/key]">Rich</button>
       <span id="fitting" data-tooltip="Fits" data-tooltip-overflow>Fits</span>
       <span id="overflowing" data-tooltip="Complete clipped text" data-tooltip-overflow>Clipped</span>
       <div id="clipper" style="overflow-x: hidden; overflow-y: hidden">

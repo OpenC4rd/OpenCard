@@ -590,7 +590,7 @@ async function navigate(token: SessionNavigationToken): Promise<EditorNavigation
 const presentation = computed<EditorPresentation>(() => ({
   title: t('iconRegistry.title'),
   description: t('iconRegistry.description'),
-  icon: 'file.project-icon',
+  icon: 'mdiStickerEmoji',
 }))
 
 const CREATE_COLLECTION_ACTION_KEY = 'project-icon-registry.create-collection'
@@ -598,7 +598,7 @@ const CREATE_COLLECTION_ACTION_KEY = 'project-icon-registry.create-collection'
 const headerActions = computed<OcActionDefinition[]>(() => [
   {
     key: CREATE_COLLECTION_ACTION_KEY,
-    icon: 'action.add',
+    icon: 'mdiPlus',
     title: t('projectConfig.icons.createCollection'),
     disabled: !document.value || importBusy.value,
   },

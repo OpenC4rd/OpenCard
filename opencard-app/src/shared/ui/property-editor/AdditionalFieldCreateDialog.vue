@@ -1,5 +1,5 @@
 <template>
-  <OcDialog :open="open" :title="t('propertyEditor.customFields.create')" as="form" size="md"
+  <OcDialog :open="open" :title="dialogTitle" as="form" size="md"
     close-on-backdrop @request-close="emit('close')" @submit="submit">
         <label class="additional-field-dialog__field">
           <span>{{ t('propertyEditor.customFields.type') }}</span>
@@ -7,6 +7,7 @@
             full-width
             :model-value="fieldType"
             :options="fieldTypeOptions"
+            :readonly="isEditing"
             @update:model-value="emit('update-field-type', $event)"
           />
         </label>
@@ -16,7 +17,8 @@
           <OcFieldInput
             full-width
             mono
-            autofocus
+            :autofocus="!isEditing"
+            :readonly="isEditing"
             :value="fieldKey"
             @input="emitInputValue('update-field-key', $event)"
           />
@@ -33,7 +35,7 @@
         </label>
 
         <OcButton class="additional-field-dialog__advanced-toggle" type="button" variant="ghost"
-          :icon="advancedOpen ? 'nav.chevron-up' : 'nav.chevron-down'"
+          :icon="advancedOpen ? 'mdiChevronUp' : 'mdiChevronDown'"
           :aria-expanded="advancedOpen" @click="advancedOpen = !advancedOpen">
           {{ t('propertyEditor.customFields.advanced') }}
         </OcButton>
@@ -62,11 +64,15 @@
         <p v-if="displayErrorText" class="additional-field-dialog__error" role="alert">{{ displayErrorText }}</p>
 
     <template #footer>
+      <OcButton v-if="isEditing && canRemove" class="additional-field-dialog__remove" type="button" variant="ghost"
+        @click="requestRemove">
+        {{ removePending ? t('propertyEditor.customFields.confirmRemove') : t('propertyEditor.customFields.remove') }}
+      </OcButton>
       <OcButton type="button" @click="emit('close')">
         {{ t('propertyEditor.customFields.cancel') }}
       </OcButton>
       <OcButton type="submit" variant="solid" :disabled="invalid || Boolean(definitionError)">
-        {{ t('propertyEditor.customFields.confirmCreate') }}
+        {{ isEditing ? t('propertyEditor.customFields.confirmEdit') : t('propertyEditor.customFields.confirmCreate') }}
       </OcButton>
     </template>
   </OcDialog>
@@ -85,13 +91,16 @@ import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcSelect from '../../../components/standard/OcSelect.vue'
 import PropertyEditor from './PropertyEditor.vue'
 import PropertyFieldRenderer from './PropertyFieldRenderer.vue'
+import { isPropertyRemovable } from './propertyRemovability'
 
 const props = defineProps<{
   open: boolean
+  mode?: 'create' | 'edit'
   fieldTypes: readonly string[]
   fieldType: string
   fieldKey: string
   title: string
+  initialDefinition?: AdditionalFieldDefinition | null
   errorText?: string
   invalid?: boolean
 }>()
@@ -101,21 +110,30 @@ const emit = defineEmits<{
   (e: 'update-field-key', value: string): void
   (e: 'update-title', value: string): void
   (e: 'close'): void
+  (e: 'remove'): void
   (e: 'submit', definition: AdditionalFieldDefinition): void
 }>()
 const { t } = useI18n()
 const advancedOpen = ref(false)
 const definitionRecord = ref<Record<string, unknown>>({})
 const previewValue = ref<unknown>('')
+const removePending = ref(false)
+const isEditing = computed(() => props.mode === 'edit')
+const canRemove = computed(() => isPropertyRemovable(props.initialDefinition ?? {}))
+const dialogTitle = computed(() => isEditing.value
+  ? t('propertyEditor.customFields.edit')
+  : t('propertyEditor.customFields.create'))
+const STRING_CONSTRAINT_KEYS = ['minLength', 'maxLength', 'multiline', 'options', 'presentation'] as const
+const NUMBER_CONSTRAINT_KEYS = ['min', 'max', 'step'] as const
 const fieldTypeOptions = computed(() => props.fieldTypes.map(option => ({
   value: option,
   label: t(`propertyEditor.fieldTypes.${option}`),
 })))
 const definitionCategories = computed(() => new Map<string, PropertyEditorCategoryDefinition>([
-  ['advanced', { title: t('propertyEditor.customFields.advanced'), icon: 'data.symbol-class' }],
+  ['advanced', { title: t('propertyEditor.customFields.advanced'), icon: 'mdiCodeBraces' }],
 ]))
 const definitionFields = computed<Record<string, PropertyEditorFieldDefinition>>(() => {
-  const common = { category: 'advanced', deletable: true } as const
+  const common = { category: 'advanced' } as const
   if (props.fieldType === 'string') return Object.fromEntries(Object.entries({
     minLength: { ...common, title: t('propertyEditor.customFields.constraints.minLength'), fieldType: 'number', min: 0, step: 1 },
     maxLength: { ...common, title: t('propertyEditor.customFields.constraints.maxLength'), fieldType: 'number', min: 0, step: 1 },
@@ -146,13 +164,16 @@ const previewDefinition = computed<PropertyEditorFieldDefinition>(() => ({
 }) as PropertyEditorFieldDefinition)
 
 watch(() => props.open, open => {
-  if (open) {
-    advancedOpen.value = false
-    definitionRecord.value = {}
-    resetPreviewValue()
+  if (!open) {
+    removePending.value = false
+    return
   }
-})
+  advancedOpen.value = false
+  definitionRecord.value = isEditing.value ? readDefinitionConstraints(props.initialDefinition) : {}
+  resetPreviewValue()
+}, { immediate: true })
 watch(() => props.fieldType, () => {
+  if (isEditing.value) return
   definitionRecord.value = {}
 })
 watch(() => [props.fieldType, JSON.stringify(definitionRecord.value)], resetPreviewValue, { immediate: true })
@@ -176,6 +197,27 @@ function deleteDefinitionProperty(intent: PropertyEditorFieldIntent): void {
   const next = { ...definitionRecord.value }
   delete next[intent.fieldKey]
   definitionRecord.value = next
+}
+
+function readDefinitionConstraints(
+  definition: AdditionalFieldDefinition | null | undefined,
+): Record<string, unknown> {
+  if (!definition) return {}
+  const source = definition as unknown as Record<string, unknown>
+  const keys = definition.fieldType === 'string'
+    ? STRING_CONSTRAINT_KEYS
+    : definition.fieldType === 'number' ? NUMBER_CONSTRAINT_KEYS : []
+  return Object.fromEntries(keys
+    .filter(key => source[key] !== undefined)
+    .map(key => [key, typeof source[key] === 'number' ? String(source[key]) : source[key]]))
+}
+
+function requestRemove(): void {
+  if (!removePending.value) {
+    removePending.value = true
+    return
+  }
+  emit('remove')
 }
 
 function parseNumber(value: unknown): number | undefined {
@@ -264,6 +306,7 @@ function emitInputValue(
   color: var(--oc-fg-muted);
 }
 .additional-field-dialog__advanced-toggle { justify-self: start; }
+.additional-field-dialog__remove { margin-inline-end: auto; color: var(--oc-fg-danger); }
 .additional-field-dialog__advanced { min-width: 0; }
 .additional-field-dialog__empty { margin: 0; color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }
 .additional-field-dialog__preview { display: grid; gap: var(--oc-space-xs); color: var(--oc-fg-muted); font-size: var(--oc-text-sm); }

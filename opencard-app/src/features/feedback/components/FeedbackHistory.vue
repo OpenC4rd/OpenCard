@@ -56,10 +56,10 @@
           </p>
         </details>
         <footer>
-          <OcButton icon="action.delete" icon-tone="danger" size="sm" variant="ghost" @click="removeSelected">
+          <OcButton icon="mdiTrashCanOutline" icon-tone="danger" size="sm" variant="ghost" @click="removeSelected">
             {{ t('app.feedback.history.deleteLocal') }}
           </OcButton>
-          <OcButton v-if="developerMode" icon="action.refresh" size="sm" :disabled="refreshing" @click="refreshRecords(true)">
+          <OcButton v-if="developerMode" icon="mdiRefresh" size="sm" :disabled="refreshing" @click="refreshRecords(true)">
             {{ refreshing ? t('app.feedback.history.refreshing') : t('app.feedback.history.refresh') }}
           </OcButton>
         </footer>

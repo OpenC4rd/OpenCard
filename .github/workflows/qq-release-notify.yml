@@ -10,8 +10,6 @@ permissions:
 jobs:
   notify:
     name: Send QQ release message
-    # The preview channel release is a rolling updater pointer, not a version.
-    if: github.event.release.tag_name != 'preview'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     env:

@@ -1,14 +1,14 @@
 <template>
   <OcFieldFrame full-width readonly :disabled="disabled">
     <template #prefix>
-      <OcButton type="button" icon-only variant="ghost" icon="nav.arrow-left"
+      <OcButton type="button" icon-only variant="ghost" icon="mdiArrowLeft"
         :disabled="disabled || currentIndex <= 0" :aria-label="previousLabel" :data-tooltip="previousLabel"
         @click="step(-1)" />
     </template>
     <OcFieldInput variant="plain" full-width readonly :value="currentLabel"
       @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)" />
     <template #suffix>
-      <OcButton type="button" icon-only variant="ghost" icon="nav.arrow-right"
+      <OcButton type="button" icon-only variant="ghost" icon="mdiArrowRight"
         :disabled="disabled || currentIndex >= options.length - 1"
         :aria-label="nextLabel" :data-tooltip="nextLabel" @click="step(1)" />
     </template>

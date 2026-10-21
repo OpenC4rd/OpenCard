@@ -1,7 +1,7 @@
 <template>
   <div class="project-icon-set-workspace" :class="{ 'is-empty': series.icons.length === 0 }">
     <div v-if="series.icons.length === 0" class="project-icon-set-workspace__empty">
-      <OcIcon name="file.image" size="lg" tone="muted" />
+      <OcIcon name="mdiFileImageOutline" size="lg" tone="muted" />
       <OcText as="strong">{{ t('projectConfig.icons.emptyIconList') }}</OcText>
     </div>
     <div v-else class="project-icon-set-workspace__grid-pane">
@@ -10,7 +10,7 @@
           :placeholder="t('projectConfig.icons.filterPlaceholder')"
           :aria-label="t('projectConfig.icons.filterPlaceholder')" @input="updateFilter" />
         <template v-if="filterQuery" #suffix>
-          <OcButton icon-only size="sm" icon="action.close" variant="ghost"
+          <OcButton icon-only size="sm" icon="mdiClose" variant="ghost"
             :aria-label="t('projectConfig.icons.clearFilter')" @click="filterQuery = ''" />
         </template>
       </OcFieldFrame>
@@ -73,25 +73,25 @@ function iconActions(index: number): readonly OcNodeAction[] {
   const boundary = (blocked: boolean, reason: string): Partial<OcNodeAction> => (
     blocked ? { disabled: true, disabledReason: t(reason) } : {}
   )
-  const duplicate: OcNodeAction = { key: 'duplicate', title: t('projectConfig.icons.duplicateIcon'), icon: 'action.copy' }
+  const duplicate: OcNodeAction = { key: 'duplicate', title: t('projectConfig.icons.duplicateIcon'), icon: 'mdiContentCopy' }
   const moveTop: OcNodeAction = {
-    key: 'move-top', title: t('projectConfig.icons.moveToTop'), icon: 'format.vertical-top',
+    key: 'move-top', title: t('projectConfig.icons.moveToTop'), icon: 'mdiFormatVerticalAlignTop',
     ...boundary(atTop, 'projectConfig.icons.alreadyAtTop'),
   }
   const moveUp: OcNodeAction = {
-    key: 'move-up', title: t('propertyEditor.arrays.moveUp'), icon: 'nav.arrow-up',
+    key: 'move-up', title: t('propertyEditor.arrays.moveUp'), icon: 'mdiArrowUp',
     ...boundary(atTop, 'projectConfig.icons.alreadyAtTop'),
   }
   const moveDown: OcNodeAction = {
-    key: 'move-down', title: t('propertyEditor.arrays.moveDown'), icon: 'nav.arrow-down',
+    key: 'move-down', title: t('propertyEditor.arrays.moveDown'), icon: 'mdiArrowDown',
     ...boundary(atBottom, 'projectConfig.icons.alreadyAtBottom'),
   }
   const moveBottom: OcNodeAction = {
-    key: 'move-bottom', title: t('projectConfig.icons.moveToBottom'), icon: 'format.vertical-bottom',
+    key: 'move-bottom', title: t('projectConfig.icons.moveToBottom'), icon: 'mdiFormatVerticalAlignBottom',
     ...boundary(atBottom, 'projectConfig.icons.alreadyAtBottom'),
   }
   const remove: OcNodeAction = {
-    key: 'delete', title: t('projectConfig.icons.removeIcon'), icon: 'action.delete', iconTone: 'danger',
+    key: 'delete', title: t('projectConfig.icons.removeIcon'), icon: 'mdiTrashCanOutline', iconTone: 'danger',
   }
   return [duplicate, moveTop, moveUp, moveDown, moveBottom, remove]
 }
@@ -135,7 +135,7 @@ const iconAlbumData = computed<OcNodeCollection>(() => ({
             },
             label: icon.name,
           }
-        : { type: 'icon' as const, icon: 'file.image' },
+        : { type: 'icon' as const, icon: 'mdiFileImageOutline' },
       tail: iconActions(index),
     }]
   })),

@@ -70,8 +70,8 @@ describe('OcOptionGroup', () => {
         modelValue: 'workspace',
         semantics: 'tabs',
         options: [
-          { value: 'workspace', label: 'Workspace', icon: 'status.folder-open' },
-          { value: 'history', label: 'History', icon: 'file.git' },
+          { value: 'workspace', label: 'Workspace', icon: 'mdiFolderOpenOutline' },
+          { value: 'history', label: 'History', icon: 'mdiSourceBranch' },
         ],
       },
     })

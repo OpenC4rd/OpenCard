@@ -350,14 +350,14 @@ describe('CardViewport wheel zoom API', () => {
       global: { stubs: { CardFaceRenderer: true } },
     })
     const viewport = wrapper.vm as unknown as {
-      flashStatus(status: { icon: 'tool.flip-to-back' | 'tool.snap-grid-on'; message: string }): void
+      flashStatus(status: { icon: 'mdiFlipToBack' | 'mdiMagnetOn'; message: string }): void
     }
 
-    viewport.flashStatus({ icon: 'tool.flip-to-back', message: 'Switched to back face' })
+    viewport.flashStatus({ icon: 'mdiFlipToBack', message: 'Switched to back face' })
     await nextTick()
     expect(wrapper.get('.card-viewport-status-flash').text()).toContain('Switched to back face')
 
-    viewport.flashStatus({ icon: 'tool.snap-grid-on', message: 'Alignment snapping enabled' })
+    viewport.flashStatus({ icon: 'mdiMagnetOn', message: 'Alignment snapping enabled' })
     await nextTick()
     const flash = wrapper.get('.card-viewport-status-flash')
     expect(flash.text()).toContain('Alignment snapping enabled')
@@ -447,14 +447,14 @@ describe('CardViewport wheel zoom API', () => {
         selectedAnchor: 'rb',
         selectedParentBlockId: 'parent',
         selectionInfo: {
-          icon: 'entity.block-text',
+          icon: 'mdiTextBoxOutline',
           iconTone: 'block-text',
           name: 'Title',
           notes: 'Primary heading',
         },
         selectionCommandActions: [{
           key: 'content.edit-rich-text',
-          icon: 'format.text-variant-outline',
+          icon: 'mdiFormatTextVariantOutline',
           title: 'Edit rich text',
         }],
       },
@@ -481,11 +481,11 @@ describe('CardViewport wheel zoom API', () => {
       .toEqual(['content.edit-rich-text', 'fill-parent', 'center', 'inset', 'outset'])
     expect(actions.map((action) => action.props('action').icon))
       .toEqual([
-        'format.text-variant-outline',
-        'layout.fill',
-        'layout.center',
-        'layout.inset',
-        'layout.outset',
+        'mdiFormatTextVariantOutline',
+        'mdiFitToPageOutline',
+        'mdiImageFilterCenterFocus',
+        'mdiArrowCollapse',
+        'mdiArrowExpand',
       ])
     expect(wrapper.get('.selection-block-info__title').text()).toContain('Title')
     expect(wrapper.get('.selection-block-info__notes').text()).toBe('Primary heading')

@@ -27,20 +27,20 @@ export function addTitleBarNotice(input: Omit<ShellTitleBarNotice, 'id'>): numbe
   return notice.id
 }
 
-export function notifySuccess(message: string, icon: IconToken = 'action.check'): number {
+export function notifySuccess(message: string, icon: IconToken = 'mdiCheck'): number {
   return addTitleBarNotice({ message, tone: 'success', icon })
 }
 
-export function notifyWarning(message: string, icon: IconToken = 'status.warning'): number {
+export function notifyWarning(message: string, icon: IconToken = 'mdiAlertOutline'): number {
   return addTitleBarNotice({ message, tone: 'warning', icon })
 }
 
 /** 小贴士：统一的警示色灯泡图标，让建议类消息和普通警告区分开。 */
-export function notifyTip(message: string, icon: IconToken = 'status.tip'): number {
+export function notifyTip(message: string, icon: IconToken = 'mdiLightbulbOnOutline'): number {
   return addTitleBarNotice({ message, tone: 'warning', icon })
 }
 
-export function notifyError(message: string, icon: IconToken = 'status.error'): number {
+export function notifyError(message: string, icon: IconToken = 'mdiAlertCircleOutline'): number {
   return addTitleBarNotice({ message, tone: 'danger', icon })
 }
 

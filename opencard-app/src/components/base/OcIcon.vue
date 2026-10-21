@@ -1,4 +1,4 @@
-<!-- Base 图标：渲染项目语义图标的 MDI SVG path。 -->
+<!-- Base 图标：按 MDI 导出名渲染内置 SVG path。 -->
 <template>
   <svg
     class="oc-icon oc-icon-svg"
@@ -29,7 +29,7 @@ import { resolveIcon, type IconToken, type IconTone } from '../../shared/ui/icon
  * OcIcon component props.
  */
 interface OcIconProps {
-  /** 图标注册键 */
+  /** 图标名：MDI 导出名 */
   name?: IconToken
   /** 图标色调 */
   tone?: IconTone
@@ -43,7 +43,7 @@ defineOptions({
 })
 
 const props = withDefaults(defineProps<OcIconProps>(), {
-  name: 'file.generic',
+  name: 'mdiFileOutline',
   tone: 'default',
   size: 'md',
 })

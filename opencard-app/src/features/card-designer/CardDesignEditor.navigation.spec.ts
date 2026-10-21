@@ -533,31 +533,31 @@ describe('CardDesignEditor issue navigation', () => {
     expect(faceAction?.props('variant')).toBe('ghost')
     expect(faceAction?.props('size')).toBe('sm')
     expect(faceAction?.props('iconSize')).toBe('action')
-    expect(faceAction?.props('action').icon).toBe('tool.flip-to-back')
+    expect(faceAction?.props('action').icon).toBe('mdiFlipToBack')
     expect(clipAction?.props('variant')).toBe('ghost')
     expect(clipAction?.props('active')).toBe(false)
     expect(clipAction?.props('size')).toBe('sm')
     expect(clipAction?.props('iconSize')).toBe('action')
-    expect(clipAction?.props('action').icon).toBe('tool.box-cutter-off')
+    expect(clipAction?.props('action').icon).toBe('mdiBoxCutterOff')
     expect(alignmentSnappingAction?.props('variant')).toBe('ghost')
     expect(alignmentSnappingAction?.props('active')).toBe(false)
     expect(alignmentSnappingAction?.props('size')).toBe('sm')
     expect(alignmentSnappingAction?.props('iconSize')).toBe('action')
-    expect(alignmentSnappingAction?.props('action').icon).toBe('tool.snap-grid')
+    expect(alignmentSnappingAction?.props('action').icon).toBe('mdiMagnet')
     faceAction?.vm.$emit('select', { key: 'switch-face' })
     clipAction?.vm.$emit('select', { key: 'toggle-face-clip' })
     alignmentSnappingAction?.vm.$emit('select', { key: 'toggle-alignment-snapping' })
     await nextTick()
 
-    expect(faceAction?.props('action').icon).toBe('tool.flip-to-front')
-    expect(clipAction?.props('action').icon).toBe('tool.box-cutter')
+    expect(faceAction?.props('action').icon).toBe('mdiFlipToFront')
+    expect(clipAction?.props('action').icon).toBe('mdiBoxCutter')
     expect(clipAction?.props('variant')).toBe('soft')
     expect(clipAction?.props('active')).toBe(true)
     expect(clipAction?.props('action').iconTone).toBeUndefined()
     expect(alignmentSnappingAction?.props('variant')).toBe('soft')
     expect(alignmentSnappingAction?.props('active')).toBe(true)
     expect(alignmentSnappingAction?.props('action').iconTone).toBeUndefined()
-    expect(alignmentSnappingAction?.props('action').icon).toBe('tool.snap-grid-on')
+    expect(alignmentSnappingAction?.props('action').icon).toBe('mdiMagnetOn')
     expect(viewport.props('alignmentSnappingEnabled')).toBe(true)
 
     const viewUpdates = sessionView(wrapper)
@@ -672,7 +672,7 @@ describe('CardDesignEditor issue navigation', () => {
     await nextTick()
     expect(viewport.props('selectionCommandActions')).toEqual([{
       key: 'content.edit-rich-text',
-      icon: 'format.text-variant-outline',
+      icon: 'mdiFormatTextVariantOutline',
       title: 'Edit rich text',
     }])
 
@@ -709,10 +709,10 @@ describe('CardDesignEditor issue navigation', () => {
     viewport.vm.$emit('block-click', 'flow-1', new MouseEvent('click'))
     await nextTick()
     expect(viewport.props('selectionCommandActions')).toEqual([
-      { key: 'flow.direction.left', icon: 'nav.arrow-left', iconTone: 'default', title: 'Flow left' },
-      { key: 'flow.direction.up', icon: 'nav.arrow-up', iconTone: 'default', title: 'Flow up' },
-      { key: 'flow.direction.down', icon: 'nav.arrow-down', iconTone: 'default', title: 'Flow down' },
-      { key: 'flow.direction.right', icon: 'nav.arrow-right', iconTone: 'accent', title: 'Flow right' },
+      { key: 'flow.direction.left', icon: 'mdiArrowLeft', iconTone: 'default', title: 'Flow left' },
+      { key: 'flow.direction.up', icon: 'mdiArrowUp', iconTone: 'default', title: 'Flow up' },
+      { key: 'flow.direction.down', icon: 'mdiArrowDown', iconTone: 'default', title: 'Flow down' },
+      { key: 'flow.direction.right', icon: 'mdiArrowRight', iconTone: 'accent', title: 'Flow right' },
     ])
 
     const directions = [
@@ -828,13 +828,13 @@ describe('CardDesignEditor issue navigation', () => {
     expect(viewport.props('layerViewShortcutLegendLabel')).toBe('Layer view shortcuts')
     expect(viewport.props('layerViewShortcutHints')).toEqual([
       {
-        keys: [{ icon: 'input.mouse-scroll-wheel' }, { separator: 'or' }, '↑ / ↓'],
+        keys: [{ icon: 'mdiMouseScrollWheel' }, { separator: 'or' }, '↑ / ↓'],
         label: 'Step through planes',
       },
       {
         keys: [
-          { icon: 'input.keyboard-shift' },
-          { icon: 'input.mouse-scroll-wheel' },
+          { icon: 'mdiAppleKeyboardShift' },
+          { icon: 'mdiMouseScrollWheel' },
           { separator: 'or' },
           '↑ / ↓',
         ],
@@ -842,14 +842,14 @@ describe('CardDesignEditor issue navigation', () => {
       },
       { keys: ['A-Z'], label: 'Cycle by name or Pinyin initial' },
       {
-        keys: [{ icon: 'input.keyboard-shift' }, 'A-Z'],
+        keys: [{ icon: 'mdiAppleKeyboardShift' }, 'A-Z'],
         label: 'Cycle names or Pinyin in current layer',
       },
-      { keys: [{ icon: 'input.keyboard-space' }], label: 'Select the focused plane' },
+      { keys: [{ icon: 'mdiKeyboardSpace' }], label: 'Select the focused plane' },
       {
         keys: [
-          { icon: 'input.keyboard-space' },
-          { icon: 'input.mouse-scroll-wheel' },
+          { icon: 'mdiKeyboardSpace' },
+          { icon: 'mdiMouseScrollWheel' },
           { separator: 'or' },
           '↑ / ↓',
         ],
@@ -857,9 +857,9 @@ describe('CardDesignEditor issue navigation', () => {
       },
       {
         keys: [
-          { icon: 'input.keyboard-shift' },
-          { icon: 'input.keyboard-space' },
-          { icon: 'input.mouse-scroll-wheel' },
+          { icon: 'mdiAppleKeyboardShift' },
+          { icon: 'mdiKeyboardSpace' },
+          { icon: 'mdiMouseScrollWheel' },
           { separator: 'or' },
           '↑ / ↓',
         ],
@@ -954,10 +954,10 @@ describe('CardDesignEditor issue navigation', () => {
       alignmentSnappingEnabled: !snappingUpdate.alignmentSnappingEnabled, clipToFace: true, activeFace: 'back',
     })
     expect(flashStatus.mock.calls).toEqual(expect.arrayContaining([
-      [{ icon: 'tool.snap-grid-on', message: 'Alignment snapping enabled' }],
-      [{ icon: 'tool.snap-grid', message: 'Alignment snapping disabled' }],
-      [{ icon: 'tool.box-cutter', message: 'Face clipping enabled' }],
-      [{ icon: 'tool.flip-to-back', message: 'Switched to back face' }],
+      [{ icon: 'mdiMagnetOn', message: 'Alignment snapping enabled' }],
+      [{ icon: 'mdiMagnet', message: 'Alignment snapping disabled' }],
+      [{ icon: 'mdiBoxCutter', message: 'Face clipping enabled' }],
+      [{ icon: 'mdiFlipToBack', message: 'Switched to back face' }],
     ]))
 
     await wrapper.get('.shortcut-input').trigger('keydown', { key: 'ArrowLeft' })
@@ -1130,11 +1130,11 @@ describe('CardDesignEditor issue navigation', () => {
     }>).find(action => action.key === key)!
     const propertyEditor = wrapper.getComponent({ name: 'PropertyEditor' })
 
-    expect(getAction('toggle-property-sort').icon).toBe('action.sort-alphabetical-ascending')
+    expect(getAction('toggle-property-sort').icon).toBe('mdiSortAlphabeticalAscending')
     propertyCard.vm.$emit('action', { key: 'toggle-property-sort' })
     await nextTick()
     expect(propertyEditor.props('sortMode')).toBe('alphabetical')
-    expect(getAction('toggle-property-sort').icon).toBe('action.sort-category')
+    expect(getAction('toggle-property-sort').icon).toBe('mdiFormatListGroup')
 
     propertyCard.vm.$emit('action', { key: 'toggle-property-delete-mode' })
     await nextTick()
@@ -1145,6 +1145,34 @@ describe('CardDesignEditor issue navigation', () => {
       ))).toBe(true)
     expect(getAction('toggle-property-delete-mode').disabled).toBeUndefined()
 
+  })
+
+  it('clears a property value from the panel but keeps its definition', async () => {
+    const document = createCdeDocument()
+    const container = document.faces.front.children[0]!.block as ReturnType<typeof createSimpleContainerBlock>
+    const textBlock = container.children[0]!.block as ReturnType<typeof createTextBlock> & Record<string, unknown>
+    textBlock.additionalFieldDefinition = { score: { fieldType: 'number', title: 'Score' } }
+    textBlock.score = 7
+
+    const wrapper = mountCde({
+      props: { modelValue: document, cardDesignerView: neutralView() },
+      stubs: { PropertyEditor: false },
+    })
+    await nextTick()
+    ;(wrapper.vm as unknown as EditorHandle).selectViewportBlock('text-1')
+    await nextTick()
+
+    expect(wrapper.find('[data-field-key="score"]').exists()).toBe(true)
+
+    wrapper.getComponent({ name: 'PropertyEditor' })
+      .vm.$emit('delete-property', { key: 'text-1', fieldKey: 'score' })
+    await nextTick()
+
+    const savedBlock = (emittedDocument(wrapper).faces.front.children[0]!.block as ReturnType<typeof createSimpleContainerBlock>)
+      .children[0]!.block as ReturnType<typeof createTextBlock> & Record<string, unknown>
+    expect(Object.prototype.hasOwnProperty.call(savedBlock, 'score')).toBe(false)
+    expect(savedBlock.additionalFieldDefinition?.score).toMatchObject({ fieldType: 'number', title: 'Score' })
+    expect(wrapper.find('[data-field-key="score"]').exists()).toBe(false)
   })
 
   it('creates a custom field for the explicit table Block and persists it in the document', async () => {

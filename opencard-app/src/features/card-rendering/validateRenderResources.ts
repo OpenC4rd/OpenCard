@@ -23,6 +23,11 @@ const PORTABLE_FONT_FAMILIES = new Set([
   'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded', 'emoji', 'math', 'fangsong',
 ])
 
+/** 问题描述里的字段名跟着属性面板的标题走，字段键本身留给定位与跳转。 */
+function issueFieldName(fieldKey: string): string {
+  return fieldKey === 'source' ? 'imageSource' : fieldKey
+}
+
 export function validateRenderResources(
   document: RenderReadyCardDocument,
   policy: ProjectRemoteResourcePolicy | undefined,
@@ -62,7 +67,7 @@ function validateBlock(
         ...(blockPath ? { blockPath } : {}),
         fieldKey: 'source',
       },
-      parameters: { fieldName: 'source' },
+      parameters: { fieldName: 'imageSource' },
       details: { url: block.source },
     }))
   }
@@ -230,7 +235,7 @@ function pushPackageResourceIssue(
       fieldKey: context.fieldKey,
     },
     parameters: {
-      fieldName: context.fieldKey,
+      fieldName: issueFieldName(context.fieldKey),
       reference,
       ...(type === 'card-designer.resource.package-missing'
         ? { packageKey: reference.slice(0, reference.indexOf('#')) }

@@ -22,8 +22,8 @@ describe('ProjectFontRegistryEditor', () => {
     const tree = wrapper.getComponent(OcTree)
     const data = tree.props('data') as OcNodeCollection
 
-    expect(data.items.get('families')?.tail).toMatchObject([{ key: 'add-family', icon: 'action.add' }])
-    expect(data.items.get('compositions')?.tail).toMatchObject([{ key: 'add-composition', icon: 'action.add' }])
+    expect(data.items.get('families')?.tail).toMatchObject([{ key: 'add-family', icon: 'mdiPlus' }])
+    expect(data.items.get('compositions')?.tail).toMatchObject([{ key: 'add-composition', icon: 'mdiPlus' }])
 
     tree.vm.$emit('action', { key: 'families', actionKey: 'add-family', source: 'inline' })
     tree.vm.$emit('action', { key: 'compositions', actionKey: 'add-composition', source: 'inline' })

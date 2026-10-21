@@ -21,7 +21,7 @@ export function createAboutPage(about: ReturnType<typeof useApplicationServices>
       onSendFeedback: () => about.openFeedbackCenter('submit'), onViewFeedback: () => about.openFeedbackCenter('history'),
     })),
     sidebar: computed(() => [{ key: 'primary', transitionKey: 'flow:about', title: '',
-      onAction: returnFromFlow, headButtons: [{ key: 'return-primary-page', icon: 'nav.arrow-left', title: t('app.shell.back') }], lists: [] }]),
+      onAction: returnFromFlow, headButtons: [{ key: 'return-primary-page', icon: 'mdiArrowLeft', title: t('app.shell.back') }], lists: [] }]),
     header: computed(() => ({ title: t('app.about.title'), titleLoading: false, actions: [] })),
   }
 }

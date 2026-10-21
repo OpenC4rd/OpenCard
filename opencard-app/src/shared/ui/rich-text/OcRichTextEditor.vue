@@ -4,9 +4,9 @@
     <div v-if="editor" class="oc-rich-text-editor__toolbar" role="toolbar" aria-label="Text formatting">
       <div class="oc-rich-text-editor__toolbar-row">
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupHistory', '历史')">
-          <OcButton size="md" icon-only icon="action.undo" :data-tooltip="tr('app.menu.undo', '撤销')" :aria-label="tr('app.menu.undo', '撤销')"
+          <OcButton size="md" icon-only icon="mdiUndoVariant" :data-tooltip="tr('app.menu.undo', '撤销')" :aria-label="tr('app.menu.undo', '撤销')"
             :disabled="!editor.can().chain().focus().undo().run()" @mousedown.prevent @click="runCommand('undo')" />
-          <OcButton size="md" icon-only icon="action.redo" :data-tooltip="tr('app.menu.redo', '重做')" :aria-label="tr('app.menu.redo', '重做')"
+          <OcButton size="md" icon-only icon="mdiRedoVariant" :data-tooltip="tr('app.menu.redo', '重做')" :aria-label="tr('app.menu.redo', '重做')"
             :disabled="!editor.can().chain().focus().redo().run()" @mousedown.prevent @click="runCommand('redo')" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.font', '字体')">
@@ -16,34 +16,34 @@
             :value="activeFontSize" @update:value="formatting.apply('fontSize', $event)" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupTypography', '文字')">
-          <OcButton size="md" icon-only icon="format.font-size-decrease" :data-tooltip="tr('propertyEditor.richText.decreaseFontSize', '减小字号')" :aria-label="tr('propertyEditor.richText.decreaseFontSize', '减小字号')"
+          <OcButton size="md" icon-only icon="mdiFormatFontSizeDecrease" :data-tooltip="tr('propertyEditor.richText.decreaseFontSize', '减小字号')" :aria-label="tr('propertyEditor.richText.decreaseFontSize', '减小字号')"
             @mousedown.prevent @click="formatting.adjustSize(-1)" />
-          <OcButton size="md" icon-only icon="format.font-size-increase" :data-tooltip="tr('propertyEditor.richText.increaseFontSize', '增大字号')" :aria-label="tr('propertyEditor.richText.increaseFontSize', '增大字号')"
+          <OcButton size="md" icon-only icon="mdiFormatFontSizeIncrease" :data-tooltip="tr('propertyEditor.richText.increaseFontSize', '增大字号')" :aria-label="tr('propertyEditor.richText.increaseFontSize', '增大字号')"
             @mousedown.prevent @click="formatting.adjustSize(1)" />
-          <OcButton size="md" icon-only icon="format.bold" :active="editor.isActive('bold')"
+          <OcButton size="md" icon-only icon="mdiFormatBold" :active="editor.isActive('bold')"
             :data-tooltip="tr('propertyEditor.richText.bold', '粗体')" :aria-label="tr('propertyEditor.richText.bold', '粗体')" @mousedown.prevent @click="runCommand('bold')" />
-          <OcButton size="md" icon-only icon="format.italic" :active="editor.isActive('italic')"
+          <OcButton size="md" icon-only icon="mdiFormatItalic" :active="editor.isActive('italic')"
             :data-tooltip="tr('propertyEditor.richText.italic', '斜体')" :aria-label="tr('propertyEditor.richText.italic', '斜体')" @mousedown.prevent @click="runCommand('italic')" />
-          <OcButton size="md" icon-only icon="format.underline" :active="editor.isActive('underline')"
+          <OcButton size="md" icon-only icon="mdiFormatUnderline" :active="editor.isActive('underline')"
             :data-tooltip="tr('propertyEditor.richText.underline', '下划线')" :aria-label="tr('propertyEditor.richText.underline', '下划线')" @mousedown.prevent @click="runCommand('underline')" />
-          <OcButton size="md" icon-only icon="format.strikethrough" :active="editor.isActive('strike')"
+          <OcButton size="md" icon-only icon="mdiFormatStrikethrough" :active="editor.isActive('strike')"
             :data-tooltip="tr('propertyEditor.richText.strikethrough', '删除线')" :aria-label="tr('propertyEditor.richText.strikethrough', '删除线')" @mousedown.prevent @click="runCommand('strike')" />
         </div>
       </div>
 
       <div class="oc-rich-text-editor__toolbar-row">
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupDocumentStructure', '文档结构')">
-          <OcButton size="md" icon-only icon="data.list-bulleted" :data-tooltip="tr('propertyEditor.richText.bulletList', '无序列表')" :aria-label="tr('propertyEditor.richText.bulletList', '无序列表')"
+          <OcButton size="md" icon-only icon="mdiFormatListBulleted" :data-tooltip="tr('propertyEditor.richText.bulletList', '无序列表')" :aria-label="tr('propertyEditor.richText.bulletList', '无序列表')"
             :active="editor.isActive('bulletList')" @mousedown.prevent @click="runCommand('bulletList')" />
-          <OcButton size="md" icon-only icon="data.list-numbered" :data-tooltip="tr('propertyEditor.richText.orderedList', '有序列表')" :aria-label="tr('propertyEditor.richText.orderedList', '有序列表')"
+          <OcButton size="md" icon-only icon="mdiFormatListNumbered" :data-tooltip="tr('propertyEditor.richText.orderedList', '有序列表')" :aria-label="tr('propertyEditor.richText.orderedList', '有序列表')"
             :active="editor.isActive('orderedList')" @mousedown.prevent @click="runCommand('orderedList')" />
-          <OcButton v-if="!editor.isActive('table')" size="md" icon-only icon="data.table" :data-tooltip="tr('propertyEditor.richText.insertTable', '插入表格')" :aria-label="tr('propertyEditor.richText.insertTable', '插入表格')"
+          <OcButton v-if="!editor.isActive('table')" size="md" icon-only icon="mdiTableLarge" :data-tooltip="tr('propertyEditor.richText.insertTable', '插入表格')" :aria-label="tr('propertyEditor.richText.insertTable', '插入表格')"
             @mousedown.prevent @click="insertTable" />
           <OcActionButton v-if="editor.isActive('table')" :action="tableAction" size="md" variant="ghost"
             @select="handleTableAction" />
         </div>
         <div v-if="bindingCompletion" class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupDataReference', '数据引用')">
-          <OcButton size="md" icon-only icon="format.code-braces" :data-tooltip="tr('propertyEditor.richText.insertBinding', '插入 binding')"
+          <OcButton size="md" icon-only icon="mdiCodeBraces" :data-tooltip="tr('propertyEditor.richText.insertBinding', '插入 binding')"
             :aria-label="tr('propertyEditor.richText.insertBinding', '插入 binding')" @mousedown.prevent @click="insertBinding" />
         </div>
         <div v-if="hasProjectIconSources" class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupProjectIcon', '项目图标')">
@@ -63,14 +63,14 @@
             @open-change="colorOpen($event)"
             @preview="formatting.preview('foregroundColor', $event)" @commit="formatting.apply('foregroundColor', $event)" @cancel="interaction.clearPreview">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command">
-              <OcIcon name="format.color-fill" size="md" /><span :style="{ backgroundColor: color }" />
+              <OcIcon name="mdiFormatColorFill" size="md" /><span :style="{ backgroundColor: color }" />
             </span></template>
           </OcColorPicker>
           <OcColorPicker :label="tr('propertyEditor.richText.textBackgroundColor', '文字背景色')" :model-value="backgroundColor" :mixed="formatting.state.value.backgroundColor.kind === 'mixed'"
             @open-change="colorOpen($event)"
             @preview="formatting.preview('backgroundColor', $event)" @commit="formatting.apply('backgroundColor', $event)" @cancel="interaction.clearPreview">
             <template #trigger="{ color }"><span class="oc-rich-text-editor__color-command">
-              <OcIcon name="format.color-highlight" size="md" /><span :style="{ backgroundColor: color }" />
+              <OcIcon name="mdiFormatColorHighlight" size="md" /><span :style="{ backgroundColor: color }" />
             </span></template>
           </OcColorPicker>
         </div>
@@ -81,7 +81,7 @@
             @mousedown.prevent @click="runCommand(alignment.value)" />
         </div>
         <div class="oc-rich-text-editor__tool-group oc-rich-text-editor__tool-group--tail" role="group" :aria-label="tr('propertyEditor.richText.groupClearFormatting', '清除格式')">
-          <OcButton size="md" icon-only icon="format.clear" :data-tooltip="tr('propertyEditor.richText.clearCharacterFormatting', '清除字符格式')" :aria-label="tr('propertyEditor.richText.clearCharacterFormatting', '清除字符格式')"
+          <OcButton size="md" icon-only icon="mdiFormatClear" :data-tooltip="tr('propertyEditor.richText.clearCharacterFormatting', '清除字符格式')" :aria-label="tr('propertyEditor.richText.clearCharacterFormatting', '清除字符格式')"
             @mousedown.prevent @click="runCommand('clear')" />
         </div>
       </div>

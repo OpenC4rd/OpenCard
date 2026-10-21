@@ -6,19 +6,19 @@
         :data-tooltip="actionHint" :aria-label="actionHint" @click="chooseProjectFile">
         <OcCover v-if="coverVisual" :visual="coverVisual" />
         <span v-else class="project-cover-field__placeholder">
-          <OcIcon name="file.image" size="lg" tone="muted" />
+          <OcIcon name="mdiFileImageOutline" size="lg" tone="muted" />
           <OcText tone="muted" size="sm">{{ t('projectConfig.cover.empty') }}</OcText>
         </span>
       </button>
       <span v-if="relativePath" class="project-cover-field__info">
         <span class="project-cover-field__title">
-          <OcIcon name="file.image" size="sm" tone="muted" />
+          <OcIcon name="mdiFileImageOutline" size="sm" tone="muted" />
           <OcText class="project-cover-field__path" tone="muted" size="xs" :truncate="true">
             {{ relativePath }}
           </OcText>
         </span>
         <span class="project-cover-field__remove">
-          <OcButton icon-only size="sm" variant="ghost" type="button" icon="action.image-minus" icon-tone="danger"
+          <OcButton icon-only size="sm" variant="ghost" type="button" icon="mdiImageMinusOutline" icon-tone="danger"
             :data-tooltip="t('projectConfig.cover.remove')" :aria-label="t('projectConfig.cover.remove')"
             @click="clear" />
         </span>

@@ -39,7 +39,7 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
               v-if="availableUpdateVersion"
               size="sm"
               variant="ghost"
-              icon="action.download"
+              icon="mdiDownload"
               :aria-label="t('app.updater.available', { version: availableUpdateVersion })"
               :data-tooltip="t('app.updater.available', { version: availableUpdateVersion })"
               @click="emit('showAvailableRelease')"
@@ -61,13 +61,13 @@ const renderedReleaseNotes = computed(() => renderMarkdown(props.currentReleaseN
       <footer>
         <span>{{ t('app.about.copyright') }}</span>
         <div class="about-content__footer-actions">
-          <OcButton icon="action.edit" variant="outline" @click="emit('sendFeedback')">
+          <OcButton icon="mdiPencilOutline" variant="outline" @click="emit('sendFeedback')">
             {{ t('app.menu.sendFeedback') }}
           </OcButton>
-          <OcButton icon="data.list-selection" variant="outline" @click="emit('viewFeedback')">
+          <OcButton icon="mdiFormatListBulletedSquare" variant="outline" @click="emit('viewFeedback')">
             {{ t('app.menu.viewFeedback') }}
           </OcButton>
-          <OcButton icon="nav.arrow-left" variant="outline" @click="emit('back')">
+          <OcButton icon="mdiArrowLeft" variant="outline" @click="emit('back')">
             {{ t('app.shell.back') }}
           </OcButton>
         </div>

@@ -17,8 +17,8 @@ import ShellBottomPanel from './ShellBottomPanel.vue'
 const issueTreeData: OcNodeCollection = {
   rootKeys: ['session:a'],
   items: new Map([
-    ['session:a', { label: 'Card A (1)', icon: 'file.opencard' }],
-    ['issue:a', { label: 'Invalid binding', icon: 'status.warning' }],
+    ['session:a', { label: 'Card A (1)', icon: 'mdiCardsOutline' }],
+    ['issue:a', { label: 'Invalid binding', icon: 'mdiAlertOutline' }],
   ]),
   children: new Map([['session:a', ['issue:a']]]),
 }
@@ -204,24 +204,24 @@ describe('ShellBottomPanel', () => {
     const toggle = wrapper.get('.shell-bottom-panel__toggle')
  
     try {
-      expect(toggle.getComponent(OcIcon).props('name')).toBe('nav.chevron-down')
+      expect(toggle.getComponent(OcIcon).props('name')).toBe('mdiChevronDown')
       await toggle.trigger('mouseenter')
-      expect(toggle.getComponent(OcIcon).props('name')).toBe('tool.pin')
+      expect(toggle.getComponent(OcIcon).props('name')).toBe('mdiPinOutline')
       expect(toggle.attributes('aria-pressed')).toBe('false')
       await toggle.trigger('click')
       expect(toggle.attributes('aria-pressed')).toBe('true')
-      expect(toggle.getComponent(OcIcon).props('name')).toBe('tool.pin-off')
+      expect(toggle.getComponent(OcIcon).props('name')).toBe('mdiPinOffOutline')
       expect(toggle.attributes('aria-label')).toBe('Unpin panel')
       await wrapper.get('.shell-bottom-panel').trigger('mouseleave')
       vi.advanceTimersByTime(180)
       expect(wrapper.emitted('expanded-change')).toEqual([[true]])
  
       await toggle.trigger('mouseleave')
-      expect(toggle.getComponent(OcIcon).props('name')).toBe('nav.chevron-down')
+      expect(toggle.getComponent(OcIcon).props('name')).toBe('mdiChevronDown')
       await toggle.trigger('click')
       expect(toggle.attributes('aria-pressed')).toBe('false')
       await toggle.trigger('mouseenter')
-      expect(toggle.getComponent(OcIcon).props('name')).toBe('tool.pin')
+      expect(toggle.getComponent(OcIcon).props('name')).toBe('mdiPinOutline')
       expect(toggle.attributes('aria-label')).toBe('Pin panel')
     } finally {
       vi.useRealTimers()

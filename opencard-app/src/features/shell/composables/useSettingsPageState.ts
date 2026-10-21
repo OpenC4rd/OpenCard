@@ -42,7 +42,7 @@ export function useSettingsPageState(options: {
   async function copyTheme(themeId: 'dark' | 'light'): Promise<void> {
     const appearance = options.settingsStore.settings.value.appearance
     const text = serializeAppTheme(appearance.themes[themeId])
-    try { await navigator.clipboard.writeText(text); notifySuccess(t('settings.themeExchange.copied'), 'action.copy') }
+    try { await navigator.clipboard.writeText(text); notifySuccess(t('settings.themeExchange.copied'), 'mdiContentCopy') }
     catch { notifyError(t('settings.themeExchange.copyFailed')) }
   }
   async function readTheme(themeId: 'dark' | 'light'): Promise<void> {
@@ -51,7 +51,7 @@ export function useSettingsPageState(options: {
     const definition = parseAppTheme(text)
     if (!definition) { notifyError(t('settings.errors.invalidThemeJson')); return }
     const imported = options.settingsStore.importThemePreset(themeId, t('settings.values.importedTheme'), definition)
-    if (imported) notifySuccess(t('settings.themeExchange.imported'), 'action.import')
+    if (imported) notifySuccess(t('settings.themeExchange.imported'), 'mdiImport')
     else notifyWarning(t('settings.themeExchange.duplicate'))
   }
   /** 重读语言目录并重新应用语言：新放进去的文件立刻能选，被删掉的那个立刻退回默认语言。 */

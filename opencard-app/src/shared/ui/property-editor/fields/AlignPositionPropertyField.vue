@@ -18,10 +18,10 @@ import type { OcOption } from '../../../../components/standard/OcOptionGroup.vue
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 
 const alignOptions: OcOption[] = [
-  { value: 'start', label: 'Start', icon: 'format.align-start' },
-  { value: 'center', label: 'Center', icon: 'format.align-center' },
-  { value: 'end', label: 'End', icon: 'format.align-end' },
-  { value: 'justify', label: 'Justify', icon: 'format.align-justify' },
+  { value: 'start', label: 'Start', icon: 'mdiFormatAlignLeft' },
+  { value: 'center', label: 'Center', icon: 'mdiFormatAlignCenter' },
+  { value: 'end', label: 'End', icon: 'mdiFormatAlignRight' },
+  { value: 'justify', label: 'Justify', icon: 'mdiFormatAlignJustify' },
 ]
 
 const props = defineProps<{

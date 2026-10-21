@@ -18,7 +18,7 @@ describe('PagePropertyEditor', () => {
             title: 'Value', fieldType: 'number', presentation: 'slider', min: 10, max: 16,
           } },
           'px',
-          { type: 'action', key: 'reset', title: 'Reset', icon: 'action.restart',
+          { type: 'action', key: 'reset', title: 'Reset', icon: 'mdiRestart',
             iconOnly: true, variant: 'outline' },
         ],
       }],

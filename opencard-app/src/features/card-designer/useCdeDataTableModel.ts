@@ -9,6 +9,7 @@ import { isBlockContainer, isBlockPackaged } from '../../entities/card/tree'
 import { isInstanceBlockFieldOverridable } from '../../entities/card/instance'
 import type { CardPropertyFieldDefinition } from '../card-properties/cardPropertyFieldDefinitions'
 import { resolveCardPropertyFields } from '../card-properties/cardPropertyFieldDefinitions'
+import { isPropertyRemovable } from '../../shared/ui/property-editor/propertyRemovability'
 
 export type CdeDataTableColumn = {
   key: string
@@ -20,6 +21,7 @@ export type CdeDataTableColumn = {
 export type CdeDataTableCell = {
   identity: string
   cardId: string
+  kind: CdeDataTableColumn['kind']
   value: unknown
   readonly: boolean
   inherited: boolean
@@ -30,7 +32,8 @@ export type CdeDataTableFieldCatalogEntry = {
   key: string
   title: string
   definition: CardPropertyFieldDefinition
-  deletable: boolean
+  resettable: boolean
+  definitionEditable: boolean
 }
 
 export type CdeDataTableFieldRow = CdeDataTableFieldCatalogEntry & {
@@ -171,7 +174,6 @@ export function useCdeDataTableModel(options: UseCdeDataTableModelOptions) {
     }
 
     const definitions = resolveCardPropertyFields(definitionRecord, {
-      allowDelete: true,
       translate: options.translate,
       hasMessage: options.hasMessage,
     })
@@ -180,13 +182,13 @@ export function useCdeDataTableModel(options: UseCdeDataTableModelOptions) {
     return Object.entries(definitions)
       .filter(([fieldKey, definition]) => (
         fieldKey !== 'name' && !definition.isHidden && !definition.isReadonly
-        
       ))
       .map(([fieldKey, definition]) => ({
         key: fieldKey,
         title: definition.title,
         definition,
-        deletable: hasOwn(blockRecord, fieldKey) && definition.deletable === true,
+        resettable: hasOwn(blockRecord, fieldKey) && isPropertyRemovable(definition),
+        definitionEditable: hasOwn(block.additionalFieldDefinition ?? {}, fieldKey),
       }))
   }
 
@@ -210,6 +212,7 @@ export function useCdeDataTableModel(options: UseCdeDataTableModelOptions) {
       return {
         identity: `${column.key}\u0000${block.id}\u0000${field.key}`,
         cardId: column.key,
+        kind: column.kind,
         value: overridden ? overrideRecord![field.key] : blueprintValue,
         readonly: !canOverride,
         inherited: column.kind === 'instance' && !overridden,

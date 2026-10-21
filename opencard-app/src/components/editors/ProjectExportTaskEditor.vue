@@ -7,7 +7,7 @@
           autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" :disabled="busy"
           :aria-expanded="menuOpen" :aria-controls="autocompleteId"
           @focus="openMenu" @input="updateQuery" @blur="closeMenu" @keydown="handleKeydown" />
-        <OcButton type="button" icon-only variant="soft" icon="action.add"
+        <OcButton type="button" icon-only variant="soft" icon="mdiPlus"
           :disabled="busy || !candidatePath" :aria-label="t('projectExport.addDocument')"
           :data-tooltip="t('projectExport.addDocument')"
           @click="addCandidate" />
@@ -53,7 +53,7 @@
           <OcFieldInput variant="plain" full-width readonly :value="outputDirectory"
             :placeholder="t('projectExport.chooseOutputDirectory')" />
           <template #suffix>
-            <OcButton type="button" icon-only variant="ghost" icon="status.folder-open"
+            <OcButton type="button" icon-only variant="ghost" icon="mdiFolderOpenOutline"
               :disabled="busy" :aria-label="t('projectExport.chooseOutputDirectory')"
               :data-tooltip="t('projectExport.chooseOutputDirectory')" @click="chooseOutputDirectory" />
           </template>
@@ -178,13 +178,13 @@ const suggestions = computed<OcAutocompleteItem[]>(() => {
   return props.documents
     .filter(document => !selectedDocuments.value.some(selected => selected.path === document.path))
     .filter(document => !normalizedQuery || document.path.toLocaleLowerCase().includes(normalizedQuery))
-    .map(document => ({ key: document.path, label: document.path, detail: '.ocdocument', icon: 'file.opencard' }))
+    .map(document => ({ key: document.path, label: document.path, detail: '.ocdocument', icon: 'mdiCardsOutline' }))
 })
 const documentTreeData = computed<OcNodeCollection>(() => {
   const removeDocumentActions: readonly OcNodeAction[] = [{
     key: REMOVE_DOCUMENT_ACTION_KEY,
     title: t('projectExport.removeDocument'),
-    icon: 'action.delete',
+    icon: 'mdiTrashCanOutline',
     iconTone: 'danger',
   }]
   return {
@@ -192,7 +192,7 @@ const documentTreeData = computed<OcNodeCollection>(() => {
     items: new Map(selectedDocuments.value.map((document): [string, OcNode] => [document.path, {
       label: document.path,
       tail: [targetResolution(document), ...(busy.value ? [] : removeDocumentActions)],
-      visual: { type: 'icon', icon: 'file.opencard' },
+      visual: { type: 'icon', icon: 'mdiCardsOutline' },
       draggable: !busy.value,
     }])),
     children: new Map(),

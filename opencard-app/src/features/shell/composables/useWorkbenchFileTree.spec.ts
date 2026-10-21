@@ -40,7 +40,7 @@ describe('useWorkbenchFileTree opened editors', () => {
     expect(normalizeNodeTail(openedEditorTreeData.value.items.get('session-1')?.tail)).toEqual([{
       key: OPENED_EDITOR_CLOSE_ACTION_KEY,
       title: 'sidebar.closeEditor',
-      icon: 'action.close',
+      icon: 'mdiClose',
     }])
   })
 
@@ -156,7 +156,7 @@ describe('useWorkbenchFileTree opened editors', () => {
       '.opencard/icons/icons.json',
     ])
     expect(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`))
-      .toMatchObject({ visual: { type: 'icon', icon: 'file.font', iconTone: 'file-config' } })
+      .toMatchObject({ visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'file-config' } })
     expect(result.projectManagementTreeData.value.children.has(`${projectPath}/.opencard/fonts/fonts.json`)).toBe(false)
     expect(result.projectManagementTreeData.value.children.has(`${projectPath}/.opencard/icons/icons.json`)).toBe(false)
     expect(normalizeNodeTail(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`)?.tail))
@@ -315,10 +315,10 @@ describe('useWorkbenchFileTree opened editors', () => {
     })
 
     expect(result.projectTreeData.value.items.get(`${projectPath}/assets/fonts/Brand.otf`)).toMatchObject({
-      visual: { type: 'icon', icon: 'file.font', iconTone: 'active' },
+      visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'active' },
     })
     expect(result.projectTreeData.value.items.get(`${projectPath}/assets/fonts/Other.otf`)).toMatchObject({
-      visual: { type: 'icon', icon: 'file.font', iconTone: 'muted' },
+      visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'muted' },
     })
   })
 })

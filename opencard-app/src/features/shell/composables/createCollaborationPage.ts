@@ -75,7 +75,7 @@ export function createCollaborationPage(options: {
   })
   const page: SpacePage = {
     key: 'collaboration',
-    navigation: { key: 'collaboration', icon: 'nav.collaboration', labelKey: 'app.shell.space.collaboration' },
+    navigation: { key: 'collaboration', icon: 'mdiAccountGroup', labelKey: 'app.shell.space.collaboration' },
     ...options.workbench,
     contentKey: 'workbench', sidebar,
     sidebarLayout: { persistenceKey: computed(() => {

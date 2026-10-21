@@ -7,7 +7,7 @@
         class="reference-string-token-field__token" :class="{ 'is-invalid': isInvalidToken(token) }">
         <span class="reference-string-token-field__token-text">{{ definition.optionLabels?.[token] ?? token }}</span>
         <OcButton class="reference-string-token-field__token-remove" icon-only size="sm" variant="ghost"
-          icon="action.close" :data-tooltip="removeText" :aria-label="removeText"
+          icon="mdiClose" :data-tooltip="removeText" :aria-label="removeText"
           :disabled="definition.isReadonly" @click="removeToken(index)" />
       </span>
 

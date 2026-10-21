@@ -18,10 +18,10 @@ import type { OcOption } from '../../../../components/standard/OcOptionGroup.vue
 import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
 
 const directionOptions: OcOption[] = [
-  { value: 'lr', label: 'Left to Right', icon: 'nav.arrow-right' },
-  { value: 'rl', label: 'Right to Left', icon: 'nav.arrow-left' },
-  { value: 'tb', label: 'Top to Bottom', icon: 'nav.arrow-down' },
-  { value: 'bt', label: 'Bottom to Top', icon: 'nav.arrow-up' },
+  { value: 'lr', label: 'Left to Right', icon: 'mdiArrowRight' },
+  { value: 'rl', label: 'Right to Left', icon: 'mdiArrowLeft' },
+  { value: 'tb', label: 'Top to Bottom', icon: 'mdiArrowDown' },
+  { value: 'bt', label: 'Bottom to Top', icon: 'mdiArrowUp' },
 ]
 
 const props = defineProps<{

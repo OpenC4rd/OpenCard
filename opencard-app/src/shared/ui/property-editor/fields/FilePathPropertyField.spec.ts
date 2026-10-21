@@ -63,8 +63,8 @@ describe('FilePathPropertyField', () => {
       await flushPromises()
       const rootMenu = wrapper.getComponent(OcAutocompletePopover)
       expect(rootMenu.props('items')).toEqual([
-        expect.objectContaining({ insertText: 'icon:', icon: 'file.project-icon' }),
-        expect.objectContaining({ label: 'Theme Pack', insertText: 'alice/theme@1.0.0#', icon: 'file.package' }),
+        expect.objectContaining({ insertText: 'icon:', icon: 'mdiStickerEmoji' }),
+        expect.objectContaining({ label: 'Theme Pack', insertText: 'alice/theme@1.0.0#', icon: 'mdiPackageVariantClosed' }),
       ])
       rootMenu.vm.$emit('select', rootMenu.props('items').find(item => item.label === 'Theme Pack')!.key)
       await flushPromises()
@@ -150,7 +150,7 @@ describe('FilePathPropertyField', () => {
           title: 'Image',
           fieldType: 'filePath',
           directoryProvider: async () => [
-            { name: 'icon:', label: 'Icons', isDirectory: true, icon: 'file.project-icon' },
+            { name: 'icon:', label: 'Icons', isDirectory: true, icon: 'mdiStickerEmoji' },
             { name: 'portrait.png', isDirectory: false },
           ],
           completion: {
@@ -172,7 +172,7 @@ describe('FilePathPropertyField', () => {
     await flushPromises()
 
     expect(wrapper.getComponent(OcAutocompletePopover).props('items')[0]).toEqual(expect.objectContaining({
-      label: 'Icons', insertText: 'icon:', icon: 'file.project-icon',
+      label: 'Icons', insertText: 'icon:', icon: 'mdiStickerEmoji',
     }))
     await input.trigger('keydown', { key: 'Enter' })
     await flushPromises()

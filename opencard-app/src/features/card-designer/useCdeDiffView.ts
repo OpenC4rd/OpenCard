@@ -221,7 +221,7 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
     const rootKeys = [options.blueprintCardId]
     items.set(options.blueprintCardId, {
       label: options.translate('cardDesigner.dataTable.blueprint'),
-      visual: { type: 'icon', icon: 'file.opencard' },
+      visual: { type: 'icon', icon: 'mdiCardsOutline' },
     })
     const model = diffModel.value
     for (const id of diffInstanceIds.value) {
@@ -231,23 +231,23 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
         && JSON.stringify(beforeInstance) !== JSON.stringify(afterInstance))
       items.set(id, {
         label: afterInstance?.name || beforeInstance?.name || id,
-        visual: { type: 'icon', icon: 'file.opencard' },
+        visual: { type: 'icon', icon: 'mdiCardsOutline' },
         tone: afterInstance && !beforeInstance
           ? 'success'
           : beforeInstance && !afterInstance ? 'danger' : changed ? 'warning' : undefined,
         tail: afterInstance && !beforeInstance
-          ? { type: 'badge', icon: 'action.add', tone: 'success', label: options.translate('versionControl.diffViewer.added') }
+          ? { type: 'badge', icon: 'mdiPlus', tone: 'success', label: options.translate('versionControl.diffViewer.added') }
           : beforeInstance && !afterInstance
             ? {
                 type: 'badge',
-                icon: 'action.minus',
+                icon: 'mdiMinus',
                 tone: 'danger',
                 label: options.translate('versionControl.diffViewer.removed'),
               }
             : changed
               ? {
                   type: 'badge',
-                  icon: 'status.circle-medium',
+                  icon: 'mdiCircleMedium',
                   tone: 'warning',
                   label: options.translate('versionControl.diffViewer.changed'),
                 }
@@ -288,7 +288,7 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
         tone: kind === 'added' ? 'success' : kind === 'removed' ? 'danger' : kind === 'changed' ? 'warning' : undefined,
         tail: kind ? {
           type: 'badge',
-          icon: kind === 'added' ? 'action.add' : kind === 'removed' ? 'action.minus' : 'status.circle-medium',
+          icon: kind === 'added' ? 'mdiPlus' : kind === 'removed' ? 'mdiMinus' : 'mdiCircleMedium',
           tone: kind === 'added' ? 'success' : kind === 'removed' ? 'danger' : 'warning',
           label: options.translate(`versionControl.diffViewer.${kind}`),
         } : undefined,
@@ -308,7 +308,6 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
     const block = afterDescriptor?.block ?? beforeDescriptor!.block
     const blockRecord = block as unknown as Readonly<Record<string, unknown>>
     const blockFields = resolveCardPropertyFields(blockRecord, {
-      allowDelete: false,
       translate: options.translate,
       hasMessage: options.hasMessage,
     })
@@ -339,7 +338,6 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
     if (!diffValuesEqual(beforeLayout, afterLayout)) {
       const layoutRecord = afterLayout ?? beforeLayout!
       const layoutFields = resolveCardPropertyFields(layoutRecord, {
-        allowDelete: false,
         translate: options.translate,
         hasMessage: options.hasMessage,
       })
@@ -378,7 +376,7 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
     diffViewMode.value = diffViewMode.value === 'split' ? 'side-by-side' : 'split'
     commitDiffUiState()
     options.flashStatus({
-      icon: 'layout.columns',
+      icon: 'mdiLandRowsVertical',
       message: options.translate(diffViewMode.value === 'side-by-side'
         ? 'cardDesigner.viewportStatus.diffSideBySide'
         : 'cardDesigner.viewportStatus.diffSplit'),
@@ -393,7 +391,7 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
     commitDiffUiState()
     if (switchedFromSideBySide) {
       options.flashStatus({
-        icon: 'layout.columns',
+        icon: 'mdiLandRowsVertical',
         message: options.translate('cardDesigner.viewportStatus.diffSplit'),
       })
     }
@@ -531,7 +529,7 @@ function createDiffPropertyProjection(
         isReadonly: true,
         tail: {
           type: 'badge',
-          icon: 'action.minus',
+          icon: 'mdiMinus',
           tone: 'danger',
           label: translate('versionControl.diffViewer.removed'),
         },
@@ -545,7 +543,7 @@ function createDiffPropertyProjection(
         isReadonly: true,
         tail: {
           type: 'badge',
-          icon: 'action.add',
+          icon: 'mdiPlus',
           tone: 'success',
           label: translate('versionControl.diffViewer.added'),
         },

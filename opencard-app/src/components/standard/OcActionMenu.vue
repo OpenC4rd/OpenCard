@@ -57,7 +57,7 @@
           <OcShortcut v-if="entry.shortcut?.length" :parts="entry.shortcut" decorative />
           <OcIcon
             v-if="hasActionChildren(entry)"
-            name="nav.arrow-right"
+            name="mdiArrowRight"
             size="md"
             class="oc-action-menu__caret"
           />

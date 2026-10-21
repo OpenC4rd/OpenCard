@@ -25,15 +25,15 @@ const { t } = useI18n()
     </Transition>
   </div>
   <section v-else-if="props.hasProject" class="page-empty-state" :aria-label="t('app.editorEmpty.title')">
-    <OcIcon class="page-empty-state__icon" name="file.generic" size="lg" />
+    <OcIcon class="page-empty-state__icon" name="mdiFileOutline" size="lg" />
     <h1>{{ t('app.editorEmpty.title') }}</h1>
     <p>{{ t('app.editorEmpty.subtitle') }}</p>
   </section>
   <section v-else class="page-empty-state" :aria-label="t('app.workbenchEmpty.title')">
-    <OcIcon class="page-empty-state__icon" name="status.folder-open" size="lg" />
+    <OcIcon class="page-empty-state__icon" name="mdiFolderOpenOutline" size="lg" />
     <h1>{{ t('app.workbenchEmpty.title') }}</h1>
     <p>{{ t('app.workbenchEmpty.subtitle') }}</p>
-    <OcButton icon="status.folder-open" variant="outline" size="lg" @click="emit('open-project')">
+    <OcButton icon="mdiFolderOpenOutline" variant="outline" size="lg" @click="emit('open-project')">
       {{ t('sidebar.openProject') }}
     </OcButton>
   </section>

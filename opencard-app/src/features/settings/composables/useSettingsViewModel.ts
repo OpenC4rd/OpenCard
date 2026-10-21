@@ -156,10 +156,10 @@ export function useSettingsViewModel(
   const categoryTreeData = computed<OcNodeCollection>(() => ({
     rootKeys: CATEGORY_KEYS,
     items: new Map([
-      ['general', { label: categoryLabels.value.general, visual: { type: 'icon', icon: 'tool.settings' } }],
-      ['appearance', { label: categoryLabels.value.appearance, visual: { type: 'icon', icon: 'data.symbol-color' } }],
-      ['workspace', { label: categoryLabels.value.workspace, visual: { type: 'icon', icon: 'tool.workspace' } }],
-      ['versionControl', { label: categoryLabels.value.versionControl, visual: { type: 'icon', icon: 'tool.collaboration' } }],
+      ['general', { label: categoryLabels.value.general, visual: { type: 'icon', icon: 'mdiCogOutline' } }],
+      ['appearance', { label: categoryLabels.value.appearance, visual: { type: 'icon', icon: 'mdiPaletteOutline' } }],
+      ['workspace', { label: categoryLabels.value.workspace, visual: { type: 'icon', icon: 'mdiPencilRulerOutline' } }],
+      ['versionControl', { label: categoryLabels.value.versionControl, visual: { type: 'icon', icon: 'mdiAccountGroupOutline' } }],
     ]),
     children: new Map(),
   }))
@@ -210,17 +210,17 @@ export function useSettingsViewModel(
             }, settings.shell.titleBarNoticeHistoryLimit,
             options.translate('settings.descriptions.titleBarNoticeHistoryLimit', 'How many the title bar keeps.')),
           ], {
-            icon: 'tool.interface',
+            icon: 'mdiRulerSquare',
             actions: [
               cardAction(
                 'locale.refresh',
                 options.translate('settings.actions.refreshLocales', 'Reload language files'),
-                'action.refresh',
+                'mdiRefresh',
               ),
               cardAction(
                 'locale-folder.open',
                 options.translate('settings.actions.openLocaleFolder', 'Open language folder'),
-                'folder.open',
+                'mdiFolderOpen',
               ),
             ],
           }),
@@ -237,13 +237,13 @@ export function useSettingsViewModel(
               suffix: options.translate('settings.values.minutes', ' minutes'),
             }, settings.shell.tipsIntervalMinutes,
             options.translate('settings.descriptions.tipsInterval', 'How often a tip shows up in the title bar.')),
-          ], { icon: 'status.tip' }),
+          ], { icon: 'mdiLightbulbOnOutline' }),
           card('updates', options.translate('settings.cards.updates', 'Updates'), [
             fieldItem('updates.showReleaseNotesAfterUpdate', {
               title: options.translate('settings.fields.showReleaseNotesAfterUpdate', 'Show release notes'),
               fieldType: 'boolean',
             }, settings.updates.showReleaseNotesAfterUpdate),
-          ], { icon: 'action.download' }),
+          ], { icon: 'mdiDownload' }),
           card('tutorials', options.translate('settings.cards.tutorials', 'Tutorials'), [
             fieldItem('tutorials.seen', {
               title: options.translate('settings.fields.seenTutorials', 'Viewed tutorials'),
@@ -263,7 +263,7 @@ export function useSettingsViewModel(
               fieldType: 'boolean',
             }, settings.exporting.openCdeWorkbookAfterExport,
             options.translate('settings.descriptions.openCdeWorkbookAfterExport', 'Opens the exported CDE workbook; turn it off to only write the file.')),
-          ], { icon: 'action.export' }),
+          ], { icon: 'mdiExport' }),
           card('rendering', options.translate('settings.cards.rendering', 'Rendering'), [
             fieldItem('rendering.customBlockMaxDepth', {
               title: options.translate('settings.fields.customBlockMaxDepth', 'Custom block maximum depth'),
@@ -279,7 +279,7 @@ export function useSettingsViewModel(
               ticks: [1000, 10000, 25000, 50000, 100000],
             }, settings.rendering.customBlockMaxNodes,
             options.translate('settings.descriptions.customBlockMaxNodes', 'Branches beyond the expanded node limit show a placeholder.')),
-          ], { icon: 'entity.block-custom' }),
+          ], { icon: 'mdiToyBrickOutline' }),
           card('cache', options.translate('settings.cards.cache', 'Cache'), [
             meterItem('cache.snapshots',
               options.translate('settings.fields.cachePackages', 'Unpacked packages'),
@@ -308,12 +308,12 @@ export function useSettingsViewModel(
               suffix: 'GB',
             }, settings.cache.networkLimitGb),
           ], {
-            icon: 'file.package',
+            icon: 'mdiPackageVariantClosed',
             actions: [
               cardAction(
                 'cache.clear',
                 options.translate('settings.actions.clearCache', 'Clear cache'),
-                'action.delete',
+                'mdiTrashCanOutline',
                 options.projectOpen.value,
               ),
             ],
@@ -420,14 +420,14 @@ export function useSettingsViewModel(
             options.translate('settings.descriptions.accentNeighborAngle', 'Which side the secondary color leans toward.')),
           ],
           {
-            icon: 'data.symbol-color',
+            icon: 'mdiPaletteOutline',
             actions: [
-              cardAction('theme.copy', options.translate('settings.actions.copyThemePreset', 'Copy this theme preset'), 'action.copy'),
-              cardAction('theme.read', options.translate('settings.actions.readThemePreset', 'Read a theme preset from the clipboard'), 'action.import'),
+              cardAction('theme.copy', options.translate('settings.actions.copyThemePreset', 'Copy this theme preset'), 'mdiContentCopy'),
+              cardAction('theme.read', options.translate('settings.actions.readThemePreset', 'Read a theme preset from the clipboard'), 'mdiImport'),
               cardAction(
                 'theme-preset.delete',
                 options.translate('settings.actions.deleteThemePreset', 'Delete imported theme'),
-                'action.delete',
+                'mdiTrashCanOutline',
                 !presetValue.startsWith('user:'),
               ),
             ],
@@ -479,7 +479,7 @@ export function useSettingsViewModel(
               fieldType: 'boolean',
             }, settings.appearance.micaBackground,
             options.translate('settings.descriptions.micaBackground', 'Uses the Windows 11 window material; falls back to an opaque background elsewhere.')),
-          ], { icon: 'tool.interface' }),
+          ], { icon: 'mdiRulerSquare' }),
         ],
       }
     }
@@ -499,7 +499,7 @@ export function useSettingsViewModel(
             options.translate('settings.descriptions.publisherKey', 'Identifies the publisher and is written into a package manifest when you publish.')),
           ], {
             actions: [
-              cardAction('identity.regenerate', options.translate('settings.actions.regeneratePublisherKey', 'Generate a new author ID'), 'action.refresh'),
+              cardAction('identity.regenerate', options.translate('settings.actions.regeneratePublisherKey', 'Generate a new author ID'), 'mdiRefresh'),
             ],
           }),
           card('committer', options.translate('settings.cards.commitIdentity', 'Commit identity'), [
@@ -520,7 +520,7 @@ export function useSettingsViewModel(
               fieldType: 'boolean',
             }, settings.versionControl.createInitialCommit,
             options.translate('settings.descriptions.createInitialCommit', 'Also creates the first commit right after initializing.')),
-          ], { icon: 'file.git' }),
+          ], { icon: 'mdiSourceBranch' }),
         ],
       }
     }
@@ -548,7 +548,7 @@ export function useSettingsViewModel(
             suffix: options.translate('settings.values.historyEntries', ' entries'),
           }, settings.workspace.historyEntryLimit,
           options.translate('settings.descriptions.historyEntryLimit', 'How many steps each editor keeps; Monaco editors use their own undo history.')),
-        ], { icon: 'action.history' }),
+        ], { icon: 'mdiHistory' }),
         card('file-tree', options.translate('settings.cards.fileTree', 'File tree'), [
           fieldItem('workspace.structureTreeSelectionBehavior', {
             title: options.translate('settings.fields.structureTreeSelectionBehavior', 'Structure tree selection'),
@@ -570,12 +570,12 @@ export function useSettingsViewModel(
           }, settings.workspace.hideDotFiles,
           options.translate('settings.descriptions.hideDotFiles', 'Files and folders whose names start with a dot stay out of the file tree.')),
         ], {
-          icon: 'data.list-tree',
+          icon: 'mdiFileTreeOutline',
           actions: [
             cardAction(
               'project-workspace.reset',
               options.translate('settings.actions.resetProjectWorkspace', 'Reset this project’s interface state'),
-              'action.restart',
+              'mdiRestart',
               !options.projectOpen.value,
             ),
           ],
@@ -593,7 +593,7 @@ export function useSettingsViewModel(
             title: options.translate('settings.fields.alignmentSnappingEnabledByDefault', 'Alignment snapping'), fieldType: 'boolean',
           }, settings.workspace.alignmentSnappingEnabledByDefault,
           options.translate('settings.descriptions.alignmentSnappingEnabledByDefault', 'Whether a newly opened canvas starts with alignment snapping on.')),
-        ], { icon: 'layout.artboard' }),
+        ], { icon: 'mdiArtboard' }),
       ],
     }
   }

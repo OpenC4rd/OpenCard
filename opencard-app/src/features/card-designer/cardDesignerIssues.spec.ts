@@ -80,8 +80,8 @@ describe('cardDesignerIssues', () => {
         id: 'issue-1',
         type: 'card-designer.render-parse.out-of-range',
         severity: 'warning',
-        locationText: '在实例“Instance 1” 正面中，块“Container.Title”（title）的 不透明度（opacity）字段',
-        description: '字段“不透明度”的值超出允许范围，已使用默认值：1',
+        locationText: '在实例“Instance 1” 正面中，块“Container.Title”（title）的 不透明度（opacity）属性',
+        description: '属性“不透明度”的值超出允许范围，已使用默认值：1',
         navigationToken: {
           protocol: 'card-designer',
           version: 2,
@@ -183,9 +183,9 @@ describe('cardDesignerIssues', () => {
 
     const issue = createCardDesignerIssues(result, null, translate, resolveFieldLabel)[0]!
     expect(issue.locationText).toBe(
-      '在蓝图 正面中，块“Container.Title”（text…7890）的 内容（content）字段，第 7 个字符',
+      '在蓝图 正面中，块“Container.Title”（text…7890）的 内容（content）属性，第 7 个字符',
     )
-    expect(issue.description).toBe('引用字段“分数”不存在')
+    expect(issue.description).toBe('引用属性“分数”不存在')
     expect(issue.navigationToken).toEqual(expect.objectContaining({
       target: expect.objectContaining({ characterOffset: 6 }),
     }))

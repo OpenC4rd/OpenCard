@@ -49,10 +49,11 @@ function createFaceGroups(): CdeDataTableFaceGroup[] {
         key: 'content',
         title: 'Content',
         definition: { fieldType: 'string', title: 'Content' },
-        deletable: false,
+        resettable: false,
+        definitionEditable: false,
         cells: [
-          { identity: 'blueprint', cardId: '__blueprint__', value: 'Blueprint', readonly: false, inherited: false, overridden: false },
-          { identity: 'instance', cardId: 'instance-1', value: 'Override', readonly: false, inherited: false, overridden: true },
+          { identity: 'blueprint', cardId: '__blueprint__', kind: 'blueprint', value: 'Blueprint', readonly: false, inherited: false, overridden: false },
+          { identity: 'instance', cardId: 'instance-1', kind: 'instance', value: 'Override', readonly: false, inherited: false, overridden: true },
         ],
       }],
     }],
@@ -82,14 +83,69 @@ describe('card data workbook', () => {
     expect(worksheet.getCell('F1').value).toBe('__blueprint__')
     expect(worksheet.getCell('G1').value).toBe('instance-1')
     expect(worksheet.getCell('G3').value).toBe('Override')
+    expect(worksheet.getCell('A1').protection?.locked).not.toBe(false)
+    expect(worksheet.getCell('F1').protection?.locked).not.toBe(false)
     expect(worksheet.getCell('A3').protection?.locked).not.toBe(false)
-    expect(worksheet.getCell('D3').protection.locked).toBe(false)
+    expect(worksheet.getCell('D3').protection?.locked).not.toBe(false)
+    expect(worksheet.getCell('F2').protection?.locked).not.toBe(false)
+    expect(worksheet.getCell('G2').protection.locked).toBe(false)
     expect(worksheet.getCell('G3').protection.locked).toBe(false)
+    expect(worksheet.getCell('H2').protection.locked).toBe(false)
+    expect(worksheet.getCell('H3').protection.locked).toBe(false)
+    expect(worksheet.getCell('H4').protection?.locked).not.toBe(false)
+    // 表格下面空一行，再一行是注释：左边驱动说明，最后一列提示可以向右加列
+    expect(worksheet.getCell('C4').value).toBeNull()
+    expect(worksheet.getCell('C5').value).toBe('OpenCard 驱动')
+    expect(worksheet.getCell('H5').value).toBe('你可以向右拓展更多列以在导入时创建新实例')
+    expect(worksheet.getCell('C5').protection?.locked).not.toBe(false)
     expect(readSheetProtection(worksheet)?.sheet).toBe(true)
     expect(readSheetProtection(worksheet)?.insertColumns).toBe(true)
     const metadata = workbook.getWorksheet('_OpenCard')!
     expect(metadata.state).toBe('veryHidden')
     expect(readSheetProtection(metadata)?.sheet).toBe(true)
+  })
+
+  it('merges identity cells of a multi-field Block without changing what imports', async () => {
+    const groups = createFaceGroups()
+    const block = groups[0]!.blocks[0]!
+    const inherited = {
+      identity: 'instance' as const,
+      cardId: 'instance-1',
+      kind: 'instance' as const,
+      value: 'Blueprint',
+      readonly: false,
+      inherited: true,
+      overridden: false,
+    }
+    groups[0]!.blocks[0] = {
+      ...block,
+      fields: [
+        block.fields[0]!,
+        { ...block.fields[0]!, key: 'opacity', title: 'Opacity', cells: [block.fields[0]!.cells[0]!, inherited] },
+      ],
+    }
+    const bytes = await exportCardDataWorkbook({
+      document: createDocument(),
+      columns: createColumns(),
+      faceGroups: groups,
+      exportInstanceIds: ['instance-1'],
+      labels: { face: 'Face', block: 'Block', field: 'Field' },
+    })
+    const ExcelJS = await import('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(bytes)
+    const worksheet = workbook.getWorksheet('Card Data')!
+    expect(worksheet.model.merges).toEqual(['C3:C4', 'D3:D4'])
+    expect(worksheet.getCell('C3').value).toBe('Front')
+    expect(worksheet.getCell('D3').value).toBe('Title Block')
+    // 田字边框：每格四边都是主题色细线，合并后只保留外圈
+    expect(worksheet.getCell('E3').border?.top?.style).toBe('thin')
+    expect(worksheet.getCell('E3').border?.right?.style).toBe('thin')
+    expect(worksheet.getCell('C3').border?.bottom?.style).toBe('thin')
+
+    const result = await importCardDataWorkbook(bytes, createDocument(), groups)
+    expect(result.blockRenames).toEqual([])
+    expect(result.updates).toEqual([])
   })
 
   it('imports a renamed Block and a new instance column', async () => {
@@ -166,6 +222,7 @@ describe('card data workbook', () => {
             cells: [createFaceGroups()[0]!.blocks[0]!.fields[0]!.cells[0]!, {
               identity: 'instance',
               cardId: 'instance-1',
+              kind: 'instance',
               value: 'Blueprint',
               readonly: false,
               inherited: true,

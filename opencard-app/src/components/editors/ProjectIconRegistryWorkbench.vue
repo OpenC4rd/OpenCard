@@ -15,7 +15,7 @@
         :selected-icon-indexes="selectedIconIndexesForSeries"
         @update:series="updateSelectedSeries" @update:selected-icon-indexes="setSelectedIconIndexes" />
       <div v-else class="project-icon-registry-workbench__placeholder">
-        <OcIcon name="file.project-icon" size="lg" tone="muted" />
+        <OcIcon name="mdiStickerEmoji" size="lg" tone="muted" />
         <OcEmpty tone="muted" inset="none">{{ t('projectConfig.icons.noSeriesSelected') }}</OcEmpty>
       </div>
     </section>
@@ -23,7 +23,7 @@
     <section class="project-icon-registry-workbench__inspector">
       <div v-if="selectedIconIndexesForSeries.length > 1"
         class="project-icon-registry-workbench__placeholder">
-        <OcIcon name="file.project-icon" size="lg" tone="muted" />
+        <OcIcon name="mdiStickerEmoji" size="lg" tone="muted" />
         <OcText tone="muted">
           {{ t('projectConfig.icons.multiSelectionNote', { count: selectedIconIndexesForSeries.length }) }}
         </OcText>
@@ -36,7 +36,7 @@
         </div>
       </template>
       <div v-else class="project-icon-registry-workbench__placeholder">
-        <OcIcon name="file.project-icon" size="lg" tone="muted" />
+        <OcIcon name="mdiStickerEmoji" size="lg" tone="muted" />
         <OcEmpty tone="muted" inset="none">{{ t('projectConfig.icons.noIconSelected') }}</OcEmpty>
       </div>
     </section>
@@ -145,8 +145,8 @@ const selectedCatalogEntry = computed<ProjectIconCatalogEntry | null>(() => {
 })
 const conflicts = computed(() => findProjectIconKeyConflicts(props.series))
 const iconPropertyCategories = computed<ReadonlyMap<string, PropertyEditorCategoryDefinition>>(() => new Map([
-  ['identity', { title: t('projectConfig.icons.identity'), icon: 'data.symbol-class' }],
-  ['appearance', { title: t('projectConfig.icons.appearance'), icon: 'file.image' }],
+  ['identity', { title: t('projectConfig.icons.identity'), icon: 'mdiCodeBraces' }],
+  ['appearance', { title: t('projectConfig.icons.appearance'), icon: 'mdiFileImageOutline' }],
 ]))
 const iconPropertyInputs = computed<PropertyEditorInput[]>(() => {
   const index = selectedIconIndex.value
@@ -162,7 +162,7 @@ const iconPropertyInputs = computed<PropertyEditorInput[]>(() => {
       pixelated: String(icon.pixelated ?? false),
     },
     fields: {
-      iconKey: { title: t('projectConfig.icons.referenceName'), fieldType: 'string', category: 'identity', order: 1, required: true, commitMode: 'blur' },
+      iconKey: { title: t('projectConfig.icons.referenceName'), fieldType: 'string', category: 'identity', order: 1, unremovable: true, commitMode: 'blur' },
       name: { title: t('projectConfig.icons.iconName'), fieldType: 'string', category: 'identity', order: 2, commitMode: 'blur' },
       tint: {
         title: t('projectConfig.icons.tint'), fieldType: 'string', category: 'appearance', order: 1,
@@ -184,7 +184,7 @@ const seriesTreeData = computed<OcNodeCollection>(() => ({
   rootKeys: props.series.map(candidate => candidate.key),
   items: new Map(props.series.map((candidate): [string, OcNode] => [candidate.key, {
     label: candidate.name,
-    visual: { type: 'icon' as const, icon: 'file.project-icon' },
+    visual: { type: 'icon' as const, icon: 'mdiStickerEmoji' },
     tail: [t('projectConfig.icons.iconCount', { count: candidate.icons.length }), ...seriesActions()],
   }])),
   children: new Map(),
@@ -193,12 +193,12 @@ const seriesTreeData = computed<OcNodeCollection>(() => ({
 function seriesActions(): OcNodeAction[] {
   return [
     {
-      key: 'add-icons', title: t('projectConfig.icons.addIcons'), icon: 'action.add',
+      key: 'add-icons', title: t('projectConfig.icons.addIcons'), icon: 'mdiPlus',
       disabled: Boolean(props.importBusy),
     },
-    { key: 'configure', title: t('projectConfig.icons.configureIconSet'), icon: 'tool.settings' },
+    { key: 'configure', title: t('projectConfig.icons.configureIconSet'), icon: 'mdiCogOutline' },
     {
-      key: 'remove', title: t('projectConfig.icons.removeSeries'), icon: 'action.delete', iconTone: 'danger',
+      key: 'remove', title: t('projectConfig.icons.removeSeries'), icon: 'mdiTrashCanOutline', iconTone: 'danger',
     },
   ]
 }

@@ -12,7 +12,7 @@ describe('SettingsPageContent', () => {
       cards: [{
         key: 'interface',
         title: 'Interface',
-        icon: 'tool.settings',
+        icon: 'mdiCogOutline',
         actions: [],
         items: [{
           key: 'appearance.baseFontSize',
@@ -46,11 +46,11 @@ describe('SettingsPageContent', () => {
       cards: [{
         key: 'theme:dark',
         title: 'Dark theme',
-        icon: 'data.symbol-color',
+        icon: 'mdiPaletteOutline',
         actions: [
-          { key: 'theme.copy', title: 'Copy this theme preset', icon: 'action.copy' },
-          { key: 'theme.read', title: 'Read a theme preset from the clipboard', icon: 'action.import' },
-          { key: 'theme-preset.delete', title: 'Delete imported theme', icon: 'action.delete' },
+          { key: 'theme.copy', title: 'Copy this theme preset', icon: 'mdiContentCopy' },
+          { key: 'theme.read', title: 'Read a theme preset from the clipboard', icon: 'mdiImport' },
+          { key: 'theme-preset.delete', title: 'Delete imported theme', icon: 'mdiTrashCanOutline' },
         ],
         items: [{
           key: 'preset',
@@ -98,13 +98,13 @@ describe('SettingsPageContent', () => {
         {
           key: 'identity',
           title: 'Author identity',
-          actions: [{ key: 'identity.regenerate', title: 'Generate a new author ID', icon: 'action.refresh' }],
+          actions: [{ key: 'identity.regenerate', title: 'Generate a new author ID', icon: 'mdiRefresh' }],
           items: [],
         },
         {
           key: 'file-tree',
           title: 'File tree',
-          actions: [{ key: 'project-workspace.reset', title: 'Reset this project’s interface state', icon: 'action.restart' }],
+          actions: [{ key: 'project-workspace.reset', title: 'Reset this project’s interface state', icon: 'mdiRestart' }],
           items: [],
         },
       ],

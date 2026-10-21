@@ -84,17 +84,17 @@ export function decorateChangedPathTree(
   const selectAction: OcNodeAction = {
     key: CHANGE_SELECT_ACTION_KEY,
     title: t('versionControl.changesSelect'),
-    icon: 'action.checkbox-blank',
+    icon: 'mdiCheckboxBlankOutline',
   }
   const deselectAction: OcNodeAction = {
     key: CHANGE_DESELECT_ACTION_KEY,
     title: t('versionControl.changesDeselect'),
-    icon: 'action.checkbox-marked',
+    icon: 'mdiCheckboxMarkedOutline',
   }
   const discardAction: OcNodeAction = {
     key: CHANGE_DISCARD_ACTION_KEY,
     title: t('versionControl.changesDiscard'),
-    icon: 'action.discard',
+    icon: 'mdiUndoVariant',
     iconTone: 'danger',
   }
 
@@ -114,7 +114,7 @@ export function decorateChangedPathTree(
         contextActions.push({
           key: CHANGE_IGNORE_FILE_ACTION_KEY,
           title: t('versionControl.changesIgnoreFile'),
-          icon: 'status.eye-off',
+          icon: 'mdiEyeOffOutline',
         })
       }
       const extensionPattern = gitignorePatternForExtension(key)
@@ -122,7 +122,7 @@ export function decorateChangedPathTree(
         contextActions.push({
           key: CHANGE_IGNORE_EXTENSION_ACTION_KEY,
           title: t('versionControl.changesIgnoreExtension', { pattern: extensionPattern }),
-          icon: 'status.eye-off',
+          icon: 'mdiEyeOffOutline',
         })
       }
     }
@@ -131,11 +131,11 @@ export function decorateChangedPathTree(
       contextActions.push({
         key: CHANGE_IGNORE_FOLDER_ACTION_KEY,
         title: t('versionControl.changesIgnoreFolder'),
-        icon: 'status.eye-off',
+        icon: 'mdiEyeOffOutline',
         children: folderLevels.map(level => ({
           key: `${CHANGE_IGNORE_FOLDER_PREFIX}${level}`,
           title: level,
-          icon: 'status.eye-off',
+          icon: 'mdiEyeOffOutline',
         })),
       })
     }

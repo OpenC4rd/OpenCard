@@ -16,7 +16,7 @@
       <OcButton :disabled="busy" @click="handleClose">
         {{ t('app.updater.releaseNotesClose') }}
       </OcButton>
-      <OcButton v-if="available" variant="solid" :icon="downloaded ? 'action.restart' : 'action.download'"
+      <OcButton v-if="available" variant="solid" :icon="downloaded ? 'mdiRestart' : 'mdiDownload'"
         :disabled="busy" @click="emit('action')">
         {{ busy
           ? t('app.updater.downloading')

@@ -10,13 +10,13 @@
       </template>
       <OcText v-else tone="muted" size="sm">{{ t('projectConfig.icons.chooseFileHint') }}</OcText>
       <div class="project-icon-registration-dialog__summary-actions">
-        <OcButton type="button" icon="nav.files" variant="outline" @click="pickFiles">
+        <OcButton type="button" icon="mdiFileMultipleOutline" variant="outline" @click="pickFiles">
           {{ hasSelection ? t('projectConfig.icons.chooseAgain') : t('projectConfig.icons.chooseFiles') }}
         </OcButton>
-        <OcButton type="button" icon="folder.open" variant="outline" @click="pickFolder">
+        <OcButton type="button" icon="mdiFolderOpen" variant="outline" @click="pickFolder">
           {{ t('projectConfig.icons.chooseFolder') }}
         </OcButton>
-        <OcButton v-if="!appendMode" type="button" variant="ghost" icon="tool.settings"
+        <OcButton v-if="!appendMode" type="button" variant="ghost" icon="mdiCogOutline"
           @click="advancedOpen = !advancedOpen">
           {{ advancedOpen ? t('projectConfig.icons.simpleSettings') : t('projectConfig.icons.advancedSettings') }}
         </OcButton>

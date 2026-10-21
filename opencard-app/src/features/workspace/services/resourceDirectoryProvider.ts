@@ -53,7 +53,7 @@ export function createResourceDirectoryProvider(
       name: 'icon:',
       label: options.iconEntryLabel,
       isDirectory: true,
-      icon: 'file.project-icon' as const,
+      icon: 'mdiStickerEmoji' as const,
     }
     // A package root offers it as well, so `作者/包名@版本#` can continue into
     // `作者/包名@版本#icon:` and reach the icons the package ships. Deeper paths inside a package
@@ -63,7 +63,7 @@ export function createResourceDirectoryProvider(
       ...entries,
       iconEntry,
       ...[...(current.packages ?? [])].map(([, pkg]) => ({
-        name: `${formatPackageCoordinate(pkg.coordinate)}#`, label: pkg.manifest.title, isDirectory: true, icon: 'file.package' as const,
+        name: `${formatPackageCoordinate(pkg.coordinate)}#`, label: pkg.manifest.title, isDirectory: true, icon: 'mdiPackageVariantClosed' as const,
       })),
     ]
   }

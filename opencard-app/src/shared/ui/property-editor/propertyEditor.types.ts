@@ -110,19 +110,20 @@ export type PropertyFieldType = BasePropertyFieldType | PropertyArrayFieldType
 
 type PropertyEditorFieldBase = {
   title: string
+  /** 覆盖按 fieldType 注册的字段图标；缺省时用类型图标。 */
+  icon?: IconToken
   /** Display state of a projected value; never written back as field data. */
   valueState?: 'unset' | 'value' | 'mixed'
   category?: string
   order?: number
   defaultValue?: unknown
-  required?: boolean
+  unremovable?: boolean
   isHidden?: boolean
   isReadonly?: boolean
   /** Whether this field may switch to the raw string editor; omitted inherits PropertyEditor. */
   allowRawStringEditor?: boolean
   commitMode?: 'input' | 'blur'
   resettable?: boolean
-  deletable?: boolean
   autoPairs?: readonly PropertyInputPair[]
   completion?: PropertyCompletion
   fontOptions?: readonly {

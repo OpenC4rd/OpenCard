@@ -48,7 +48,6 @@ type RenderParseFailure =
   | 'conversion-failed'
   | 'invalid-option'
   | 'out-of-range'
-  | 'required'
   | 'invalid-color'
   | 'invalid-css-length'
   | 'invalid-file-path'
@@ -454,7 +453,6 @@ function dynamicRenderContract(
   return {
     kind,
     defaultValue: createPropertyDefaultValue(definition),
-    ...(definition.required ? { required: true } : {}),
     ...(definition.min !== undefined ? { min: definition.min } : {}),
     ...(definition.max !== undefined ? { max: definition.max } : {}),
     ...(definition.fieldType === 'filePath' && definition.allowRemote ? { allowRemote: true } : {}),
@@ -482,12 +480,9 @@ function createFieldReader(
       && source[fieldKey] !== null
       && source[fieldKey] !== undefined
 
-    if (!hasValue) {
-      if (contract.required) pushIssue(context, fieldKey, contract, 'required', issues)
-      return parseRenderDefault(context.typeName, fieldKey, contract)
-    }
+    if (!hasValue) return parseRenderDefault(context.typeName, fieldKey, contract)
 
-    const parsed = parseRenderField(source[fieldKey], contract, false, allowTypedLiterals)
+    const parsed = parseRenderField(source[fieldKey], contract, allowTypedLiterals)
     if (!parsed.ok) {
       for (const diagnostic of parsed.diagnostics) {
         pushIssue(context, fieldKey, contract, diagnostic.code, issues, diagnostic.path)
@@ -511,7 +506,7 @@ function createFieldReader(
         && source[fieldKey] !== undefined
       if (!hasValue) return fallback
 
-      const parsed = parseRenderField(source[fieldKey], contract, false, allowTypedLiterals)
+      const parsed = parseRenderField(source[fieldKey], contract, allowTypedLiterals)
       if (!parsed.ok) {
         for (const diagnostic of parsed.diagnostics) {
           pushIssue(context, fieldKey, contract, diagnostic.code, issues, diagnostic.path)
@@ -540,10 +535,7 @@ function createFieldReader(
       const hasValue = Object.prototype.hasOwnProperty.call(source, fieldKey)
         && source[fieldKey] !== null
         && source[fieldKey] !== undefined
-      if (!hasValue) {
-        if (contract.required) pushIssue(context, fieldKey, contract, 'required', issues)
-        return
-      }
+      if (!hasValue) return
       if (source[fieldKey] !== expected) {
         pushIssue(context, fieldKey, contract, 'invalid-option', issues)
       }
@@ -562,11 +554,8 @@ type RenderFieldResult =
 function parseRenderField(
   value: unknown,
   contract: RenderFieldContract,
-  ignoreRequired = false,
   allowTypedLiterals = false,
 ): RenderFieldResult {
-  if (!ignoreRequired && contract.required && value === '') return invalidRenderField('required')
-
   if (contract.kind === 'array') {
     if (!Array.isArray(value)) return invalidRenderField('invalid-type')
     if (contract.itemShape === 'root-child') {
@@ -628,7 +617,7 @@ function parseRenderField(
 }
 
 function parseRenderDefault(typeName: string, fieldKey: string, contract: RenderFieldContract): unknown {
-  const parsed = parseRenderField(cloneRenderValue(contract.defaultValue), contract, true)
+  const parsed = parseRenderField(cloneRenderValue(contract.defaultValue), contract)
   if (!parsed.ok) {
     throw new Error(`Invalid render default for ${typeName}.${fieldKey}: ${parsed.diagnostics[0]?.code}`)
   }

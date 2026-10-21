@@ -81,7 +81,7 @@ describe('renderParser', () => {
     expect(document).toEqual(sourceSnapshot)
   })
 
-  it('accepts an empty image block without a required-field warning', () => {
+  it('falls back to the contract default for missing fields without reporting an issue', () => {
     const document = createDocument()
     document.faces.front.children[0]!.block = createImageBlock({
       id: 'image', name: 'Optional image', source: '',
@@ -92,19 +92,11 @@ describe('renderParser', () => {
     expect(result.document.faces.front.children[0]!.block).toMatchObject({
       type: 'image-block', source: '', fit: 'cover',
     })
-    expect(result.issues).not.toContainEqual(expect.objectContaining({
-      type: 'card-designer.render-parse.required',
-      location: expect.objectContaining({ blockId: 'image', fieldKey: 'source' }),
-    }))
-    expect(result.issues).not.toContainEqual(expect.objectContaining({
-      location: expect.objectContaining({ blockId: 'image', fieldKey: 'maskSource' }),
-    }))
+    expect(result.issues).toEqual([])
     delete (document.faces.front.children[0]!.block as unknown as Record<string, unknown>).maskSource
     const withoutMask = parseRenderDocument(document)
     expect(withoutMask.document.faces.front.children[0]!.block).toMatchObject({ maskSource: '' })
-    expect(withoutMask.issues).not.toContainEqual(expect.objectContaining({
-      location: expect.objectContaining({ blockId: 'image', fieldKey: 'maskSource' }),
-    }))
+    expect(withoutMask.issues).toEqual([])
   })
 
   it('accepts every image source form: path, package path, remote url, and icon reference', () => {
