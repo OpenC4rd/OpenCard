@@ -1,10 +1,12 @@
 # OpenCard
 
-OpenCard 是一个面向桌游设计师和内容创作者的桌面卡牌工作台。
+OpenCard 是一个面向桌游设计师和内容创作者的集成化桌面工作台，用于持续维护卡牌项目。
+
+它延续了 **CardEditor → EzCardDotNet → OpenCard** 的完整迭代过程，并在这个过程中积累了上千名桌游设计师与自制桌游爱好者。
 
 它把 **版式设计、卡牌内容和批量实例** 放在同一个项目里：先用蓝图定义一套可复用的卡牌结构，再创建多个实例填入不同内容，最后统一处理字体、图标和字典文本。
 
-> **0.4.0 Early Access**：核心编辑工作流已经可以体验，但 OpenCard 仍在早期开发阶段。发布、项目版本管理和协作能力尚未达到完整产品的状态，请在升级前备份项目文件。
+> **v0.5.0-beta.1 Early Access**：核心编辑工作流已经可用，仓库仍处于快速迭代阶段。当前已连续发布多个 0.4.x 版本并进入 0.5 Beta，发布、项目版本管理和协作能力仍在完善，请在升级前备份项目文件。
 
 ## 你可以用 OpenCard 做什么
 
@@ -83,11 +85,11 @@ OpenCard 当前更适合作为编辑和维护工作台。完成一轮设计后�
 - 网络联机式项目测试
 - 在线协作与云端同步
 
-这些项目不是 0.4.0 的隐藏承诺。重要项目请使用外部备份或 Git 等版本控制工具保存可回退副本。
+这些项目不是 v0.5.x Beta 的隐藏承诺。重要项目请使用外部备份或 Git 等版本控制工具保存可回退副本。
 
 ## Early Access 说明
 
-0.4.0 的目标是把“组织项目 → 设计蓝图 → 创建实例 → 管理资源”这条主线做成可以实际使用的桌面工作流。早期体验阶段意味着：
+v0.5.x Beta 的目标是把“组织项目 → 设计蓝图 → 创建实例 → 管理资源”这条主线持续打磨成稳定可用的桌面工作流。早期体验阶段意味着：
 
 - 文件格式和交互细节可能在后续版本调整
 - 现有功能可能继续收紧边界或改变入口
@@ -132,9 +134,12 @@ OpenCard/
 ## 文档和反馈
 
 - 版本变化：[`opencard-app/RELEASE_NOTES.md`](opencard-app/RELEASE_NOTES.md)
+- 最新发布：[Releases](https://github.com/OpenC4rd/OpenCard/releases)
 - 工程约定：[`docs/工程规则.md`](docs/工程规则.md)
 - UI 组件规范：[`docs/UI_RULES.md`](docs/UI_RULES.md)
 - 问题反馈：[GitHub Issues](https://github.com/OpenC4rd/OpenCard/issues)
+- 社群交流（QQ）：[OpenCard 桌游交流群（约 1200+ 人）](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=MJD18YzJxqft6Q6rKX-sSNiLrtmqVQmJ&authKey=TM3En%2BxxzFeqimSCUhG%2F5VLmfRDeXtnfm1h6P7cwfoGR6bVXkXk2cYm%2BOG0MHuJ8&noverify=0&group_code=567915181)
+- 开发者动态：[Bilibili](https://space.bilibili.com/271218438)
 
 ## 许可证与项目状态
 
