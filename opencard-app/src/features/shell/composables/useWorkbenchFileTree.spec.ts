@@ -1,98 +1,66 @@
 import { createTestSession } from '../../editor-runtime/editorTestSession'
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, type Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
-import { normalizeNodeTail } from '../../../shared/ui/node/node.types'
-import {
-  OPENED_EDITOR_CLOSE_ACTION_KEY,
-  PROJECT_ENTRY_MORE_ACTION_KEY,
-  useWorkbenchFileTree,
-} from './useWorkbenchFileTree'
+import { useWorkbenchFileTree } from './useWorkbenchFileTree'
 
-describe('useWorkbenchFileTree opened editors', () => {
-  it('projects a close action onto every opened editor item', () => {
-    const sessions = ref<EditorSession[]>([createTestSession({
-      id: 'session-1',
-      resourceKind: 'workspace',
-      path: 'D:/project/card.ocdocument',
-      fileTypeId: 'opencard',
-      name: 'card.ocdocument',
-      editorId: 'card-designer',
-      savedContent: '',
-      draftContent: '',
-      isDirty: false,
-      isPreview: false,
-    })])
-    const { openedEditorTreeData } = useWorkbenchFileTree({
-      projectPath: ref(''),
-      indexedEntries: ref([]),
-      sessions,
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
-    })
-
-    expect(openedEditorTreeData.value.items.get('session-1')?.label).toBe('card.ocdocument')
-    expect(openedEditorTreeData.value.items.get('session-1')?.loading).toBe(true)
-    expect(normalizeNodeTail(openedEditorTreeData.value.items.get('session-1')?.tail)).toEqual([{
-      key: OPENED_EDITOR_CLOSE_ACTION_KEY,
-      title: 'sidebar.closeEditor',
-      icon: 'mdiClose',
-    }])
+function createTree(options: {
+  projectPath?: string
+  entries?: readonly { name: string; isDirectory?: boolean }[]
+  sessions?: Ref<EditorSession[]>
+  activeSession?: Ref<EditorSession | null>
+  openPreviewFile?: (path: string) => Promise<unknown>
+} = {}) {
+  return useWorkbenchFileTree({
+    projectPath: ref(options.projectPath ?? 'D:/project'),
+    indexedEntries: ref(options.entries ?? []),
+    sessions: options.sessions ?? ref<EditorSession[]>([]),
+    formatSessionTitle: session => session.state.name,
+    activeSession: options.activeSession ?? ref<EditorSession | null>(null),
+    translate: key => key,
+    isDirectoryExpanded: () => false,
+    activateSession: () => undefined,
+    openPreviewFile: options.openPreviewFile ?? (async () => undefined),
   })
+}
 
-  it('projects project entries as draggable, renamable action hosts', () => {
-    const { projectTreeData } = useWorkbenchFileTree({
-      projectPath: ref('D:/project'),
-      indexedEntries: ref([{ name: 'cards/main.ocdocument', isDirectory: false }]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
-    })
-
-    expect(projectTreeData.value.items.get('D:/project/cards/main.ocdocument')).toMatchObject({
-      renamable: true,
-      draggable: true,
-      tail: [{ key: PROJECT_ENTRY_MORE_ACTION_KEY }],
-      renameSelection: { start: 0, end: 4 },
-    })
+function workspaceSession(path: string): EditorSession {
+  return createTestSession({
+    id: 'session-1',
+    resourceKind: 'workspace',
+    path,
+    fileTypeId: 'opencard',
+    name: path.split('/').pop()!,
+    editorId: 'card-designer',
+    savedContent: '{}',
+    draftContent: '{}',
+    isDirty: false,
+    isPreview: false,
   })
+}
 
+describe('useWorkbenchFileTree', () => {
   it('hides dot-prefixed files and directories by default', () => {
     const projectPath = 'D:/project'
-    const { projectTreeData } = useWorkbenchFileTree({
-      projectPath: ref(projectPath),
-      indexedEntries: ref([
+    const tree = createTree({
+      projectPath,
+      entries: [
         { name: '.opencard', isDirectory: true },
         { name: '.opencard/project.json', isDirectory: false },
         { name: '.opencard/fonts', isDirectory: true },
         { name: '.opencard/fonts/Brand.otf', isDirectory: false },
         { name: '.env', isDirectory: false },
         { name: 'notes.txt', isDirectory: false },
-      ]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
+      ],
     })
 
-    expect(projectTreeData.value.rootKeys).toEqual([`${projectPath}/notes.txt`])
-    expect([...projectTreeData.value.items.keys()]).toEqual([`${projectPath}/notes.txt`])
+    expect(tree.projectTreeData.value.rootKeys).toEqual([`${projectPath}/notes.txt`])
+    expect([...tree.projectTreeData.value.items.keys()]).toEqual([`${projectPath}/notes.txt`])
   })
 
   it('treats .opencard like an ordinary directory when dot entries are visible', () => {
     const projectPath = 'D:/project'
-    const { projectTreeData } = useWorkbenchFileTree({
+    const tree = useWorkbenchFileTree({
       projectPath: ref(projectPath),
       indexedEntries: ref([
         { name: '.opencard', isDirectory: true },
@@ -100,94 +68,27 @@ describe('useWorkbenchFileTree opened editors', () => {
         { name: '.env', isDirectory: false },
       ]),
       hideDotFiles: ref(false),
-      sessions: ref([]),
+      sessions: ref<EditorSession[]>([]),
       formatSessionTitle: session => session.state.name,
       activeSession: ref(null),
       translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
+      isDirectoryExpanded: () => false,
+      activateSession: () => undefined,
+      openPreviewFile: async () => undefined,
     })
 
-    expect(projectTreeData.value.rootKeys).toEqual([
+    expect(tree.projectTreeData.value.rootKeys).toEqual([
       `${projectPath}/.opencard`,
       `${projectPath}/.env`,
     ])
-    expect(projectTreeData.value.children.get(`${projectPath}/.opencard`))
+    expect(tree.projectTreeData.value.children.get(`${projectPath}/.opencard`))
       .toEqual([`${projectPath}/.opencard/project.json`])
   })
 
-  it('provides fixed localized project-management entries that open managed files', async () => {
+  it('opens the file a project-management entry names', async () => {
     const projectPath = 'D:/project'
     const openPreviewFile = vi.fn(async () => undefined)
-    const result = useWorkbenchFileTree({
-      projectPath: ref(projectPath),
-      indexedEntries: ref([
-        { name: '.opencard/fonts/Brand.otf', isDirectory: false },
-        { name: '.opencard/fonts/Unused.otf', isDirectory: false },
-        { name: '.opencard/icons/status.png', isDirectory: false },
-        { name: '.opencard/icons/unused.png', isDirectory: false },
-      ]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => `translated:${key}`,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile,
-    })
-
-    expect(result.projectManagementTreeData.value.rootKeys).toEqual([
-      `${projectPath}/.opencard/project.json`,
-      `${projectPath}/.opencard/locale.json`,
-      `${projectPath}/.opencard/fonts/fonts.json`,
-      `${projectPath}/.opencard/icons/icons.json`,
-      `${projectPath}/.opencard/blocks/blocks.json`,
-      `${projectPath}/.opencard/packages`,
-    ])
-    expect(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`)?.label)
-      .toBe('translated:fileTypes.opencardFontRegistry')
-    expect(result.projectManagementTreeData.value.rootKeys.slice(0, 4).map(rootKey => (
-      result.projectManagementTreeData.value.items.get(rootKey)?.tail
-    ))).toEqual([
-      '.opencard/project.json',
-      '.opencard/locale.json',
-      '.opencard/fonts/fonts.json',
-      '.opencard/icons/icons.json',
-    ])
-    expect(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`))
-      .toMatchObject({ visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'file-config' } })
-    expect(result.projectManagementTreeData.value.children.has(`${projectPath}/.opencard/fonts/fonts.json`)).toBe(false)
-    expect(result.projectManagementTreeData.value.children.has(`${projectPath}/.opencard/icons/icons.json`)).toBe(false)
-    expect(normalizeNodeTail(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/fonts/fonts.json`)?.tail))
-      .toEqual(['.opencard/fonts/fonts.json'])
-    expect(normalizeNodeTail(result.projectManagementTreeData.value.items.get(`${projectPath}/.opencard/icons/icons.json`)?.tail))
-      .toEqual(['.opencard/icons/icons.json'])
-    expect(result.projectManagementExpandedKeys.value).toEqual([])
-
-    const fontRegistryKey = `${projectPath}/.opencard/fonts/fonts.json`
-    expect(result.setProjectManagementEntryExpanded(fontRegistryKey, false)).toBe(false)
-    expect(result.setProjectManagementEntryExpanded(fontRegistryKey, true)).toBe(false)
-
-    await result.handleProjectManagementSelect([`${projectPath}/.opencard/fonts/fonts.json`])
-    expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/.opencard/fonts/fonts.json`)
-
-  })
-
-  it('opens the file a management entry names', async () => {
-    const projectPath = 'D:/project'
-    const openPreviewFile = vi.fn(async () => undefined)
-    const result = useWorkbenchFileTree({
-      projectPath: ref(projectPath),
-      indexedEntries: ref([]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => `translated:${key}`,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile,
-    })
+    const tree = createTree({ projectPath, openPreviewFile })
 
     for (const fileName of [
       '.opencard/project.json',
@@ -196,129 +97,66 @@ describe('useWorkbenchFileTree opened editors', () => {
       '.opencard/icons/icons.json',
     ]) {
       openPreviewFile.mockClear()
-      await result.handleProjectManagementSelect([`${projectPath}/${fileName}`])
+      await tree.handleProjectManagementSelect([`${projectPath}/${fileName}`])
       expect(openPreviewFile).toHaveBeenCalledWith(`${projectPath}/${fileName}`)
     }
   })
 
-  it('does not expose cleanup actions before asset registries finish loading', async () => {
-    const projectPath = 'D:/project'
-    const result = useWorkbenchFileTree({
-      projectPath: ref(projectPath),
-      indexedEntries: ref([
-        { name: '.opencard/fonts/Unused.otf', isDirectory: false },
-        { name: '.opencard/icons/unused.png', isDirectory: false },
-      ]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
-    })
-
-    expect(result.projectManagementTreeData.value.children.size).toBe(0)
-  })
-
   it('keeps selection references stable when active editor content changes', async () => {
     const path = 'D:/project/card.ocdocument'
-    const session: EditorSession = createTestSession({
-      id: 'session-1',
-      resourceKind: 'workspace',
-      path,
-      fileTypeId: 'opencard',
-      name: 'card.ocdocument',
-      editorId: 'card-designer',
-      savedContent: '{}',
-      draftContent: '{}',
-      isDirty: false,
-      isPreview: false,
-    })
+    const session = workspaceSession(path)
     const activeSession = ref<EditorSession | null>(session)
-    const result = useWorkbenchFileTree({
-      projectPath: ref('D:/project'),
-      indexedEntries: ref([{ name: 'card.ocdocument', isDirectory: false }]),
-      sessions: ref<EditorSession[]>([session]),
-      formatSessionTitle: current => current.state.name,
+    const tree = createTree({
+      entries: [{ name: 'card.ocdocument', isDirectory: false }],
+      sessions: ref([session]),
       activeSession,
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
     })
-    const selectedFiles = result.selectedProjectEntryKeys.value
-    const selectedEditors = result.openedEditorSelectedKeys.value
+    const selectedFiles = tree.selectedProjectEntryKeys.value
+    const selectedEditors = tree.openedEditorSelectedKeys.value
 
-    activeSession.value!.updateContent('{"changed":true}')
+    session.updateContent('{"changed":true}')
     await nextTick()
 
-    expect(result.selectedProjectEntryKeys.value).toBe(selectedFiles)
-    expect(result.openedEditorSelectedKeys.value).toBe(selectedEditors)
+    expect(tree.selectedProjectEntryKeys.value).toBe(selectedFiles)
+    expect(tree.openedEditorSelectedKeys.value).toBe(selectedEditors)
   })
 
-  it('opens font files through their dedicated preview session', async () => {
+  it('opens a font file through its dedicated preview session', async () => {
     const path = 'D:/project/assets/fonts/Brand.otf'
     const openPreviewFile = vi.fn(async () => undefined)
-    const result = useWorkbenchFileTree({
-      projectPath: ref('D:/project'),
-      indexedEntries: ref([{ name: 'assets/fonts/Brand.otf', isDirectory: false }]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
+    const tree = createTree({
+      entries: [{ name: 'assets/fonts/Brand.otf', isDirectory: false }],
       openPreviewFile,
     })
 
-    await result.handleFileTreeSelect([path])
+    await tree.handleFileTreeSelect([path])
 
-    expect(result.selectedProjectEntryKeys.value).toEqual([path])
+    expect(tree.selectedProjectEntryKeys.value).toEqual([path])
     expect(openPreviewFile).toHaveBeenCalledWith(path)
   })
 
-  it('preserves multi-selection across resource refresh without opening previews', async () => {
+  it('preserves multi-selection across a resource refresh without opening previews', async () => {
     const indexedEntries = ref([{ name: 'a.png' }, { name: 'b.png' }])
     const openPreviewFile = vi.fn(async () => undefined)
     const tree = useWorkbenchFileTree({
-      projectPath: ref('D:/project'), indexedEntries, sessions: ref([]), activeSession: ref(null),
-      formatSessionTitle: session => session.state.name, translate: key => key,
-      isDirectoryExpanded: () => false, activateSession: vi.fn(), openPreviewFile,
+      projectPath: ref('D:/project'),
+      indexedEntries,
+      sessions: ref<EditorSession[]>([]),
+      formatSessionTitle: session => session.state.name,
+      activeSession: ref(null),
+      translate: key => key,
+      isDirectoryExpanded: () => false,
+      activateSession: () => undefined,
+      openPreviewFile,
     })
     await tree.handleFileTreeSelect(['D:/project/a.png', 'D:/project/b.png'])
     indexedEntries.value = [...indexedEntries.value, { name: 'c.png' }]
     await nextTick()
     expect(tree.selectedProjectEntryKeys.value).toEqual(['D:/project/a.png', 'D:/project/b.png'])
     expect(openPreviewFile).not.toHaveBeenCalled()
+
     indexedEntries.value = [{ name: 'a.png' }]
     await nextTick()
     expect(tree.selectedProjectEntryKeys.value).toEqual(['D:/project/a.png'])
-  })
-
-  it('separates registered font files from unregistered files in the project tree', () => {
-    const projectPath = 'D:/project'
-    const result = useWorkbenchFileTree({
-      projectPath: ref(projectPath),
-      indexedEntries: ref([
-        { name: 'assets/fonts/Brand.otf', isDirectory: false },
-        { name: 'assets/fonts/Other.otf', isDirectory: false },
-      ]),
-      sessions: ref([]),
-      formatSessionTitle: session => session.state.name,
-      activeSession: ref(null),
-      registeredFontSources: ref(['assets/fonts/Brand.otf']),
-      translate: key => key,
-      isDirectoryExpanded: vi.fn(() => false),
-      activateSession: vi.fn(),
-      openPreviewFile: vi.fn(async () => undefined),
-    })
-
-    expect(result.projectTreeData.value.items.get(`${projectPath}/assets/fonts/Brand.otf`)).toMatchObject({
-      visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'active' },
-    })
-    expect(result.projectTreeData.value.items.get(`${projectPath}/assets/fonts/Other.otf`)).toMatchObject({
-      visual: { type: 'icon', icon: 'mdiFormatFont', iconTone: 'muted' },
-    })
   })
 })

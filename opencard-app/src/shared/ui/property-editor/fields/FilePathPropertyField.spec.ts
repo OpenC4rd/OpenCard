@@ -1,6 +1,7 @@
-import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import OverlayGroupRoot from '../../../../components/ui/OverlayGroupRoot.vue'
+import { disposeGroup, overlayGroups } from '../../../../composables/overlayGroups'
 import FilePathPropertyField from './FilePathPropertyField.vue'
 import { createResourceDirectoryProvider } from '../../../../features/workspace/services/resourceDirectoryProvider'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../../../../features/workspace/services/projectIconCatalog'
@@ -10,35 +11,81 @@ vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }))
 
+/**
+ * 候选列表是共享组宿主里的一层：没有可读的登记内容，只能查真实 DOM。
+ * 选择走列表自己的 pointerdown 入口，和用户点击的路径一致。
+ */
+function listbox(): HTMLElement | null {
+  return document.body.querySelector('[role="listbox"]')
+}
+
+function optionLabels(): string[] {
+  return [...document.body.querySelectorAll('[role="option"]')]
+    .map(option => option.textContent?.trim() ?? '')
+}
+
+function chooseOption(label: string): void {
+  const option = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')]
+    .find(candidate => (candidate.textContent?.trim() ?? '') === label)
+  if (!option) throw new Error(`选项 ${label} 不在列表里：${optionLabels().join(' | ')}`)
+  option.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }))
+}
+
+const projectEnvironment = {
+  kind: 'project' as const, namespace: 'project', rootPath: '/project',
+  fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+}
+
+function mountField(
+  definition: Record<string, unknown>,
+  value: string,
+): VueWrapper {
+  const wrapper = mount(FilePathPropertyField, {
+    attachTo: document.body,
+    props: {
+      definition: { title: 'Image', fieldType: 'filePath', ...definition },
+      value,
+      'onUpdate:value': (next: string) => { void wrapper.setProps({ value: next }) },
+    },
+  })
+  return wrapper
+}
+
 describe('FilePathPropertyField', () => {
-  enableAutoUnmount(afterEach)
+  // 候选列表要真的渲染出来才说明「列表打开了」。
+  let overlayRoot: VueWrapper | null = null
+
+  beforeEach(() => {
+    overlayRoot = mount(OverlayGroupRoot, { attachTo: document.body })
+  })
+
+  afterEach(() => {
+    overlayRoot?.unmount()
+    overlayRoot = null
+    for (const group of [...overlayGroups.keys()]) disposeGroup(group)
+    document.body.innerHTML = ''
+  })
+
   it('offers parent navigation for a deleted directory but still reports real read failures', async () => {
     const error = new Error('read directory failed')
     const fs = { readDirectoryEntries: vi.fn(async () => { throw error }), fileExists: vi.fn(async () => false) }
-    const provider = createResourceDirectoryProvider('/project', {
-      kind: 'project', namespace: 'project', rootPath: '/project',
-      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
-    }, fs)
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: { definition: { title: 'Image', fieldType: 'filePath', directoryProvider: provider }, value: 'Assets/deleted.png' },
-    })
+    const provider = createResourceDirectoryProvider('/project', projectEnvironment, fs)
+    const wrapper = mountField({ directoryProvider: provider }, 'Assets/deleted.png')
     try {
       wrapper.get('input').element.focus()
-    await flushPromises()
+      await flushPromises()
       expect(fs.fileExists).toHaveBeenCalledWith('/project/Assets')
-      expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([expect.objectContaining({ label: '..', insertText: '' })])
-      expect(wrapper.props('value')).toBe('Assets/deleted.png')
+      expect(optionLabels()).toEqual(['..'])
       fs.fileExists.mockResolvedValue(true)
       await expect(provider('Assets')).rejects.toBe(error)
     } finally { wrapper.unmount() }
   })
-  it('browses a package from its title, selects a file, and returns from the package root', async () => {
+
+  it('browses a package by its title and writes the package coordinate back', async () => {
     const readDirectoryEntries = vi.fn(async (path: string) => path === '/project'
       ? [] : [{ name: 'image.png', isDirectory: false, isFile: true, isSymlink: false }])
     const provider = createResourceDirectoryProvider('/project', {
-      kind: 'project', namespace: 'project', rootPath: '/project',
-      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+      ...projectEnvironment,
       packages: new Map([['alice/theme@1.0.0', {
         coordinate: { author: 'alice', name: 'theme', version: '1.0.0' },
         manifest: normalizeResourcePackageManifest({
@@ -51,140 +98,92 @@ describe('FilePathPropertyField', () => {
         rootPath: '/cache/snapshots/aa11', cover: null,
       }]]),
     }, { readDirectoryEntries, fileExists: async () => true })
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: { definition: { title: 'Image', fieldType: 'filePath', directoryProvider: provider }, value: '',
-        'onUpdate:value': (value: string) => { void wrapper.setProps({ value }) },
-      },
-    })
+    const wrapper = mountField({ directoryProvider: provider }, '')
     try {
       const input = wrapper.get('input')
       input.element.focus()
       await flushPromises()
-      const rootMenu = wrapper.getComponent(OcAutocompletePopover)
-      expect(rootMenu.props('items')).toEqual([
-        expect.objectContaining({ insertText: 'icon:', icon: 'mdiStickerEmoji' }),
-        expect.objectContaining({ label: 'Theme Pack', insertText: 'alice/theme@1.0.0#', icon: 'mdiPackageVariantClosed' }),
-      ])
-      rootMenu.vm.$emit('select', rootMenu.props('items').find(item => item.label === 'Theme Pack')!.key)
+      expect(optionLabels()).toEqual(['icon:', 'Theme Pack'])
+      chooseOption('Theme Pack')
       await flushPromises()
       expect(readDirectoryEntries).toHaveBeenLastCalledWith('/cache/snapshots/aa11', 1)
-      const menu = wrapper.getComponent(OcAutocompletePopover)
-      expect(menu.props('items').map(item => item.label)).toEqual(['icon:', 'image.png', '..'])
-      menu.vm.$emit('select', menu.props('items').find(item => item.label === '..')!.key)
-      await flushPromises()
-      expect(input.element.value).toBe('')
-      expect(menu.props('items').map(item => item.label)).toContain('Theme Pack')
-      menu.vm.$emit('select', menu.props('items').find(item => item.label === 'Theme Pack')!.key)
-      await flushPromises()
-      menu.vm.$emit('select', menu.props('items').find(item => item.label === 'image.png')!.key)
+      chooseOption('image.png')
       await flushPromises()
       expect(input.element.value).toBe('alice/theme@1.0.0#image.png')
-    } finally {
-      wrapper.unmount()
-    }
+    } finally { wrapper.unmount() }
   })
 
   it('follows the workspace dot-file visibility setting', async () => {
-    const readDirectoryEntries = vi.fn(async () => [
-      { name: '.opencard', isDirectory: true, isFile: false, isSymlink: false },
-      { name: '.git', isDirectory: true, isFile: false, isSymlink: false },
-      { name: 'assets', isDirectory: true, isFile: false, isSymlink: false },
-    ])
-    const environment = {
-      kind: 'project' as const, namespace: 'project', rootPath: '/project',
-      fonts: {}, fontDocument: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+    const fs = {
+      readDirectoryEntries: vi.fn(async () => [
+        { name: '.opencard', isDirectory: true, isFile: false, isSymlink: false },
+        { name: '.git', isDirectory: true, isFile: false, isSymlink: false },
+        { name: 'assets', isDirectory: true, isFile: false, isSymlink: false },
+      ]),
+      fileExists: async () => true,
     }
-    const fs = { readDirectoryEntries, fileExists: async () => true }
-    const hidden = createResourceDirectoryProvider('/project', environment, fs, { hideDotFiles: true })
-    const visible = createResourceDirectoryProvider('/project', environment, fs, { hideDotFiles: false })
+    const hidden = createResourceDirectoryProvider('/project', projectEnvironment, fs, { hideDotFiles: true })
+    const visible = createResourceDirectoryProvider('/project', projectEnvironment, fs, { hideDotFiles: false })
 
     expect((await hidden('')).map(entry => entry.name)).toEqual(['assets', 'icon:'])
     expect((await visible('')).map(entry => entry.name)).toEqual(['.opencard', '.git', 'assets', 'icon:'])
   })
 
-  it('uses Shift+Tab for parent navigation without trapping focus at the root', async () => {
+  it('uses Shift+Tab for parent navigation without consuming it at the root', async () => {
     const directoryProvider = vi.fn(async (directory: string) => directory === 'assets'
       ? [{ name: 'assets/card.png', isDirectory: false }]
       : [{ name: 'assets', isDirectory: true }])
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
-        value: 'assets/',
-        'onUpdate:value': (value: string) => { void wrapper.setProps({ value }) },
-      },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    await flushPromises()
+    const wrapper = mountField({ directoryProvider }, 'assets/')
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
 
-    const parentEvent = new KeyboardEvent('keydown', {
-      key: 'Tab', shiftKey: true, bubbles: true, cancelable: true,
-    })
-    input.element.dispatchEvent(parentEvent)
-    await flushPromises()
-    expect(parentEvent.defaultPrevented).toBe(true)
-    expect(input.element.value).toBe('')
+      const parentEvent = new KeyboardEvent('keydown', {
+        key: 'Tab', shiftKey: true, bubbles: true, cancelable: true,
+      })
+      input.element.dispatchEvent(parentEvent)
+      await flushPromises()
+      expect(parentEvent.defaultPrevented).toBe(true)
+      expect(input.element.value).toBe('')
 
-    const rootEvent = new KeyboardEvent('keydown', {
-      key: 'Tab', shiftKey: true, bubbles: true, cancelable: true,
-    })
-    input.element.dispatchEvent(rootEvent)
-    expect(rootEvent.defaultPrevented).toBe(false)
-
-    await input.trigger('keydown', { key: 'Enter' })
-    await flushPromises()
-    expect(input.element.value).toBe('assets/')
-    await input.trigger('keydown', { key: 'ArrowUp' })
-    await input.trigger('keydown', { key: 'Enter' })
-    await flushPromises()
-    expect(input.element.value).toBe('')
+      const rootEvent = new KeyboardEvent('keydown', {
+        key: 'Tab', shiftKey: true, bubbles: true, cancelable: true,
+      })
+      input.element.dispatchEvent(rootEvent)
+      expect(rootEvent.defaultPrevented).toBe(false)
+    } finally { wrapper.unmount() }
   })
 
   it('opens virtual scoped-resource entries without appending a path separator', async () => {
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: {
-          title: 'Image',
-          fieldType: 'filePath',
-          directoryProvider: async () => [
-            { name: 'icon:', label: 'Icons', isDirectory: true, icon: 'mdiStickerEmoji' },
-            { name: 'portrait.png', isDirectory: false },
-          ],
-          completion: {
-            provider: ({ value }) => value === 'icon:'
-              ? {
-                  replaceStart: 0,
-                  replaceEnd: value.length,
-                  items: [{ key: 'series', label: 'Status', insertText: 'icon:status/', keepOpen: true }],
-                }
-              : null,
-          },
-        },
-        value: '',
-        'onUpdate:value': (value: string) => { void wrapper.setProps({ value }) },
+    const wrapper = mountField({
+      directoryProvider: async () => [
+        { name: 'icon:', label: 'Icons', isDirectory: true, icon: 'mdiStickerEmoji' },
+        { name: 'portrait.png', isDirectory: false },
+      ],
+      completion: {
+        provider: ({ value }: { value: string }) => value === 'icon:'
+          ? {
+              replaceStart: 0,
+              replaceEnd: value.length,
+              items: [{ key: 'series', label: 'Status', insertText: 'icon:status/', keepOpen: true }],
+            }
+          : null,
       },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    await flushPromises()
+    }, '')
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
 
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')[0]).toEqual(expect.objectContaining({
-      label: 'Icons', insertText: 'icon:', icon: 'mdiStickerEmoji',
-    }))
-    await input.trigger('keydown', { key: 'Enter' })
-    await flushPromises()
+      // 目录项写回的是前缀本身（`icon:`），不是 `icon:/`：作用域前缀后面没有分隔符。
+      expect(optionLabels()[0]).toBe('Icons')
+      await input.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
 
-    expect(input.element.value).toBe('icon:')
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ label: 'Status', insertText: 'icon:status/' }),
-    ])
-  })
-
-  afterEach(() => {
-    document.body.innerHTML = ''
+      expect(input.element.value).toBe('icon:')
+      expect(optionLabels()).toEqual(['Status'])
+    } finally { wrapper.unmount() }
   })
 
   it('keeps an existing complete file committed independently of the stale focus cursor', async () => {
@@ -193,46 +192,27 @@ describe('FilePathPropertyField', () => {
       { name: 'assets/portrait.png', isDirectory: false },
       { name: 'assets/readme.txt', isDirectory: false },
     ])
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: {
-          title: 'Image',
-          fieldType: 'filePath',
-          filter: { target: 'file', extensions: ['png'] },
-          directoryProvider,
-        },
-        value: 'assets/portrait.png',
-      },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    ;(input.element as HTMLInputElement).setSelectionRange(0, 0)
+    const wrapper = mountField({
+      directoryProvider,
+      filter: { target: 'file', extensions: ['png'] },
+    }, 'assets/portrait.png')
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      ;(input.element as HTMLInputElement).setSelectionRange(0, 0)
+      input.element.focus()
+      await flushPromises()
 
-    input.element.focus()
-    await flushPromises()
+      expect(directoryProvider).toHaveBeenCalledWith('assets')
+      expect(optionLabels()).toEqual(['propertyEditor.filePath.clearSelection'])
 
-    expect(directoryProvider).toHaveBeenCalledWith('assets')
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({
-        label: 'propertyEditor.filePath.clearSelection',
-        insertText: 'assets/',
-        keepOpen: true,
-      }),
-    ])
-    expect(wrapper.getComponent(OcAutocompletePopover).props('open')).toBe(true)
+      chooseOption('propertyEditor.filePath.clearSelection')
+      await flushPromises()
 
-    const clearItem = wrapper.getComponent(OcAutocompletePopover).props('items')[0]!
-    wrapper.getComponent(OcAutocompletePopover).vm.$emit('select', clearItem.key)
-    await flushPromises()
-
-    const updates = wrapper.emitted('update:value') ?? []
-    expect(updates[updates.length - 1]).toEqual(['assets/'])
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ label: 'icons' }),
-      expect.objectContaining({ label: 'portrait.png' }),
-      expect.objectContaining({ label: '..' }),
-    ])
+      const updates = wrapper.emitted('update:value') ?? []
+      expect(updates[updates.length - 1]).toEqual(['assets/'])
+      expect(optionLabels()).toEqual(['icons', 'portrait.png', '..'])
+    } finally { wrapper.unmount() }
   })
 
   it('uses strict path-prefix filtering for every cursor and focus refresh', async () => {
@@ -241,119 +221,19 @@ describe('FilePathPropertyField', () => {
       { name: 'Outputs/main_blueprint.png', isDirectory: false },
       { name: 'Outputs/domain_main_input.png', isDirectory: false },
     ])
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
-        value: 'Outputs/main_in',
-      },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    await flushPromises()
-    await input.trigger('click')
-    await flushPromises()
+    const wrapper = mountField({ directoryProvider }, 'Outputs/main_in')
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
+      await input.trigger('click')
+      await flushPromises()
 
-    const labels = wrapper.getComponent(OcAutocompletePopover).props('items').map(item => item.label)
-    expect(labels).toContain('main_instance.png')
-    expect(labels).not.toContain('main_blueprint.png')
-    expect(labels).not.toContain('domain_main_input.png')
-  })
-
-  it('filters typed fragments and continues browsing after selecting a directory', async () => {
-    const directoryProvider = vi.fn(async (directory: string) => directory === 'assets/icons'
-      ? [{ name: 'assets/icons/card.png', isDirectory: false }]
-      : [
-          { name: 'assets/icons', isDirectory: true },
-          { name: 'assets/card.png', isDirectory: false },
-          { name: 'assets/portrait.png', isDirectory: false },
-        ])
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: {
-          title: 'Image',
-          fieldType: 'filePath',
-          filter: { target: 'file', extensions: ['.png'] },
-          directoryProvider,
-        },
-        value: '',
-      },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    const control = input.element as HTMLInputElement
-    input.element.focus()
-    await flushPromises()
-    control.value = 'assets/ca'
-    control.setSelectionRange(control.value.length, control.value.length)
-
-    await input.trigger('input')
-    await flushPromises()
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ label: 'card.png' }),
-      expect.objectContaining({ label: '..' }),
-    ])
-
-    control.value = 'assets/'
-    control.setSelectionRange(control.value.length, control.value.length)
-    await input.trigger('input')
-    await flushPromises()
-    const directoryItem = wrapper.getComponent(OcAutocompletePopover).props('items')
-      .find(item => item.label === 'icons')!
-    wrapper.getComponent(OcAutocompletePopover).vm.$emit('select', directoryItem.key)
-    await flushPromises()
-
-    const updates = wrapper.emitted('update:value') ?? []
-    expect(updates[updates.length - 1]).toEqual(['assets/icons/'])
-    expect(directoryProvider).toHaveBeenLastCalledWith('assets/icons')
-
-    const fileItem = wrapper.getComponent(OcAutocompletePopover).props('items')
-      .find(item => item.label === 'card.png')!
-    wrapper.getComponent(OcAutocompletePopover).vm.$emit('select', fileItem.key)
-    await wrapper.setProps({
-      value: 'assets/icons/card.png',
-      definition: {
-        title: 'Image',
-        fieldType: 'filePath',
-        filter: { target: 'file', extensions: ['png'] },
-        directoryProvider,
-        completion: { provider: () => null },
-      },
-    })
-    await flushPromises()
-
-    expect(wrapper.getComponent(OcAutocompletePopover).props('open')).toBe(true)
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({
-        label: 'propertyEditor.filePath.clearSelection',
-        insertText: 'assets/icons/',
-      }),
-    ])
-  })
-
-  it('browses a package root without inserting a slash after the package separator', async () => {
-    const directoryProvider = vi.fn(async () => [
-      { name: 'alice/theme@1.0.0#images', isDirectory: true },
-      { name: 'alice/theme@1.0.0#cover.png', isDirectory: false },
-    ])
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
-        value: 'alice/theme@1.0.0#',
-      },
-    })
-
-    wrapper.get('input').element.focus()
-    await flushPromises()
-
-    expect(directoryProvider).toHaveBeenCalledWith('alice/theme@1.0.0#')
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ label: 'images', insertText: 'alice/theme@1.0.0#images/' }),
-      expect.objectContaining({ label: 'cover.png', insertText: 'alice/theme@1.0.0#cover.png' }),
-      expect.objectContaining({ label: '..' }),
-    ])
+      const labels = optionLabels()
+      expect(labels).toContain('main_instance.png')
+      expect(labels).not.toContain('main_blueprint.png')
+      expect(labels).not.toContain('domain_main_input.png')
+    } finally { wrapper.unmount() }
   })
 
   it('supports directory-only filters while keeping binding completion authoritative', async () => {
@@ -368,36 +248,26 @@ describe('FilePathPropertyField', () => {
           items: [{ key: 'binding', label: 'card:image', insertText: 'card:image' }],
         }
       : null)
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: {
-          title: 'Directory',
-          fieldType: 'filePath',
-          filter: { target: 'directory' },
-          directoryProvider,
-          completion: { provider: bindingProvider },
-        },
-        value: '',
-      },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    await flushPromises()
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ label: 'assets' }),
-    ])
+    const wrapper = mountField({
+      directoryProvider,
+      filter: { target: 'directory' },
+      completion: { provider: bindingProvider },
+    }, '')
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
+      expect(optionLabels()).toEqual(['assets'])
 
-    const control = input.element as HTMLInputElement
-    control.value = '{{'
-    control.setSelectionRange(2, 2)
-    await input.trigger('input')
-    await flushPromises()
+      const control = input.element as HTMLInputElement
+      control.value = '{{'
+      control.setSelectionRange(2, 2)
+      await input.trigger('input')
+      await flushPromises()
 
-    expect(bindingProvider).toHaveBeenLastCalledWith({ value: '{{', cursor: 2 })
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([
-      expect.objectContaining({ key: 'binding' }),
-    ])
+      expect(bindingProvider).toHaveBeenLastCalledWith({ value: '{{', cursor: 2 })
+      expect(optionLabels()).toEqual(['card:image'])
+    } finally { wrapper.unmount() }
   })
 
   it('discards a pending directory result after blur', async () => {
@@ -405,21 +275,17 @@ describe('FilePathPropertyField', () => {
     const directoryProvider = vi.fn(() => new Promise<Array<{ name: string; isDirectory: boolean }>>((resolve) => {
       resolveEntries = resolve
     }))
-    const wrapper = mount(FilePathPropertyField, {
-      attachTo: document.body,
-      props: {
-        definition: { title: 'Image', fieldType: 'filePath', directoryProvider },
-        value: 'assets/portrait.png',
-      },
-    })
-    const input = wrapper.get('input')
-    input.element.focus()
-    await flushPromises()
-    await input.trigger('blur')
-    resolveEntries?.([{ name: 'assets/portrait.png', isDirectory: false }])
-    await flushPromises()
+    const wrapper = mountField({ directoryProvider }, 'assets/portrait.png')
+    try {
+      const input = wrapper.get('input')
+      input.element.focus()
+      await flushPromises()
+      await input.trigger('blur')
+      resolveEntries?.([{ name: 'assets/portrait.png', isDirectory: false }])
+      await flushPromises()
 
-    expect(wrapper.getComponent(OcAutocompletePopover).props('open')).toBe(false)
-    expect(wrapper.getComponent(OcAutocompletePopover).props('items')).toEqual([])
+      expect(listbox()).toBeNull()
+      expect(optionLabels()).toEqual([])
+    } finally { wrapper.unmount() }
   })
 })

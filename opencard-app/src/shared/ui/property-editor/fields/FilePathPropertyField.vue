@@ -30,19 +30,25 @@
       @keyup="handleCursorKeyup"
     />
 
-    <OcAutocompletePopover
-      :id="autocompleteId"
+    <OcOverlayMarker
+      ref="layer"
+      :group="`completion:${autocompleteId}`"
+      :anchor="completionAnchor"
+      :owner="completionControl"
+      placement="bottom-start"
+      :max-height="220"
       :open="isMenuOpen"
-      :anchor="activeInput"
-      :items="items"
-      :active-key="activeKey"
-      @select="applySuggestionByKey"
-    />
+      @update:open="isMenuOpen = $event"
+      @close="isMenuOpen = false"
+    >
+      <OcAutocompleteList :id="autocompleteId" :items="items" :active-key="activeKey"
+        @select="applySuggestionByKey" />
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { reportAppError } from '../../../../features/logging/appErrorCatalog'
 import type {
@@ -54,8 +60,9 @@ import type {
   FilePathDirectoryEntry,
   FilePathFilter,
 } from '../../../model/filePath'
-import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
+import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+import OcOverlayMarker from '../../../../components/standard/OcOverlayMarker.vue'
 
 import { usePropertyCompletion } from './usePropertyCompletion'
 
@@ -76,9 +83,13 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const activeInput = ref<HTMLInputElement | null>(null)
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const completion = usePropertyCompletion(() => activeInput.value)
 const { completionState: completionResult, suggestions: items, isMenuOpen, activeKey,
-  autocompleteId, activeDescendantId, clear: clearCompletion } = completion
+  autocompleteId, activeDescendantId, anchor: completionAnchor, control: completionControl,
+  clear: clearCompletion } = completion
+// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
+onBeforeUnmount(() => layer.value?.close())
 
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)).replace(/\\/g, '/'))
 watch(

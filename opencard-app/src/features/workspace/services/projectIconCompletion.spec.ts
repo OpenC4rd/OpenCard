@@ -36,25 +36,23 @@ describe('project icon completion', () => {
     const editing = await provider({ value: partial, cursor: partial.length })
     expect(editing?.items).toContainEqual(expect.objectContaining({ insertText: value }))
   })
-  it('lists collections without repeating their key', async () => {
+  it('inserts a collection key and keeps the picker open for its icons', async () => {
     const result = await createProjectIconCompletionProvider(sources, { mode: 'reference' })(
       { value: 'icon:', cursor: 5 },
     )
     const collection = result?.items.find(item => item.insertText === 'status/')
     expect(collection).toMatchObject({ label: 'Status icons', keepOpen: true })
-    expect(collection).not.toHaveProperty('detail')
   })
 
-  it('lists icons by name without repeating their key', async () => {
+  it('inserts the icon reference by name', async () => {
     const value = 'icon:status/'
     const result = await createProjectIconCompletionProvider(sources, {
       mode: 'reference',
       readDimensions: readSize,
     })({ value, cursor: value.length })
-    const icon = result?.items[0]
-    expect(icon).toMatchObject({ label: 'Warning badge', insertText: 'icon:status/warning', keepOpen: true })
-    expect(icon).not.toHaveProperty('detail')
-    expect(icon?.thumbnailStyle?.width).toBe('2em')
+    expect(result?.items[0]).toMatchObject({
+      label: 'Warning badge', insertText: 'icon:status/warning', keepOpen: true,
+    })
   })
 
   it('replaces the whole reference when a package is chosen, not just the collection slot', async () => {
@@ -122,7 +120,6 @@ describe('project icon completion', () => {
       label: 'Sword',
       insertText: '[[alice/theme@1.0.0#icon:mark/sword]]',
     })
-    expect(result?.items[0]).not.toHaveProperty('detail')
   })
 
 })

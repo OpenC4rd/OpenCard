@@ -4,7 +4,7 @@
     :mixed="definition.valueState === 'mixed'" :placeholder="definition.placeholder"
     :disabled="definition.isReadonly" :allow-alpha="definition.allowAlpha ?? true"
     @preview="emit('preview:value', $event)" @cancel="emit('cancel:value')"
-    @update:model-value="emit('update:value', $event)" />
+    @commit="emit('update:value', $event)" />
 </template>
 
 <script setup lang="ts">

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import enUS from './en-US'

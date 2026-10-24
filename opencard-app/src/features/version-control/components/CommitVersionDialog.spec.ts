@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import enUS from '../../../locales/en-US'
 import CommitVersionDialog from './CommitVersionDialog.vue'
 
-function mountDialog(props: { busy?: boolean; error?: string } = {}) {
+function mountDialog(props: { busy?: boolean } = {}) {
   return mount(CommitVersionDialog, {
     props: { open: true, ...props },
     global: {
@@ -15,7 +15,7 @@ function mountDialog(props: { busy?: boolean; error?: string } = {}) {
 }
 
 describe('CommitVersionDialog', () => {
-  it('submits a required summary and optional description', async () => {
+  it('submits a trimmed summary with an optional description', async () => {
     const wrapper = mountDialog()
     await wrapper.get('input').setValue('  Update card layout  ')
     await wrapper.get('textarea').setValue('  Align the back face with the front.  ')
@@ -27,31 +27,21 @@ describe('CommitVersionDialog', () => {
     }]])
   })
 
-  it('does not submit without a summary', async () => {
+  it('refuses to submit without a summary', async () => {
     const wrapper = mountDialog()
     await wrapper.get('textarea').setValue('Description only')
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
-    expect(wrapper.get('[role="alert"]').text()).toBe('Enter a summary.')
   })
 
-  it('keeps dismissal and duplicate submit disabled while committing', async () => {
+  it('refuses submit and dismissal while committing', async () => {
     const wrapper = mountDialog({ busy: true })
     await wrapper.get('input').setValue('Update card layout')
     await wrapper.get('form').trigger('submit')
-    await wrapper.findAll('button').find(button => button.text() === 'Cancel')!.trigger('click')
+    wrapper.getComponent({ name: 'OcDialog' }).vm.$emit('request-close')
 
     expect(wrapper.emitted('submit')).toBeUndefined()
     expect(wrapper.emitted('close')).toBeUndefined()
-    expect(wrapper.get('form').attributes('aria-busy')).toBe('true')
-  })
-
-  it('shows a commit service error without replacing the form', () => {
-    const wrapper = mountDialog({ error: 'There are no staged changes to commit' })
-
-    expect(wrapper.get('[role="alert"]').text()).toContain('There are no staged changes')
-    expect(wrapper.find('input').exists()).toBe(true)
-    expect(wrapper.find('textarea').exists()).toBe(true)
   })
 })

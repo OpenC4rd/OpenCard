@@ -45,10 +45,8 @@ describe('warmCodeEditorOnIdle', () => {
     warmCodeEditorOnIdle()
     warmCodeEditorOnIdle()
 
-    // 只断言“退化为定时预热且幂等”；回调体内部触发加载的分支由上一个用例覆盖。
-    const scheduled = scheduleSpy.mock.calls.filter(([, delay]) => delay === 3000)
-    expect(scheduled).toHaveLength(1)
-    expect(scheduled[0]?.[0]).toBeTypeOf('function')
+    // 一次预热只排一次延迟加载：没有空闲回调的运行环境（例如 WKWebView）也不能漏掉它。
+    expect(scheduleSpy).toHaveBeenCalledTimes(1)
     scheduleSpy.mockRestore()
   })
 

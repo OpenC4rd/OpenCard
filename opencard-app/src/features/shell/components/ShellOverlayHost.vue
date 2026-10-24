@@ -27,12 +27,12 @@
     </template>
   </OcDialog>
 
-  <FloatingMenuHost />
+  <OverlayGroupRoot />
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import FloatingMenuHost from '../../../components/ui/FloatingMenuHost.vue'
+import OverlayGroupRoot from '../../../components/ui/OverlayGroupRoot.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'

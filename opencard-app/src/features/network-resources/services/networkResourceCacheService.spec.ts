@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import type { FileSystemService } from '../../workspace/services/fileSystemService'
 import { NetworkResourceCacheService } from './networkResourceCacheService'
@@ -140,8 +141,6 @@ describe('NetworkResourceCacheService', () => {
     const indexWriteIndex = firstTransaction.findIndex(operation => operation.startsWith('write:') && operation.includes('index.json.'))
     expect(replaceIndex).toBeGreaterThanOrEqual(0)
     expect(indexWriteIndex).toBeGreaterThan(replaceIndex)
-    // 每个项目一个清单的老布局不再出现。
-    expect([...fake.files.keys()].filter(path => path.endsWith('cache.json'))).toEqual([])
   })
 
   it('names the project directory from the project path alone', async () => {

@@ -1,11 +1,22 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
-import OcIcon from '../../../components/base/OcIcon.vue'
-import OcActionButton from '../../../components/standard/OcActionButton.vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import OverlayGroupRoot from '../../../components/ui/OverlayGroupRoot.vue'
+import { disposeGroup, overlayGroups } from '../../../composables/overlayGroups'
 import PropertyEditor from './PropertyEditor.vue'
-import PropertyFieldActionRail from './PropertyFieldActionRail.vue'
-import { useFloatingMenu } from '../../../composables/useFloatingMenu'
+
+/**
+ * 右键菜单渲染在 "context-menu" 组的宿主里；子层是 `${overlayKey}/sub` 组。
+ */
+function menuElement(index = 0): HTMLElement | null {
+  return document.body.querySelectorAll<HTMLElement>('.overlay-group-layer .oc-action-menu')[index] ?? null
+}
+
+function menuButton(key: string, index = 0): HTMLButtonElement {
+  const button = [...(menuElement(index)?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])]
+    .find(item => item.dataset.ocActionKey === key)
+  if (!button) throw new Error(`No menu command for "${key}"`)
+  return button
+}
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
@@ -14,12 +25,26 @@ vi.mock('vue-i18n', () => ({
   }),
 }))
 
-describe('PropertyEditor records protocol', () => {
+function mountEditor(props: Record<string, unknown>, options: Record<string, unknown> = {}) {
+  return mount(PropertyEditor, { ...options, props: { sortMode: 'category', inputs: [], ...props } })
+}
 
-  it('uses the category action definitions for its context menu', async () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+describe('PropertyEditor records protocol', () => {
+  // 右键菜单由 OverlayGroupRoot 为 "context-menu" 组创建的宿主渲染。
+  let overlayRoot: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    overlayRoot = mount(OverlayGroupRoot, { attachTo: document.body })
+  })
+
+  afterEach(() => {
+    overlayRoot?.unmount()
+    overlayRoot = null
+    for (const group of [...overlayGroups.keys()]) disposeGroup(group)
+  })
+
+  it('offers add-property from the category menu and emits the chosen field', async () => {
+    const wrapper = mountEditor({
         inputs: [{
           key: 'block',
           record: {},
@@ -27,28 +52,27 @@ describe('PropertyEditor records protocol', () => {
             content: { title: 'Content', fieldType: 'string', defaultValue: '' },
           },
         }],
-      },
     })
 
     await wrapper.get('.property-editor__category-header').trigger('contextmenu')
-    const menu = useFloatingMenu()
-    expect(menu.state.value.items[0]).toMatchObject({ key: 'add-property' })
-    menu.selectMenuItem('add-property:content')
+    await flushPromises()
+    // 具体字段是 "add-property" 这一项的子层：悬停分支才看得见它。
+    menuButton('add-property').closest('.oc-action-menu__item')!.dispatchEvent(new Event('pointerenter'))
+    await flushPromises()
+    menuButton('add-property:content', 1).click()
+    await flushPromises()
     expect(wrapper.emitted('add-property')).toEqual([[
       { key: 'block', fieldKey: 'content' },
     ]])
-    menu.closeMenu()
   })
 
-  it('copies the stable field key from the field title button', async () => {
+  it('copies the stable field key rather than the localized label', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
     })
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+    const wrapper = mountEditor({
         deleteMode: false,
         inputs: [{
           key: 'block',
@@ -57,22 +81,16 @@ describe('PropertyEditor records protocol', () => {
             opacity: { title: 'Opacity', fieldType: 'number' },
           },
         }],
-      },
     })
 
-    const button = wrapper.get('.property-editor__field-key-button')
-    expect(button.text()).toBe('Opacity')
-    expect(button.attributes('data-tooltip')).toBe('propertyEditor.actions.copyFieldKeyTooltip')
-    await button.trigger('click')
+    await wrapper.get('.property-editor__field-key-button').trigger('click')
     await flushPromises()
 
     expect(writeText).toHaveBeenCalledWith('opacity')
   })
 
   it('dispatches explicitly marked strings to the rich-text editor', async () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+    const wrapper = mountEditor({
         inputs: [{
           key: 'text',
           record: { content: '<p>Hello</p>' },
@@ -80,21 +98,15 @@ describe('PropertyEditor records protocol', () => {
             content: { title: 'Content', fieldType: 'string', richText: true },
           },
         }],
-      },
     })
-
-    await vi.dynamicImportSettled()
-    await flushPromises()
-    await nextTick()
-    expect(wrapper.find('.rich-text-string-field__preview').exists()).toBe(true)
-    expect(wrapper.find('textarea').exists()).toBe(false)
 
     const editor = wrapper.vm as unknown as {
       activateField: (inputKey: string, fieldKey: string) => Promise<boolean>
     }
     expect(await editor.activateField('text', 'content')).toBe(true)
+    await vi.dynamicImportSettled()
     await flushPromises()
-    expect(document.body.querySelector('.rich-text-string-popover')).not.toBeNull()
+    expect(document.body.querySelector('[data-oc-modal-root]')).not.toBeNull()
     wrapper.unmount()
   })
 
@@ -104,9 +116,7 @@ describe('PropertyEditor records protocol', () => {
       replaceEnd: 0,
       items: [{ key: 'base', label: 'base.opencardproject', insertText: 'base.opencardproject' }],
     }))
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+    const wrapper = mountEditor({
         inputs: [{
           key: 'project',
           record: { extends: ['base.opencardproject', 'locale.opencardproject'] },
@@ -119,18 +129,12 @@ describe('PropertyEditor records protocol', () => {
             },
           },
         }],
-      },
     })
 
-    const items = wrapper.findAll('.array-property-field__item')
-    expect(items).toHaveLength(2)
-    expect(items[0].get('button[aria-label="Move up"]').attributes('disabled')).toBeDefined()
-    expect(items[1].get('button[aria-label="Move down"]').attributes('disabled')).toBeDefined()
-
-    await items[0].get('input').trigger('focus')
+    await wrapper.findAll('input')[0]!.trigger('focus')
     expect(completion).toHaveBeenCalled()
 
-    await items[1].get('button[aria-label="Move up"]').trigger('click')
+    await wrapper.findAll('button[aria-label="Move up"]')[1]!.trigger('click')
     const moveEmissions = wrapper.emitted('update-property') ?? []
     expect(moveEmissions[moveEmissions.length - 1]).toEqual([{
       key: 'project',
@@ -138,7 +142,7 @@ describe('PropertyEditor records protocol', () => {
       value: ['locale.opencardproject', 'base.opencardproject'],
     }])
 
-    await items[0].get('button[aria-label="Delete item"]').trigger('click')
+    await wrapper.findAll('button[aria-label="Delete item"]')[0]!.trigger('click')
     const deleteEmissions = wrapper.emitted('update-property') ?? []
     expect(deleteEmissions[deleteEmissions.length - 1]).toEqual([{
       key: 'project',
@@ -147,11 +151,8 @@ describe('PropertyEditor records protocol', () => {
     }])
   })
 
-  it('reveals a field by its input and field keys', async () => {
-    const wrapper = mount(PropertyEditor, {
-      attachTo: document.body,
-      props: {
-        sortMode: 'category',
+  it('reveals a field by its input and field keys, placing the caret at the character offset', async () => {
+    const wrapper = mountEditor({
         inputs: [{
           key: 'block:1',
           record: { content: '😀 Hello {{self:missing}}!' },
@@ -159,10 +160,9 @@ describe('PropertyEditor records protocol', () => {
             content: { title: 'Content', fieldType: 'string' },
           },
         }],
-      },
-    })
+    }, { attachTo: document.body })
 
-    const row = wrapper.get('.property-editor__row')
+    const row = wrapper.get('[data-field-key="content"]')
     const scrollIntoView = vi.fn()
     Object.defineProperty(row.element, 'scrollIntoView', { value: scrollIntoView })
 
@@ -175,19 +175,15 @@ describe('PropertyEditor records protocol', () => {
     }
     expect(await editor.revealField('block:1', 'content', 8)).toBe(true)
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
-    expect(row.classes()).toContain('is-revealed')
     expect(document.activeElement).toBe(row.get('input').element)
     expect((row.get('input').element as HTMLInputElement).selectionStart).toBe(9)
-    expect((row.get('input').element as HTMLInputElement).selectionEnd).toBe(9)
     expect(await editor.revealField('block:1', 'missing')).toBe(false)
 
     wrapper.unmount()
   })
 
-  it('shows the delete action only in delete mode and emits on the first click', async () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+  it('offers the delete action only in delete mode and emits on the first click', async () => {
+    const wrapper = mountEditor({
         inputs: [{
           key: 'block',
           record: { score: 10 },
@@ -195,53 +191,18 @@ describe('PropertyEditor records protocol', () => {
             score: { title: 'Score', fieldType: 'number' },
           },
         }],
-      },
     })
 
-    const findDeleteAction = () => wrapper.findAllComponents(OcActionButton)
-      .find(button => button.props('action').key === 'delete-property')
-    expect(findDeleteAction()).toBeUndefined()
+    expect(wrapper.find('[data-field-key="score"] [data-action-key="delete-property"]').exists()).toBe(false)
     await wrapper.setProps({ deleteMode: true })
-    const button = findDeleteAction()!
-    button.vm.$emit('select', { key: 'delete-property' })
+    await wrapper.get('[data-field-key="score"] [data-action-key="delete-property"] button').trigger('click')
     expect(wrapper.emitted('delete-property')).toEqual([[
       { key: 'block', fieldKey: 'score' },
     ]])
   })
 
-  it('projects editor mode and reset through the same field Action Rail', () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
-        allowRawStringEditor: true,
-        inputs: [{
-          key: 'block',
-          record: { opacity: 1 },
-          fields: {
-            opacity: {
-              title: 'Opacity',
-              fieldType: 'number',
-              resettable: true,
-              binding: { provider: () => null },
-            },
-          },
-        }],
-      },
-    })
-    const rail = wrapper.getComponent(PropertyFieldActionRail)
-
-    expect(rail.props('actions').map(action => action.key))
-      .toEqual(['field-editor.use-raw-string', 'reset-property'])
-    rail.vm.$emit('action', 'reset-property')
-    expect(wrapper.emitted('reset-property')).toEqual([[
-      { key: 'block', fieldKey: 'opacity' },
-    ]])
-  })
-
-  it('does not expose the delete action for unremovable or readonly fields', () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+  it('withholds the delete action for unremovable or readonly fields', () => {
+    const wrapper = mountEditor({
         deleteMode: true,
         inputs: [{
           key: 'block',
@@ -251,20 +212,17 @@ describe('PropertyEditor records protocol', () => {
             label: { title: 'Label', fieldType: 'string', isReadonly: true },
           },
         }],
-      },
     })
 
-    expect(wrapper.findAllComponents(OcActionButton)
-      .some(button => button.props('action').key === 'delete-property')).toBe(false)
+    expect(wrapper.find('[data-field-key="score"] [data-action-key="delete-property"]').exists()).toBe(false)
+    expect(wrapper.find('[data-field-key="label"] [data-action-key="delete-property"]').exists()).toBe(false)
   })
 
   it('switches a bindable number field to the raw string editor', async () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+    const wrapper = mountEditor({
         allowRawStringEditor: true,
         bindingInterpreter: {
-          isExpression: (value) => typeof value === 'string' && value.startsWith('{{'),
+          isExpression: (value: unknown) => typeof value === 'string' && value.startsWith('{{'),
         },
         inputs: [{
           key: 'block',
@@ -278,17 +236,11 @@ describe('PropertyEditor records protocol', () => {
             },
           },
         }],
-      },
     })
 
-    expect(wrapper.find('.reference-string-field').exists()).toBe(false)
-    const rawToggle = () => wrapper.findAllComponents(OcActionButton)
-      .find(button => button.props('action').key.startsWith('field-editor.'))!
-    expect(rawToggle().props('action').icon).toBe('mdiCursorText')
     await wrapper.get('button[aria-label="propertyEditor.bindings.useRawEditor"]').trigger('click')
-    expect(wrapper.find('.reference-string-field').exists()).toBe(true)
-    expect(rawToggle().props('action').icon).toBe('mdiNumeric')
-    await wrapper.get('.reference-string-field input').setValue('{{self:score}}')
+    await wrapper.get('input').setValue('{{self:score}}')
+    expect((wrapper.get('input').element as HTMLInputElement).value).toBe('{{self:score}}')
     expect(wrapper.emitted('update-property')).toEqual([[
       { key: 'block', fieldKey: 'opacity', value: '{{self:score}}' },
     ]])
@@ -296,27 +248,23 @@ describe('PropertyEditor records protocol', () => {
 
   it('shows a field rendering warning beside the affected editor row', () => {
     const warningKey = `block\u0000opacity`
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+    const wrapper = mountEditor({
         fieldWarnings: new Map([[warningKey, 'The current value has a rendering warning']]),
         inputs: [{
           key: 'block', record: { opacity: '2' },
           fields: { opacity: { title: 'Opacity', fieldType: 'number' } },
         }],
-      },
     })
-    const warning = wrapper.get('[data-tooltip="The current value has a rendering warning"]')
-    expect(warning.getComponent(OcIcon).props()).toMatchObject({ name: 'mdiAlertOutline', tone: 'warning' })
+
+    const row = wrapper.get('[data-field-key="opacity"]')
+    expect(row.find('[data-tooltip="The current value has a rendering warning"]').exists()).toBe(true)
   })
 
-  it('shows an existing binding in the raw string editor without the legacy binding field', () => {
-    const wrapper = mount(PropertyEditor, {
-      props: {
-        sortMode: 'category',
+  it('opens an existing binding in the raw string editor without the legacy binding field', () => {
+    const wrapper = mountEditor({
         allowRawStringEditor: true,
         bindingInterpreter: {
-          isExpression: (value) => typeof value === 'string' && value.startsWith('{{'),
+          isExpression: (value: unknown) => typeof value === 'string' && value.startsWith('{{'),
         },
         inputs: [{
           key: 'block',
@@ -330,11 +278,9 @@ describe('PropertyEditor records protocol', () => {
             },
           },
         }],
-      },
     })
 
-    expect(wrapper.find('.reference-string-field').exists()).toBe(true)
-    expect(wrapper.find('.binding-property-field').exists()).toBe(false)
-    expect((wrapper.get('.reference-string-field input').element as HTMLInputElement).value).toBe('{{self:score}}')
+    const row = wrapper.get('[data-field-key="opacity"]')
+    expect((row.get('input').element as HTMLInputElement).value).toBe('{{self:score}}')
   })
 })

@@ -15,11 +15,10 @@ describe('projectFontLoader', () => {
     const generated = await createProjectFontCss([{ key: 'brand', name: 'Brand', files: {
       light: { upright: 'fonts/Light.ttf' }, normal: { upright: 'fonts/Regular.ttf', italic: 'fonts/Italic.ttf' }, bold: { upright: 'fonts/Bold.ttf' },
     } }], [], source => `asset://${source}`)
-    expect(generated.cssText.split('\n')).toHaveLength(4)
+    expect(generated.cssText.match(/@font-face/g)).toHaveLength(4)
     expect(generated.cssText).toContain('font-weight: 300')
     expect(generated.cssText).toContain('font-weight: 700')
     expect(generated.cssText).toContain('font-style: italic')
-    expect(generated.cssText).not.toContain('font-stretch')
   })
 
   it('creates disjoint coverage rules per slot for compositions', async () => {

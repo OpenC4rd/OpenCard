@@ -9,20 +9,18 @@ const fonts = [
 ]
 
 describe('ProjectFontCompositionDialog', () => {
-  it('stores ordered fontKey members', async () => {
-    const wrapper = mount(ProjectFontCompositionDialog, { props: { open: true, families: fonts, compositions: [] }, global: { stubs: { Teleport: true, OcAutocompletePopover: true } } })
-    await wrapper.get('.project-font-set-dialog__field input').setValue('Body')
-    const input = wrapper.get('[role="combobox"]')
-    await input.setValue('CJK'); await input.trigger('keydown', { key: 'Enter' })
-    await wrapper.get('form').trigger('submit')
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ members: [{ fontKey: 'cjk' }] })
-  })
+  it('submits the ordered fontKey members', async () => {
+    const wrapper = mount(ProjectFontCompositionDialog, {
+      props: { open: true, families: fonts, compositions: [] },
+      global: { stubs: { Teleport: true, OcAutocompleteList: true } },
+    })
 
-  it('does not offer composition members', async () => {
-    const wrapper = mount(ProjectFontCompositionDialog, { props: {
-      open: true, families: fonts, compositions: [{ key: 'nested', name: 'Nested', members: [{ fontKey: 'latin' }] }],
-    }, global: { stubs: { Teleport: true, OcAutocompletePopover: true } } })
-    await wrapper.get('[role="combobox"]').trigger('focus')
-    expect(wrapper.text()).not.toContain('Nested')
+    await wrapper.findAll('input')[0]!.setValue('Body')
+    const input = wrapper.get('[role="combobox"]')
+    await input.setValue('CJK')
+    await input.trigger('keydown', { key: 'Enter' })
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ members: [{ fontKey: 'cjk' }] })
   })
 })

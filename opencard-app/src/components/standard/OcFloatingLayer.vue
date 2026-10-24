@@ -1,6 +1,6 @@
 <template>
-  <Teleport :to="overlayRoot">
-    <Transition name="oc-floating-layer-fade" appear>
+  <Teleport v-if="!inline" :to="overlayRoot">
+    <Transition name="oc-floating-layer-fade" appear @after-leave="handleAfterLeave">
       <div
         v-if="open && anchor"
         ref="floatingRef"
@@ -13,10 +13,24 @@
       </div>
     </Transition>
   </Teleport>
+
+  <!-- inline：由外层唯一的容器负责挂载，本层只做定位。 -->
+  <Transition v-else name="oc-floating-layer-fade" appear @after-leave="handleAfterLeave">
+    <div
+      v-if="open && anchor"
+      ref="floatingRef"
+      class="oc-floating-layer"
+      :style="layerStyle"
+      :data-placement="resolvedPlacement"
+      v-bind="$attrs"
+    >
+      <slot />
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, watch, type CSSProperties } from 'vue'
+import { computed, onBeforeUnmount, ref, toRef, watch, type CSSProperties } from 'vue'
 import { isOverlayRootActive, registerOverlayOwner, resolveOverlayRoot } from '../../shared/ui/overlayScope'
 import {
   autoUpdate,
@@ -35,21 +49,34 @@ defineOptions({
   inheritAttrs: false,
 })
 
+const emit = defineEmits<{ 'after-leave': [] }>()
+
+// 卸载过程中 Transition 仍会收尾，此时再把离场交给调用方会让它在已移除的节点上重开。
+let unmounting = false
+onBeforeUnmount(() => { unmounting = true })
+
+function handleAfterLeave(): void {
+  if (!unmounting) emit('after-leave')
+}
+
 const props = withDefaults(defineProps<{
   open: boolean
-  anchor: HTMLElement | DOMRect | null
+  anchor: HTMLElement | DOMRect | (() => DOMRect | null) | null
   owner?: HTMLElement | null
   placement?: Placement
   gap?: number
   viewportPadding?: number
   matchAnchorWidth?: boolean
   maxHeight?: number
+  /** 不自行 Teleport：由外层唯一的浮层容器负责挂载（浮层树的子层用）。 */
+  inline?: boolean
 }>(), {
   placement: 'bottom-start',
   gap: 4,
   viewportPadding: 8,
   matchAnchorWidth: false,
   maxHeight: 320,
+  inline: false,
 })
 
 
@@ -64,8 +91,16 @@ const anchorRef = computed<ReferenceElement | null>(() => {
     return anchor
   }
 
+  // 函数锚点让 autoUpdate 每次重算都能拿到最新矩形（跟随光标/滚动），矩形快照不会过期。
+  const read = typeof anchor === 'function' ? anchor : () => anchor
+  // contextElement 是 autoUpdate 的监听源：没有它，虚拟锚点只挂 window 滚动，
+  // 属性面板这类内部滚动容器的滚动不会触发重算，光标跟随就失效。
+  const contextElement = props.owner ?? null
   const virtualAnchor: VirtualElement = {
-    getBoundingClientRect: () => anchor,
+    getBoundingClientRect: () => read()
+      ?? contextElement?.getBoundingClientRect()
+      ?? new DOMRect(),
+    contextElement: contextElement ?? undefined,
   }
   return virtualAnchor
 })

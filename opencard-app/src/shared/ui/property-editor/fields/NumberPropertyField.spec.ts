@@ -1,41 +1,35 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import OcButton from '../../../../components/base/OcButton.vue'
 import NumberPropertyField from './NumberPropertyField.vue'
+import type { PropertyEditorFieldDefinition } from '../propertyEditor.types'
+
+type NumberFieldDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'number' }>
+
+function mountField(definition: NumberFieldDefinition, value: string) {
+  return mount(NumberPropertyField, { props: { definition, value } })
+}
 
 describe('NumberPropertyField', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  it('uses themed steppers and clamps values to the schema range', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Number', fieldType: 'number', min: 0, max: 2 },
-        value: '1',
-      },
-    })
+  it('clamps a stepped value to the schema range and stops at its bounds', async () => {
+    const wrapper = mountField({ title: 'Number', fieldType: 'number', min: 0, max: 2 }, '1.9')
 
-    const steppers = wrapper.findAll('.number-field__stepper')
-    expect(steppers).toHaveLength(2)
-    expect(wrapper.findAllComponents(OcButton).map(button => button.props('icon')))
-      .toEqual(['mdiChevronUp', 'mdiChevronDown'])
-
-    await steppers[0].trigger('click')
-    await steppers[1].trigger('click')
-    expect(wrapper.emitted('update:value')).toEqual([['2'], ['0']])
-
+    await wrapper.get('button[aria-label="Increase"]').trigger('click')
     await wrapper.setProps({ value: '2' })
-    expect(wrapper.findAll('.number-field__stepper')[0].attributes('disabled')).toBeDefined()
+    await wrapper.get('button[aria-label="Increase"]').trigger('click')
+    await wrapper.setProps({ value: '0.1' })
+    await wrapper.get('button[aria-label="Decrease"]').trigger('click')
+    await wrapper.setProps({ value: '0' })
+    await wrapper.get('button[aria-label="Decrease"]').trigger('click')
+
+    expect(wrapper.emitted('update:value')).toEqual([['2'], ['0']])
   })
 
   it('preserves invalid text for RenderParser diagnostics', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Number', fieldType: 'number' },
-        value: 'invalid',
-      },
-    })
+    const wrapper = mountField({ title: 'Number', fieldType: 'number' }, 'invalid')
 
     expect(wrapper.get('input').element.value).toBe('invalid')
     await wrapper.get('input').setValue('12oops')
@@ -43,39 +37,24 @@ describe('NumberPropertyField', () => {
   })
 
   it('multiplies click and hold steps by five while Shift is pressed', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Number', fieldType: 'number' },
-        value: '1',
-      },
-    })
+    const wrapper = mountField({ title: 'Number', fieldType: 'number' }, '1')
 
-    await wrapper.findAll('.number-field__stepper')[0].trigger('click', { shiftKey: true })
+    await wrapper.get('button[aria-label="Increase"]').trigger('click', { shiftKey: true })
     expect(wrapper.emitted('update:value')).toEqual([['6']])
   })
 
   it('uses the schema decimal step', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Scale', fieldType: 'number', min: 0.1, step: 0.1 },
-        value: '1',
-      },
-    })
+    const wrapper = mountField({ title: 'Scale', fieldType: 'number', min: 0.1, step: 0.1 }, '1')
 
-    await wrapper.findAll('.number-field__stepper')[0]!.trigger('click')
-    await wrapper.findAll('.number-field__stepper')[1]!.trigger('click')
+    await wrapper.get('button[aria-label="Increase"]').trigger('click')
+    await wrapper.get('button[aria-label="Decrease"]').trigger('click')
     expect(wrapper.emitted('update:value')).toEqual([['1.1'], ['0.9']])
   })
 
   it('rounds step writes and valid blurred input to at most three decimal places', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Scale', fieldType: 'number', step: 0.1 },
-        value: '9.6',
-      },
-    })
+    const wrapper = mountField({ title: 'Scale', fieldType: 'number', step: 0.1 }, '9.6')
 
-    await wrapper.findAll('.number-field__stepper')[0]!.trigger('click')
+    await wrapper.get('button[aria-label="Increase"]').trigger('click')
     const input = wrapper.get('input')
     await input.setValue('1.2345')
     await input.trigger('blur')
@@ -92,9 +71,7 @@ describe('NumberPropertyField', () => {
   })
 
   it('keeps empty, incomplete, and diagnostic text unchanged on blur', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: { definition: { title: 'Number', fieldType: 'number' }, value: '' },
-    })
+    const wrapper = mountField({ title: 'Number', fieldType: 'number' }, '')
     const input = wrapper.get('input')
 
     await input.setValue('-')
@@ -106,27 +83,20 @@ describe('NumberPropertyField', () => {
   })
 
   it('steps between allowed values', async () => {
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Factor', fieldType: 'number', min: 1, max: 12, allowedValues: [1, 2, 3, 4, 6, 12] },
-        value: '4',
-      },
-    })
+    const wrapper = mountField(
+      { title: 'Factor', fieldType: 'number', min: 1, max: 12, allowedValues: [1, 2, 3, 4, 6, 12] },
+      '4',
+    )
 
-    await wrapper.findAll('.number-field__stepper')[0]!.trigger('click')
-    await wrapper.findAll('.number-field__stepper')[1]!.trigger('click')
+    await wrapper.get('button[aria-label="Increase"]').trigger('click')
+    await wrapper.get('button[aria-label="Decrease"]').trigger('click')
     expect(wrapper.emitted('update:value')).toEqual([['6'], ['3']])
   })
 
   it('accelerates repeated steps while held and stops on release', async () => {
     vi.useFakeTimers()
-    const wrapper = mount(NumberPropertyField, {
-      props: {
-        definition: { title: 'Number', fieldType: 'number' },
-        value: '0',
-      },
-    })
-    const increase = wrapper.findAll('.number-field__stepper')[0]
+    const wrapper = mountField({ title: 'Number', fieldType: 'number' }, '0')
+    const increase = wrapper.get('button[aria-label="Increase"]')
 
     await increase.trigger('pointerdown')
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))

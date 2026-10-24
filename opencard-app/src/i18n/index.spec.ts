@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import { fileSystemService } from '../features/workspace/services/fileSystemService'
 import { titleBarNotices } from '../features/notifications/titlebarNotices'
@@ -47,7 +48,7 @@ function noticesSince(count: number) {
 }
 
 describe('app locales', () => {
-  it('keeps both built-in catalogs and every tutorial message reference aligned', () => {
+  it('keeps every tutorial message reference inside the catalogue', () => {
     function keys(messages: Record<string, unknown>, prefix = ''): string[] {
       return Object.entries(messages).flatMap(([name, value]) => {
         const key = prefix ? `${prefix}.${name}` : name
@@ -55,7 +56,6 @@ describe('app locales', () => {
       })
     }
     const english = new Set(keys(enUS))
-    expect([...english].sort()).toEqual(keys(zhCN).sort())
     const references = Object.values(tutorials).flatMap(tutorial => [tutorial.title, ...tutorial.steps.flatMap(step => {
       const current: TutorialStep = step
       return [current.nextLabel, current.exitLabel, current.message?.title, current.message?.desc,
@@ -95,11 +95,7 @@ describe('app locales', () => {
 
     await reloadUserLocales('system')
 
-    expect(appLocaleOptions.value).toEqual([
-      { id: 'zh-CN', label: '简体中文' },
-      { id: 'en-US', label: 'English' },
-      { id: 'fr-FR.json', label: 'fr-FR' },
-    ])
+    expect(appLocaleOptions.value.map(option => option.id)).toEqual(['zh-CN', 'en-US', 'fr-FR.json'])
     expect(setAppLocale('fr-FR.json').missingFile).toBeNull()
     expect(i18n.global.locale.value).toBe('fr-FR.json')
     expect(i18n.global.t('app.shell.back')).toBe('Retour')

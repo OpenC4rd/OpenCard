@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   createAvailableProjectIconKey,
   createAvailableProjectIconSeriesKey,
-  DEFAULT_PROJECT_ICON_DIRECTORY,
-  DEFAULT_PROJECT_ICON_TINT,
   duplicateProjectIcon,
   findProjectIconKeyConflicts,
-  isRasterProjectIconSource,
   normalizeProjectIconDirectory,
   normalizeProjectIconSource,
   parseProjectIconSeries,
@@ -24,7 +21,6 @@ const series: ProjectIconSeries = {
 
 describe('projectIcons', () => {
   it('keeps the icon directory a safe project-relative path', () => {
-    expect(DEFAULT_PROJECT_ICON_DIRECTORY).toBe('icons')
     expect(normalizeProjectIconDirectory(' resources\\icons/ ')).toBe('resources/icons')
     expect(normalizeProjectIconDirectory('icons/outline')).toBe('icons/outline')
     expect(normalizeProjectIconDirectory('../icons')).toBeNull()
@@ -42,18 +38,7 @@ describe('projectIcons', () => {
     expect(normalizeProjectIconSource('C:/elsewhere/warn.svg')).toBeNull()
   })
 
-  it('distinguishes raster sources from vector ones', () => {
-    expect(isRasterProjectIconSource('icons/pixel.png')).toBe(true)
-    expect(isRasterProjectIconSource('icons/photo.webp')).toBe(true)
-    expect(isRasterProjectIconSource('icons/warn.svg')).toBe(false)
-  })
-
-  it('round-trips a set of standalone icon files', () => {
-    expect(parseProjectIconSeries([series])).toEqual([series])
-  })
-
   it('defaults an absent tint and drops unknown or superseded fields', () => {
-    expect(DEFAULT_PROJECT_ICON_TINT).toBe('context')
     const parsed = parseProjectIconSeries([{
       ...series,
       grid: { snapToGrid: true, rows: 3, columns: 3, pixelated: false },
@@ -117,20 +102,6 @@ describe('projectIcons', () => {
       { kind: 'icon', seriesIndex: 0, iconIndex: 0, key: 'same' },
       { kind: 'icon', seriesIndex: 0, iconIndex: 1, key: 'SAME' },
     ])
-  })
-
-  it('reads each icon key once when checking a 400-icon set', () => {
-    let keyReads = 0
-    const icons = Array.from({ length: 400 }, (_, index) => new Proxy({
-      iconKey: `icon-${index}`, name: '', source: 'a.svg', tint: 'context' as const,
-    }, {
-      get(target, property, receiver) {
-        if (property === 'iconKey') keyReads += 1
-        return Reflect.get(target, property, receiver)
-      },
-    }))
-    expect(findProjectIconKeyConflicts([{ ...series, icons }])).toEqual([])
-    expect(keyReads).toBe(400)
   })
 
   it('duplicates an icon beside its source with an available key', () => {

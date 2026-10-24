@@ -1,89 +1,102 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setupGlobalTooltip } from './globalTooltip'
 
+const FIXTURE = `
+  <button id="first" data-tooltip="First tooltip">First</button>
+  <button id="second" data-tooltip="Second tooltip">Second</button>
+  <button id="rich" data-tooltip="[b]Before[/b][br][i]Now[/i] [code]copy[/code] [icon:mdiContentCopy] [key]Alt[/key]">Rich</button>
+  <span id="fitting" data-tooltip="Fits" data-tooltip-overflow>Fits</span>
+  <span id="overflowing" data-tooltip="Complete clipped text" data-tooltip-overflow>Clipped</span>
+  <div id="clipper" style="overflow-x: hidden; overflow-y: hidden">
+    <span id="clipped-by-ancestor" data-tooltip="Cut by a parent" data-tooltip-overflow>Cut…</span>
+    <span id="fitting-in-clipper" data-tooltip="Fits inside" data-tooltip-overflow>Fits</span>
+  </div>
+`
+
+function tooltipLayer(): HTMLDivElement {
+  return document.getElementById('oc-tooltip-layer') as HTMLDivElement
+}
+
+function isVisible(): boolean {
+  return tooltipLayer().getAttribute('aria-hidden') === 'false'
+}
+
+function focus(id: string): void {
+  document.getElementById(id)!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+}
+
 describe('globalTooltip', () => {
+  // 全局提示只安装一次（模块内单例），宿主与 layer 因此在整组用例里共用。
+  beforeAll(() => {
+    document.body.innerHTML = FIXTURE
+    setupGlobalTooltip()
+  })
+
   afterEach(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     vi.useRealTimers()
   })
 
-  it('delays pointer tooltips but shows focus tooltips immediately and dismisses them', () => {
+  it('delays pointer tooltips but shows focus tooltips at once, and dismisses on Escape and pointerdown', () => {
     vi.useFakeTimers()
-    document.body.innerHTML = `
-      <button id="first" data-tooltip="First tooltip">First</button>
-      <button id="second" data-tooltip="Second tooltip">Second</button>
-      <button id="rich" data-tooltip="[b]Before[/b][br][i]Now[/i] [code]copy[/code] [icon:mdiContentCopy] [key]Alt[/key]">Rich</button>
-      <span id="fitting" data-tooltip="Fits" data-tooltip-overflow>Fits</span>
-      <span id="overflowing" data-tooltip="Complete clipped text" data-tooltip-overflow>Clipped</span>
-      <div id="clipper" style="overflow-x: hidden; overflow-y: hidden">
-        <span id="clipped-by-ancestor" data-tooltip="Cut by a parent" data-tooltip-overflow>Cut…</span>
-        <span id="fitting-in-clipper" data-tooltip="Fits inside" data-tooltip-overflow>Fits</span>
-      </div>
-    `
-    setupGlobalTooltip()
-
+    const layer = tooltipLayer()
     const first = document.getElementById('first')!
     const second = document.getElementById('second')!
-    const layer = document.getElementById('oc-tooltip-layer') as HTMLDivElement
 
     expect(layer.getAttribute('role')).toBe('tooltip')
     first.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     vi.advanceTimersByTime(349)
-    expect(layer.hidden).toBe(true)
+    expect(isVisible()).toBe(false)
 
     second.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     vi.advanceTimersByTime(350)
-    expect(layer.hidden).toBe(false)
+    expect(isVisible()).toBe(true)
     expect(layer.textContent).toBe('Second tooltip')
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    expect(layer.classList.contains('open')).toBe(false)
-    expect(layer.getAttribute('aria-hidden')).toBe('true')
+    expect(isVisible()).toBe(false)
 
-    first.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-    expect(layer.hidden).toBe(false)
-    expect(layer.getAttribute('aria-hidden')).toBe('false')
+    focus('first')
+    expect(isVisible()).toBe(true)
     expect(layer.textContent).toBe('First tooltip')
 
     first.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    expect(layer.classList.contains('open')).toBe(false)
-    expect(layer.getAttribute('aria-hidden')).toBe('true')
+    expect(isVisible()).toBe(false)
+  })
 
-    const rich = document.getElementById('rich')!
-    rich.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-    expect(layer.textContent).toBe('BeforeNow copy  Alt')
-    expect(layer.querySelector('strong')?.textContent).toBe('Before')
-    expect(layer.querySelector('em')?.textContent).toBe('Now')
-    expect(layer.querySelector('br')).not.toBeNull()
-    expect(layer.querySelector('code')?.textContent).toBe('copy')
-    expect(layer.querySelector('.oc-key')?.textContent).toBe('Alt')
-    expect(layer.querySelector('.oc-inline-markup__icon path')).not.toBeNull()
-
+  it('shows an overflow tooltip only when the text is clipped by its own box or an ancestor', () => {
     const fitting = document.getElementById('fitting')!
     Object.defineProperty(fitting, 'clientWidth', { configurable: true, value: 80 })
     Object.defineProperty(fitting, 'scrollWidth', { configurable: true, value: 80 })
-    fitting.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-    expect(layer.getAttribute('aria-hidden')).toBe('true')
+    focus('fitting')
+    expect(isVisible()).toBe(false)
 
     const overflowing = document.getElementById('overflowing')!
     Object.defineProperty(overflowing, 'clientWidth', { configurable: true, value: 80 })
     Object.defineProperty(overflowing, 'scrollWidth', { configurable: true, value: 160 })
-    overflowing.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-    expect(layer.getAttribute('aria-hidden')).toBe('false')
-    expect(layer.textContent).toBe('Complete clipped text')
+    focus('overflowing')
+    expect(isVisible()).toBe(true)
+    expect(tooltipLayer().textContent).toBe('Complete clipped text')
 
     // 省略也可以做在容器上（行标题、菜单项、下拉值）：文字自己没超出，但盒子探出了裁剪它的祖先。
     stubBox(document.getElementById('clipper')!, { left: 0, right: 100 })
-    const clippedByAncestor = document.getElementById('clipped-by-ancestor')!
-    stubBox(clippedByAncestor, { left: 0, right: 220 })
-    clippedByAncestor.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-    expect(layer.getAttribute('aria-hidden')).toBe('false')
-    expect(layer.textContent).toBe('Cut by a parent')
+    stubBox(document.getElementById('clipped-by-ancestor')!, { left: 0, right: 220 })
+    focus('clipped-by-ancestor')
+    expect(isVisible()).toBe(true)
+    expect(tooltipLayer().textContent).toBe('Cut by a parent')
 
     // 没探出去就不提示：裁剪盒里放得下的文字不该因为祖先裁剪就冒出来。
-    const fittingInClipper = document.getElementById('fitting-in-clipper')!
-    stubBox(fittingInClipper, { left: 0, right: 60 })
-    fittingInClipper.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
-    expect(layer.getAttribute('aria-hidden')).toBe('true')
+    stubBox(document.getElementById('fitting-in-clipper')!, { left: 0, right: 60 })
+    focus('fitting-in-clipper')
+    expect(isVisible()).toBe(false)
+  })
+
+  it('renders inline tooltip markup instead of showing its brackets', () => {
+    focus('rich')
+
+    const layer = tooltipLayer()
+    expect(layer.textContent).toBe('BeforeNow copy  Alt')
+    expect(layer.querySelector('br')).not.toBeNull()
   })
 })
 

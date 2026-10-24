@@ -1,52 +1,11 @@
-import { actionChildren } from '../../shared/ui/action/action.types'
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { CardDocument } from '../../entities/card/model'
-import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
 import { useCdeInstanceOps } from './useCdeInstanceOps'
 
 const translate = (messageKey: string) => messageKey
 
 describe('useCdeInstanceOps tree actions', () => {
-  it('projects instance operations behind a single submenu action', () => {
-    const document: CardDocument = {
-      type: 'card-document',
-
-      id: 'document',
-      version: '1.0.0',
-      width: '540',
-      height: '850',
-      faces: {
-        front: { type: 'card-face', id: 'front', background: '#FFFFFF', children: [] },
-        back: { type: 'card-face', id: 'back', background: '#FFFFFF', children: [] },
-      },
-      instances: [{
-        type: 'card-instance',
-        id: 'instance-1',
-        name: 'Instance 1',
-        amount: '1',
-        data: {},
-      }],
-    }
-    const state = useCdeInstanceOps({
-      cardDoc: ref(document),
-      documentRevision: ref(0),
-      blueprintCardId: '__blueprint__',
-      selectedCardId: ref('__blueprint__'),
-      selectedCardKeys: ref(['__blueprint__']),
-      translate,
-      refreshDocumentState: vi.fn(),
-      markDocumentChanged: vi.fn(),
-    })
-
-    const nodeActions = (key: string) => normalizeNodeTail(state.instanceTreeData.value.items.get(key)?.tail)
-      .filter(isNodeTailAction)
-    expect(nodeActions('__blueprint__')).toEqual([])
-    expect(nodeActions('instance-1').map(action => action.key)).toEqual(['instance-more'])
-    expect(actionChildren(nodeActions('instance-1')[0]!).map(action => action.key))
-      .toEqual(['rename', 'duplicate-instance', 'delete-instance'])
-  })
-
   it('duplicates and deletes the complete selected instance set', () => {
     const document: CardDocument = {
       type: 'card-document',

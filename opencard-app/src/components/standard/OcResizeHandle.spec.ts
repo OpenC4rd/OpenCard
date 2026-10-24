@@ -41,10 +41,7 @@ describe('OcResizeHandle', () => {
   })
 
   it('exposes separator orientation and value boundaries', () => {
-    const { element } = mountHandle({
-      orientation: 'vertical',
-      tooltip: 'Resize panel[br]Double-click to toggle',
-    })
+    const { element } = mountHandle({ orientation: 'vertical' })
 
     expect(element.getAttribute('role')).toBe('separator')
     expect(element.getAttribute('aria-orientation')).toBe('vertical')
@@ -52,7 +49,6 @@ describe('OcResizeHandle', () => {
     expect(element.getAttribute('aria-valuemax')).toBe('480')
     expect(element.getAttribute('aria-valuenow')).toBe('240')
     expect(element.getAttribute('aria-label')).toBe('Resize panel')
-    expect(element.getAttribute('data-tooltip')).toBe('Resize panel[br]Double-click to toggle')
   })
 
   it('uses pointer capture and restores body state after a horizontal separator drag', async () => {

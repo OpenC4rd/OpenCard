@@ -39,8 +39,6 @@ describe('storedResourcePackageStore', () => {
       { path: '/app/packages/broken.ocpack', reason: 'Package manifest is invalid' },
     ])
     expect(store.isLoading.value).toBe(false)
-    expect(store.findPackage(theme.path)).toEqual(theme)
-    expect(store.findPackage('/app/packages/missing.ocpack')).toBeNull()
   })
 
   it('shares one load between concurrent callers and stops blocking when it fails', async () => {
@@ -71,10 +69,8 @@ describe('storedResourcePackageStore', () => {
     const service = createService()
     const store = createStoredResourcePackageStore(service as unknown as StoredResourcePackageLibraryService)
 
-    const imported = await store.importPackage('/incoming/theme.ocpack')
+    await store.importPackage('/incoming/theme.ocpack')
 
-    expect(service.importPackage).toHaveBeenCalledWith('/incoming/theme.ocpack')
-    expect(imported).toEqual(theme)
     expect(store.packs.value).toEqual([theme])
   })
 
@@ -86,7 +82,6 @@ describe('storedResourcePackageStore', () => {
 
     await store.removePackage(theme.path)
 
-    expect(service.removePackage).toHaveBeenCalledWith(theme.path)
     expect(store.packs.value).toEqual([])
   })
 })

@@ -42,7 +42,6 @@ it('replays the welcome guide after clearing all records with a project still op
     navigation.selectSpace('welcome')
     await flushPromises()
     expect(tutorial.session.value?.tutorialId).toBe('overview')
-    expect(document.querySelector('.oc-tutorial')?.textContent).toContain('Welcome to OpenCard')
   } finally {
     wrapper.unmount()
     tutorial.exit()

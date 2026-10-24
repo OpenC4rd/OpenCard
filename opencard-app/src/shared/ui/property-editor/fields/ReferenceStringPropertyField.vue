@@ -67,26 +67,33 @@
       </div>
     </OcFieldFrame>
 
-    <OcAutocompletePopover
-      :id="autocompleteId"
+    <OcOverlayMarker
+      ref="layer"
+      :group="`completion:${autocompleteId}`"
+      :anchor="completionAnchor"
+      :owner="completionControl"
+      placement="bottom-start"
+      :max-height="220"
       :open="isMenuOpen"
-      :anchor="activeInput"
-      :items="suggestions"
-      :active-key="activeKey"
-      @select="acceptSuggestionByKey"
-    />
+      @update:open="isMenuOpen = $event"
+      @close="isMenuOpen = false"
+    >
+      <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activeKey"
+        @select="acceptSuggestionByKey" />
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type {
   PropertyCompletionItem,
   PropertyEditorFieldDefinition,
 } from '../propertyEditor.types'
-import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
+import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+import OcOverlayMarker from '../../../../components/standard/OcOverlayMarker.vue'
 import ReferenceStringTokenField from './ReferenceStringTokenField.vue'
 
 import { usePropertyCompletion, matchStaticCompletion } from './usePropertyCompletion'
@@ -105,8 +112,12 @@ const emit = defineEmits<{
 
 const draftValue = ref(props.value == null ? '' : String(props.value))
 const activeInput = ref<TextControl | null>(null)
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const completion = usePropertyCompletion(() => activeInput.value)
-const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId } = completion
+const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId,
+  anchor: completionAnchor, control: completionControl } = completion
+// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
+onBeforeUnmount(() => layer.value?.close())
 
 const autocompleteMatch = computed(() => matchStaticCompletion(
   draftValue.value, props.definition.completion?.static?.values ?? [],

@@ -32,14 +32,11 @@ describe('externalOpenService', () => {
     expect(classifyExternalOpenPath('/cards/.opencard/LOCALE.JSON')).toBeNull()
     expect(classifyExternalOpenPath('D:/Cards/demo.octemplate')).toBe('template')
     expect(classifyExternalOpenPath('D:/Cards/demo.zip')).toBeNull()
+    expect(classifyExternalOpenPath('D:/Packs/theme.ocpack')).toBe('resource-package')
     expect(filterSupportedExternalOpenPaths([
       'D:/Cards/main.ocdocument',
       'D:/Cards/readme.txt',
     ])).toEqual(['D:/Cards/main.ocdocument'])
-  })
-
-  it('tells an icon pack from a package archive by their extensions', () => {
-    expect(classifyExternalOpenPath('D:/Packs/theme.ocpack')).toBe('resource-package')
   })
 
   it('drains startup paths and paths queued by later app launches', async () => {

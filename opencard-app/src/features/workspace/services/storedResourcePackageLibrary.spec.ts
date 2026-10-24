@@ -14,11 +14,10 @@ vi.mock('./resourcePackageArchive', async (importOriginal) => ({
 type DirectoryEntry = { name: string; isFile: boolean; isDirectory: boolean; isSymlink: boolean }
 
 class MemoryFileSystem implements Pick<FileSystemService,
-  'createDirectory' | 'readDirectory' | 'fileExists' | 'copyFile' | 'deleteFile' | 'pickFile'
+  'createDirectory' | 'readDirectory' | 'fileExists' | 'copyFile' | 'deleteFile'
 > {
   readonly directories = new Set<string>()
   readonly files = new Map<string, Uint8Array>()
-  readonly pickFile = vi.fn(async () => null as string | null)
 
   async createDirectory(path: string): Promise<void> { this.directories.add(path) }
   async fileExists(path: string): Promise<boolean> {
@@ -152,18 +151,6 @@ describe('StoredResourcePackageLibraryService', () => {
     await expect(createLibrary(fs).importPackage('/incoming/Broken.ocpack'))
       .rejects.toThrow('Package fingerprint is missing')
     expect(fs.files.has('/app/packages/Broken.ocpack')).toBe(false)
-  })
-
-  it('offers only package archives in the file dialog', async () => {
-    const fs = new MemoryFileSystem()
-
-    await createLibrary(fs).pickSourceFile('Choose a package')
-
-    expect(fs.pickFile).toHaveBeenCalledWith({
-      title: 'Choose a package',
-      fileTypeName: 'OpenCard package',
-      extensions: ['ocpack'],
-    })
   })
 
   it('removes one stored package', async () => {

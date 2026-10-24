@@ -74,8 +74,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
   })
 
   it('avoids a leftover folder instead of mixing two sets in one directory', async () => {
-    // A folder from an earlier set that was removed without cleanup: the Key is free in the registry,
-    // but `icons/outline` still holds files, so the new set must not be written in among them.
+    // A folder from an earlier set that was removed without cleanup still holds files.
     const existing = new Set(['D:/Demo/.opencard/icons/outline'])
     mocks.fileExists.mockImplementation(async (path: string) => existing.has(path))
     mocks.readDirectory.mockResolvedValue([{ name: 'old.svg', isFile: true, isDirectory: false }])
@@ -95,8 +94,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
   })
 
   it('reuses an empty leftover folder so removing and re-creating a set keeps its folder', async () => {
-    // Removing a set moves its files out but leaves the folder. Re-creating it must land in the same
-    // folder, or the name would drift to `outline-2`, then `outline-3`, on every removal.
+    // Removing a set leaves its folder behind; re-creating the set must reuse it.
     const existing = new Set(['D:/Demo/.opencard/icons/outline'])
     mocks.fileExists.mockImplementation(async (path: string) => existing.has(path))
     mocks.readDirectory.mockResolvedValue([])
@@ -145,8 +143,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
   })
 
   it('prepares every icon before copying any of them', async () => {
-    // Reading and probing is the slow half of an import, so it runs ahead of the copy instead of
-    // being interleaved with it one file at a time. Observable order: all reads, then all writes.
+    // Observable order: every read and probe, then every write.
     const order: string[] = []
     mocks.readBinaryFile.mockImplementation(async (path: string) => {
       order.push(`read:${path}`)
@@ -185,8 +182,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
   })
 
   it('writes nothing at all when one icon cannot be prepared', async () => {
-    // Preparing first is what keeps a failed import from leaving copied files behind with no
-    // registry entry to reach them.
+    // Preparing first keeps a failed import from leaving copied files with no registry entry.
     mocks.readBinaryFile.mockImplementation(async (path: string) => {
       if (path === 'D:/Icons/Coin.svg') throw new Error('read failed')
       return new Uint8Array([1])
@@ -272,8 +268,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
   })
 
   it('adds new icons to the folder the set already owns instead of opening a second one', async () => {
-    // The set's Key and its folder name need not agree: it may have been renamed, or its folder may
-    // carry a suffix from an earlier set. Adding must follow the files, not rebuild the folder name.
+    // The set's folder may carry a suffix from an earlier set; adding follows the files.
     const wrapper = mount(ProjectIconRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({
           iconSeries: [{
@@ -302,9 +297,7 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
   })
 
   it('still delivers the new set when the editor is rebuilt mid-copy', async () => {
-    // The shell rebuilds this editor whenever the active file changes, and a vnode listener is not
-    // invoked once the emitting component unmounts. The result must therefore reach the session by id,
-    // or the files would land on disk with no registry entry and the set would vanish.
+    // The shell rebuilds this editor when the active file changes; the result must still reach the session.
     let release: () => void = () => undefined
     mocks.readBinaryFile.mockImplementation(() => new Promise(resolve => {
       release = () => resolve(new Uint8Array([1]))
@@ -330,15 +323,4 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     }])
   })
 
-  it('delivers through the owning editor while it is still mounted', async () => {
-    const wrapper = mountEditor()
-    wrapper.getComponent(ProjectIconRegistrationDialog).vm.$emit('submit', {
-      name: 'Outline icons', key: 'outline',
-      icons: [{ sourcePath: 'D:/Icons/Warn.svg', iconKey: 'warn', name: 'Warn' }],
-    })
-    await flushPromises()
-
-    // A live editor updates its own session directly.
-    expect(wrapper.props('session').state.isDirty).toBe(true)
-  })
 })

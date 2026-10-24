@@ -31,7 +31,8 @@
               </form>
               <div v-else class="card-data-table__column-heading" tabindex="0"
                 @contextmenu="openColumnContextMenu($event, column)"
-                @keydown="openColumnKeyboardMenu($event, column)">
+                @keydown="openColumnKeyboardMenu($event, column)"
+                @keydown.esc="dismissContextMenuOnEscape">
                 <OcIcon :name="column.kind === 'blueprint' ? 'mdiViewDashboard' : 'mdiViewDashboardEditOutline'"
                   size="md" tone="muted" />
                 <span>{{ column.title }}</span>
@@ -73,7 +74,8 @@
                 <span class="card-data-table__face-heading"
                   :tabindex="faceCommands(face).length > 0 ? 0 : undefined"
                   @contextmenu="openFaceContextMenu($event, face)"
-                  @keydown="openFaceKeyboardMenu($event, face)">
+                  @keydown="openFaceKeyboardMenu($event, face)"
+                  @keydown.esc="dismissContextMenuOnEscape">
                   <OcIcon name="mdiCardsOutline" size="md" tone="muted" />
                   <span>{{ face.title }}</span>
                   <OcActionButton v-if="!props.readonly && faceBlockAction(face)" :action="faceBlockAction(face)!"
@@ -89,7 +91,8 @@
                 <span class="card-data-table__block-heading" tabindex="0"
                   :style="{ paddingInlineStart: 'var(--oc-indent-step)' }"
                   @contextmenu="openBlockContextMenu($event, block)"
-                  @keydown="openBlockKeyboardMenu($event, block)">
+                  @keydown="openBlockKeyboardMenu($event, block)"
+                  @keydown.esc="dismissContextMenuOnEscape">
                   <OcIcon :name="getBlockPresentation(block.type).icon" size="md"
                     :tone="getBlockPresentation(block.type).iconTone" />
                   <span>{{ block.title }}</span>
@@ -108,7 +111,8 @@
                 <span class="card-data-table__field-heading" tabindex="0"
                   :style="{ paddingInlineStart: 'calc(var(--oc-indent-step) * 2)' }"
                   @contextmenu="openFieldContextMenu($event, block, field)"
-                  @keydown="openFieldKeyboardMenu($event, block, field)">
+                  @keydown="openFieldKeyboardMenu($event, block, field)"
+                  @keydown.esc="dismissContextMenuOnEscape">
                   <OcIcon :name="getPropertyFieldIcon(field.definition)" size="sm" tone="muted" />
                   <span>{{ field.title }}</span>
                   <OcActionButton v-if="!props.readonly && field.definitionEditable" :action="editFieldDefinitionAction()"
@@ -149,6 +153,18 @@
         </template>
       </table>
     </div>
+    <OcOverlayMarker
+      ref="contextMenu"
+      group="context-menu"
+      :anchor="contextAnchor"
+      :owner="contextOwner"
+      :open="contextOpen"
+      @update:open="contextOpen = $event"
+      @close="handleContextMenuClose"
+    >
+      <OcActionMenu :actions="contextItems" overlay-key="context-menu" :on-select="selectContextAction"
+        @close="handleContextMenuClose" />
+    </OcOverlayMarker>
   </section>
 </template>
 
@@ -158,14 +174,17 @@ import {
   nextTick,
   onBeforeUnmount,
   ref,
+  shallowRef,
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OcButton from '../../components/base/OcButton.vue'
 import OcFieldInput from '../../components/base/OcFieldInput.vue'
 import OcIcon from '../../components/base/OcIcon.vue'
 import OcActionButton from '../../components/standard/OcActionButton.vue'
+import OcActionMenu from '../../components/standard/OcActionMenu.vue'
+import OcOverlayMarker from '../../components/standard/OcOverlayMarker.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
-import { useFloatingMenu } from '../../composables/useFloatingMenu'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import type { PropertyEditorBindingInterpreter, PropertyEditorFieldDefinition } from '../../shared/ui/property-editor/propertyEditor.types'
 import PropertyFieldActionRail from '../../shared/ui/property-editor/PropertyFieldActionRail.vue'
 import PropertyFieldRenderer from '../../shared/ui/property-editor/PropertyFieldRenderer.vue'
@@ -227,7 +246,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { openContextMenu, openKeyboardContextMenu } = useFloatingMenu()
+
 const fieldEditorModes = usePropertyFieldEditorModes()
 const rootRef = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
@@ -510,28 +529,101 @@ function fieldCommands(field: CdeDataTableFieldRow): OcActionMenuEntry[] {
   ]
 }
 
+const contextMenu = ref<{ open: () => void; close: () => void } | null>(null)
+const contextOpen = ref(false)
+const contextItems = shallowRef<readonly OcActionMenuEntry[]>([])
+/** 未打开时的占位：marker 要求锚点非空，openMenuAt 一定先写锚点再 open()。 */
+const contextAnchor = shallowRef<HTMLElement | DOMRect>(new DOMRect())
+const contextOwner = shallowRef<HTMLElement | null>(null)
+const contextHandler = shallowRef<((key: string) => void) | null>(null)
+
+function openMenuAt(
+  anchor: HTMLElement | DOMRect,
+  items: readonly OcActionMenuEntry[],
+  onSelect: (key: string) => void,
+  owner: HTMLElement,
+): void {
+  if (items.length === 0) return
+  contextItems.value = items
+  contextAnchor.value = anchor
+  contextOwner.value = owner
+  contextHandler.value = onSelect
+  // marker 的 open() 读的是已提交的 props：等这帧把新锚点与归属落到 marker 上再开，
+  // 否则换触发元素时会沿用上一次的 anchor / owner。
+  void nextTick(() => contextMenu.value?.open())
+}
+
+function handleContextMenuClose(): void {
+  contextOpen.value = false
+  contextHandler.value = null
+}
+
+/** Esc：菜单开着时收掉它并阻止上层弹窗把同一个 Esc 当成自己的关闭；没开就保持原义。 */
+function dismissContextMenuOnEscape(event: KeyboardEvent): void {
+  if (!contextOpen.value) return
+  event.preventDefault()
+  contextMenu.value?.close()
+}
+
+/** 选中一项先收起菜单再执行：动作自己带闭包，不依赖菜单还开着。 */
+function selectContextAction(key: string): void {
+  const handler = contextHandler.value
+  contextMenu.value?.close()
+  handler?.(key)
+}
+
+useOverlayDismiss(() => contextOpen.value, () => contextOwner.value, () => contextMenu.value?.close())
+
+// 表格被卸载时它打开的菜单不能留在组里变成空面板。
+onBeforeUnmount(() => { contextMenu.value?.close() })
+
+function isContextMenuKey(event: KeyboardEvent): boolean {
+  return event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)
+}
+
 function openColumnContextMenu(event: MouseEvent, column: CdeDataTableColumn): void {
-  openContextMenu({ event, items: columnCommands(column), onSelect: key => handleColumnAction(column, key) })
+  const owner = event.currentTarget
+  if (!(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), columnCommands(column),
+    key => handleColumnAction(column, key), owner)
 }
 
 function openColumnKeyboardMenu(event: KeyboardEvent, column: CdeDataTableColumn): void {
-  openKeyboardContextMenu(event, columnCommands(column), key => handleColumnAction(column, key))
+  const owner = event.currentTarget
+  if (!isContextMenuKey(event) || !(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(owner, columnCommands(column), key => handleColumnAction(column, key), owner)
 }
 
 function openFaceContextMenu(event: MouseEvent, face: CdeDataTableFaceGroup): void {
-  openContextMenu({ event, items: faceCommands(face), onSelect: key => emit('add-block', key) })
+  const owner = event.currentTarget
+  if (!(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), faceCommands(face),
+    key => emit('add-block', key), owner)
 }
 
 function openFaceKeyboardMenu(event: KeyboardEvent, face: CdeDataTableFaceGroup): void {
-  openKeyboardContextMenu(event, faceCommands(face), key => emit('add-block', key))
+  const owner = event.currentTarget
+  if (!isContextMenuKey(event) || !(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(owner, faceCommands(face), key => emit('add-block', key), owner)
 }
 
 function openBlockContextMenu(event: MouseEvent, block: CdeDataTableBlockCatalogEntry): void {
-  openContextMenu({ event, items: blockContextCommands(block), onSelect: key => handleBlockAction(block.key, key) })
+  const owner = event.currentTarget
+  if (!(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), blockContextCommands(block),
+    key => handleBlockAction(block.key, key), owner)
 }
 
 function openBlockKeyboardMenu(event: KeyboardEvent, block: CdeDataTableBlockCatalogEntry): void {
-  openKeyboardContextMenu(event, blockContextCommands(block), key => handleBlockAction(block.key, key))
+  const owner = event.currentTarget
+  if (!isContextMenuKey(event) || !(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(owner, blockContextCommands(block), key => handleBlockAction(block.key, key), owner)
 }
 
 function handleFieldAction(blockId: string, fieldKey: string, actionKey: string): void {
@@ -544,11 +636,11 @@ function openFieldContextMenu(
   block: CdeDataTableBlockCatalogEntry,
   field: CdeDataTableFieldRow,
 ): void {
-  openContextMenu({
-    event,
-    items: fieldCommands(field),
-    onSelect: key => handleFieldAction(block.key, field.key, key),
-  })
+  const owner = event.currentTarget
+  if (!(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), fieldCommands(field),
+    key => handleFieldAction(block.key, field.key, key), owner)
 }
 
 function openFieldKeyboardMenu(
@@ -556,11 +648,10 @@ function openFieldKeyboardMenu(
   block: CdeDataTableBlockCatalogEntry,
   field: CdeDataTableFieldRow,
 ): void {
-  openKeyboardContextMenu(
-    event,
-    fieldCommands(field),
-    key => handleFieldAction(block.key, field.key, key),
-  )
+  const owner = event.currentTarget
+  if (!isContextMenuKey(event) || !(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(owner, fieldCommands(field), key => handleFieldAction(block.key, field.key, key), owner)
 }
 
 function commitRename(cardId: string): void {

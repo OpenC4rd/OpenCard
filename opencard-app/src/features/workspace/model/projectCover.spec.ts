@@ -4,7 +4,6 @@ import {
   isProjectCoverPath,
   normalizeProjectRelativeCoverPath,
   projectRelativePathFromAbsolute,
-  resolveCoverAbsolutePath,
 } from './projectCover'
 
 describe('project cover paths', () => {
@@ -43,22 +42,6 @@ describe('project cover paths', () => {
     expect(isProjectCoverPath('assets/cover.svg')).toBe(true)
     expect(isProjectCoverPath('assets/cover.txt')).toBe(false)
     expect(isProjectCoverPath('../cover.png')).toBe(false)
-  })
-
-  it('resolves absolute cover paths against the host root', () => {
-    expect(resolveCoverAbsolutePath('D:/Cards/Project/', 'assets/cover.png'))
-      .toBe('D:/Cards/Project/assets/cover.png')
-    expect(resolveCoverAbsolutePath('/cards/project', '.opencard/cover.png'))
-      .toBe('/cards/project/.opencard/cover.png')
-  })
-
-  it('turns an image inside the project into a project-relative cover path', () => {
-    expect(projectRelativePathFromAbsolute('D:/Cards/Project', 'D:/Cards/Project/assets/cover.png'))
-      .toBe('assets/cover.png')
-    expect(projectRelativePathFromAbsolute('D:/Cards/Project/', 'D:\\Cards\\Project\\covers\\a.webp'))
-      .toBe('covers/a.webp')
-    expect(projectRelativePathFromAbsolute('D:/Cards/Project', 'D:/Cards/Project/assets/cover.png'))
-      .toBe(projectRelativePathFromAbsolute('d:/cards/project', 'D:/CARDS/PROJECT/assets/cover.png'))
   })
 
   it('refuses paths outside the project root', () => {

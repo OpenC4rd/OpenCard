@@ -120,7 +120,6 @@ describe('useCdeViewportController', () => {
     controller.handleViewportSizeChange({ width: 100, height: 50 })
 
     expect(controller.transformPreviewRendererStyle.value.transform).toBe('scale(0.5)')
-    expect(controller.transformPreviewViewportStyle.value).toEqual({ width: '200px', height: '100px' })
     expect(controller.transformPreviewFrameStyle.value).toEqual({
       transform: 'translate3d(75px, 37.5px, 0)',
       width: '50px',

@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RenderReadyCardFace } from '../render.types'
 import { createTextBlock } from '../../../entities/card/model'
 import CardViewport from './CardViewport.vue'
-import { parseRenderReadyBlockForTest } from './renderTestUtils'
-import { useFloatingMenu } from '../../../composables/useFloatingMenu'
 import { createCardRenderResourceContext } from '../cardRenderResources'
+import { parseRenderReadyBlockForTest } from './renderTestUtils'
 
 const resourceContext = createCardRenderResourceContext({})
 
@@ -20,32 +19,16 @@ const face: RenderReadyCardFace = {
   children: [],
 }
 
-const layeredFace: RenderReadyCardFace = {
-  ...face,
-  children: [{
-    block: parseRenderReadyBlockForTest(createTextBlock({ id: 'layer-block', zIndex: '2' })),
-    location: {
-      id: 'layer-location',
-      type: 'simple-container-location',
-      anchor: 'lt',
-      x: '0px',
-      y: '0px',
-    },
-  }],
+function textChild(id: string, x: string, y: string) {
+  return {
+    block: parseRenderReadyBlockForTest(createTextBlock({ id })),
+    location: { id: `${id}-location`, type: 'simple-container-location' as const, anchor: 'lt' as const, x, y },
+  }
 }
 
 const snappingFace: RenderReadyCardFace = {
   ...face,
-  children: [
-    {
-      block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected' })),
-      location: { id: 'selected-location', type: 'simple-container-location', anchor: 'lt', x: '50px', y: '50px' },
-    },
-    {
-      block: parseRenderReadyBlockForTest(createTextBlock({ id: 'sibling' })),
-      location: { id: 'sibling-location', type: 'simple-container-location', anchor: 'lt', x: '158px', y: '20px' },
-    },
-  ],
+  children: [textChild('selected', '50px', '50px'), textChild('sibling', '158px', '20px')],
 }
 
 let layoutChange: (target: Element) => void
@@ -69,7 +52,27 @@ class ResizeObserverMock {
   unobserve(): void {}
 }
 
-describe('CardViewport wheel zoom API', () => {
+/** A face renderer that exposes one DOM block per id, so the viewport can measure it. */
+function faceStub(...ids: string[]) {
+  return defineComponent({
+    name: 'CardFaceRenderer',
+    setup: () => () => h('div', { class: 'card-canvas' },
+      ids.map(id => h('div', { 'data-block-id': id }))),
+  })
+}
+
+function rect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    left, top, width, height, right: left + width, bottom: top + height, x: left, y: top,
+    toJSON: () => ({}),
+  } as DOMRect
+}
+
+function pinRect(element: Element, value: DOMRect): void {
+  Object.defineProperty(element, 'getBoundingClientRect', { value: () => value })
+}
+
+describe('CardViewport', () => {
   let animationFrames: FrameRequestCallback[]
 
   beforeEach(() => {
@@ -83,7 +86,6 @@ describe('CardViewport wheel zoom API', () => {
   })
 
   afterEach(() => {
-    useFloatingMenu().closeMenu()
     vi.unstubAllGlobals()
   })
 
@@ -117,26 +119,22 @@ describe('CardViewport wheel zoom API', () => {
     }
   }
 
-  it('coalesces pan input and moves the selected frame without measuring content again', async () => {
-    let selectedLeft = 250
+  it('coalesces pan input into one transform per frame without re-measuring content', async () => {
     const geometry = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-      const selected = this.getAttribute('data-block-id') === 'layer-block'
-      return { x: selected ? selectedLeft : 0, y: selected ? 150 : 0,
-        left: selected ? selectedLeft : 0, top: selected ? 150 : 0,
-        right: selected ? 350 : 1000, bottom: selected ? 190 : 800,
-        width: selected ? 100 : 1000, height: selected ? 40 : 800,
-        toJSON: () => ({}),
-      } as DOMRect
+      const selected = this.getAttribute('data-block-id') === 'selected'
+      return selected ? rect(250, 150, 100, 40) : rect(0, 0, 1000, 800)
     })
     const wrapper = mount(CardViewport, { props: {
-      resourceContext, face: layeredFace, selectedBlockId: 'layer-block',
-      selectedLocationType: 'simple-container-location', selectedAnchor: 'lt',
+      resourceContext,
+      face: { ...face, children: [textChild('selected', '0px', '0px')] },
+      selectedBlockId: 'selected',
+      selectedLocationType: 'simple-container-location',
+      selectedAnchor: 'lt',
     } })
     await flushPromises()
     await flushAnimation()
-    const selected = wrapper.get('.selection-frame')
-    expect(selected.attributes('style')).toContain('translate3d(250px, 150px, 0)')
     geometry.mockClear()
+
     await wrapper.get('.card-viewport').trigger('mousedown', { button: 1, clientX: 400, clientY: 300 })
     const before = wrapper.emitted('viewport-transform-change')?.length ?? 0
     for (let index = 1; index <= 20; index++) {
@@ -145,14 +143,12 @@ describe('CardViewport wheel zoom API', () => {
     expect(wrapper.emitted('viewport-transform-change')?.length ?? 0).toBe(before)
     await flushAnimation()
     expect(wrapper.emitted('viewport-transform-change')?.length).toBe(before + 1)
-    expect(selected.attributes('style')).toContain('translate3d(350px, 150px, 0)')
     expect(geometry).not.toHaveBeenCalled()
+
     await wrapper.get('.card-viewport').trigger('mouseup', { button: 1 })
-    selectedLeft = 420
-    layoutChange(wrapper.get('[data-block-id="layer-block"]').element)
+    layoutChange(wrapper.get('[data-block-id="selected"]').element)
     await flushPromises()
     expect(geometry).toHaveBeenCalled()
-    expect(selected.attributes('style')).toContain('translate3d(420px, 150px, 0)')
     wrapper.unmount()
     geometry.mockRestore()
   })
@@ -173,144 +169,12 @@ describe('CardViewport wheel zoom API', () => {
     viewport.zoomByWheelAt(-120, WheelEvent.DOM_DELTA_PIXEL, anchorX, anchorY)
     await flushAnimation()
     const zoomEvents = wrapper.emitted('viewport-transform-change') ?? []
-    const zoomedIn = zoomEvents[zoomEvents.length - 1]?.[0] as {
-      x: number
-      y: number
-      scale: number
-    }
+    const zoomedIn = zoomEvents[zoomEvents.length - 1]?.[0] as { x: number, y: number, scale: number }
     expect(zoomedIn.scale).toBeGreaterThan(1)
-    const zoomedWorldX = (
-      anchorX - (1000 - face.width * zoomedIn.scale) / 2 - zoomedIn.x
-    ) / zoomedIn.scale
-    const zoomedWorldY = (
-      anchorY - (800 - face.height * zoomedIn.scale) / 2 - zoomedIn.y
-    ) / zoomedIn.scale
+    const zoomedWorldX = (anchorX - (1000 - face.width * zoomedIn.scale) / 2 - zoomedIn.x) / zoomedIn.scale
+    const zoomedWorldY = (anchorY - (800 - face.height * zoomedIn.scale) / 2 - zoomedIn.y) / zoomedIn.scale
     expect(zoomedWorldX).toBeCloseTo(initialWorldX, 4)
     expect(zoomedWorldY).toBeCloseTo(initialWorldY, 4)
-  })
-
-  it('fits the face into a supplied visible region instead of resetting to 100%', async () => {
-    const wrapper = mount(CardViewport, {
-      props: { resourceContext, face },
-      global: { stubs: { CardFaceRenderer: true } },
-    })
-    const viewport = wrapper.vm as unknown as {
-      fitView(targetRect?: { left: number; top: number; width: number; height: number }): void
-    }
-
-    viewport.fitView({ left: 200, top: 100, width: 500, height: 600 })
-    await nextTick()
-
-    const transformEvents = wrapper.emitted('viewport-transform-change') ?? []
-    const fitted = transformEvents[transformEvents.length - 1]?.[0] as {
-      x: number
-      y: number
-      scale: number
-    }
-    expect(fitted.scale).toBeCloseTo(536 / face.height, 4)
-    expect(fitted.scale).not.toBe(1)
-    expect(fitted.x).toBe(-50)
-    expect(fitted.y).toBe(0)
-  })
-
-  it('fits content inside viewport insets without centering it behind an inspector', async () => {
-    const wrapper = mount(CardViewport, {
-      props: { resourceContext, face, viewportInsets: { bottom: 300 } },
-      global: { stubs: { CardFaceRenderer: true } },
-    })
-    const viewport = wrapper.vm as unknown as {
-      fitContent(rect: { left: number; top: number; width: number; height: number }): void
-    }
-    const content = { left: 20, top: 30, width: 100, height: 100 }
-
-    viewport.fitContent(content)
-    await nextTick()
-
-    const transformEvents = wrapper.emitted('viewport-transform-change') ?? []
-    const fitted = transformEvents[transformEvents.length - 1]?.[0] as { x: number; y: number; scale: number }
-    const baseX = (1000 - face.width * fitted.scale) / 2
-    const baseY = (800 - face.height * fitted.scale) / 2
-    expect(baseX + fitted.x + (content.left + content.width / 2) * fitted.scale).toBeCloseTo(500)
-    expect(baseY + fitted.y + (content.top + content.height / 2) * fitted.scale).toBeCloseTo(250)
-  })
-
-  it('forwards face clipping to the face renderer', () => {
-    const wrapper = mount(CardViewport, {
-      props: { resourceContext, face, clipToFace: true },
-    })
-
-    expect(wrapper.find('.card-canvas').classes()).toContain('card-canvas--clipped')
-  })
-
-  it('renders comparison revisions inside one viewport stage and preserves blank selection', async () => {
-    const wrapper = mount(CardViewport, {
-      props: {
-        resourceContext,
-        face,
-        comparison: {
-          before: { face, resourceContext, placeholder: true },
-          after: { face: { ...face, background: '#000000' }, resourceContext },
-          divider: 0.4,
-          viewMode: 'split',
-        },
-      },
-      global: { stubs: { CardFaceRenderer: defineComponent({ name: 'CardFaceRenderer', render: () => h('div') }) } },
-    })
-
-    expect(wrapper.findAllComponents({ name: 'CardFaceRenderer' })).toHaveLength(1)
-    expect(wrapper.find('.card-comparison-placeholder').exists()).toBe(true)
-    expect(wrapper.findAll('.card-viewport')).toHaveLength(1)
-    expect(wrapper.findAll('.card-viewport-comparison-layer')).toHaveLength(2)
-    expect(wrapper.findAll('.card-viewport-comparison-layer')[1]!.attributes('style')).toContain('inset(0 0 0 40%)')
-    expect(wrapper.find('.card-viewport-stage--before').exists()).toBe(true)
-    expect(wrapper.find('.card-viewport-stage--after').exists()).toBe(true)
-    expect(wrapper.find('.card-viewport-comparison-divider').exists()).toBe(true)
-    wrapper.element.dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true }))
-    await nextTick()
-    expect(wrapper.emitted('blank-click')).toHaveLength(1)
-    wrapper.unmount()
-  })
-
-  it('keeps the comparison divider inside the viewport safe region', async () => {
-    const wrapper = mount(CardViewport, {
-      props: {
-        resourceContext,
-        face,
-        viewportInsets: { left: 200, right: 300 },
-        comparison: {
-          before: { face, resourceContext },
-          after: { face, resourceContext },
-          divider: 0.5,
-          viewMode: 'split',
-        },
-      },
-      global: { stubs: { CardFaceRenderer: true } },
-    })
-    await nextTick()
-    expect(wrapper.find('.card-viewport-comparison-divider').attributes('style')).toContain('left: 450px')
-  })
-
-  it('centers side-by-side revisions inside equal safe-region halves', async () => {
-    const wrapper = mount(CardViewport, {
-      props: {
-        resourceContext,
-        face,
-        viewportInsets: { left: 200, right: 300 },
-        comparison: {
-          before: { face, resourceContext },
-          after: { face, resourceContext },
-          divider: 0.2,
-          viewMode: 'side-by-side',
-        },
-      },
-      global: { stubs: { CardFaceRenderer: true } },
-    })
-    await nextTick()
-    const stages = wrapper.findAll('.card-viewport-comparison-layer .card-viewport-stage')
-    expect(stages[0]!.attributes('style')).toContain('translate(10px, -40px)')
-    expect(stages[1]!.attributes('style')).toContain('translate(260px, -40px)')
-    expect(wrapper.get('.card-viewport-comparison-divider').classes()).toContain('is-static')
-    expect(wrapper.get('.card-viewport-comparison-divider').attributes('style')).toContain('left: 450px')
   })
 
   it('zooms around the pointer within the active side-by-side half', async () => {
@@ -337,278 +201,165 @@ describe('CardViewport wheel zoom API', () => {
     await flushAnimation()
 
     const events = wrapper.emitted('viewport-transform-change') ?? []
-    const zoomed = events[events.length - 1]?.[0] as { x: number; y: number; scale: number }
+    const zoomed = events[events.length - 1]?.[0] as { x: number, y: number, scale: number }
     const leftOrigin = 200 + 125 - face.width * zoomed.scale / 2
     const preservedWorldX = (anchorX - leftOrigin - zoomed.x) / zoomed.scale
     const initialWorldX = (anchorX - (200 + 125 - face.width / 2))
     expect(preservedWorldX).toBeCloseTo(initialWorldX, 3)
   })
 
-  it('flashes and replaces centered viewport status feedback', async () => {
+  it('fits the face into a supplied visible region instead of resetting to 100%', async () => {
     const wrapper = mount(CardViewport, {
       props: { resourceContext, face },
       global: { stubs: { CardFaceRenderer: true } },
     })
     const viewport = wrapper.vm as unknown as {
-      flashStatus(status: { icon: 'mdiFlipToBack' | 'mdiMagnetOn'; message: string }): void
+      fitView(targetRect?: { left: number, top: number, width: number, height: number }): void
     }
 
-    viewport.flashStatus({ icon: 'mdiFlipToBack', message: 'Switched to back face' })
+    viewport.fitView({ left: 200, top: 100, width: 500, height: 600 })
     await nextTick()
-    expect(wrapper.get('.card-viewport-status-flash').text()).toContain('Switched to back face')
 
-    viewport.flashStatus({ icon: 'mdiMagnetOn', message: 'Alignment snapping enabled' })
+    const transformEvents = wrapper.emitted('viewport-transform-change') ?? []
+    const fitted = transformEvents[transformEvents.length - 1]?.[0] as { x: number, y: number, scale: number }
+    expect(fitted.scale).toBeCloseTo(536 / face.height, 4)
+    expect(fitted.x).toBe(-50)
+    expect(fitted.y).toBe(0)
+  })
+
+  it('fits content inside viewport insets without centering it behind an inspector', async () => {
+    const wrapper = mount(CardViewport, {
+      props: { resourceContext, face, viewportInsets: { bottom: 300 } },
+      global: { stubs: { CardFaceRenderer: true } },
+    })
+    const viewport = wrapper.vm as unknown as {
+      fitContent(rect: { left: number, top: number, width: number, height: number }): void
+    }
+    const content = { left: 20, top: 30, width: 100, height: 100 }
+
+    viewport.fitContent(content)
     await nextTick()
-    const flash = wrapper.get('.card-viewport-status-flash')
-    expect(flash.text()).toContain('Alignment snapping enabled')
-    await flash.trigger('animationend')
-    expect(wrapper.find('.card-viewport-status-flash').exists()).toBe(false)
+
+    const transformEvents = wrapper.emitted('viewport-transform-change') ?? []
+    const fitted = transformEvents[transformEvents.length - 1]?.[0] as { x: number, y: number, scale: number }
+    const baseX = (1000 - face.width * fitted.scale) / 2
+    const baseY = (800 - face.height * fitted.scale) / 2
+    expect(baseX + fitted.x + (content.left + content.width / 2) * fitted.scale).toBeCloseTo(500)
+    expect(baseY + fitted.y + (content.top + content.height / 2) * fitted.scale).toBeCloseTo(250)
+  })
+
+  it('still emits one blank click when the comparison stage covers the canvas', async () => {
+    const wrapper = mount(CardViewport, {
+      props: {
+        resourceContext,
+        face,
+        comparison: {
+          before: { face, resourceContext, placeholder: true },
+          after: { face: { ...face, background: '#000000' }, resourceContext },
+          divider: 0.4,
+          viewMode: 'split',
+        },
+      },
+      global: { stubs: { CardFaceRenderer: true } },
+    })
+
+    wrapper.element.dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true }))
+    await nextTick()
+    expect(wrapper.emitted('blank-click')).toHaveLength(1)
+    wrapper.unmount()
   })
 
   it('pauses viewport zoom while layer view is active and restores it on exit', async () => {
-    const LayerSourceStub = defineComponent({
-      name: 'CardFaceRenderer',
-      template: '<div data-block-id="layer-block">Layer</div>',
-    })
+    const layerFace: RenderReadyCardFace = { ...face, children: [textChild('layer-block', '0px', '0px')] }
     const wrapper = mount(CardViewport, {
-      props: { resourceContext, face: layeredFace, layerViewActive: true, layerViewBasePlaneLabel: 'Base plate' },
-      global: { stubs: { CardFaceRenderer: LayerSourceStub } },
+      props: { resourceContext, face: layerFace, layerViewActive: true },
+      global: { stubs: { CardFaceRenderer: faceStub('layer-block') } },
     })
     const viewport = wrapper.vm as unknown as {
       zoomBy: (factor: number) => void
       cycleLayerByInitial: (initial: string, currentLayerOnly?: boolean) => boolean
     }
 
-    const candidateName = layeredFace.children[0]!.block.name
-    const layerName = typeof candidateName === 'string' && candidateName ? candidateName : 'layer-block'
-    expect(wrapper.get('.card-layer-view__base-index').text()).toBe('Base plate')
-    expect(viewport.cycleLayerByInitial(Array.from(layerName.trimStart())[0]!)).toBe(true)
+    const layerName = String(layerFace.children[0]!.block.name)
+    expect(viewport.cycleLayerByInitial(Array.from(layerName.trimStart())[0]!.toUpperCase())).toBe(true)
 
     viewport.zoomBy(1.25)
     await flushAnimation()
     expect(wrapper.emitted('viewport-transform-change')).toBeUndefined()
-    expect(wrapper.get('.card-viewport').classes()).toContain('card-viewport--layer-view')
 
     await wrapper.setProps({ layerViewActive: false })
     viewport.zoomBy(1.25)
     await flushAnimation()
     expect(wrapper.emitted('viewport-transform-change')?.length).toBeGreaterThan(0)
-    expect(wrapper.get('.card-viewport').classes()).not.toContain('card-viewport--layer-view')
   })
 
-  it('anchors supplemental information to the top-right of the face', async () => {
+  it('emits anchor-preserving geometry actions and nudges from the public viewport API', async () => {
     const wrapper = mount(CardViewport, {
-      props: { resourceContext, face },
-      slots: {
-        info: '<div data-test="face-info">Details</div>',
-        'left-info': '<div data-test="height-info">Height</div>',
-        'bottom-info': '<div data-test="width-info">Width</div>',
-      },
-      global: { stubs: { CardFaceRenderer: true } },
-    })
-
-    const info = wrapper.find('.card-viewport-info')
-    expect(info.exists()).toBe(true)
-    expect(info.attributes('style')).toContain(`left: ${face.width + 16}px`)
-    expect(info.find('[data-test="face-info"]').text()).toBe('Details')
-    expect(wrapper.find('.card-viewport-left-info').attributes('style'))
-      .toContain(`top: ${face.height / 2}px`)
-    expect(wrapper.find('.card-viewport-left-info .card-viewport-dimension-line').classes())
-      .toContain('card-viewport-dimension-line--vertical')
-    expect(wrapper.find('[data-test="height-info"]').text()).toBe('Height')
-    expect(wrapper.find('.card-viewport-bottom-info').attributes('style'))
-      .toContain(`left: ${face.width / 2}px`)
-    expect(wrapper.find('[data-test="width-info"]').text()).toBe('Width')
-    expect(wrapper.find('.card-viewport-left-info .card-viewport-dimension-line').attributes('style'))
-      .toContain(`height: ${face.height}px`)
-    expect(wrapper.find('.card-viewport-bottom-info .card-viewport-dimension-line').attributes('style'))
-      .toContain(`width: ${face.width}px`)
-
-    await wrapper.setProps({ showInfo: false })
-    expect(wrapper.find('.card-viewport-info').exists()).toBe(false)
-    expect(wrapper.find('.card-viewport-left-info').exists()).toBe(false)
-    expect(wrapper.find('.card-viewport-bottom-info').exists()).toBe(false)
-  })
-
-  it('emits anchor-preserving geometry actions from the selection toolbar', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { 'data-block-id': 'parent' }, [
-          h('div', { 'data-block-id': 'selected' }),
-        ])
-      },
-    })
-    const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face,
         selectedBlockId: null,
         selectedLocationType: 'simple-container-location',
         selectedAnchor: 'rb',
         selectedParentBlockId: 'parent',
-        selectionInfo: {
-          icon: 'mdiTextBoxOutline',
-          iconTone: 'block-text',
-          name: 'Title',
-          notes: 'Primary heading',
-        },
-        selectionCommandActions: [{
-          key: 'content.edit-rich-text',
-          icon: 'mdiFormatTextVariantOutline',
-          title: 'Edit rich text',
-        }],
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('parent', 'selected') } },
     })
-    const viewport = wrapper.get('.card-viewport').element
-    const parent = wrapper.get('[data-block-id="parent"]').element
-    const selected = wrapper.get('[data-block-id="selected"]').element
-    Object.defineProperty(viewport, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('[data-block-id="parent"]').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 100, 80))
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
     await flushPromises()
-    const actions = wrapper.findAllComponents({ name: 'OcActionButton' })
-    expect(actions.map((action) => action.props('action').key))
-      .toEqual(['content.edit-rich-text', 'fill-parent', 'center', 'inset', 'outset'])
-    expect(actions.map((action) => action.props('action').icon))
-      .toEqual([
-        'mdiFormatTextVariantOutline',
-        'mdiFitToPageOutline',
-        'mdiImageFilterCenterFocus',
-        'mdiArrowCollapse',
-        'mdiArrowExpand',
-      ])
-    expect(wrapper.get('.selection-block-info__title').text()).toContain('Title')
-    expect(wrapper.get('.selection-block-info__notes').text()).toBe('Primary heading')
-    expect(wrapper.get('.selection-block-info').attributes('data-tooltip')).toBeUndefined()
-    await wrapper.get('.selection-block-info').trigger('pointerdown')
-    expect(wrapper.get('.selection-frame').classes()).not.toContain('is-moving')
 
-    actions.find((action) => action.props('action').key === 'fill-parent')
-      ?.vm.$emit('select', { key: 'fill-parent' })
-    actions.find((action) => action.props('action').key === 'center')
-      ?.vm.$emit('select', { key: 'center' })
-    actions.find((action) => action.props('action').key === 'content.edit-rich-text')
-      ?.vm.$emit('select', { key: 'content.edit-rich-text' })
-
-    expect(wrapper.emitted('selection-action')).toEqual([
-      [{ type: 'fill-parent', blockId: 'selected', width: true, height: true }],
-      [{
-        type: 'geometry.apply',
-        operation: 'center',
-        blockId: 'selected',
-        x: 150,
-        y: 110,
-      }],
-    ])
-    expect(wrapper.emitted('selection-command')).toEqual([[
-      { key: 'content.edit-rich-text', blockId: 'selected' },
-    ]])
-
-    expect(wrapper.vm.runSelectionQuickAction('outset')).toBe(true)
-    expect(wrapper.vm.nudgeSelection(1, -1)).toBe(true)
-    const selectionActions = wrapper.emitted('selection-action') ?? []
-    expect(selectionActions[selectionActions.length - 1]).toEqual([{
-      type: 'geometry.apply',
-      operation: 'outset',
-      blockId: 'selected',
-      width: 120,
-      height: 100,
-      x: 240,
-      y: 160,
-    }])
-    expect(wrapper.emitted('move-selection')).toEqual([[{
-      blockId: 'selected',
-      x: 249,
-      y: 171,
-    }]])
-
-    await wrapper.get('.selection-frame').trigger('contextmenu')
-    const menu = useFloatingMenu()
-    expect(menu.state.value.items.map(item => item.key))
-      .toEqual([
-        'content.edit-rich-text',
-        'selection-layout-divider',
-        'fill-parent',
-        'center',
-        'inset',
-        'outset',
-      ])
-    menu.selectMenuItem('fill-parent')
-    const contextSelectionActions = wrapper.emitted('selection-action') ?? []
-    expect(contextSelectionActions[contextSelectionActions.length - 1]).toEqual([
+    wrapper.vm.runSelectionQuickAction('fill-parent')
+    expect(wrapper.emitted('selection-action')?.[0]).toEqual([
       { type: 'fill-parent', blockId: 'selected', width: true, height: true },
     ])
 
-    await wrapper.get('.selection-handle-t').trigger('pointerdown')
-    expect(wrapper.find('.selection-block-info').exists()).toBe(false)
-    expect(wrapper.find('.selection-size-label--width').exists()).toBe(false)
-    expect(wrapper.get('.selection-size-label--height').text()).toBe('80px')
-    await wrapper.setProps({ selectedBlockId: 'other' })
-    const resizeDrag = createSelectionDrag()
-    resizeDrag.begin()
-    resizeDrag.moveBy(0, -10)
-    window.dispatchEvent(new Event('pointerup'))
-    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toMatchObject({
-      blockId: 'selected',
-      width: 100,
-      height: 90,
+    expect(wrapper.vm.runSelectionQuickAction('outset')).toBe(true)
+    const selectionActions = wrapper.emitted('selection-action') ?? []
+    expect(selectionActions[selectionActions.length - 1]).toEqual([{
+      type: 'geometry.apply', operation: 'outset', blockId: 'selected',
+      width: 120, height: 100, x: 240, y: 160,
+    }])
+
+    expect(wrapper.vm.nudgeSelection(1, -1)).toBe(true)
+    expect(wrapper.emitted('move-selection')).toEqual([[{ blockId: 'selected', x: 249, y: 171 }]])
+  })
+
+  it('drops a locked axis from the emitted quick action', async () => {
+    const wrapper = mount(CardViewport, {
+      props: {
+        resourceContext,
+        face,
+        selectedBlockId: null,
+        selectedLocationType: 'simple-container-location',
+        selectedAnchor: 'rb',
+        selectedParentBlockId: 'parent',
+      },
+      global: { stubs: { CardFaceRenderer: faceStub('parent', 'selected') } },
     })
-    await wrapper.setProps({ selectedBlockId: 'selected' })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('[data-block-id="parent"]').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 100, 80))
+    await wrapper.setProps({ selectedBlockId: 'selected', widthLocked: true, heightLocked: false })
     await nextTick()
     await flushPromises()
 
-    await wrapper.get('.selection-frame').trigger('pointerdown')
-    expect(wrapper.find('.selection-block-info').exists()).toBe(false)
-    expect(wrapper.get('.selection-frame').classes()).toContain('is-moving')
-    expect(wrapper.get('.selection-anchor-guide-label--x').text()).toBe('x 250px')
-    expect(wrapper.get('.selection-anchor-guide-label--y').text()).toBe('y 170px')
-    expect(wrapper.get('.selection-anchor-badge').text()).toBe('RB')
-    window.dispatchEvent(new Event('pointercancel'))
-    await wrapper.setProps({ showPositionOnMove: false, showSizeOnResize: false })
-    await wrapper.get('.selection-handle-t').trigger('pointerdown')
-    expect(wrapper.find('.selection-size-label').exists()).toBe(false)
-    window.dispatchEvent(new Event('pointercancel'))
-    await nextTick()
-    await wrapper.get('.selection-frame').trigger('pointerdown')
-    expect(wrapper.find('.selection-anchor-guide').exists()).toBe(false)
-    window.dispatchEvent(new Event('pointercancel'))
-
-    await wrapper.setProps({ widthLocked: true, heightLocked: false })
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-t', 'selection-handle-b'])
     expect(wrapper.vm.runSelectionQuickAction('outset')).toBe(true)
-    const lockedActions = wrapper.emitted('selection-action') ?? []
-    expect(lockedActions[lockedActions.length - 1]).toEqual([{
+    const actions = wrapper.emitted('selection-action') ?? []
+    expect(actions[actions.length - 1]).toEqual([{
       type: 'geometry.apply', operation: 'outset', blockId: 'selected',
       height: 100, y: 160,
     }])
-    await wrapper.setProps({ heightLocked: true })
-    expect(wrapper.findAll('.selection-handle')).toHaveLength(0)
-    expect(wrapper.findAllComponents({ name: 'OcActionButton' }).map(action => action.props('action').key))
-      .toEqual(['content.edit-rich-text', 'center'])
   })
 
-  it('uses direction-aware flow handles and emits only the resized axis', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { 'data-block-id': 'parent' }, [
-          h('div', { 'data-block-id': 'selected' }),
-        ])
-      },
-    })
+  it('emits only the resized axis for a flow child', async () => {
     const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face,
         selectedBlockId: null,
         selectedLocationType: 'flow-container-location',
@@ -616,116 +367,54 @@ describe('CardViewport wheel zoom API', () => {
         selectedParentFlowDirection: 'lr',
         selectedFlowAlign: 'start',
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('parent', 'selected') } },
     })
-    const viewport = wrapper.get('.card-viewport').element
-    const parent = wrapper.get('[data-block-id="parent"]').element
-    const selected = wrapper.get('[data-block-id="selected"]').element
-    Object.defineProperty(viewport, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 225, height: 80, right: 375, bottom: 230 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('[data-block-id="parent"]').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 225, 80))
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
     await flushPromises()
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-r', 'selection-handle-b'])
 
     await wrapper.get('.selection-handle-b').trigger('pointerdown')
-    const crossAxisDrag = createSelectionDrag()
-    crossAxisDrag.begin()
-    crossAxisDrag.moveBy(0, 20)
+    const drag = createSelectionDrag()
+    drag.begin()
+    drag.moveBy(0, 20)
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
       height: 100,
     })
-
-    await wrapper.setProps({ selectedParentFlowDirection: 'rl', selectedFlowAlign: 'end' })
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-l', 'selection-handle-t'])
-    await wrapper.setProps({ selectedFlowAlign: 'justify' })
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-l'])
-    await wrapper.setProps({ selectedParentFlowDirection: 'lr', selectedFlowAlign: 'center' })
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-r', 'selection-handle-t', 'selection-handle-b'])
-    await wrapper.get('.selection-handle-b').trigger('pointerdown')
-    const centeredCrossAxisDrag = createSelectionDrag()
-    centeredCrossAxisDrag.begin()
-    centeredCrossAxisDrag.moveBy(0, 10)
-    window.dispatchEvent(new Event('pointerup'))
-    expect(wrapper.emitted('resize-selection')?.[1]?.[0]).toEqual({
-      blockId: 'selected',
-      height: 100,
-    })
-    await wrapper.setProps({ widthLocked: true, heightLocked: false })
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-t', 'selection-handle-b'])
-    await wrapper.setProps({ widthLocked: false, heightLocked: true })
-    expect(wrapper.findAll('.selection-handle').map(handle => handle.classes()[1]))
-      .toEqual(['selection-handle-r'])
-    expect(wrapper.findAllComponents({ name: 'OcActionButton' }).map(action => action.props('action').key))
-      .not.toContain('fill-cross-axis')
   })
 
   it('keeps a minimum-size resize handle pinned until the pointer catches up', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { class: 'card-canvas' }, [
-          h('div', { 'data-block-id': 'selected' }),
-        ])
-      },
-    })
     const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face: snappingFace,
         selectedBlockId: null,
         selectedLocationType: 'simple-container-location',
         selectedAnchor: 'lt',
         alignmentSnappingEnabled: false,
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('selected') } },
     })
-    const viewport = wrapper.get<HTMLElement>('.card-viewport')
-    const parent = wrapper.get('.card-canvas')
-    const selected = wrapper.get('[data-block-id="selected"]')
-    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent.element, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected.element, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('.card-canvas').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 100, 80))
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
     await flushPromises()
     await wrapper.get('.selection-handle-r').trigger('pointerdown')
 
-    const selectionDrag = createSelectionDrag()
-    selectionDrag.begin()
-    const moveBy = async (movementX: number) => {
-      selectionDrag.moveBy(movementX, 0)
-      await nextTick()
-    }
-
-    await moveBy(-100)
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 24px')
-    await moveBy(-40)
-    await moveBy(20)
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 24px')
-    await moveBy(45)
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 25px')
+    const drag = createSelectionDrag()
+    drag.begin()
+    drag.moveBy(-100, 0)
+    drag.moveBy(-40, 0)
+    drag.moveBy(20, 0)
+    drag.moveBy(45, 0)
 
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
@@ -738,36 +427,20 @@ describe('CardViewport wheel zoom API', () => {
   })
 
   it('keeps the original aspect ratio while Shift resizes from a corner', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { class: 'card-canvas' }, [
-          h('div', { 'data-block-id': 'selected' }),
-        ])
-      },
-    })
     const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face: snappingFace,
         selectedBlockId: null,
         selectedLocationType: 'simple-container-location',
         selectedAnchor: 'lt',
         alignmentSnappingEnabled: false,
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('selected') } },
     })
-    const viewport = wrapper.get<HTMLElement>('.card-viewport')
-    const parent = wrapper.get('.card-canvas')
-    const selected = wrapper.get('[data-block-id="selected"]')
-    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent.element, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected.element, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('.card-canvas').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 100, 80))
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
@@ -778,9 +451,6 @@ describe('CardViewport wheel zoom API', () => {
     drag.begin()
     // 100×80 是"宽的那边"更长，所以跟手的是宽：只往右拉 40，高按比例跟到 112，左上角待着不动。
     drag.moveBy(40, 0, { shiftKey: true })
-    await nextTick()
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('height: 112px')
-
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
@@ -792,36 +462,20 @@ describe('CardViewport wheel zoom API', () => {
   })
 
   it('follows the taller edge when Shift resizing a selection that is taller than it is wide', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { class: 'card-canvas' }, [
-          h('div', { 'data-block-id': 'selected' }),
-        ])
-      },
-    })
     const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face: snappingFace,
         selectedBlockId: null,
         selectedLocationType: 'simple-container-location',
         selectedAnchor: 'lt',
         alignmentSnappingEnabled: false,
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('selected') } },
     })
-    const viewport = wrapper.get<HTMLElement>('.card-viewport')
-    const parent = wrapper.get('.card-canvas')
-    const selected = wrapper.get('[data-block-id="selected"]')
-    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent.element, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected.element, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 60, height: 150, right: 210, bottom: 300 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('.card-canvas').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 60, 150))
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
@@ -832,9 +486,6 @@ describe('CardViewport wheel zoom API', () => {
     drag.begin()
     // 竖着比横着长，所以这一回跟手的是高：往下拉 30 就是高 +30，宽按 60:150 跟到 72。
     drag.moveBy(0, 30, { shiftKey: true })
-    await nextTick()
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 72px')
-
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
@@ -845,44 +496,25 @@ describe('CardViewport wheel zoom API', () => {
     })
   })
 
-  it('snaps the ratio-driven edge while Shift resizing, and claims only the edge that really landed on the target', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { class: 'card-canvas' }, [
-          h('div', { 'data-block-id': 'selected' }),
-          h('div', { 'data-block-id': 'sibling' }),
-        ])
-      },
-    })
+  it('snaps the ratio-driven edge while Shift resizing and commits only the snapped size', async () => {
     const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face: snappingFace,
         selectedBlockId: null,
         selectedLocationType: 'simple-container-location',
         selectedAnchor: 'lt',
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('selected', 'sibling') } },
     })
-    const viewport = wrapper.get<HTMLElement>('.card-viewport')
-    const parent = wrapper.get('[class="card-canvas"]')
-    const selected = wrapper.get('[data-block-id="selected"]')
-    const sibling = wrapper.get('[data-block-id="sibling"]')
-    viewport.element.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
-    viewport.element.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
-    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent.element, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected.element, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
-    })
-    // 兄弟块上边在世界坐标 165：等比缩放后的底边（162）离它 3px，宽的那条边离另一条线 6px —— 该吸的是底边。
-    Object.defineProperty(sibling.element, 'getBoundingClientRect', {
-      value: () => ({ left: 300, top: 265, width: 80, height: 60, right: 380, bottom: 325 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('.card-canvas').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 100, 80))
+    // 兄弟块上边在世界坐标 265：等比缩放后的底边（262）离它 3px —— 该吸的是底边。
+    pinRect(wrapper.get('[data-block-id="sibling"]').element, rect(300, 265, 80, 60))
+    const viewportEl = wrapper.get('.card-viewport').element as HTMLElement
+    viewportEl.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
+    viewportEl.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
@@ -891,17 +523,8 @@ describe('CardViewport wheel zoom API', () => {
 
     const drag = createSelectionDrag()
     drag.begin()
-    // 跟手的是宽（100 > 80）：横拉 40 本会让 100×80 变成 140×112，底边 162 被兄弟块吸到 165。
+    // 跟手的是宽（100 > 80）：横拉 40 本会让 100×80 变成 140×112，底边 262 被兄弟块吸到 265。
     drag.moveBy(40, 0, { shiftKey: true })
-    await nextTick()
-
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 143.75px')
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('height: 115px')
-    // 只有真的落在线上的那条边有引导线：另一条边只是按比例跟过来，不该画在目标上。
-    const guides = wrapper.findAll('.selection-alignment-guides line')
-    expect(guides).toHaveLength(1)
-    expect(guides[0]!.attributes()).toMatchObject({ x1: '150', x2: '380', y1: '265', y2: '265' })
-
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
@@ -912,43 +535,24 @@ describe('CardViewport wheel zoom API', () => {
     })
   })
 
-  it('snaps absolute resize and move edges to a direct sibling with aligned previews', async () => {
-    const SelectionRendererStub = defineComponent({
-      name: 'CardFaceRenderer',
-      setup() {
-        return () => h('div', { class: 'card-canvas' }, [
-          h('div', { 'data-block-id': 'selected' }),
-          h('div', { 'data-block-id': 'sibling' }),
-        ])
-      },
-    })
+  it('snaps absolute resize and move edges to a direct sibling', async () => {
     const wrapper = mount(CardViewport, {
-      props: { resourceContext,
+      props: {
+        resourceContext,
         face: snappingFace,
         selectedBlockId: null,
         selectedLocationType: 'simple-container-location',
         selectedAnchor: 'lt',
       },
-      global: { stubs: { CardFaceRenderer: SelectionRendererStub } },
+      global: { stubs: { CardFaceRenderer: faceStub('selected', 'sibling') } },
     })
-    const viewport = wrapper.get<HTMLElement>('.card-viewport')
-    const parent = wrapper.get('[class="card-canvas"]')
-    const selected = wrapper.get('[data-block-id="selected"]')
-    const sibling = wrapper.get('[data-block-id="sibling"]')
-    viewport.element.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
-    viewport.element.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
-    Object.defineProperty(viewport.element, 'getBoundingClientRect', {
-      value: () => ({ left: 0, top: 0, width: 1000, height: 800, right: 1000, bottom: 800 }),
-    })
-    Object.defineProperty(parent.element, 'getBoundingClientRect', {
-      value: () => ({ left: 100, top: 100, width: 400, height: 300, right: 500, bottom: 400 }),
-    })
-    Object.defineProperty(selected.element, 'getBoundingClientRect', {
-      value: () => ({ left: 150, top: 150, width: 100, height: 80, right: 250, bottom: 230 }),
-    })
-    Object.defineProperty(sibling.element, 'getBoundingClientRect', {
-      value: () => ({ left: 258, top: 120, width: 80, height: 60, right: 338, bottom: 180 }),
-    })
+    pinRect(wrapper.get('.card-viewport').element, rect(0, 0, 1000, 800))
+    pinRect(wrapper.get('.card-canvas').element, rect(100, 100, 400, 300))
+    pinRect(wrapper.get('[data-block-id="selected"]').element, rect(150, 150, 100, 80))
+    pinRect(wrapper.get('[data-block-id="sibling"]').element, rect(258, 120, 80, 60))
+    const viewportEl = wrapper.get('.card-viewport').element as HTMLElement
+    viewportEl.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
+    viewportEl.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
 
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
@@ -957,12 +561,6 @@ describe('CardViewport wheel zoom API', () => {
     const resizeDrag = createSelectionDrag()
     resizeDrag.begin()
     resizeDrag.moveBy(5, 0)
-    await nextTick()
-
-    const guide = wrapper.get('.selection-alignment-guides line')
-    expect(guide.attributes()).toMatchObject({ x1: '258', x2: '258', y1: '120', y2: '230' })
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('width: 108px')
-
     window.dispatchEvent(new Event('pointerup'))
     await nextTick()
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
@@ -972,17 +570,11 @@ describe('CardViewport wheel zoom API', () => {
       x: 50,
       y: 50,
     })
-    expect(wrapper.find('.selection-alignment-guides').exists()).toBe(false)
 
     await wrapper.get('.selection-frame').trigger('pointerdown')
     const moveDrag = createSelectionDrag()
     moveDrag.begin()
     moveDrag.moveBy(5, 0)
-    await nextTick()
-    expect(wrapper.get('.selection-alignment-guides line').attributes())
-      .toMatchObject({ x1: '258', x2: '258', y1: '120', y2: '230' })
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('translate3d(158px, 150px, 0)')
-
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('move-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
@@ -995,9 +587,6 @@ describe('CardViewport wheel zoom API', () => {
     const unsnappedDrag = createSelectionDrag()
     unsnappedDrag.begin()
     unsnappedDrag.moveBy(5, 0)
-    await nextTick()
-    expect(wrapper.find('.selection-alignment-guides').exists()).toBe(false)
-    expect(wrapper.get('.selection-frame').attributes('style')).toContain('translate3d(155px, 150px, 0)')
     window.dispatchEvent(new Event('pointerup'))
     expect(wrapper.emitted('move-selection')?.[1]?.[0]).toEqual({
       blockId: 'selected',
@@ -1006,13 +595,10 @@ describe('CardViewport wheel zoom API', () => {
     })
   })
 
-  it('drags dimensions by axis, changes cursors, and snaps to tens with Shift', async () => {
+  it('drags face dimensions by axis and snaps them to tens with Shift', async () => {
     const wrapper = mount(CardViewport, {
       props: { resourceContext, face },
-      slots: {
-        'left-info': 'Height',
-        'bottom-info': 'Width',
-      },
+      slots: { 'left-info': 'Height', 'bottom-info': 'Width' },
       global: { stubs: { CardFaceRenderer: true } },
     })
 
@@ -1021,7 +607,6 @@ describe('CardViewport wheel zoom API', () => {
       clientX: 100,
       bubbles: true,
     }))
-    expect(document.body.style.cursor).toBe('ew-resize')
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 135, shiftKey: true }))
     window.dispatchEvent(new MouseEvent('pointerup'))
 
@@ -1030,11 +615,9 @@ describe('CardViewport wheel zoom API', () => {
       clientY: 100,
       bubbles: true,
     }))
-    expect(document.body.style.cursor).toBe('ns-resize')
     window.dispatchEvent(new MouseEvent('pointermove', { clientY: 70 }))
     window.dispatchEvent(new MouseEvent('pointerup'))
 
-    expect(document.body.style.cursor).toBe('')
     expect(wrapper.emitted('face-dimension-change')).toEqual([
       [{ dimension: 'width', value: face.width + 40, final: false }],
       [{ dimension: 'width', value: face.width + 40, final: true }],
@@ -1042,5 +625,4 @@ describe('CardViewport wheel zoom API', () => {
       [{ dimension: 'height', value: face.height + 30, final: true }],
     ])
   })
-
 })

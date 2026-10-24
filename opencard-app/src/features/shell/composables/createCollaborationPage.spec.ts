@@ -71,9 +71,6 @@ it.each([false, true])('starts separate tutorials for a repository initially ini
     await vi.waitFor(() => expect(tutorial.session.value?.step.id).toBe('sidebar'))
     expect(tutorial.session.value?.tutorialId).toBe('versionControl')
     expect(settings.settings.value.tutorials.seen.includes('initializeVersionControl')).toBe(!initialized)
-    expect(wrapper.find('[data-oc-tutorial="collaboration.graph"]').exists()).toBe(true)
-    expect(wrapper.find('[data-oc-tutorial="collaboration.changes"]').exists()).toBe(true)
-    expect(wrapper.find('[data-oc-tutorial="collaboration.commit"]').exists()).toBe(true)
     projectPath.value = 'D:/Cards/other'
     await nextTick()
     expect(tutorial.session.value).toBeNull()

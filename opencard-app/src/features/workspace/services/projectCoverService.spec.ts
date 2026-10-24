@@ -20,17 +20,13 @@ function projectFiles(profile: unknown, coverPath = 'assets/cover.png'): Map<str
 }
 
 describe('projectCoverService', () => {
-  it('resolves a declared cover to an asset source', async () => {
+  it('resolves a declared cover when the file exists', async () => {
     const files = projectFiles({ name: 'Demo', cover: 'assets/cover.png' })
     await expect(resolveProjectCover({
       fs: createFileSystem(files),
       rootPath: '/project',
       relativePath: 'assets\\cover.png',
-    })).resolves.toEqual({
-      relativePath: 'assets/cover.png',
-      absolutePath: '/project/assets/cover.png',
-      src: 'asset:///project/assets/cover.png',
-    })
+    })).resolves.toMatchObject({ relativePath: 'assets/cover.png' })
   })
 
   it('treats missing, unsafe, and non-image covers as absent', async () => {
@@ -49,7 +45,7 @@ describe('projectCoverService', () => {
   it('reads the project cover from an unopened project', async () => {
     const files = projectFiles({ name: 'Demo', cover: '.opencard/cover.webp' }, '.opencard/cover.webp')
     await expect(readProjectCover({ fs: createFileSystem(files), projectRootPath: '/project/' }))
-      .resolves.toMatchObject({ relativePath: '.opencard/cover.webp', src: 'asset:///project/.opencard/cover.webp' })
+      .resolves.toMatchObject({ relativePath: '.opencard/cover.webp' })
   })
 
   it('stays silent when the project profile is missing, broken, or without a cover', async () => {

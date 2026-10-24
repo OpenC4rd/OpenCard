@@ -199,24 +199,18 @@
   opacity: 1;
 }
 
-.titlebar-notice-floating {
+/* 任务面板与通知面板：宽度与滚动归内容根，浮层宿主按内容尺寸收缩。 */
+.titlebar-notice-panel {
+  display: grid;
   width: max-content;
   max-width: min(420px, calc(100vw - (var(--oc-space-sm) * 2)));
+  /* 宿主的上限从内容盒继承进来，滚动留在面板自己身上。 */
+  max-height: inherit;
+  gap: var(--oc-space-sm);
+  padding: var(--oc-space-xs) 0 var(--oc-space-sm) var(--oc-space-sm);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  translate: var(--oc-scrollbar-size) 0;
-  border-radius: var(--oc-radius-control);
-  background: var(--oc-bg-surface);
-  box-shadow:
-    var(--oc-shadow-lg),
-    inset 0 0 0 1px var(--oc-border-default);
-}
-
-.titlebar-notice-panel {
-  display: grid;
-  gap: var(--oc-space-sm);
-  padding: var(--oc-space-xs) 0 var(--oc-space-sm) var(--oc-space-sm);
 }
 
 .titlebar-notice-history-row {
@@ -266,18 +260,12 @@
   white-space: pre-line;
 }
 
-.titlebar-task-floating {
-  width: min(320px, calc(100vw - 16px));
-  overflow: hidden;
-  border: 1px solid var(--oc-border-default);
-  border-radius: var(--oc-radius-control);
-  box-shadow: var(--oc-shadow-lg);
-}
-
 .titlebar-task-panel {
   display: grid;
+  width: min(320px, calc(100vw - 16px));
   gap: var(--oc-space-sm);
   padding: var(--oc-space-sm);
+  overflow: hidden;
 }
 
 .titlebar-task-row {

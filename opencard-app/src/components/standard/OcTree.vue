@@ -29,6 +29,18 @@
       :style="virtualContentStyle">
       <OcTreeRow v-for="entry in renderedEntries" :key="entry.key" :entry="entry" :context="rowContext" />
     </div>
+    <OcOverlayMarker
+      ref="contextMenu"
+      group="context-menu"
+      :anchor="contextAnchor"
+      :owner="contextOwner"
+      :open="contextOpen"
+      @update:open="contextOpen = $event"
+      @close="handleContextMenuClose"
+    >
+      <OcActionMenu :actions="contextItems" overlay-key="context-menu" :on-select="selectContextAction"
+        @close="handleContextMenuClose" />
+    </OcOverlayMarker>
   </div>
 </template>
 
@@ -38,10 +50,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, markRa
 import { taskScheduler } from '../../utils/taskScheduler'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
+import OcActionMenu from './OcActionMenu.vue'
+import OcOverlayMarker from './OcOverlayMarker.vue'
 import OcTreeRow, { type OcTreeRowEntry as VisibleEntry, type OcTreeRowContext } from './OcTreeRow.vue'
 import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
 import { resolveNodeSelection, type OcNodeSelectionMode } from '../../shared/ui/node/nodeSelection'
-import { useFloatingMenu, type FloatingMenuItem } from '../../composables/useFloatingMenu'
+import type { OcActionMenuEntry } from '../../shared/ui/action/action.types'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import type {
   OcNode,
   OcNodeActionEvent,
@@ -122,7 +137,6 @@ const emit = defineEmits<{
   move: [event: OcNodeMoveEvent]
   'external-drop': [event: OcNodeExternalDropEvent]
 }>()
-const { openContextMenu } = useFloatingMenu()
 
 const treeRootElement = ref<HTMLElement | null>(null)
 const rowRefs = new Map<OcNodeKey, HTMLElement>()
@@ -496,8 +510,56 @@ function resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNode
   })
 }
 
-function resolveContextActions(key: OcNodeKey): FloatingMenuItem[] {
-  const result: FloatingMenuItem[] = []
+const contextMenu = ref<{ open: () => void; close: () => void } | null>(null)
+const contextOpen = ref(false)
+const contextItems = shallowRef<readonly OcActionMenuEntry[]>([])
+/** 未打开时的占位：marker 要求锚点非空，openMenuAt 一定先写锚点再 open()。 */
+const contextAnchor = shallowRef<HTMLElement | DOMRect>(new DOMRect())
+const contextOwner = shallowRef<HTMLElement | null>(null)
+const contextHandler = shallowRef<((key: string) => void) | null>(null)
+
+function openMenuAt(
+  anchor: HTMLElement | DOMRect,
+  items: readonly OcActionMenuEntry[],
+  onSelect: (key: string) => void,
+  owner: HTMLElement,
+): void {
+  if (items.length === 0) return
+  contextItems.value = items
+  contextAnchor.value = anchor
+  contextOwner.value = owner
+  contextHandler.value = onSelect
+  // marker 的 open() 读的是已提交的 props：等这帧把新锚点与归属落到 marker 上再开，
+  // 否则换触发元素时会沿用上一次的 anchor / owner。
+  void nextTick(() => contextMenu.value?.open())
+}
+
+function handleContextMenuClose(): void {
+  contextOpen.value = false
+  contextHandler.value = null
+}
+
+/** Esc：菜单开着时收掉它并阻止上层弹窗把同一个 Esc 当成自己的关闭；没开就保持原义。 */
+function dismissContextMenuOnEscape(event: KeyboardEvent): void {
+  if (!contextOpen.value) return
+  event.preventDefault()
+  contextMenu.value?.close()
+}
+
+/** 选中一项先收起菜单再执行：动作自己带闭包，不依赖菜单还开着。 */
+function selectContextAction(key: string): void {
+  const handler = contextHandler.value
+  contextMenu.value?.close()
+  handler?.(key)
+}
+
+useOverlayDismiss(() => contextOpen.value, () => contextOwner.value, () => contextMenu.value?.close())
+
+// 树被卸载时它打开的菜单不能留在组里变成空面板。
+onBeforeUnmount(() => { contextMenu.value?.close() })
+
+function resolveContextActions(key: OcNodeKey): OcActionMenuEntry[] {
+  const result: OcActionMenuEntry[] = []
   const entries = props.data.items.get(key)?.contextActions
   for (const entry of (typeof entries === 'function' ? entries() : entries) ?? []) {
     if (entry.type === 'divider') {
@@ -510,18 +572,20 @@ function resolveContextActions(key: OcNodeKey): FloatingMenuItem[] {
   return result
 }
 
-function openItemContextMenu(key: OcNodeKey, event?: MouseEvent): boolean {
+function openItemContextMenu(key: OcNodeKey, event: MouseEvent | KeyboardEvent): void {
   const item = props.data.items.get(key)
-  if (!item || item.disabled) return false
+  const owner = event.currentTarget
+  if (!item || item.disabled || !(owner instanceof HTMLElement)) return
   const actions = resolveContextActions(key)
-  if (actions.length === 0) return false
+  if (actions.length === 0) return
   if (!isSelected(key)) emitSelectionIntent(key, false, 'right', false)
-  return openContextMenu({
-    event,
-    anchor: event ? undefined : rowRefs.get(key),
-    items: actions,
-    onSelect: actionKey => emitActionIntent(key, actionKey, 'context'),
-  })
+  event.preventDefault()
+  openMenuAt(
+    event instanceof MouseEvent ? new DOMRect(event.clientX, event.clientY, 0, 0) : owner,
+    actions,
+    actionKey => emitActionIntent(key, actionKey, 'context'),
+    owner,
+  )
 }
 
 function handleRowContextMenu(event: MouseEvent, key: OcNodeKey): void {
@@ -625,7 +689,10 @@ function handleRowKeydown(event: KeyboardEvent, key: OcNodeKey, index: number): 
     event.preventDefault()
     if (props.data.items.get(key)?.renamable) void startRename(key)
   } else if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
-    if (openItemContextMenu(key)) event.preventDefault()
+    openItemContextMenu(key, event)
+  } else if (event.key === 'Escape') {
+    // 行本身就是右键菜单的触发元素：焦点还在行上时 Esc 收回菜单，不往弹窗冒泡。
+    dismissContextMenuOnEscape(event)
   } else if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
     emitSelectionIntent(key, event.ctrlKey || event.metaKey, 'keyboard', event.shiftKey)

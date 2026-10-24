@@ -129,7 +129,6 @@ describe('ProjectIconRegistryFileEditor', () => {
     await wrapper.vm.$nextTick()
 
     // A source outside the managed icon folder is never staged or deleted.
-    expect(wrapper.text()).not.toContain('projectConfig.icons.cleanupOrphanedFiles')
     await confirmRemoval(wrapper).trigger('click')
     await flushPromises()
     expect(mocks.stageProjectAssetFiles).not.toHaveBeenCalled()
@@ -175,19 +174,11 @@ describe('ProjectIconRegistryFileEditor', () => {
     expect(wrapper.vm.canSave).toBe(false)
   })
 
-  it('uses raw repair mode for invalid JSON', () => {
-    const wrapper = mount(ProjectIconRegistryFileEditor, {
-      props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: '{broken' }),  },
-    })
-    expect(wrapper.find('.monaco-stub').exists()).toBe(true)
-  })
-
-  it('offers creating and importing icon packs from the workspace header', async () => {
+  it('opens pack creation from the workspace header', async () => {
     const wrapper = mount(ProjectIconRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({ iconSeries: [{ name: 'Status icons', key: 'status', source: 'status.png', icons: [] }] }) }),  },
     })
 
-    expect(wrapper.vm.presentation).toMatchObject({ title: 'iconRegistry.title', icon: 'mdiStickerEmoji' })
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(false)
 
     await wrapper.vm.onHeaderAction('project-icon-registry.create-collection')

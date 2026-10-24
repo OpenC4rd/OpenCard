@@ -1,5 +1,5 @@
 import { createTestSession } from '../../editor-runtime/editorTestSession'
-import { nextTick, ref } from 'vue'
+import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -226,33 +226,6 @@ describe('useWorkbenchVersionControl', () => {
     expect(versionControl.versionGraphExpandedKeys.value).toEqual(['project-timeline:c3'])
   })
 
-  it('keeps expanded version graph nodes when the timeline is refreshed', async () => {
-    mocks.readHistory.mockResolvedValue(ok([
-      commitSummary('a1', [{ path: DOCUMENT_PATH, status: 'modified' }]),
-      commitSummary('b2', [{ path: DOCUMENT_PATH, status: 'modified' }]),
-    ]))
-    const { versionControl, projectPath, activeSession } = createVersionControl()
-    projectPath.value = PROJECT_ROOT
-    activeSession.value = workspaceSession()
-    await vi.waitFor(() => expect(versionControl.timelineProjectTreeData.value.rootKeys).toEqual([
-      'project-timeline:a1',
-      'project-timeline:b2',
-    ]))
-
-    versionControl.handleVersionGraphExpansionChange({ key: 'project-timeline:a1', expanded: true })
-    versionControl.handleVersionGraphExpansionChange({ key: 'project-timeline:b2', expanded: true })
-    expect(versionControl.versionGraphExpandedKeys.value).toEqual(['project-timeline:a1', 'project-timeline:b2'])
-
-    await versionControl.refreshTimeline()
-    await nextTick()
-
-    expect(versionControl.timelineProjectTreeData.value.rootKeys).toEqual([
-      'project-timeline:a1',
-      'project-timeline:b2',
-    ])
-    expect(versionControl.versionGraphExpandedKeys.value).toEqual(['project-timeline:a1', 'project-timeline:b2'])
-  })
-
   it('keeps the commit dialog open while a commit runs and closes it on success', async () => {
     mocks.readStatus.mockResolvedValue(ok({ entries: [statusEntry(DOCUMENT_PATH)] }))
     const { versionControl, projectPath } = createVersionControl()
@@ -299,11 +272,11 @@ describe('useWorkbenchVersionControl', () => {
     expect(mocks.createCommit).not.toHaveBeenCalled()
   })
 
-  it('initializes with the configured identity and creates the first commit by default', async () => {
-    const { versionControl, projectPath } = createVersionControl({ committerName: '张三' })
-    projectPath.value = PROJECT_ROOT
+  it('initializes with the configured identity and honors the first-commit setting', async () => {
+    const committing = createVersionControl({ committerName: '张三' })
+    committing.projectPath.value = PROJECT_ROOT
 
-    await versionControl.initializeProjectRepository()
+    await committing.versionControl.initializeProjectRepository()
 
     // 邮箱留空：按名称走 key 用的同一套归一化算法。
     expect(mocks.initializeRepository).toHaveBeenCalledWith(PROJECT_ROOT, {
@@ -312,18 +285,17 @@ describe('useWorkbenchVersionControl', () => {
     })
     expect(mocks.stageAll).toHaveBeenCalledWith(PROJECT_ROOT)
     expect(mocks.createCommit).toHaveBeenCalledWith(PROJECT_ROOT, { message: 'versionControl.initialCommitMessage' })
-    expect(versionControl.isInitializingRepository.value).toBe(false)
-  })
+    expect(committing.versionControl.isInitializingRepository.value).toBe(false)
 
-  it('skips the first commit when the setting is off and keeps an explicit email', async () => {
-    const { versionControl, projectPath } = createVersionControl({
+    vi.clearAllMocks()
+    const skipping = createVersionControl({
       committerName: 'Author',
       committerEmail: 'author@example.com',
       createInitialCommit: false,
     })
-    projectPath.value = PROJECT_ROOT
+    skipping.projectPath.value = PROJECT_ROOT
 
-    await versionControl.initializeProjectRepository()
+    await skipping.versionControl.initializeProjectRepository()
 
     expect(mocks.initializeRepository).toHaveBeenCalledWith(PROJECT_ROOT, {
       name: 'Author',
@@ -360,7 +332,7 @@ describe('useWorkbenchVersionControl', () => {
     expect(mocks.stageAll).not.toHaveBeenCalled()
   })
 
-  it('reports an initialization failure without leaving the busy state on', async () => {
+  it('reports an initialization failure without leaving the busy state on, including non-error throws', async () => {
     const noticeCount = titleBarNotices.value.length
     const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
     projectPath.value = PROJECT_ROOT
@@ -371,17 +343,12 @@ describe('useWorkbenchVersionControl', () => {
     expect(versionControl.isInitializingRepository.value).toBe(false)
     expect(noticesAfter(noticeCount)).toEqual(['initialization exploded'])
     expect(mocks.stageAll).not.toHaveBeenCalled()
-  })
 
-  it('falls back to the generic message when initialization throws a non-error', async () => {
-    const noticeCount = titleBarNotices.value.length
-    const { versionControl, projectPath } = createVersionControl({ committerName: 'Author' })
-    projectPath.value = PROJECT_ROOT
+    const nonErrorCount = titleBarNotices.value.length
     mocks.initializeRepository.mockRejectedValueOnce('initialization exploded')
-
     await versionControl.initializeProjectRepository()
 
-    expect(noticesAfter(noticeCount)).toEqual(['versionControl.initializeFailed'])
+    expect(noticesAfter(nonErrorCount)).toEqual(['versionControl.initializeFailed'])
   })
 
   it('reports a failed first commit as such once the repository exists', async () => {

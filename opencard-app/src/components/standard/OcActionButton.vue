@@ -1,4 +1,4 @@
-<!-- Base action button: top-level children open on click/focus; nested menu items own hover behavior. -->
+<!-- Base action button: its menu is one marker in the shared "menu" group, so any other menu takes the host over. -->
 <template>
   <div
     ref="rootRef"
@@ -12,6 +12,7 @@
     @pointerleave="scheduleCloseMenu"
     @focusin="openMenu"
     @focusout="scheduleCloseMenu"
+    @keydown="handleRootKeydown"
   >
     <OcButton
       :variant="variant"
@@ -33,27 +34,30 @@
     <span v-if="hasActionBadge(action.badge)" class="oc-number-badge oc-action-button__badge" aria-hidden="true">
       {{ formatActionBadge(action.badge) }}
     </span>
-    <OcFloatingLayer
-      v-if="isMenuOpen && hasActionChildren(action)"
-      :open="true"
+
+    <!--
+      组名固定 "menu"：和标题栏菜单共用同一个宿主，全局同一时刻只有一个菜单。
+      抢先打开时旧菜单收到 close（真正关闭），这里只跟 marker 的结果。
+    -->
+    <OcOverlayMarker
+      ref="menuLayer"
+      group="menu"
       :anchor="rootRef"
+      :owner="rootRef"
       placement="bottom-end"
-      :gap="0"
-      :max-height="480"
-      class="oc-action-button__floating oc-floating-layer--surface"
-      :data-oc-action-menu-branch="menuBranchId"
-      @pointerenter="cancelCloseMenu"
-      @pointerleave="scheduleCloseMenu"
+      :open="isMenuOpen"
+      @update:open="isMenuOpen = $event"
+      @close="handleMenuClosed"
     >
       <OcActionMenu
-        v-if="hasActionChildren(action)"
-        :actions="actionChildren(action)"
-        :branch-id="menuBranchId"
-        @select="handleMenuSelect"
-        @dismiss="closeMenu"
-        @keep-open="cancelCloseMenu"
+        :actions="actionChildren(props.action)"
+        :overlay-key="overlayKey"
+        :on-select="handleMenuSelect"
+        @pointerenter="cancelCloseMenu"
+        @focusin="cancelCloseMenu"
+        @close="closeMenu"
       />
-    </OcFloatingLayer>
+    </OcOverlayMarker>
   </div>
 </template>
 
@@ -69,20 +73,20 @@ export type {
 
 <script setup lang="ts">
 import { onBeforeUnmount, ref, useId } from 'vue'
-import { actionChildren } from '../../shared/ui/action/action.types'
+import { actionChildren, hasActionChildren } from '../../shared/ui/action/action.types'
 import OcButton from '../base/OcButton.vue'
 import type { OcIconSize } from '../base/OcIcon.vue'
 import { inlineMarkupToText } from '../../shared/ui/inline-markup/inlineMarkup'
-import OcActionMenu, {
-  isActionMenuBranchEvent,
-} from './OcActionMenu.vue'
 import type {
   ActionButtonSize,
   ActionButtonVariant,
   OcActionDefinition,
   OcActionSelectPayload,
 } from '../../shared/ui/action/action.types'
-import OcFloatingLayer from './OcFloatingLayer.vue'
+import OcActionMenu from './OcActionMenu.vue'
+import OcOverlayMarker from './OcOverlayMarker.vue'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
+import { isFocusOpenSuppressed, withFocusOpenSuppressed } from '../../composables/overlayGroups'
 import { actionAccessibleLabel, actionTitleText, formatActionBadge, hasActionBadge } from './actionBadge'
 
 defineOptions({
@@ -110,99 +114,96 @@ const emit = defineEmits<{
   select: [payload: OcActionSelectPayload]
 }>()
 
+/** 指针离开按钮后给菜单留的过渡时间。 */
+const CLOSE_DELAY_MS = 90
+
 const rootRef = ref<HTMLElement | null>(null)
-const menuBranchId = useId()
+const menuLayer = ref<{ open(): void; close(): void } | null>(null)
+/** 只用来给这一份菜单的子层组名定位，不再参与任何注册表。 */
+const overlayKey = `action-button:${useId()}`
+/** 打开状态由 marker 同步上来：它既是渲染输入（aria / 图标），也是 marker 的打开意图。 */
 const isMenuOpen = ref(false)
+/** 点一次钉住：钉住期间指针离开也不收；再点一次或别处交互才收。 */
 const isMenuPinned = ref(false)
 let closeTimer: number | null = null
-let listeningForOutsidePointer = false
 
+useOverlayDismiss(() => isMenuOpen.value, () => rootRef.value, () => closeMenu())
+
+// 按钮被卸载（页面切换、行重键）时，它打开的那一层不能留在 "menu" 组里变成空面板。
 onBeforeUnmount(() => {
   cancelCloseMenu()
-  stopListeningForOutsidePointer()
+  menuLayer.value?.close()
 })
 
-function handleButtonClick(): void {
-  if (props.action.disabled) {
-    return
-  }
-
-  if (hasActionChildren(props.action)) {
-    if (isMenuPinned.value) {
-      closeMenu()
-      return
-    }
-    isMenuPinned.value = true
-    startListeningForOutsidePointer()
-    openMenu()
-    return
-  }
-
-  emit('select', { key: props.action.key })
-}
-
-function handleMenuSelect(payload: OcActionSelectPayload): void {
-  closeMenu()
-  emit('select', payload)
-}
-
-function openMenu(): void {
-  if (props.action.disabled || !hasActionChildren(props.action) || !rootRef.value) {
-    return
-  }
-
-  cancelCloseMenu()
-  isMenuOpen.value = true
+function cancelCloseMenu(): void {
+  if (closeTimer === null) return
+  window.clearTimeout(closeTimer)
+  closeTimer = null
 }
 
 function scheduleCloseMenu(): void {
   if (isMenuPinned.value) return
   cancelCloseMenu()
   closeTimer = window.setTimeout(() => {
+    closeTimer = null
     closeMenu()
-  }, 90)
+  }, CLOSE_DELAY_MS)
 }
 
-function cancelCloseMenu(): void {
-  if (closeTimer === null) {
+function handleButtonClick(): void {
+  if (props.action.disabled) return
+
+  if (!hasActionChildren(props.action)) {
+    emit('select', { key: props.action.key })
     return
   }
 
-  window.clearTimeout(closeTimer)
-  closeTimer = null
+  if (isMenuPinned.value) {
+    closeMenu()
+    return
+  }
+
+  // 只钉住真的打开了的菜单：锚点还没挂上时不留一个「钉住但没菜单」的状态。
+  isMenuPinned.value = openMenu()
 }
 
-function closeMenu(): void {
+function openMenu(): boolean {
+  // 程序化回焦触发按钮时不要顺手把刚关掉的菜单再打开。
+  if (isFocusOpenSuppressed()) return false
+  if (props.action.disabled || !hasActionChildren(props.action) || !rootRef.value) return false
+  cancelCloseMenu()
+  isMenuOpen.value = true
+  return true
+}
+
+/** 键盘收菜单：焦点还在菜单里，一收就掉到 body 上，还给触发按钮；Esc 只退这一层。 */
+function handleRootKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || !isMenuOpen.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  closeMenu(true)
+}
+
+function closeMenu(restoreFocus = false): void {
+  const returnFocus = restoreFocus && isMenuOpen.value
   cancelCloseMenu()
   isMenuPinned.value = false
   isMenuOpen.value = false
-  stopListeningForOutsidePointer()
+  if (!returnFocus) return
+  withFocusOpenSuppressed(() => rootRef.value?.querySelector<HTMLElement>('.oc-button')?.focus())
 }
 
-function startListeningForOutsidePointer(): void {
-  if (listeningForOutsidePointer) return
-  listeningForOutsidePointer = true
-  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+/** 被别的菜单抢走 "menu" 组，或这一层自己关了：状态跟着 marker 走，钉住一并解除。 */
+function handleMenuClosed(): void {
+  cancelCloseMenu()
+  isMenuOpen.value = false
+  isMenuPinned.value = false
 }
 
-function stopListeningForOutsidePointer(): void {
-  if (!listeningForOutsidePointer) return
-  listeningForOutsidePointer = false
-  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
-}
-
-function handleDocumentPointerDown(event: PointerEvent): void {
-  if (!isMenuPinned.value) return
-  const path = event.composedPath()
-  const isInsideTrigger = rootRef.value ? path.includes(rootRef.value) : false
-  const isInsideActionMenu = isActionMenuBranchEvent(event, menuBranchId)
-  if (!isInsideTrigger && !isInsideActionMenu) closeMenu()
-}
-
-function hasActionChildren(
-  action: OcActionDefinition,
-): boolean {
-  return typeof action.children === 'function' || Boolean(action.children?.length)
+/** 选中：先收菜单再执行动作，动作自己带闭包，不依赖菜单还开着。 */
+function handleMenuSelect(key: string): void {
+  closeMenu()
+  emit('select', { key })
 }
 </script>
 
@@ -210,10 +211,6 @@ function hasActionChildren(
 .oc-action-button {
   position: relative;
   display: inline-flex;
-}
-
-.oc-action-button__floating {
-  overflow: visible;
 }
 
 .oc-action-button__badge {

@@ -13,7 +13,7 @@
           :aria-expanded="open"
           aria-haspopup="dialog"
           @click="togglePicker"
-          @keydown.esc.stop="closePicker(true, true)"
+          @keydown.esc.stop="closePicker(true)"
         >
           <span class="oc-color-picker__field-dot" />
         </button>
@@ -43,122 +43,68 @@
       type="button"
       class="oc-color-picker__trigger"
       :class="[
-        `oc-color-picker__trigger--${size}`,
         `oc-color-picker__trigger--${variant}`,
-        { 'is-embedded': embedded },
       ]"
       :disabled="disabled"
       :aria-label="label"
       :aria-expanded="open"
       aria-haspopup="dialog"
       @click="togglePicker"
-      @keydown.esc.stop="closePicker(true, true)"
+      @keydown.esc.stop="closePicker(true)"
     >
-      <slot name="trigger" :color="mixed && !open ? 'transparent' : displayColor" :open="open">
-        <span class="oc-color-picker__swatch" :style="{ backgroundColor: mixed && !open ? 'transparent' : displayColor }" />
+      <slot name="trigger" :color="mixed && !open ? 'transparent' : committedValue" :open="open">
+        <span class="oc-color-picker__swatch" :style="{ backgroundColor: mixed && !open ? 'transparent' : committedValue }" />
       </slot>
     </button>
 
-    <OcFloatingLayer
-      :open="open"
+    <OcOverlayMarker
+      ref="layer"
+      :group="pickerKey"
       :anchor="triggerRef"
+      :owner="rootRef"
       placement="bottom-start"
       :max-height="360"
-      class="oc-color-picker__floating oc-floating-layer--surface"
+      :open="open"
+      @update:open="open = $event"
     >
-      <div class="oc-color-picker__panel" role="dialog" :aria-label="label" @keydown.esc.stop.prevent="closePicker(true, true)">
-        <div
-          v-if="inputMode === 'hex'"
-          ref="saturationRef"
-          class="oc-color-picker__saturation"
-          :style="{ backgroundColor: `hsl(${hsva.hue} 100% 50%)` }"
-          role="slider"
-          tabindex="0"
-          aria-label="Saturation and brightness"
-          :aria-valuetext="`${Math.round(hsva.saturation * 100)}%, ${Math.round(hsva.value * 100)}%`"
-          @pointerdown="startDrag('saturation', $event)"
-          @keydown="handleSaturationKeydown"
-        >
-          <span class="oc-color-picker__cursor" :style="saturationCursorStyle" />
-        </div>
-
-        <div class="oc-color-picker__channel-sliders">
-          <label v-for="slider in sliderChannels" :key="slider.key"
-            class="oc-color-picker__slider-row">
-            <span>{{ slider.label }}</span>
-            <OcSlider class="oc-color-picker__channel-slider"
-              :model-value="slider.value" :min="slider.min" :max="slider.max" :step="slider.step"
-              :aria-label="slider.ariaLabel" :style="slider.style"
-              @preview="previewSliderChannel(slider.key, $event)" @commit="commitColor()" />
-          </label>
-        </div>
-
-        <label v-if="allowAlpha" class="oc-color-picker__slider-row">
-          <span>A</span>
-          <OcSlider class="oc-color-picker__channel-slider"
-            :model-value="Math.round(hsva.alpha * 100)" :min="0" :max="100" :step="1"
-            aria-label="Alpha" :style="alphaSliderStyle"
-            @preview="previewSliderChannel('alpha', $event)" @commit="commitColor()" />
-        </label>
-
-        <div class="oc-color-picker__mode-row">
-          <span class="oc-color-picker__preview" :style="{ backgroundColor: displayColor }" />
-          <OcOptionGroup v-model="inputMode" class="oc-color-picker__mode"
-            :options="inputModeOptions" appearance="sliding-outline" size="sm" fill />
-        </div>
-
-        <div class="oc-color-picker__channels" :style="channelGridStyle(channelFields.length)">
-          <OcFieldFrame v-for="channel in channelFields" :key="channel.key" size="sm"
-            full-width
-          >
-            <template #prefix>
-              <span class="oc-color-picker__channel-label">{{ channel.label }}</span>
-            </template>
-            <OcFieldInput
-              class="oc-color-picker__channel-input"
-              variant="plain"
-              size="sm"
-              :type="channel.type"
-              :value="channel.value"
-              :min="channel.min"
-              :max="channel.max"
-              :step="channel.step"
-              :maxlength="channel.maxLength"
-              :aria-label="channel.ariaLabel"
-              spellcheck="false"
-              @blur="commitChannel(channel.key, $event)"
-              @keydown.enter.prevent="commitChannel(channel.key, $event)"
-            />
-          </OcFieldFrame>
-        </div>
-
-        <div class="oc-color-picker__presets" aria-label="Preset colors">
-          <button
-            v-for="preset in presetColors"
-            :key="preset"
-            type="button"
-            class="oc-color-picker__preset"
-            :class="{ 'is-selected': preset === displayColor }"
-            :style="{ backgroundColor: preset }"
-            :aria-label="preset"
-            :data-tooltip="preset"
-            @click="commitColor(preset)"
-          />
-        </div>
-      </div>
-    </OcFloatingLayer>
+      <OcColorPanel
+        :label="label"
+        :hsva="hsva"
+        :input-mode="inputMode"
+        :allow-alpha="allowAlpha"
+        :display-color="displayColor"
+        :presets="presetColors"
+        :saturation-cursor-style="saturationCursorStyle"
+        :slider-channels="sliderChannels"
+        :channel-fields="channelFields"
+        :alpha-slider-style="alphaSliderStyle"
+        @drag-start="handleDragStart"
+        @commit="commitColor"
+        @preview-channel="previewSliderChannel"
+        @update:input-mode="setInputMode"
+        @channel-input="commitChannel"
+        @saturation-keydown="handleSaturationKeydown"
+        @escape="handlePanelEscape"
+      />
+    </OcOverlayMarker>
   </span>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useAttrs, watch, type CSSProperties } from 'vue'
-import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
+import { computed, onBeforeUnmount, ref, useAttrs, useId, watch, type CSSProperties } from 'vue'
 import { clamp } from '../../shared/model/number'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
-import OcFloatingLayer from './OcFloatingLayer.vue'
-import OcOptionGroup, { type OcOption } from './OcOptionGroup.vue'
-import OcSlider from './OcSlider.vue'
+import OcColorPanel, {
+  type ColorChannelField,
+  type ColorChannelKey,
+  type ColorDragStart,
+  type ColorInputMode,
+  type ColorSliderField,
+  type ColorSliderKey,
+} from './OcColorPanel.vue'
+import OcOverlayMarker from './OcOverlayMarker.vue'
 import {
   getReadableForegroundColor,
   hexToHsva,
@@ -170,42 +116,15 @@ import {
   type HsvaColor,
 } from './colorModel'
 
-type ColorInputMode = 'hex' | 'rgb' | 'hsv'
-type ColorChannelKey = 'hex' | 'red' | 'green' | 'blue' | 'hue' | 'saturation' | 'value' | 'alpha'
-
-interface ColorChannelField {
-  key: ColorChannelKey
-  label: string
-  ariaLabel: string
-  type: 'text' | 'number'
-  value: string | number
-  min?: number
-  max?: number
-  step?: number
-  maxLength?: number
-}
-
-interface ColorSliderField {
-  key: Exclude<ColorChannelKey, 'hex'>
-  label: string
-  ariaLabel: string
-  value: number
-  min: number
-  max: number
-  step: number
-  style: CSSProperties
-}
-
 defineOptions({ name: 'OcColorPicker', inheritAttrs: false })
+
+const PRESETS: readonly string[] = ['#FFFFFF', '#B8B8B8', '#1F2430', '#000000', '#F14C4C', '#F59E0B', '#3FB950', '#58A6FF', '#7C6CFF', '#A855F7']
 
 const props = withDefaults(defineProps<{
   modelValue?: string
   label?: string
   disabled?: boolean
-  embedded?: boolean
-  size?: 'sm' | 'md' | 'lg'
   variant?: 'default' | 'field'
-  presets?: readonly string[]
   allowAlpha?: boolean
   /** Values differ across the current selection; no single swatch is implied. */
   mixed?: boolean
@@ -215,10 +134,7 @@ const props = withDefaults(defineProps<{
   modelValue: '#000000',
   label: 'Choose color',
   disabled: false,
-  embedded: false,
-  size: 'md',
   variant: 'default',
-  presets: () => ['#FFFFFF', '#B8B8B8', '#1F2430', '#000000', '#F14C4C', '#F59E0B', '#3FB950', '#58A6FF', '#7C6CFF', '#A855F7'],
   allowAlpha: true,
   mixed: false,
   placeholder: '',
@@ -228,15 +144,16 @@ const emit = defineEmits<{
   preview: [value: string]
   commit: [value: string]
   cancel: []
-  'update:modelValue': [value: string]
   'open-change': [open: boolean]
 }>()
 
 const attrs = useAttrs()
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
+// 每实例一个组：picker 是「点击打开 + 外部点击关闭」，点另一个 picker 时
+// dismiss 的 pointerdown 会先把旧的关掉，共享组只会变成「先关后开」，滑不起来。
+const pickerKey = `color-picker:${useId()}`
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
-const saturationRef = ref<HTMLElement | null>(null)
-const open = ref(false)
 const initialColor = normalizePickerColor(props.modelValue) ?? '#000000'
 const hsva = ref<HsvaColor>(hexToHsva(initialColor) ?? { hue: 0, saturation: 0, value: 0, alpha: 1 })
 const hexDraft = ref(initialColor)
@@ -245,24 +162,27 @@ const inlineEditing = ref(false)
 const inputMode = ref<ColorInputMode>('hex')
 let dragKind: 'saturation' | null = null
 let dragPointerId: number | null = null
+let dragElement: HTMLElement | null = null
+/** 触发按钮关闭时保留当前预览；只有宿主关层才撤销未提交的预览。 */
 
-const inputModeOptions: readonly OcOption[] = [
-  { value: 'hex', label: 'HEX' },
-  { value: 'rgb', label: 'RGB' },
-  { value: 'hsv', label: 'HSV' },
-]
+/** 由宿主同步出来的打开状态：它既是渲染输入（aria），也是 marker 的打开意图。 */
+const open = ref(false)
 
 const triggerAttrs = computed(() => {
   const { class: _class, style: _style, ...rest } = attrs
   return rest
 })
+
+useOverlayDismiss(() => open.value, () => rootRef.value, () => closePicker(false))
+
 const normalizedDraft = computed(() => normalizePickerColor(hexDraft.value))
-const displayColor = computed(() => normalizedDraft.value ?? hsvaToHex(hsva.value))
+// 面板的当前色只由 hsva 决定；hexDraft 是输入框的编辑缓冲，不能反过来盖住面板。
+const displayColor = computed(() => hsvaToHex(hsva.value))
 const opaqueColor = computed(() => hsvaToHex({ ...hsva.value, alpha: 1 }))
 const rgba = computed(() => hsvaToRgba(hsva.value))
-const presetColors = computed(() => props.presets
+const presetColors = PRESETS
   .map(color => normalizePickerColor(color))
-  .filter((color): color is string => Boolean(color)))
+  .filter((color): color is string => Boolean(color))
 const saturationCursorStyle = computed<CSSProperties>(() => ({
   left: `${hsva.value.saturation * 100}%`,
   top: `${(1 - hsva.value.value) * 100}%`,
@@ -320,11 +240,16 @@ const channelFields = computed<ColorChannelField[]>(() => {
   }]
   return props.allowAlpha ? [...fields, alphaField] : fields
 })
+/**
+ * 字段底色：输入框正在编辑时跟 hexDraft（用户就在字段上看颜色），
+ * 面板拖拽时 hexDraft 不动，所以底色也不动。
+ */
+const fieldBackground = computed(() => normalizedDraft.value ?? committedValue.value)
 const fieldStyle = computed<CSSProperties>(() => {
   if (props.mixed && !open.value && !inlineEditing.value) return {}
   return {
-    backgroundColor: displayColor.value,
-    color: getReadableForegroundColor(opaqueColor.value),
+    backgroundColor: fieldBackground.value,
+    color: getReadableForegroundColor(fieldBackground.value.slice(0, 7)),
   }
 })
 
@@ -332,10 +257,17 @@ watch(() => props.modelValue, value => {
   if (open.value || dragKind) return
   syncColor(value)
 })
+watch(open, isOpen => {
+  emit('open-change', isOpen)
+  if (isOpen) return
+  // 关闭一律走这里：主动关和被别的 picker 抢占都可能是「拖到一半」。
+  stopDragListeners()
+  cancelUncommittedPreview()
+})
 
-useOverlayDismiss(() => open.value, () => rootRef.value, () => closePicker(false, true))
 onBeforeUnmount(() => {
   stopDragListeners()
+  layer.value?.close()
 })
 
 function syncColor(value: string): void {
@@ -347,30 +279,33 @@ function syncColor(value: string): void {
   hsva.value = preserveAchromaticAxes(nextHsva, hsva.value)
 }
 
-function setOpen(next: boolean): void {
-  if (open.value === next) return
-  open.value = next
-  emit('open-change', next)
-}
-
 function togglePicker(): void {
   if (props.disabled) return
-  if (open.value) closePicker(false, false)
+  if (open.value) closePicker(false)
   else {
     if (props.variant !== 'field') syncColor(props.modelValue)
-    setOpen(true)
+    open.value = true
   }
 }
 
-function closePicker(restoreFocus: boolean, cancelDraft: boolean): void {
-  const hasUncommittedPreview = cancelDraft && displayColor.value !== committedValue.value
-  if (hasUncommittedPreview) {
-    syncDraft(committedValue.value, true)
-    emit('cancel')
-  }
-  setOpen(false)
-  stopDragListeners()
+function closePicker(restoreFocus: boolean): void {
+  if (!open.value) return
+  open.value = false
   if (restoreFocus) triggerRef.value?.focus()
+}
+
+function cancelUncommittedPreview(): void {
+  if (displayColor.value === committedValue.value) return
+  syncDraft(committedValue.value, true)
+  emit('cancel')
+}
+
+function handlePanelEscape(): void {
+  closePicker(true)
+}
+
+function setInputMode(mode: ColorInputMode): void {
+  inputMode.value = mode
 }
 
 function syncDraft(value: string, preview: boolean): void {
@@ -392,23 +327,24 @@ function preserveAchromaticAxes(next: HsvaColor, previous: HsvaColor): HsvaColor
 
 function previewHsva(next: HsvaColor): void {
   hsva.value = next
-  hexDraft.value = hsvaToHex(next)
-  emit('preview', hexDraft.value)
+  // 预览只动面板；字段上的色块和 hex 只在 commit 时更新，不能跟着拖拽跳。
+  emit('preview', hsvaToHex(next))
 }
 
 function commitColor(value = displayColor.value): void {
   const normalized = normalizePickerColor(value)
   if (!normalized) return
-  syncDraft(normalized, true)
+  // 提交只发一次确定值；preview 是拖拽中的临时态，不在这里重复。
+  syncDraft(normalized, false)
   committedValue.value = normalized
-  emit('update:modelValue', normalized)
   emit('commit', normalized)
 }
 
-function startDrag(kind: 'saturation', event: PointerEvent): void {
-  if (event.button !== 0) return
+function handleDragStart({ event, element }: ColorDragStart): void {
+  if (event.button !== 0 || !element) return
   event.preventDefault()
-  dragKind = kind
+  dragKind = 'saturation'
+  dragElement = element
   dragPointerId = event.pointerId
   updateFromPointer(event)
   document.addEventListener('pointermove', handlePointerMove)
@@ -430,15 +366,15 @@ function handlePointerUp(event: PointerEvent): void {
 function stopDragListeners(): void {
   dragKind = null
   dragPointerId = null
+  dragElement = null
   document.removeEventListener('pointermove', handlePointerMove)
   document.removeEventListener('pointerup', handlePointerUp)
   document.removeEventListener('pointercancel', handlePointerUp)
 }
 
 function updateFromPointer(event: PointerEvent): void {
-  const target = saturationRef.value
-  if (!target || !dragKind) return
-  const rect = target.getBoundingClientRect()
+  if (!dragElement || !dragKind) return
+  const rect = dragElement.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return
   const horizontal = clampUnit((event.clientX - rect.left) / rect.width)
   previewHsva({
@@ -510,11 +446,11 @@ function commitChannel(key: ColorChannelKey, event: Event): void {
   commitColor()
 }
 
-function previewSliderChannel(key: Exclude<ColorChannelKey, 'hex'>, value: number): void {
+function previewSliderChannel(key: ColorSliderKey, value: number): void {
   applyChannelValue(key, value)
 }
 
-function applyChannelValue(key: Exclude<ColorChannelKey, 'hex'>, value: number): void {
+function applyChannelValue(key: ColorSliderKey, value: number): void {
   if (key === 'alpha') {
     previewHsva({ ...hsva.value, alpha: clamp(value, 0, 100) / 100 })
   } else if (key === 'hue') {
@@ -538,7 +474,7 @@ function numericChannel(
 }
 
 function colorSlider(
-  key: Exclude<ColorChannelKey, 'hex'>,
+  key: ColorSliderKey,
   label: string,
   ariaLabel: string,
   value: number,
@@ -576,17 +512,12 @@ function valueGradient(): string {
   return `linear-gradient(to right, #000000, ${end})`
 }
 
-function channelGridStyle(count: number): CSSProperties {
-  return { '--oc-color-channel-count': count }
-}
-
 function normalizePickerColor(value: string): string | null {
   const normalized = normalizeHexColor(value)
   if (!normalized) return null
   if (!props.allowAlpha && normalized.length === 9) return normalized.slice(0, 7)
   return normalized
 }
-
 
 function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value))
@@ -610,17 +541,6 @@ function clampUnit(value: number): number {
   background: var(--oc-bg-input);
   color: var(--oc-fg-default);
   cursor: pointer;
-}
-
-.oc-color-picker__trigger--sm {
-  width: var(--oc-size-sm);
-  height: var(--oc-size-sm);
-  padding: 3px;
-}
-
-.oc-color-picker__trigger--lg {
-  width: var(--oc-size-lg);
-  height: var(--oc-size-lg);
 }
 
 .oc-color-picker__field {
@@ -663,14 +583,6 @@ function clampUnit(value: number): number {
   opacity: .5;
 }
 
-.oc-color-picker__trigger.is-embedded {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
 .oc-color-picker__trigger:focus-visible {
   outline: none;
   box-shadow: var(--oc-focus-ring);
@@ -686,144 +598,5 @@ function clampUnit(value: number): number {
   height: 100%;
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oc-border-strong) 55%, transparent);
-}
-</style>
-
-<style>
-.oc-color-picker__floating {
-  width: 220px;
-  overflow: hidden;
-}
-
-.oc-color-picker__panel {
-  display: grid;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-sm);
-}
-
-.oc-color-picker__saturation {
-  position: relative;
-  height: var(--oc-color-picker-plane-height);
-  overflow: hidden;
-  border-radius: var(--oc-radius-control);
-  background-image:
-    linear-gradient(to top, #000, transparent),
-    linear-gradient(to right, #fff, transparent);
-  cursor: crosshair;
-  touch-action: none;
-}
-
-.oc-color-picker__cursor {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  border: var(--oc-color-channel-handle-border-width) solid var(--oc-color-channel-handle-border-color);
-  border-radius: 50%;
-  box-shadow: var(--oc-color-channel-handle-shadow);
-}
-
-.oc-color-picker__saturation:focus-visible {
-  outline: none;
-  box-shadow: var(--oc-focus-ring);
-}
-
-.oc-color-picker__channel-sliders {
-  display: grid;
-  gap: var(--oc-space-2xs);
-}
-
-.oc-color-picker__slider-row {
-  display: grid;
-  grid-template-columns: var(--oc-size-sm) minmax(0, 1fr);
-  align-items: center;
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-xs);
-}
-
-.oc-color-picker__channel-slider {
-  min-width: 0;
-  height: var(--oc-color-channel-handle-height);
-}
-
-.oc-color-picker__channel-slider .oc-slider__rail {
-  height: var(--oc-color-channel-track-height);
-}
-
-.oc-color-picker__channel-slider .oc-slider__thumb {
-  width: var(--oc-color-channel-handle-width);
-  height: var(--oc-color-channel-handle-height);
-  border: var(--oc-color-channel-handle-border-width) solid var(--oc-color-channel-handle-border-color);
-  border-radius: var(--oc-radius-pill);
-  background: transparent;
-  box-shadow: var(--oc-color-channel-handle-shadow);
-  transition: none;
-}
-
-.oc-color-picker__mode-row {
-  display: grid;
-  grid-template-columns: var(--oc-size-md) minmax(0, 1fr);
-  gap: var(--oc-space-xs);
-  align-items: center;
-}
-
-.oc-color-picker__mode {
-  width: 100%;
-}
-
-.oc-color-picker__preview {
-  width: var(--oc-size-md);
-  height: var(--oc-size-md);
-  border-radius: var(--oc-radius-control);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oc-border-strong) 55%, transparent);
-}
-
-.oc-color-picker__channels {
-  display: grid;
-  grid-template-columns: repeat(var(--oc-color-channel-count), minmax(0, 1fr));
-  gap: var(--oc-space-2xs);
-}
-
-.oc-color-picker__channel-label {
-  display: inline-flex;
-  align-items: center;
-  padding-inline-start: var(--oc-space-2xs);
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-xs);
-}
-
-.oc-color-picker__channel-input {
-  padding-inline: var(--oc-space-2xs);
-  text-align: right;
-}
-
-.oc-color-picker__channel-input[type='number'] {
-  appearance: textfield;
-}
-
-.oc-color-picker__channel-input::-webkit-inner-spin-button,
-.oc-color-picker__channel-input::-webkit-outer-spin-button {
-  margin: 0;
-  appearance: none;
-}
-
-.oc-color-picker__presets {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: var(--oc-space-2xs);
-}
-
-.oc-color-picker__preset {
-  aspect-ratio: 1;
-  min-width: 0;
-  padding: 0;
-  border: 1px solid var(--oc-border-default);
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-.oc-color-picker__preset.is-selected {
-  box-shadow: 0 0 0 1px var(--oc-bg-surface), 0 0 0 2px var(--oc-accent);
 }
 </style>

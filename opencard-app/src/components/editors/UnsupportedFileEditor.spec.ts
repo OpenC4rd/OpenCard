@@ -35,13 +35,13 @@ describe('UnsupportedFileEditor', () => {
     mocks.openWithDefaultApp.mockResolvedValue(undefined)
   })
 
-  it('loads workspace content only after the user chooses readonly text', async () => {
+  it('reads workspace content only after the user chooses readonly text', async () => {
     const wrapper = mount(UnsupportedFileEditor, {
       props: { session: createTestSession({ path: 'assets/reference.bin', name: 'reference.bin' }), resourceRootPath: 'D:/project' },
     })
 
     expect(mocks.readFile).not.toHaveBeenCalled()
-    expect(wrapper.findAll('button').every(button => button.attributes('disabled') === undefined)).toBe(true)
+
     await wrapper.findAll('button')[0]!.trigger('click')
 
     expect(mocks.readFile).toHaveBeenCalledWith('D:/project/assets/reference.bin')
@@ -52,9 +52,9 @@ describe('UnsupportedFileEditor', () => {
     })
   })
 
-  it('delegates system opening without reading the file', async () => {
+  it('hands a system open to the OS without reading the file', async () => {
     const wrapper = mount(UnsupportedFileEditor, {
-      props: { session: createTestSession({ path: 'D:/outside/reference.bin', name: 'reference.bin' }),  },
+      props: { session: createTestSession({ path: 'D:/outside/reference.bin', name: 'reference.bin' }) },
     })
 
     await wrapper.findAll('button')[1]!.trigger('click')

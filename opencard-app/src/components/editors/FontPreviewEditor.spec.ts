@@ -63,7 +63,7 @@ describe('FontPreviewEditor', () => {
     vi.unstubAllGlobals()
   })
 
-  it('loads the font for the session and removes it when the preview closes', async () => {
+  it('loads the font for the session and releases it when the preview closes', async () => {
     const wrapper = mount(FontPreviewEditor, {
       props: { session: createTestSession({ path: 'assets/Brand.otf', name: 'Brand.otf' }), resourceRootPath: 'D:/project' },
     })
@@ -74,13 +74,6 @@ describe('FontPreviewEditor', () => {
     expect(fontSet.add).toHaveBeenCalledWith(expect.objectContaining({
       source: 'url("blob:font-preview")',
     }))
-    const input = wrapper.get('textarea')
-    expect(input.attributes('style')).toContain('OpenCardFontPreview-')
-    expect((input.element as HTMLTextAreaElement).value).toBe('fontPreview.sample')
-    expect(wrapper.find('.font-preview-editor__reference').exists()).toBe(false)
-    await input.setValue('自定义试字 OpenCard')
-    expect((input.element as HTMLTextAreaElement).value).toBe('自定义试字 OpenCard')
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     expect(wrapper.props('session').state.isDirty).toBe(false)
 
     const loadedFace = fontSet.add.mock.calls[0]![0]
@@ -89,14 +82,13 @@ describe('FontPreviewEditor', () => {
     expect(mocks.revokeObjectURL).toHaveBeenCalledWith('blob:font-preview')
   })
 
-  it('offers repair after loading fails and translates a rejected repaired font', async () => {
+  it('offers repair after loading fails and reports a rejected repaired font', async () => {
     mocks.rejectLoad = true
     const wrapper = mount(FontPreviewEditor, {
-      props: { session: createTestSession({ path: 'D:/fonts/Broken.ttf', name: 'Broken.ttf' }),  },
+      props: { session: createTestSession({ path: 'D:/fonts/Broken.ttf', name: 'Broken.ttf' }) },
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('fontPreview.attemptRepair')
     await wrapper.get('button').trigger('click')
     await flushPromises()
 

@@ -24,9 +24,22 @@
         <OcButton type="button" icon-only variant="soft" icon="mdiPlus" :disabled="!candidateMemberKey"
           :aria-label="t('projectConfig.fonts.addMember')" :data-tooltip="t('projectConfig.fonts.addMember')"
           @click="addCandidateMember" />
+
+        <OcOverlayMarker
+          ref="layer"
+          :group="`completion:${memberAutocompleteId}`"
+          :anchor="memberPickerRef"
+          :owner="activeMemberInput"
+          placement="bottom-start"
+          :max-height="220"
+          :open="memberMenuOpen"
+          @update:open="memberMenuOpen = $event"
+          @close="memberMenuOpen = false"
+        >
+          <OcAutocompleteList :id="memberAutocompleteId" :items="memberSuggestions"
+            :active-key="activeMemberKey" @select="selectMemberSuggestion" />
+        </OcOverlayMarker>
       </div>
-      <OcAutocompletePopover :id="memberAutocompleteId" :open="memberMenuOpen" :anchor="memberPickerRef"
-        :items="memberSuggestions" :active-key="activeMemberKey" @select="selectMemberSuggestion" />
       <OcButton type="button" variant="ghost" icon="mdiCogOutline" @click="advancedOpen = !advancedOpen">
         {{ t('projectConfig.fonts.advancedRanges') }}
       </OcButton>
@@ -85,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
   ProjectFontComposition,
@@ -100,8 +113,9 @@ import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
-import OcAutocompletePopover from '../standard/OcAutocompletePopover.vue'
+import OcAutocompleteList from '../standard/OcAutocompleteList.vue'
 import OcDialog from '../standard/OcDialog.vue'
+import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 
 export type ProjectFontCompositionRequest = {
   originalKey?: string
@@ -127,6 +141,7 @@ const characterInputs = ref<string[]>([])
 const memberQuery = ref('')
 const selectedCandidateKey = ref<string | null>(null)
 const memberPickerRef = ref<HTMLElement | null>(null)
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const activeMemberInput = ref<HTMLInputElement | null>(null)
 const memberMenuOpen = ref(false)
 const activeMemberKey = ref<string | null>(null)
@@ -195,7 +210,10 @@ const validationMessage = computed(() => {
 })
 
 watch([() => props.open, () => props.originalKey], ([open]) => {
-  if (!open) return
+  if (!open) {
+    resetMemberPicker()
+    return
+  }
   const composition = props.compositions.find(candidate => candidate.key === props.originalKey)
   name.value = composition?.name ?? createDefaultSetName()
   key.value = composition?.key ?? ''
@@ -214,6 +232,9 @@ watch(memberSuggestions, suggestions => {
     ? activeMemberKey.value
     : (suggestions[0]?.key ?? null)
 })
+
+// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
+onBeforeUnmount(() => { layer.value?.close() })
 
 function createDefaultSetName(): string {
   const existingNames = new Set(props.compositions.map(composition => composition.name.toLocaleLowerCase()))

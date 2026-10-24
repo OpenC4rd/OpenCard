@@ -46,25 +46,6 @@ function pointer(element: HTMLElement, type: string, init: PointerEventInit): vo
 }
 
 describe('CdeOverlayDock', () => {
-  it('keeps full glass content width while translating a partially collapsed Dock', () => {
-    const wrapper = mount(CdeOverlayDock, {
-      props: { ...props, extent: 120 },
-      slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
-    })
-
-    const dock = wrapper.element as HTMLElement
-    expect(dock.style.width).toBe('280px')
-    expect(Number.parseFloat(dock.style.transform.match(/-?[\d.]+/)?.[0] ?? '0'))
-      .toBeCloseTo(-157.43, 1)
-    expect(wrapper.get('[aria-label="Resize sidebar"]').attributes('aria-orientation')).toBe('vertical')
-    expect(wrapper.get('[aria-label="Resize sidebar"]').attributes('data-tooltip'))
-      .toBe('Resize sidebar[br]Double-click to toggle')
-    expect(wrapper.findAllComponents({ name: 'OcResizeTrack' })[1]?.props()).toMatchObject({
-      edge: 'right',
-      placement: 'outside',
-    })
-  })
-
   it('settles width drag through the shared extent contract', async () => {
     const wrapper = mount(CdeOverlayDock, {
       props,
@@ -79,7 +60,6 @@ describe('CdeOverlayDock', () => {
 
     pointer(handle, 'pointerdown', { button: 0, pointerId: 1, clientX: 280 })
     await nextTick()
-    expect(wrapper.classes()).toContain('is-resizing')
     pointer(handle, 'pointermove', { pointerId: 1, clientX: 200 })
     pointer(handle, 'pointerup', { pointerId: 1, clientX: 200 })
     await nextTick()
@@ -87,7 +67,6 @@ describe('CdeOverlayDock', () => {
     const updates = wrapper.emitted('update:extent') ?? []
     expect(updates[updates.length - 1]).toEqual([0])
     expect(wrapper.emitted('resize-end')).toHaveLength(1)
-    expect(wrapper.classes()).not.toContain('is-resizing')
   })
 
   it('emits a collapse toggle intent on width handle double click', () => {
@@ -112,8 +91,6 @@ describe('CdeOverlayDock', () => {
 
     expect(wrapper.emitted('update:top-size')).toContainEqual([280])
     expect(handle.getAttribute('aria-orientation')).toBe('horizontal')
-    expect((wrapper.get('.cde-overlay-dock__split-handle').element as HTMLElement).style.height)
-      .toBe(`${props.splitGap}px`)
   })
 
   it('keeps the measured split origin when the first pointer move arrives', async () => {

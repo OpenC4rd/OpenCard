@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import {
   createPropertyFieldEditorModeAction,
@@ -11,6 +12,8 @@ const bindableNumber = {
   fieldType: 'number' as const,
   binding: { provider: () => null },
 }
+
+const labels = { useFieldEditor: 'Use field editor', useRawStringEditor: 'Use raw string editor' }
 
 describe('property field editor modes', () => {
   it('keeps editor preferences scoped to stable field identities', () => {
@@ -35,10 +38,7 @@ describe('property field editor modes', () => {
     })
 
     expect(state).toEqual({ editorId: 'raw-string', switchTarget: null })
-    expect(createPropertyFieldEditorModeAction(state, bindableNumber, {
-      useFieldEditor: 'Use field editor',
-      useRawStringEditor: 'Use raw string editor',
-    })).toBeNull()
+    expect(createPropertyFieldEditorModeAction(state, bindableNumber, labels)).toBeNull()
   })
 
   it('offers raw-string for every editable scalar while excluding arrays, objects, and readonly fields', () => {
@@ -83,25 +83,16 @@ describe('property field editor modes', () => {
     }).switchTarget).toBeNull()
   })
 
-  it('projects stable Action Definitions and preserves source editing after value changes', () => {
+  it('keeps source editing after the value changes and switches the action back', () => {
     const modes = usePropertyFieldEditorModes()
     const initial = modes.resolve({ identity: 'width', definition: bindableNumber, value: 10 })
-    expect(createPropertyFieldEditorModeAction(initial, bindableNumber, {
-      useFieldEditor: 'Use field editor',
-      useRawStringEditor: 'Use raw string editor',
-    })).toMatchObject({
-      key: USE_RAW_STRING_EDITOR_ACTION_KEY,
-      icon: 'mdiCursorText',
-    })
+    expect(createPropertyFieldEditorModeAction(initial, bindableNumber, labels)?.key)
+      .toBe(USE_RAW_STRING_EDITOR_ACTION_KEY)
 
     modes.preserveRawString('width')
     const source = modes.resolve({ identity: 'width', definition: bindableNumber, value: '10' })
-    expect(createPropertyFieldEditorModeAction(source, bindableNumber, {
-      useFieldEditor: 'Use field editor',
-      useRawStringEditor: 'Use raw string editor',
-    })).toMatchObject({
-      key: USE_FIELD_EDITOR_ACTION_KEY,
-      icon: 'mdiNumeric',
-    })
+    expect(source).toEqual({ editorId: 'raw-string', switchTarget: 'field' })
+    expect(createPropertyFieldEditorModeAction(source, bindableNumber, labels)?.key)
+      .toBe(USE_FIELD_EDITOR_ACTION_KEY)
   })
 })

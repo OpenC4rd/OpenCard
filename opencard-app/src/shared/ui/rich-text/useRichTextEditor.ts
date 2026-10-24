@@ -288,6 +288,8 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     }
   })
   const selectedNodeKind = computed<'binding' | 'projectIcon' | null>(() => {
+    // 选择变化只递增 toolbarRevision；不读它的话这个 computed 会一直缓存首次的 null。
+    toolbarRevision.value
     const node = editor.value?.state.selection instanceof NodeSelection
       ? editor.value.state.selection.node
       : null

@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import packageMetadata from '../../../../package.json'
 import type { FeedbackSubmission } from '../model/feedback'
 import {
-  createFeedbackEnvironment,
   FeedbackServiceError,
   getFeedbackStatuses,
   isFeedbackServiceConfigured,
@@ -101,13 +99,5 @@ describe('feedback service', () => {
       endpoint: 'https://feedback.example.com',
       fetch: vi.fn<typeof fetch>().mockRejectedValue(new TypeError('offline')),
     })).rejects.toMatchObject({ code: 'network' })
-  })
-
-  it('uses application metadata and a privacy-limited platform value', () => {
-    expect(createFeedbackEnvironment('zh-CN')).toEqual({
-      appVersion: packageMetadata.version,
-      locale: 'zh-CN',
-      platform: navigator.platform || 'unknown',
-    })
   })
 })

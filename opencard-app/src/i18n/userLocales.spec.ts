@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import {
   MAX_USER_LOCALE_FILE_BYTES,

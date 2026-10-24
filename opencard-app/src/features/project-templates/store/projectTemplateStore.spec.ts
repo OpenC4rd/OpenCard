@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectTemplate } from '../model/projectTemplate'
 import type { ProjectTemplateService } from '../services/projectTemplateService'

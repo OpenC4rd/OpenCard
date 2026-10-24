@@ -11,9 +11,22 @@
           :disabled="busy || !candidatePath" :aria-label="t('projectExport.addDocument')"
           :data-tooltip="t('projectExport.addDocument')"
           @click="addCandidate" />
+
+        <OcOverlayMarker
+          ref="layer"
+          :group="`completion:${autocompleteId}`"
+          :anchor="pickerRef"
+          :owner="activeInput"
+          placement="bottom-start"
+          :max-height="220"
+          :open="menuOpen"
+          @update:open="menuOpen = $event"
+          @close="menuOpen = false"
+        >
+          <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activePath"
+            @select="selectSuggestion" />
+        </OcOverlayMarker>
       </div>
-      <OcAutocompletePopover :id="autocompleteId" :open="menuOpen" :anchor="pickerRef"
-        :items="suggestions" :active-key="activePath" @select="selectSuggestion" />
       <OcTree v-if="selectedDocuments.length" class="project-export-task-editor__documents"
         :data="documentTreeData" :selected-keys="[]"
         role="listbox" selection-mode="none" activation-mode="none"
@@ -76,15 +89,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { open as openDirectory } from '@tauri-apps/plugin-dialog'
 import OcButton from '../base/OcButton.vue'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
-import OcAutocompletePopover, { type OcAutocompleteItem } from '../standard/OcAutocompletePopover.vue'
+import OcAutocompleteList, { type OcAutocompleteItem } from '../standard/OcAutocompleteList.vue'
 import OcEnumStepper from '../standard/OcEnumStepper.vue'
+import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 import OcSelect, { type OcSelectOption } from '../standard/OcSelect.vue'
 import OcTree from '../standard/OcTree.vue'
 import NumberPropertyField from '../../shared/ui/property-editor/fields/NumberPropertyField.vue'
@@ -126,6 +140,7 @@ const showValidation = computed(() => props.showValidation)
 const preparationIssues = computed(() => props.preparationIssues)
 
 const pickerRef = ref<HTMLElement | null>(null)
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const query = ref('')
 const menuOpen = ref(false)
 const activePath = ref<string | null>(null)
@@ -200,6 +215,10 @@ const documentTreeData = computed<OcNodeCollection>(() => {
 })
 const candidatePath = computed(() => activePath.value && suggestions.value.some(item => item.key === activePath.value)
   ? activePath.value : null)
+
+// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
+onBeforeUnmount(() => { layer.value?.close() })
+
 const scale = computed(() => Number(scaleText.value))
 const canSubmit = computed(() => selectedDocuments.value.length > 0
   && outputDirectory.value.trim().length > 0

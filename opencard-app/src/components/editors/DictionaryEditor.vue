@@ -28,7 +28,8 @@
                 <th v-for="column in grid.columns" :key="column.key"
                   class="dictionary-editor__data-column" scope="col" tabindex="0"
                   @contextmenu="openColumnContextMenu($event, column)"
-                  @keydown="openColumnKeyboardMenu($event, column)">
+                  @keydown="openColumnKeyboardMenu($event, column)"
+                  @keydown.esc="dismissContextMenuOnEscape">
                   <form v-if="editingLanguage === column.sourceKey" class="dictionary-editor__rename"
                     @submit.prevent="commitLanguageRename(column.sourceKey!)">
                     <OcFieldInput ref="renameInputRef" :value="renameDraft" size="sm" mono full-width
@@ -84,7 +85,8 @@
               <tr v-for="row in grid.rows" :key="row.key">
                 <th class="dictionary-editor__key-column oc-data-grid__sticky-column" scope="row" tabindex="0"
                   @contextmenu="openRecordContextMenu($event, row.key)"
-                  @keydown="openRecordKeyboardMenu($event, row.key)">
+                  @keydown="openRecordKeyboardMenu($event, row.key)"
+                  @keydown.esc="dismissContextMenuOnEscape">
                   <form v-if="editingRecord === row.key" class="dictionary-editor__rename"
                     @submit.prevent="commitRecordRename(row.key)">
                     <OcFieldInput ref="renameInputRef" :value="renameDraft" size="sm" mono full-width
@@ -157,6 +159,18 @@
     </div>
     <DictionaryWorkbookImportDialog :result="pendingWorkbookImport"
       @cancel="pendingWorkbookImport = null" @confirm="confirmWorkbookImport" />
+    <OcOverlayMarker
+      ref="contextMenu"
+      group="context-menu"
+      :anchor="contextAnchor"
+      :owner="contextOwner"
+      :open="contextOpen"
+      @update:open="contextOpen = $event"
+      @close="handleContextMenuClose"
+    >
+      <OcActionMenu :actions="contextItems" overlay-key="context-menu" :on-select="selectContextAction"
+        @close="handleContextMenuClose" />
+    </OcOverlayMarker>
   </section>
 </template>
 
@@ -184,7 +198,7 @@ import {
   setDictionaryCellValue,
   type DictionaryGridColumn,
 } from '../../features/workspace/model/projectDictionaryGrid'
-import { useFloatingMenu } from '../../composables/useFloatingMenu'
+import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import OcDataGridColumnResizeHandle from '../../shared/ui/data-grid/OcDataGridColumnResizeHandle.vue'
 import { useDataGridCellMounting } from '../../shared/ui/data-grid/useDataGridCellMounting'
 import { useDataGridColumnSizing } from '../../shared/ui/data-grid/useDataGridColumnSizing'
@@ -205,13 +219,15 @@ import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
 import OcActionButton from '../standard/OcActionButton.vue'
+import OcActionMenu from '../standard/OcActionMenu.vue'
+import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
 const props = defineProps<EditorProps>()
 const editorState = computed(() => props.session.state)
 const filePath = computed(() => editorState.value.path ?? `draft://${editorState.value.id}`)
 const { t } = useI18n()
-const { openContextMenu, openKeyboardContextMenu } = useFloatingMenu()
+
 const dictionary = ref<ProjectDictionary | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
@@ -505,34 +521,88 @@ function handleLanguageAction(language: string, actionKey: string): void {
   }
 }
 
+const contextMenu = ref<{ open: () => void; close: () => void } | null>(null)
+const contextOpen = ref(false)
+const contextItems = shallowRef<readonly OcActionMenuEntry[]>([])
+/** 未打开时的占位：marker 要求锚点非空，openMenuAt 一定先写锚点再 open()。 */
+const contextAnchor = shallowRef<HTMLElement | DOMRect>(new DOMRect())
+const contextOwner = shallowRef<HTMLElement | null>(null)
+const contextHandler = shallowRef<((key: string) => void) | null>(null)
+
+function openMenuAt(
+  anchor: HTMLElement | DOMRect,
+  items: readonly OcActionMenuEntry[],
+  onSelect: (key: string) => void,
+  owner: HTMLElement,
+): void {
+  if (items.length === 0) return
+  contextItems.value = items
+  contextAnchor.value = anchor
+  contextOwner.value = owner
+  contextHandler.value = onSelect
+  // marker 的 open() 读的是已提交的 props：等这帧把新锚点与归属落到 marker 上再开，
+  // 否则换触发元素时会沿用上一次的 anchor / owner。
+  void nextTick(() => contextMenu.value?.open())
+}
+
+function handleContextMenuClose(): void {
+  contextOpen.value = false
+  contextHandler.value = null
+}
+
+/** Esc：菜单开着时收掉它并阻止上层弹窗把同一个 Esc 当成自己的关闭；没开就保持原义。 */
+function dismissContextMenuOnEscape(event: KeyboardEvent): void {
+  if (!contextOpen.value) return
+  event.preventDefault()
+  contextMenu.value?.close()
+}
+
+/** 选中一项先收起菜单再执行：动作自己带闭包，不依赖菜单还开着。 */
+function selectContextAction(key: string): void {
+  const handler = contextHandler.value
+  contextMenu.value?.close()
+  handler?.(key)
+}
+
+useOverlayDismiss(() => contextOpen.value, () => contextOwner.value, () => contextMenu.value?.close())
+
+// 编辑器被卸载时它打开的菜单不能留在组里变成空面板。
+onBeforeUnmount(() => { contextMenu.value?.close() })
+
+function isContextMenuKey(event: KeyboardEvent): boolean {
+  return event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)
+}
+
 function openRecordContextMenu(event: MouseEvent, recordKey: string): void {
-  openContextMenu({
-    event,
-    items: recordCommands(),
-    onSelect: key => handleRecordAction(recordKey, key),
-  })
+  const owner = event.currentTarget
+  if (!(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), recordCommands(),
+    key => handleRecordAction(recordKey, key), owner)
 }
 
 function openRecordKeyboardMenu(event: KeyboardEvent, recordKey: string): void {
-  openKeyboardContextMenu(event, recordCommands(), key => handleRecordAction(recordKey, key))
+  const owner = event.currentTarget
+  if (!isContextMenuKey(event) || !(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(owner, recordCommands(), key => handleRecordAction(recordKey, key), owner)
 }
 
 function openColumnContextMenu(event: MouseEvent, column: DictionaryGridColumn): void {
   if (column.kind !== 'language') return
-  openContextMenu({
-    event,
-    items: languageCommands(),
-    onSelect: key => handleLanguageAction(column.sourceKey!, key),
-  })
+  const owner = event.currentTarget
+  if (!(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), languageCommands(),
+    key => handleLanguageAction(column.sourceKey!, key), owner)
 }
 
 function openColumnKeyboardMenu(event: KeyboardEvent, column: DictionaryGridColumn): void {
   if (column.kind !== 'language') return
-  openKeyboardContextMenu(
-    event,
-    languageCommands(),
-    key => handleLanguageAction(column.sourceKey!, key),
-  )
+  const owner = event.currentTarget
+  if (!isContextMenuKey(event) || !(owner instanceof HTMLElement)) return
+  event.preventDefault()
+  openMenuAt(owner, languageCommands(), key => handleLanguageAction(column.sourceKey!, key), owner)
 }
 
 function cellIdentity(recordKey: string, columnKey: string): string {

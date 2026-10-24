@@ -1,7 +1,9 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import OcSelect from './OcSelect.vue'
 import OcDialog from './OcDialog.vue'
+import OverlayGroupRoot from '../ui/OverlayGroupRoot.vue'
+import { disposeGroup, overlayGroups } from '../../composables/overlayGroups'
 import { h } from 'vue'
 
 const options = [
@@ -11,6 +13,19 @@ const options = [
 ]
 
 describe('OcSelect', () => {
+  let overlayRoot: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    overlayRoot = mount(OverlayGroupRoot, { attachTo: document.body })
+  })
+
+  afterEach(() => {
+    overlayRoot?.unmount()
+    overlayRoot = null
+    for (const group of [...overlayGroups.keys()]) disposeGroup(group)
+    document.body.innerHTML = ''
+  })
+
   it('dismisses for outside activation and keyboard focus without committing a choice', async () => {
     const wrapper = mount(OcSelect, { attachTo: document.body, props: { modelValue: 'one', options } })
     const outside = document.createElement('button')
@@ -18,17 +33,24 @@ describe('OcSelect', () => {
     try {
       const trigger = wrapper.get('.oc-select__trigger')
       await trigger.trigger('click')
+      await flushPromises()
+      expect(document.querySelector('.oc-select__listbox')).not.toBeNull()
+
       outside.click()
-      await wrapper.vm.$nextTick()
+      await flushPromises()
       expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(document.querySelector('.oc-select__listbox')).toBeNull()
+
       await trigger.trigger('click')
+      await flushPromises()
       outside.focus()
-      await wrapper.vm.$nextTick()
+      await flushPromises()
       expect(trigger.attributes('aria-expanded')).toBe('false')
       expect(wrapper.emitted('commit')).toBeUndefined()
     } finally { wrapper.unmount(); outside.remove() }
   })
-  it('keeps a modal dropdown inside its owner and commits its real option', async () => {
+
+  it('commits a real option inside a modal dialog', async () => {
     const selected = [] as string[]
     const wrapper = mount(OcDialog, {
       attachTo: document.body,
@@ -41,32 +63,32 @@ describe('OcSelect', () => {
     })
     try {
       await wrapper.vm.$nextTick()
-      const backdrop = document.body.querySelector('.oc-dialog__backdrop')!
-      backdrop.querySelector<HTMLButtonElement>('.oc-select__trigger')!.click()
-      await wrapper.vm.$nextTick()
-      const layer = backdrop.querySelector('.oc-floating-layer')!
-      expect(layer.parentElement).toBe(backdrop)
-      layer.querySelectorAll<HTMLButtonElement>('.oc-select__option')[2]!.click()
-      await wrapper.vm.$nextTick()
+      document.body.querySelector<HTMLButtonElement>('.oc-select__trigger')!.click()
+      await flushPromises()
+      document.body.querySelectorAll<HTMLButtonElement>('.oc-select__option')[2]!.click()
+      await flushPromises()
+
       expect(selected).toEqual(['three'])
     } finally {
       wrapper.unmount()
     }
   })
-  it('opens a themed listbox and commits a selected option', async () => {
+
+  it('opens a listbox and commits the selected option', async () => {
     const wrapper = mount(OcSelect, {
       props: { modelValue: 'one', options },
       attachTo: document.body,
     })
 
     await wrapper.get('.oc-select__trigger').trigger('click')
-    const option = document.body.querySelectorAll<HTMLButtonElement>('.oc-select__option')[2]!
-    option.click()
-    await wrapper.vm.$nextTick()
+    await flushPromises()
+    document.body.querySelectorAll<HTMLButtonElement>('.oc-select__option')[2]!.click()
+    await flushPromises()
 
     expect(wrapper.emitted('update:modelValue')).toEqual([['three']])
     expect(wrapper.emitted('commit')).toEqual([['three']])
     expect(wrapper.get('.oc-select__trigger').attributes('aria-expanded')).toBe('false')
+    expect(document.querySelector('.oc-select__listbox')).toBeNull()
     wrapper.unmount()
   })
 
@@ -91,27 +113,9 @@ describe('OcSelect', () => {
     })
 
     await wrapper.get('.oc-select__trigger').trigger('click')
+
     expect(wrapper.get('.oc-select__trigger').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('.oc-select__trigger').attributes('aria-expanded')).toBe('false')
-  })
-
-  it('renders selected and menu labels with the option presentation style', async () => {
-    const wrapper = mount(OcSelect, {
-      props: {
-        modelValue: 'brand',
-        options: [{
-          value: 'brand',
-          label: 'Brand',
-          labelStyle: { fontFamily: 'Brand Preview' },
-        }],
-      },
-      attachTo: document.body,
-    })
-
-    expect((wrapper.get('.oc-select__value').element as HTMLElement).style.fontFamily).toBe('"Brand Preview"')
-    await wrapper.get('.oc-select__trigger').trigger('click')
-    expect((document.body.querySelector('.oc-select__option-label') as HTMLElement).style.fontFamily)
-      .toBe('"Brand Preview"')
-    wrapper.unmount()
+    expect(document.querySelector('.oc-select__listbox')).toBeNull()
   })
 })

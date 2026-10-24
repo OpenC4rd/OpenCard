@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, it, vi } from 'vitest'
 import { createTutorialStore } from './tutorial'
 import { findTutorialSpace } from './tutorialLayout'

@@ -14,7 +14,6 @@
                 `oc-dialog--height-mode-${heightMode}`,
                 heightMode === 'fixed' && height ? `oc-dialog--height-${height}` : null,
                 heightMode === 'content' && minHeight ? `oc-dialog--min-height-${minHeight}` : null,
-                maxHeight && maxHeight !== 'viewport' ? `oc-dialog--max-height-${maxHeight}` : null,
                 { 'oc-dialog--flush': !padded, 'oc-dialog--scroll-locked': !scrollable },
               ]"
               tabindex="-1"
@@ -54,7 +53,6 @@ import OcDialogLayout from './OcDialogLayout.vue'
 
 defineOptions({ name: 'OcDialog', inheritAttrs: false })
 
-type OcDialogCloseReason = 'escape' | 'backdrop'
 type OcDialogHeightPreset = 'sm' | 'md' | 'lg' | 'workspace'
 
 const props = withDefaults(defineProps<{
@@ -66,7 +64,6 @@ const props = withDefaults(defineProps<{
   heightMode?: 'content' | 'fixed'
   height?: OcDialogHeightPreset
   minHeight?: OcDialogHeightPreset
-  maxHeight?: OcDialogHeightPreset | 'viewport'
   padded?: boolean
   scrollable?: boolean
   dismissible?: boolean
@@ -85,7 +82,6 @@ const props = withDefaults(defineProps<{
   heightMode: 'content',
   height: undefined,
   minHeight: undefined,
-  maxHeight: 'viewport',
   padded: true,
   scrollable: true,
   dismissible: true,
@@ -97,8 +93,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  'request-close': [reason: OcDialogCloseReason]
-  'update:open': [value: boolean]
+  'request-close': []
   submit: [event: Event]
 }>()
 const backdropRef = ref<HTMLElement | null>(null)
@@ -125,7 +120,7 @@ watch(() => props.open, async open => {
   if (!props.open || !backdropRef.value) return
   unregister?.()
   unregister = registerDialogRoot(backdropRef.value, { onEscape: () => {
-    if (props.closeOnEscape) requestClose('escape')
+    if (props.closeOnEscape) requestClose()
   } })
 }, { immediate: true })
 
@@ -139,12 +134,12 @@ function finishClose(): void {
   unregister = undefined
 }
 
-function requestClose(reason: OcDialogCloseReason): void {
-  if (props.dismissible) { emit('request-close', reason); emit('update:open', false) }
+function requestClose(): void {
+  if (props.dismissible) emit('request-close')
 }
 
 function handleBackdropPointerDown(): void {
-  if (props.closeOnBackdrop) requestClose('backdrop')
+  if (props.closeOnBackdrop) requestClose()
 }
 
 </script>
@@ -198,11 +193,6 @@ function handleBackdropPointerDown(): void {
 .oc-dialog--min-height-md { min-height: min(var(--oc-dialog-height-md), var(--oc-dialog-available-height)); }
 .oc-dialog--min-height-lg { min-height: min(var(--oc-dialog-height-lg), var(--oc-dialog-available-height)); }
 .oc-dialog--min-height-workspace { min-height: min(var(--oc-dialog-height-workspace), var(--oc-dialog-available-height)); }
-
-.oc-dialog--max-height-sm { max-height: min(var(--oc-dialog-height-sm), var(--oc-dialog-available-height)); }
-.oc-dialog--max-height-md { max-height: min(var(--oc-dialog-height-md), var(--oc-dialog-available-height)); }
-.oc-dialog--max-height-lg { max-height: min(var(--oc-dialog-height-lg), var(--oc-dialog-available-height)); }
-.oc-dialog--max-height-workspace { max-height: min(var(--oc-dialog-height-workspace), var(--oc-dialog-available-height)); }
 
 .oc-dialog:focus-visible { box-shadow: var(--oc-shadow-lg), var(--oc-focus-ring); }
 

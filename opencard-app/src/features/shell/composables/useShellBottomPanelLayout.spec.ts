@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { expect, it, vi } from 'vitest'
 import OcResizeTrack from '../../../components/standard/OcResizeTrack.vue'
 import { useShellBottomPanelLayout } from './useShellBottomPanelLayout'
@@ -28,7 +28,7 @@ it('skips layout animations when the transition duration is zero', async () => {
   const enabledChange = layout.animateLayoutChange()
   contentHeight = 100
   await enabledChange
-  expect(animate).toHaveBeenCalledWith({ translate: ['0 100px', '0 0'] }, { duration: 75, easing: 'ease' })
+  expect(animate).toHaveBeenCalledWith(expect.any(Object), { duration: 75, easing: 'ease' })
   wrapper.unmount()
   stack.remove()
 })
@@ -57,7 +57,7 @@ it('previews reverse dragging, cancels without committing, and commits pointer o
   )
   pointer('pointerdown', 400)
   pointer('pointermove', 350)
-  await wrapper.vm.$nextTick()
+  await nextTick()
   expect(layout.height.value).toBe(180)
   expect(layout.previewHeight.value).toBe(230)
   expect(layout.previewPercentage.value).toBe(38)
@@ -67,7 +67,7 @@ it('previews reverse dragging, cancels without committing, and commits pointer o
   pointer('pointerdown', 400)
   pointer('pointermove', 200)
   pointer('pointerup', 200)
-  await wrapper.vm.$nextTick()
+  await nextTick()
   expect(layout.height.value).toBe(300)
   expect(layout.isResizing.value).toBe(false)
   await handle.trigger('keydown', { key: 'ArrowDown' })

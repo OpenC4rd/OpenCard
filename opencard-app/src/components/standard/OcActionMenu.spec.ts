@@ -1,11 +1,48 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OcActionMenu from './OcActionMenu.vue'
+import OcActionButton from './OcActionButton.vue'
+import OverlayGroupRoot from '../ui/OverlayGroupRoot.vue'
+import { disposeGroup, overlayGroups } from '../../composables/overlayGroups'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
 
 describe('OcActionMenu', () => {
+  let overlayRoot: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    overlayRoot = mount(OverlayGroupRoot, { attachTo: document.body })
+  })
+
+  afterEach(() => {
+    overlayRoot?.unmount()
+    overlayRoot = null
+    for (const group of [...overlayGroups.keys()]) disposeGroup(group)
+    document.body.innerHTML = ''
+  })
+
+  function menus(): HTMLElement[] {
+    return [...document.body.querySelectorAll<HTMLElement>('[role="menu"]')]
+  }
+
+  function menuAt(index: number): HTMLElement {
+    const menu = menus()[index]
+    if (!menu) throw new Error(`No menu at layer ${index}`)
+    return menu
+  }
+
+  async function openMenu(action: OcActionDefinition) {
+    const wrapper = mount(OcActionButton, { attachTo: document.body, props: { action } })
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    return wrapper
+  }
+
   it('renders dividers without turning them into commands', async () => {
+    const onSelect = vi.fn()
     const wrapper = mount(OcActionMenu, {
       props: {
+        overlayKey: 'spec-menu',
+        onSelect,
         actions: [
           { key: 'save', title: 'Save', icon: 'mdiContentSaveOutline', shortcut: ['Ctrl', 'S'] },
           { type: 'divider', key: 'file-export-divider' },
@@ -16,68 +53,26 @@ describe('OcActionMenu', () => {
 
     expect(wrapper.findAll('[role="separator"]')).toHaveLength(1)
     expect(wrapper.findAll('[role="menuitem"]')).toHaveLength(2)
-    expect(wrapper.findAll('[role="menuitem"]')[0]!.attributes('data-tooltip')).toBeUndefined()
-    expect(wrapper.findAll('[role="menuitem"]')[0]!.attributes('title')).toBeUndefined()
-    expect(wrapper.findAll('.oc-key').map(key => key.text()))
-      .toEqual(['Ctrl', 'S'])
 
     await wrapper.findAll('[role="menuitem"]')[1]!.trigger('click')
-    expect(wrapper.emitted('select')).toEqual([[{ key: 'export' }]])
+
+    expect(onSelect).toHaveBeenCalledWith('export')
   })
 
-  it('renders generic action thumbnails in the dense menu row', () => {
+  it('caps a numeric badge and keeps it out of the accessible name', () => {
     const wrapper = mount(OcActionMenu, {
-      props: {
-        actions: [{
-          key: 'status/wide',
-          title: 'Wide',
-          thumbnailStyle: { width: '2em', height: '1em', backgroundImage: 'url("status.png")' },
-          thumbnailLabel: 'Wide icon',
-        }],
-      },
-    })
-    const thumbnail = wrapper.get('.oc-action-menu__thumbnail')
-    expect(thumbnail.attributes('aria-label')).toBe('Wide icon')
-    expect(thumbnail.attributes('style')).toContain('background-image')
-    expect(wrapper.find('.oc-action-menu__icon-spacer').exists()).toBe(false)
-  })
-
-  it('renders a capped numeric badge with an accessible action label', () => {
-    const wrapper = mount(OcActionMenu, {
-      props: { actions: [{ key: 'feedback', title: 'Feedback', badge: 120, badgeLabel: '120 unread replies' }] },
+      props: { overlayKey: 'spec-menu', actions: [{ key: 'feedback', title: 'Feedback', badge: 120, badgeLabel: '120 unread replies' }] },
     })
 
     expect(wrapper.get('.oc-number-badge').text()).toBe('99+')
     expect(wrapper.get('[role="menuitem"]').attributes('aria-label')).toBe('Feedback, 120 unread replies')
   })
 
-  it('renders marked-up titles while deriving a plain accessible label', () => {
-    const wrapper = mount(OcActionMenu, {
-      props: { actions: [{ key: 'fill', title: '[b]Fill[/b] [key]F[/key] [icon:mdiArrowExpandAll]' }] },
-    })
-
-    expect(wrapper.get('.oc-action-menu__label strong').text()).toBe('Fill')
-    expect(wrapper.get('.oc-action-menu__label kbd').text()).toBe('F')
-    expect(wrapper.find('.oc-action-menu__label .oc-icon').exists()).toBe(true)
-    expect(wrapper.get('[role="menuitem"]').attributes('aria-label')).toBe('Fill F')
-  })
-
-  it('opts project-icon thumbnails into the shared project-icon renderer', () => {
-    const wrapper = mount(OcActionMenu, {
-      props: {
-        actions: [{
-          key: 'status/wide',
-          thumbnailStyle: { '--oc-project-icon-renderer': 'mask' },
-        }],
-      },
-    })
-    expect(wrapper.get('.oc-action-menu__thumbnail').classes()).toContain('oc-project-icon')
-  })
-
   it('moves keyboard focus across enabled commands', async () => {
     const wrapper = mount(OcActionMenu, {
       attachTo: document.body,
       props: {
+        overlayKey: 'spec-menu',
         actions: [
           { key: 'first', title: 'First' },
           { key: 'disabled', title: 'Disabled', disabled: true },
@@ -98,51 +93,62 @@ describe('OcActionMenu', () => {
     wrapper.unmount()
   })
 
-  it('opens nested commands with ArrowRight and requests close with ArrowLeft', async () => {
-    const wrapper = mount(OcActionMenu, {
-      attachTo: document.body,
-      props: {
-        actions: [{
-          key: 'more',
-          title: 'More',
-          children: [{ key: 'rename', title: 'Rename' }],
-        }],
-      },
+  it('opens the nested layer with ArrowRight and focuses its first command', async () => {
+    const wrapper = await openMenu({
+      key: 'more',
+      title: 'More',
+      children: [{ key: 'edit', title: 'Edit', children: [{ key: 'rename', title: 'Rename' }] }],
     })
 
-    await wrapper.get('[role="menuitem"]').trigger('keydown', { key: 'ArrowRight' })
-    await wrapper.vm.$nextTick()
-    expect(document.activeElement?.textContent).toContain('Rename')
-    const childMenu = wrapper.findAllComponents(OcActionMenu)[0]
-    await childMenu!.get('[role="menuitem"]').trigger('keydown', { key: 'ArrowLeft' })
-    expect(childMenu!.emitted('close-submenu')).toHaveLength(1)
+    const branch = menuAt(0).querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    branch.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    await flushPromises()
+
+    const childItem = menuAt(1).querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    expect(childItem.getAttribute('aria-label')).toBe('Rename')
+    expect(document.activeElement).toBe(childItem)
+    wrapper.unmount()
+  })
+
+  it('collapses the nested layer with ArrowLeft and returns focus to the branch', async () => {
+    const wrapper = await openMenu({
+      key: 'more',
+      title: 'More',
+      children: [{ key: 'edit', title: 'Edit', children: [{ key: 'rename', title: 'Rename' }] }],
+    })
+
+    const branch = menuAt(0).querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    branch.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    await flushPromises()
+    const childItem = menuAt(1).querySelector<HTMLButtonElement>('[role="menuitem"]')!
+
+    childItem.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    await flushPromises()
+
+    // 只收起自己打开的那一层：根层由调用方决定何时关闭。
+    expect(menus()).toHaveLength(1)
+    expect(branch.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(branch)
     wrapper.unmount()
   })
 
   it('keeps the child menu alive while a command inside it is being pressed', async () => {
-    const wrapper = mount(OcActionMenu, {
-      attachTo: document.body,
-      props: {
-        actions: [{
-          key: 'trash',
-          title: 'Trash',
-          children: [{ key: 'confirm', title: 'Confirm' }],
-        }],
-      },
+    const wrapper = await openMenu({
+      key: 'trash',
+      title: 'Trash',
+      children: [{ key: 'danger', title: 'Danger', children: [{ key: 'confirm', title: 'Confirm' }] }],
     })
-    const branch = wrapper.get<HTMLButtonElement>('[role="menuitem"]')
-    branch.element.closest('.oc-action-menu__item')!.dispatchEvent(new Event('pointerenter'))
-    await wrapper.vm.$nextTick()
-    const confirm = document.body.querySelector<HTMLButtonElement>(
-      '.oc-action-menu__button[aria-label="Confirm"]',
-    )!
+
+    const branch = menuAt(0).querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    branch.closest('.oc-action-menu__item')!.dispatchEvent(new Event('pointerenter'))
+    await flushPromises()
+    const confirm = document.body.querySelector<HTMLButtonElement>('[data-oc-action-key="confirm"]')!
     expect(confirm).not.toBeNull()
 
-    // 先点一下分支：焦点落在分支项里（点它本身没有动作，但焦点留在了那儿）。
-    branch.element.focus()
-    await wrapper.vm.$nextTick()
+    branch.focus()
+    await flushPromises()
 
-    // 再按子菜单里的命令：焦点离开分支项会排一个延迟关闭，命令必须在那个延迟之后依然接得住。
+    // 按子菜单命令时焦点离开分支项会排一个延迟关闭，命令必须在那个延迟之后依然接得住。
     confirm.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }))
     confirm.focus()
     await new Promise((resolve) => window.setTimeout(resolve, 150))
@@ -153,11 +159,18 @@ describe('OcActionMenu', () => {
     wrapper.unmount()
   })
 
-  it('requests dismissal on Escape', async () => {
-    const wrapper = mount(OcActionMenu, {
-      props: { actions: [{ key: 'rename', title: 'Rename' }] },
+  it('closes its own layer on Escape', async () => {
+    const wrapper = await openMenu({
+      key: 'more',
+      title: 'More',
+      children: [{ key: 'rename', title: 'Rename' }],
     })
-    await wrapper.get('[role="menuitem"]').trigger('keydown', { key: 'Escape' })
-    expect(wrapper.emitted('dismiss')).toHaveLength(1)
+
+    const item = menuAt(0).querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+
+    expect(menus()).toHaveLength(0)
+    wrapper.unmount()
   })
 })

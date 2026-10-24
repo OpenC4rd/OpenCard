@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import type { RenderReadyBaseBlock } from '../features/card-rendering/render.types'
 import { getBlockBoxStyles } from './blockStyle'

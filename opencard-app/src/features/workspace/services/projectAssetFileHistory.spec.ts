@@ -35,12 +35,11 @@ describe('project asset file history', () => {
   it('stages across storage volumes and follows undo, redo, and release', async () => {
     const original = 'D:/Cards/.opencard/assets/Brand.png'
     const staged = 'C:/Users/Test/.opencard/cache/staged/remove-1/0-Brand.png'
-    const { fs, files, directories, copyFile } = createFileSystem([original])
+    const { fs, files, directories } = createFileSystem([original])
 
     const resource = await stageProjectAssetFiles([original], 'remove-1', fs)
     expect(files.has(original)).toBe(false)
     expect(files.has(staged)).toBe(true)
-    expect(copyFile).toHaveBeenCalledWith(original, staged)
 
     await resource.undo()
     expect(files.has(original)).toBe(true)

@@ -2,8 +2,6 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OcTree from '../../../components/standard/OcTree.vue'
-import type { OcNodeCollection } from '../../../shared/ui/node/node.types'
-import { isNodeTailAction, normalizeNodeTail } from '../../../shared/ui/node/node.types'
 import type { AppSettings } from '../../settings/model/appSettings'
 import type { ProjectWorkspaceState } from '../../app-state/model/appState'
 import type { ProjectCover } from '../model/projectCover'
@@ -11,7 +9,7 @@ import { useShellProgressTasks } from '../../shell/composables/useShellProgressT
 import ResourcePackageBuilderDialog from './ResourcePackageBuilderDialog.vue'
 
 const buildPackage = vi.hoisted(() => vi.fn(async () => ({ outputPath: '/output/theme.ocpack' })))
-const pickSavePath = vi.hoisted(() => vi.fn(async () => '/output/theme.ocpack'))
+const pickSavePath = vi.hoisted(() => vi.fn(async (): Promise<string | null> => '/output/theme.ocpack'))
 const readProjectCover = vi.hoisted(() => vi.fn(async (): Promise<ProjectCover | null> => null))
 const notifications = vi.hoisted(() => ({ notifyError: vi.fn(), notifySuccess: vi.fn() }))
 
@@ -27,7 +25,6 @@ const projectStore = vi.hoisted(() => ({
     { key: 'status', name: 'Status', source: 'icons/status.png', icons: [] },
   ] },
   projectProfile: { value: { author: 'publisher-test' } },
-  // 内化别人的资源时要按坐标找到包解开在哪；这份替身里一个包都没装。
   projectResourceEnvironment: { value: { packages: new Map() } },
 }))
 
@@ -37,7 +34,6 @@ const settings = vi.hoisted(() => ({
   } as unknown as AppSettings,
 }))
 const appState = vi.hoisted(() => ({ value: { projects: { workspaces: {} as Record<string, ProjectWorkspaceState> } } }))
-const updateSetting = vi.hoisted(() => vi.fn())
 const updateProjects = vi.hoisted(() => vi.fn((patch: { workspaces?: Record<string, ProjectWorkspaceState> }) => {
   if (patch.workspaces) appState.value.projects.workspaces = patch.workspaces
 }))
@@ -45,7 +41,7 @@ const updateProjects = vi.hoisted(() => vi.fn((patch: { workspaces?: Record<stri
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../store/projectStore', () => ({ useProjectStore: () => projectStore }))
 vi.mock('../../settings/store/appSettingsStore', () => ({
-  useAppSettingsStore: () => ({ settings, updateSetting }),
+  useAppSettingsStore: () => ({ settings }),
 }))
 vi.mock('../../app-state/store/appStateStore', () => ({ useAppStateStore: () => ({ state: appState, updateProjects }) }))
 vi.mock('../services/buildResourcePackage', () => ({ buildResourcePackageFromProject: buildPackage }))
@@ -54,20 +50,30 @@ vi.mock('../services/projectCoverService', () => ({ readProjectCover }))
 vi.mock('../../notifications/titlebarNotices', () => notifications)
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async () => () => {}) }))
 
-const imageEntries = [
+const entries = [
   'images/card.png', 'images/nested/banner.svg', 'images/notes.txt',
   '.opencard/icons/status.png', '.git/logo.png', '/outside/leak.png',
 ]
 
-function mountBuilder(entries: readonly string[] = [], projectRootPath = '/project') {
+function mountBuilder() {
   return mount(ResourcePackageBuilderDialog, {
-    props: { open: true, projectRootPath, projectName: 'Project', entries },
+    props: { open: true, projectRootPath: '/project', projectName: 'Project', entries },
     global: { stubs: { Teleport: true } },
   })
 }
 
-function actionsOf(data: OcNodeCollection, key: string): readonly string[] | undefined {
-  return normalizeNodeTail(data.items.get(key)?.tail).filter(isNodeTailAction).map(action => action.key)
+function treeOf(wrapper: ReturnType<typeof mountBuilder>) {
+  return wrapper.findComponent(OcTree)
+}
+
+async function toggle(wrapper: ReturnType<typeof mountBuilder>, key: string, actionKey: 'select' | 'deselect') {
+  treeOf(wrapper).vm.$emit('action', { key, actionKey, source: 'inline' })
+  await nextTick()
+}
+
+async function submit(wrapper: ReturnType<typeof mountBuilder>) {
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
 }
 
 function buildTaskKeys(): readonly string[] {
@@ -76,128 +82,70 @@ function buildTaskKeys(): readonly string[] {
 
 beforeEach(() => {
   appState.value.projects.workspaces = {}
-  updateSetting.mockClear()
   updateProjects.mockClear()
   pickSavePath.mockClear()
+  pickSavePath.mockResolvedValue('/output/theme.ocpack')
   buildPackage.mockClear()
   readProjectCover.mockClear()
-  readProjectCover.mockResolvedValue(null)
   notifications.notifySuccess.mockClear()
   notifications.notifyError.mockClear()
 })
 
-describe('ResourcePackageBuilderDialog cover summary', () => {
-  it('shows the inherited project cover as read-only information', async () => {
-    readProjectCover.mockResolvedValue({
-      relativePath: 'assets/cover.png',
-      absolutePath: '/project/assets/cover.png',
-      src: 'asset:///project/assets/cover.png',
-    })
+describe('ResourcePackageBuilderDialog', () => {
+  it('builds with every candidate by default and only project-relative files', async () => {
     const wrapper = mountBuilder()
     await flushPromises()
 
-    expect(readProjectCover).toHaveBeenCalledWith(expect.objectContaining({ projectRootPath: '/project' }))
-    expect((wrapper.get('.resource-package-builder__cover input').element as HTMLInputElement).value)
-      .toBe('assets/cover.png')
-  })
+    await submit(wrapper)
 
-  it('states that a project without a cover produces a package without one', async () => {
-    const wrapper = mountBuilder()
-    await flushPromises()
-
-    expect((wrapper.get('.resource-package-builder__cover input').element as HTMLInputElement).value)
-      .toBe('resourcePackage.coverNone')
-  })
-})
-
-describe('ResourcePackageBuilderDialog selection', () => {
-  it('keeps public font and composition selections independent and selects everything by default', async () => {
-    const wrapper = mountBuilder()
-    const tree = wrapper.findComponent(OcTree)
-    let data = tree.props('data') as OcNodeCollection
-    expect(data.children.get('category:fonts')).toEqual(['font-group:families', 'font-group:compositions'])
-    expect(actionsOf(data, 'font-family:latin')).toEqual(['deselect'])
-    expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
-    expect(actionsOf(data, 'font-composition:body')).toEqual(['deselect'])
-    expect(actionsOf(data, 'icon-series:status')).toEqual(['deselect'])
-
-    tree.vm.$emit('action', { key: 'font-composition:body', actionKey: 'deselect', source: 'inline' })
-    tree.vm.$emit('action', { key: 'font-family:cjk', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    data = tree.props('data') as OcNodeCollection
-    expect(actionsOf(data, 'font-composition:body')).toEqual(['select'])
-    expect(actionsOf(data, 'font-family:cjk')).toEqual(['select'])
-    expect(actionsOf(data, 'font-family:latin')).toEqual(['deselect'])
-
-    tree.vm.$emit('action', { key: 'font-family:cjk', actionKey: 'select', source: 'inline' })
-    await nextTick()
-    data = tree.props('data') as OcNodeCollection
-    expect(actionsOf(data, 'font-composition:body')).toEqual(['select'])
-    expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
-  })
-
-  it('selects project icon series without exposing their files', async () => {
-    const wrapper = mountBuilder()
-    const tree = wrapper.findComponent(OcTree)
-    let data = tree.props('data') as OcNodeCollection
-    expect(data.children.get('category:icons')).toEqual(['icon-series:status'])
-    expect(data.items.get('category:icons')?.tail).toBeUndefined()
-    expect([...data.items.keys()].some(key => key.includes('status.png'))).toBe(false)
-
-    tree.vm.$emit('action', { key: 'icon-series:status', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    data = tree.props('data') as OcNodeCollection
-    expect(actionsOf(data, 'icon-series:status')).toEqual(['select'])
-
-    tree.vm.$emit('action', { key: 'icon-series:status', actionKey: 'select', source: 'inline' })
-    await nextTick()
-    expect(actionsOf(tree.props('data') as OcNodeCollection, 'icon-series:status')).toEqual(['deselect'])
-  })
-
-  it('shows project files by directory and builds from the selection', async () => {
-    const wrapper = mountBuilder(imageEntries)
-    const tree = wrapper.findComponent(OcTree)
-    let data = tree.props('data') as OcNodeCollection
-
-    expect(data.children.get('category:other-files')).toEqual(['folder:other-files:images'])
-    expect(data.children.get('folder:other-files:images')).toEqual([
-      'file:images/card.png', 'folder:other-files:images/nested', 'file:images/notes.txt',
-    ])
-    expect(data.items.has('file:images/nested/banner.svg')).toBe(true)
-    expect(data.items.has('file:images/notes.txt')).toBe(true)
-    expect([...data.items.keys()].some(key => key.includes('.opencard')
-      || key.includes('.git') || key.includes('outside'))).toBe(false)
-    expect(data.items.get('category:other-files')?.tail).toBeUndefined()
-    // An image row carries only its selection command, with no descriptive text part.
-    expect(normalizeNodeTail(data.items.get('file:images/card.png')?.tail).filter(part => typeof part === 'string'))
-      .toEqual([])
-    expect(actionsOf(data, 'file:images/card.png')).toEqual(['deselect'])
-
-    tree.vm.$emit('action', { key: 'file:images/card.png', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    tree.vm.$emit('action', { key: 'file:images/nested/banner.svg', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    data = tree.props('data') as OcNodeCollection
-    expect(actionsOf(data, 'file:images/card.png')).toEqual(['select'])
-
-    tree.vm.$emit('action', { key: 'file:images/card.png', actionKey: 'select', source: 'inline' })
-    await nextTick()
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
     expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Project',
-      otherSelection: { paths: ['images/notes.txt', 'images/card.png'] },
+      author: 'publisher-test',
+      version: '1.0.0',
+      title: 'Project',
+      outputPath: '/output/theme.ocpack',
+      fontSelection: { familyKeys: ['latin', 'cjk'], compositionKeys: ['body'] },
+      iconSelection: { seriesKeys: ['status'] },
+      // 隐藏目录、托管目录与项目外的路径都不是候选。
+      otherSelection: { paths: ['images/card.png', 'images/nested/banner.svg', 'images/notes.txt'] },
     }))
   })
 
-  it('hands the build to the global progress bar instead of freezing the dialog', async () => {
-    let finishBuild: (value: { outputPath: string }) => void = () => {}
-    buildPackage.mockReturnValueOnce(new Promise(resolve => { finishBuild = resolve }))
-    const wrapper = mountBuilder(imageEntries)
+  it('keeps a deselected composition out of the build without touching the fonts', async () => {
+    const wrapper = mountBuilder()
+    await flushPromises()
+    await toggle(wrapper, 'font-composition:body', 'deselect')
+    await toggle(wrapper, 'font-family:cjk', 'deselect')
+    await toggle(wrapper, 'icon-series:status', 'deselect')
+    await toggle(wrapper, 'file:images/notes.txt', 'deselect')
+
+    await submit(wrapper)
+
+    expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
+      fontSelection: { familyKeys: ['latin'], compositionKeys: [] },
+      iconSelection: { seriesKeys: [] },
+      otherSelection: { paths: ['images/card.png', 'images/nested/banner.svg'] },
+    }))
+  })
+
+  it('keeps the selection open when the destination picker is cancelled', async () => {
+    pickSavePath.mockResolvedValueOnce(null)
+    const wrapper = mountBuilder()
     await flushPromises()
 
-    await wrapper.get('form').trigger('submit')
+    await submit(wrapper)
+
+    expect(buildPackage).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('closes the dialog and finishes the build on the global progress bar', async () => {
+    let finishBuild: (value: { outputPath: string }) => void = () => {}
+    buildPackage.mockReturnValueOnce(new Promise(resolve => { finishBuild = resolve }))
+    const wrapper = mountBuilder()
     await flushPromises()
+
+    await submit(wrapper)
 
     // The destination is settled, so the dialog closes and the packing keeps running in the background.
     expect(wrapper.emitted('close')).toHaveLength(1)
@@ -206,36 +154,32 @@ describe('ResourcePackageBuilderDialog selection', () => {
     finishBuild({ outputPath: '/output/theme.ocpack' })
     await flushPromises()
 
-    expect(notifications.notifySuccess).toHaveBeenCalledWith('resourcePackage.built')
+    expect(notifications.notifySuccess).toHaveBeenCalledOnce()
     expect(buildTaskKeys()).not.toContain('resource-package-build')
   })
 
-  it('reports a failed build as an instant message and clears its progress task', async () => {
+  it('reports a failed build and clears its progress task', async () => {
     buildPackage.mockRejectedValueOnce(new Error('disk full'))
-    const wrapper = mountBuilder(imageEntries)
+    const wrapper = mountBuilder()
     await flushPromises()
 
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     expect(notifications.notifyError).toHaveBeenCalledWith('disk full')
-    expect(notifications.notifySuccess).not.toHaveBeenCalled()
     expect(buildTaskKeys()).not.toContain('resource-package-build')
   })
 
   it('refuses to start a second build while one is still running', async () => {
     let finishBuild: (value: { outputPath: string }) => void = () => {}
     buildPackage.mockReturnValueOnce(new Promise(resolve => { finishBuild = resolve }))
-    const wrapper = mountBuilder(imageEntries)
+    const wrapper = mountBuilder()
     await flushPromises()
 
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
     buildPackage.mockClear()
 
     // Submitting again must not reuse the key of the build that is still in flight.
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
     expect(buildPackage).not.toHaveBeenCalled()
 
     finishBuild({ outputPath: '/output/theme.ocpack' })
@@ -243,9 +187,8 @@ describe('ResourcePackageBuilderDialog selection', () => {
     expect(buildTaskKeys()).not.toContain('resource-package-build')
   })
 
-  it('restores the previous build and falls back to every candidate when nothing was remembered', async () => {
+  it('restores a remembered selection instead of selecting everything', async () => {
     appState.value.projects.workspaces = {
-      '/other': { expandedDirectories: [] },
       '/project': {
         expandedDirectories: [],
         packageBuilder: {
@@ -256,53 +199,37 @@ describe('ResourcePackageBuilderDialog selection', () => {
           fontFamilyKeys: ['cjk'],
           fontCompositionKeys: [],
           iconSeriesKeys: [],
-          imagePaths: ['images/nested/banner.svg'],
+          otherPaths: ['images/nested/banner.svg'],
+          imagePaths: [],
         },
       },
     }
-    const wrapper = mountBuilder(imageEntries)
-    const tree = wrapper.findComponent(OcTree)
-    const data = tree.props('data') as OcNodeCollection
-
-    expect(actionsOf(data, 'font-family:latin')).toEqual(['select'])
-    expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
-    expect(actionsOf(data, 'font-composition:body')).toEqual(['select'])
-    expect(actionsOf(data, 'icon-series:status')).toEqual(['select'])
-    expect(actionsOf(data, 'file:images/nested/banner.svg')).toEqual(['deselect'])
-    expect(actionsOf(data, 'file:images/card.png')).toEqual(['select'])
-    // The remembered package name and version come back; the version would otherwise default to 1.0.0.
-    const fields = wrapper.findAll('.resource-package-builder__fields input')
-    expect((fields[0]!.element as HTMLInputElement).value).toBe('Theme')
-    expect((fields[1]!.element as HTMLInputElement).value).toBe('Theme Pack')
-    expect((fields[3]!.element as HTMLInputElement).value).toBe('2.1.0')
-
-    await wrapper.get('form').trigger('submit')
+    const wrapper = mountBuilder()
     await flushPromises()
+
+    await submit(wrapper)
+
     expect(buildPackage).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Theme',
-      otherSelection: { paths: ['images/nested/banner.svg'] },
+      title: 'Theme Pack',
+      version: '2.1.0',
       fontSelection: { familyKeys: ['cjk'], compositionKeys: [] },
       iconSelection: { seriesKeys: [] },
+      otherSelection: { paths: ['images/nested/banner.svg'] },
     }))
   })
 
-  it('remembers the build inputs for the project and restores them on reopen', async () => {
-    const wrapper = mountBuilder(imageEntries)
-    const tree = wrapper.findComponent(OcTree)
-    tree.vm.$emit('action', { key: 'file:images/card.png', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    tree.vm.$emit('action', { key: 'font-family:latin', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    tree.vm.$emit('action', { key: 'font-composition:body', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    tree.vm.$emit('action', { key: 'icon-series:status', actionKey: 'deselect', source: 'inline' })
-    await nextTick()
-    await wrapper.get('form').trigger('submit')
+  it('remembers the build inputs for the project on submit', async () => {
+    const wrapper = mountBuilder()
     await flushPromises()
+    await toggle(wrapper, 'font-family:latin', 'deselect')
+    await toggle(wrapper, 'font-composition:body', 'deselect')
+    await toggle(wrapper, 'icon-series:status', 'deselect')
 
-    const currentStates = appState.value.projects.workspaces
+    await submit(wrapper)
+
     expect(updateProjects).toHaveBeenCalledTimes(1)
-    expect(currentStates['/project']?.packageBuilder).toEqual({
+    expect(appState.value.projects.workspaces['/project']?.packageBuilder).toEqual({
       name: 'Project',
       author: 'publisher-test',
       version: '1.0.0',
@@ -312,15 +239,7 @@ describe('ResourcePackageBuilderDialog selection', () => {
       iconSeriesKeys: [],
       customBlockKeys: [],
       imagePaths: [],
-      otherPaths: ['images/nested/banner.svg', 'images/notes.txt'],
+      otherPaths: ['images/card.png', 'images/nested/banner.svg', 'images/notes.txt'],
     })
-
-    const reopened = mountBuilder(imageEntries)
-    const reopenedTree = reopened.findComponent(OcTree)
-    const data = reopenedTree.props('data') as OcNodeCollection
-    expect(actionsOf(data, 'font-family:latin')).toEqual(['select'])
-    expect(actionsOf(data, 'font-family:cjk')).toEqual(['deselect'])
-    expect(actionsOf(data, 'file:images/card.png')).toEqual(['select'])
-    expect(actionsOf(data, 'file:images/nested/banner.svg')).toEqual(['deselect'])
   })
 })

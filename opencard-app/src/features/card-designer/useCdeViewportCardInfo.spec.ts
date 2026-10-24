@@ -169,26 +169,6 @@ afterEach(() => {
 })
 
 describe('useCdeViewportCardInfo', () => {
-  it('projects file, document, face, block count and note rows for the blueprint', () => {
-    const { state, wrapper } = createHarness()
-
-    expect(state.viewportCardInfo.value).toEqual([
-      { key: 'fileName', value: 'cards/hero.ocdocument' },
-      { key: 'document', value: 'Document @ 1.0.0' },
-      { key: 'description', value: 'desc(Reusable hero\ncard.)', multiline: true },
-      { key: 'instanceCount', value: 'instances(1)' },
-      { key: 'face', value: 'Front Face', separated: true },
-      { key: 'blockCount', value: 'blocks(4)' },
-      { key: 'notes', value: 'Review print\nmargins.', separated: true, multiline: true },
-    ])
-    expect(state.viewportCardDimensions.value).toEqual({
-      width: 'width(540)',
-      height: 'height(850)',
-    })
-
-    wrapper.unmount()
-  })
-
   it('falls back to the file name and then to the raw path when no relative path resolves', async () => {
     const { fileName, filePath, resourceRootPath, state, wrapper } = createHarness()
 

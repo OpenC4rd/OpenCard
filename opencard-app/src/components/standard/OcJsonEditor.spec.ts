@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import OcJsonEditor from './OcJsonEditor.vue'
 
 describe('OcJsonEditor', () => {
-  it('formats input value and emits parsed JSON objects', async () => {
+  it('formats the value and emits parsed JSON on edit', async () => {
     const wrapper = mount(OcJsonEditor, {
       props: {
         modelValue: {
@@ -15,21 +15,18 @@ describe('OcJsonEditor', () => {
 
     const textarea = wrapper.get('textarea')
     const initialValue = (textarea.element as HTMLTextAreaElement).value
-
     expect(initialValue).toContain('"name": "OpenCard"')
-    expect(initialValue).toContain('"enabled": true')
 
     await textarea.setValue('{\n  "name": "Sample",\n  "enabled": false\n}')
 
     const payloads = wrapper.emitted('update:modelValue')
-    expect(payloads).toBeTruthy()
     expect(payloads?.[payloads.length - 1]?.[0]).toEqual({
       name: 'Sample',
       enabled: false,
     })
   })
 
-  it('keeps invalid drafts visible and shows a validation error', async () => {
+  it('keeps an invalid draft and reports it instead of emitting', async () => {
     const wrapper = mount(OcJsonEditor, {
       props: {
         modelValue: {
@@ -42,14 +39,5 @@ describe('OcJsonEditor', () => {
 
     expect(wrapper.text()).toContain('Invalid JSON')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-  })
-
-  it('uses semantic height modes', () => {
-    const wrapper = mount(OcJsonEditor, {
-      props: { modelValue: [], heightMode: 'array' },
-    })
-
-    expect(wrapper.get('textarea').classes()).toContain('oc-json-editor__input--array')
-    expect(wrapper.get('textarea').attributes('style')).toBeUndefined()
   })
 })

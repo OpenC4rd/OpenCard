@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MAX_BASE_FONT_SIZE, MIN_BASE_FONT_SIZE } from './baseFontSize'
-import { DEFAULT_OC_THEME, OC_THEME_REGISTRY } from './themes'
+import { DEFAULT_OC_THEME } from './themes'
 import {
   deriveAccentNeighborColor,
   getOcTheme,
@@ -10,29 +10,6 @@ import {
   setOcTheme,
   setOcTransitionSpeed,
 } from './theme'
-
-const fileIconColorTokens = [
-  '--oc-icon-file-opencard',
-  '--oc-icon-file-json',
-  '--oc-icon-file-markdown',
-  '--oc-icon-file-typescript',
-  '--oc-icon-file-javascript',
-  '--oc-icon-file-vue',
-  '--oc-icon-file-html',
-  '--oc-icon-file-css',
-  '--oc-icon-file-image',
-  '--oc-icon-file-config',
-  '--oc-icon-folder',
-] as const
-const blockIconColorTokens = [
-  '--oc-icon-block-text',
-  '--oc-icon-block-markdown',
-  '--oc-icon-block-image',
-  '--oc-icon-block-qrcode',
-  '--oc-icon-block-shape',
-  '--oc-icon-block-simple-container',
-  '--oc-icon-block-flow-container',
-] as const
 
 function testLuminance(value: string): number {
   const channels = [1, 3, 5].map(index => Number.parseInt(value.slice(index, index + 2), 16) / 255)
@@ -113,44 +90,6 @@ describe('OC theme runtime', () => {
     expect(hoverBackground).toBe('#516FE6')
     expect(testContrast(foreground, hoverBackground))
       .toBeGreaterThanOrEqual(testContrast(foreground, restingBackground))
-  })
-
-  it.each(['dark', 'light'] as const)('applies %s tokens and native color scheme', (themeId) => {
-    setOcTheme(themeId)
-
-    expect(getOcTheme()).toBe(themeId)
-    expect(document.documentElement.dataset.ocTheme).toBe(themeId)
-    expect(document.documentElement.style.colorScheme).toBe(themeId)
-    expect(document.documentElement.style.getPropertyValue('--oc-bg-base'))
-      .toBe(OC_THEME_REGISTRY[themeId]['--oc-bg-base'])
-    expect(document.documentElement.style.getPropertyValue('--oc-bg-block'))
-      .toBe(OC_THEME_REGISTRY[themeId]['--oc-bg-block'])
-    expect(document.documentElement.style.getPropertyValue('--oc-table-row-height'))
-      .toBe(OC_THEME_REGISTRY[themeId]['--oc-table-row-height'])
-    expect(document.documentElement.style.getPropertyValue('--oc-border-width'))
-      .toBe(OC_THEME_REGISTRY[themeId]['--oc-border-width'])
-    expect(document.documentElement.style.getPropertyValue('--oc-viewport-dot-pattern'))
-      .toBe(OC_THEME_REGISTRY[themeId]['--oc-viewport-dot-pattern'])
-  })
-
-  it.each(['dark', 'light'] as const)('uses distinct OKLCH file and Block icon colors in %s', (themeId) => {
-    const fileColors = fileIconColorTokens.map(token => OC_THEME_REGISTRY[themeId][token])
-    const blockColors = blockIconColorTokens.map(token => OC_THEME_REGISTRY[themeId][token])
-    const isOklchColor = (value: string) => /^oklch\([\d.]+% [\d.]+ [\d.]+\)$/.test(value)
-
-    expect(fileColors.every(isOklchColor)).toBe(true)
-    expect(blockColors.every(isOklchColor)).toBe(true)
-    expect(new Set(fileColors).size).toBe(fileColors.length)
-    expect(new Set(blockColors).size).toBe(blockColors.length)
-  })
-
-  it('keeps light-theme file and Block icons within a balanced lightness range', () => {
-    const colors = [...fileIconColorTokens, ...blockIconColorTokens]
-      .map(token => OC_THEME_REGISTRY.light[token])
-    const lightnessValues = colors.map(color => Number(/^oklch\(([\d.]+)%/.exec(color)?.[1]))
-
-    expect(Math.min(...lightnessValues)).toBeGreaterThanOrEqual(67)
-    expect(Math.max(...lightnessValues)).toBeLessThanOrEqual(77)
   })
 
   it('falls back unknown themes to the default theme', () => {

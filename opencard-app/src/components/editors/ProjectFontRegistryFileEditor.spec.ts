@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   historyResource: { undo: vi.fn(), redo: vi.fn(), release: vi.fn() },
 }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('./MonacoEditor.vue', () => ({ default: { template: '<div class="monaco-stub" />' } }))
+vi.mock('./MonacoEditor.vue', () => ({ default: { name: 'MonacoEditor', template: '<div />' } }))
 vi.mock('../../features/workspace/services/fileSystemService', () => ({
   fileSystemService: {
     readBinaryFile: vi.fn(),
@@ -81,13 +81,13 @@ describe('ProjectFontRegistryFileEditor', () => {
     const invalid = mount(ProjectFontRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/fonts/fonts.json', draftContent: '{broken' }),  },
     })
-    expect(invalid.find('.monaco-stub').exists()).toBe(true)
+    expect(invalid.findComponent({ name: 'MonacoEditor' }).exists()).toBe(true)
 
     const unknownShape = mount(ProjectFontRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/fonts/fonts.json', draftContent: JSON.stringify({ fonts: [] }) }),  },
       global: { stubs: { ProjectFontRegistryEditor: true } },
     })
-    expect(unknownShape.find('.monaco-stub').exists()).toBe(false)
+    expect(unknownShape.findComponent({ name: 'MonacoEditor' }).exists()).toBe(false)
 
     const empty = mount(ProjectFontRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/fonts/fonts.json', draftContent: '{}' }),  },

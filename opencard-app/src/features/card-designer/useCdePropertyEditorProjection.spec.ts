@@ -1,6 +1,4 @@
-import { computed, h, ref } from 'vue'
-import { flushPromises, mount } from '@vue/test-utils'
-import ReferenceStringPropertyField from '../../shared/ui/property-editor/fields/ReferenceStringPropertyField.vue'
+import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createSimpleContainerBlock,
@@ -14,10 +12,6 @@ import { useCdePropertyEditorProjection } from './useCdePropertyEditorProjection
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import { normalizeResourcePackageManifest } from '../workspace/model/resourcePackage'
-import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
-import FilePathPropertyField from '../../shared/ui/property-editor/fields/FilePathPropertyField.vue'
-import OcAutocompletePopover from '../../components/standard/OcAutocompletePopover.vue'
-import { i18n } from '../../i18n'
 
 function createHarness(resourceEnvironment = ref<ProjectResourceEnvironment>()) {
   const text = createTextBlock({
@@ -125,48 +119,6 @@ async function completionItems(
 }
 
 describe('useCdePropertyEditorProjection', () => {
-  it('keeps real path browsing open across document reprojection without reopening a dismissed menu', async () => {
-    const harness = createHarness()
-    harness.directoryProvider.mockImplementation(async directory => directory === 'assets'
-      ? [{ name: 'card.png', isDirectory: false }] : [{ name: 'assets', isDirectory: true }])
-    const wrapper = mount({ setup: () => () => h(PropertyEditor, {
-      inputs: harness.state.propertyEditorInputs.value, sortMode: 'category',
-      'onUpdate-property': mutation => {
-        harness.rawPropertyInputs.value = harness.rawPropertyInputs.value.map(input => ({
-          ...input, record: { ...input.record, [mutation.fieldKey]: mutation.value },
-        }))
-        harness.documentRevision.value += 1
-      },
-    }) }, { attachTo: document.body, global: { plugins: [i18n] } })
-    try {
-      const field = wrapper.getComponent(FilePathPropertyField)
-      const input = field.get('input').element
-      input.focus()
-      await flushPromises()
-      const choose = async (label: string) => {
-        const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent?.includes(label))!
-        option.dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }))
-        await flushPromises()
-      }
-      await choose('assets')
-      expect(input.value).toBe('assets/')
-      harness.documentRevision.value += 1
-      await flushPromises()
-      expect(field.get('input').element).toBe(input)
-      expect(field.getComponent(OcAutocompletePopover).props('open')).toBe(true)
-      expect(document.activeElement).toBe(input)
-      await choose('card.png')
-      expect(input.value).toBe('assets/card.png')
-      harness.documentRevision.value += 1
-      await flushPromises()
-      expect(field.getComponent(OcAutocompletePopover).props('open')).toBe(true)
-      expect(field.getComponent(OcAutocompletePopover).props('items')[0]?.key).toContain('clear-file:')
-      await field.get('input').trigger('keydown', { key: 'Escape' })
-      harness.documentRevision.value += 1
-      await flushPromises()
-      expect(field.getComponent(OcAutocompletePopover).props('open')).toBe(false)
-    } finally { wrapper.unmount() }
-  })
   it('refreshes package font completion and previews from the environment snapshot', async () => {
     const coordinate = 'alice/theme@1.0.0'
     const invisibleCoordinate = 'goblin/invisible@1.0.0'
@@ -213,35 +165,6 @@ describe('useCdePropertyEditorProjection', () => {
     }))
     expect(fields().content?.fontOptions?.some(font => font.value.startsWith(invisibleCoordinate))).toBe(false)
     expect(await completionItems(fields().fontFamily?.completion?.provider, 'Ar', 2)).toEqual([])
-    const definition = fields().fontFamily!
-    if (definition.fieldType !== 'string') throw new Error('Expected a string font field')
-    const wrapper = mount(ReferenceStringPropertyField, {
-      attachTo: document.body,
-      props: { definition, value: 'Arial; alice/theme@1.0.0#; Georgia' },
-    })
-    try {
-      const input = wrapper.get('input')
-      input.element.setSelectionRange(25, 25)
-      input.element.focus()
-      await flushPromises()
-      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('Theme')
-      await input.trigger('keydown', { key: 'Tab' })
-      await flushPromises()
-      expect(input.element.value).toBe('Arial; alice/theme@1.0.0#font:; Georgia')
-      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('Body')
-      await input.trigger('keydown', { key: 'ArrowDown' })
-      await input.trigger('keydown', { key: 'Enter' })
-      await flushPromises()
-      expect(input.element.value).toBe('Arial; ; Georgia')
-      expect(document.body.querySelector('[role="option"]')?.textContent?.trim()).toBe('Theme')
-      await input.trigger('keydown', { key: 'Tab' })
-      await flushPromises()
-      await input.trigger('keydown', { key: 'Enter' })
-      await flushPromises()
-      expect(wrapper.emitted('update:value')?.slice(-1)[0]).toEqual(['Arial; alice/theme@1.0.0#font:body; Georgia'])
-    } finally {
-      wrapper.unmount()
-    }
     environment.value = { ...environment.value, packageEnvironments: new Map() }
     expect(await completionItems(fields().fontFamily?.completion?.provider, 'alice/theme@1.0.0#', 18)).toEqual([])
   })

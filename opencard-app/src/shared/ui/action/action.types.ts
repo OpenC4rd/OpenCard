@@ -32,6 +32,10 @@ export function actionChildren(action: OcActionDefinition): readonly OcActionMen
   return typeof action.children === 'function' ? action.children() : action.children ?? []
 }
 
+export function hasActionChildren(action: OcActionDefinition): boolean {
+  return typeof action.children === 'function' || Boolean(action.children?.length)
+}
+
 export interface OcActionSelectPayload {
   key: string
 }

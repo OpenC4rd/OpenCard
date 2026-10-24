@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { effectScope, shallowRef } from 'vue'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useOcdocumentDiffSession } from './useOcdocumentDiffSession'

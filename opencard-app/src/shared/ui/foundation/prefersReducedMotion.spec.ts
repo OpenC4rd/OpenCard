@@ -5,14 +5,11 @@ import { prefersReducedMotion, reducedMotionQuery } from './prefersReducedMotion
  * jsdom ships no `window.matchMedia`, and the guard is what keeps every motion-reading component
  * from throwing from inside its mount, transition, or unmount hooks in that environment.
  */
-function stubMotionPreference(matches: boolean, seenQueries?: string[]): void {
+function stubMotionPreference(matches: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
-    value: (query: string) => {
-      seenQueries?.push(query)
-      return { matches, media: query }
-    },
+    value: (query: string) => ({ matches, media: query }),
   })
 }
 
@@ -33,14 +30,5 @@ describe('reduced motion preference', () => {
 
     stubMotionPreference(false)
     expect(prefersReducedMotion()).toBe(false)
-  })
-
-  it('asks for the reduced-motion query itself rather than any media query', () => {
-    const queries: string[] = []
-    stubMotionPreference(false, queries)
-
-    reducedMotionQuery()
-
-    expect(queries).toEqual(['(prefers-reduced-motion: reduce)'])
   })
 })

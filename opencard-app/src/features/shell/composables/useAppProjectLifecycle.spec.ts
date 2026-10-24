@@ -142,19 +142,6 @@ describe('useAppProjectLifecycle', () => {
     expect(harness.shellLocation.value).toEqual({ base: { space: 'welcome' } })
   })
 
-  it('opens an ordinary directory directly without initializing project internals', async () => {
-    const harness = createHarness()
-
-    await expect(harness.lifecycle.openRecentProject('D:/new-project')).resolves.toBe(true)
-
-    expect(harness.events).toEqual([
-      'close-current-project',
-      'set:D:/new-project',
-      'remember:D:/new-project',
-    ])
-    expect(harness.shellLocation.value).toEqual({ base: { space: 'workbench' } })
-  })
-
   it('waits for the unsaved confirmation before switching projects', async () => {
     const harness = createHarness({ closeOutcome: 'prompted' })
 

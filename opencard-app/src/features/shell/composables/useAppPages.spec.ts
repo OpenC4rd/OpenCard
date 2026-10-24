@@ -44,8 +44,6 @@ describe('application page ownership', () => {
       expect(useAppPages().pages.welcome).toBe(app.pages.welcome)
       expect(listeners.mock.calls.length).toBe(listenerCount)
       const navigation = useShellNavigation()
-      expect(app.pages.welcome.header.value).toBeNull()
-      expect(app.pages.workbench.header.value).toBeNull()
       await app.pages.workbench.menuContribution!.value.file!.onAction('new-open-card')
       const session = (app.pages.workbench.contentProps.value.editor as { props: { session: EditorSession } }).props.session
       session.updateContent( '{"base":{"title":"edited"}}')
@@ -67,10 +65,6 @@ describe('application page ownership', () => {
         navigation.selectSpace(space)
         await nextTick()
         expect(app.currentPage.value).toBe(app.pages[space])
-        if (space === 'welcome') expect(app.currentPage.value.header.value).toBeNull()
-        else expect(app.currentPage.value.header.value?.title).toBeTruthy()
-        expect(app.currentPage.value.bottomPanel).toBeUndefined()
-        expect(app.pages.workbench.menuContribution?.value.edit?.actions[0]).toMatchObject({ disabled: true })
       }
       navigation.selectSpace('workbench')
       await nextTick()

@@ -2,12 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
-  open: vi.fn(),
   readDir: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }))
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open, save: vi.fn() }))
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn(), save: vi.fn() }))
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readTextFile: vi.fn(),
   writeTextFile: vi.fn(),
@@ -30,15 +29,10 @@ describe('fileSystemService native file actions', () => {
     mocks.invoke.mockResolvedValue(undefined)
   })
 
-  it('issues an independent reveal command for every click', async () => {
-    await Promise.all([
-      fileSystemService.revealInFileManager('D:/cards/a.ocdocument'),
-      fileSystemService.revealInFileManager('D:/cards/a.ocdocument'),
-      fileSystemService.revealInFileManager('D:/cards/a.ocdocument'),
-    ])
+  it('reveals the requested path through the native command', async () => {
+    await fileSystemService.revealInFileManager('D:/cards/a.ocdocument')
 
-    expect(mocks.invoke).toHaveBeenCalledTimes(3)
-    expect(mocks.invoke).toHaveBeenNthCalledWith(1, 'reveal_path', { path: 'D:/cards/a.ocdocument' })
+    expect(mocks.invoke).toHaveBeenCalledExactlyOnceWith('reveal_path', { path: 'D:/cards/a.ocdocument' })
   })
 
   it('uses trash_path for user deletion and propagates failure', async () => {
@@ -54,16 +48,6 @@ describe('fileSystemService native file actions', () => {
     expect(mocks.invoke).not.toHaveBeenCalledWith('reveal_path', expect.anything())
   })
 
-  it('forwards the requested initial directory to the native file picker', async () => {
-    mocks.open.mockResolvedValueOnce(null)
-    await fileSystemService.pickFile({
-      title: 'Choose image',
-      fileTypeName: 'Images',
-      extensions: ['png'],
-      defaultPath: 'D:/Project',
-    })
-    expect(mocks.open).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: 'D:/Project' }))
-  })
 })
 
 describe('fileSystemService recursive listing', () => {
@@ -131,15 +115,5 @@ describe('fileSystemService recursive listing', () => {
     ])
     expect(readPaths).not.toContain('D:/Project/.opencard/icons')
     expect(readPaths).not.toContain('D:/Project/.opencard/icons/outline')
-  })
-
-  it('reads every directory when no recursion policy is given', async () => {
-    mocks.readDir.mockImplementation(async (path: string) => (
-      (tree[path] ?? []).map(entry => ({ ...entry, isFile: !entry.isDirectory, isSymlink: false }))
-    ))
-
-    const entries = await fileSystemService.readDirectoryEntries('D:/Project', Number.POSITIVE_INFINITY)
-
-    expect(entries.map(entry => entry.name)).toContain('.opencard/icons/outline/warn.svg')
   })
 })

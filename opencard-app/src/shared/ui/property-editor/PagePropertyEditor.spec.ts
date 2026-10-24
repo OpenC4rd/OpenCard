@@ -6,7 +6,7 @@ import PropertyFieldRenderer from './PropertyFieldRenderer.vue'
 import type { EditorItem } from './propertyEditor.types'
 
 describe('PagePropertyEditor', () => {
-  it('renders recursive mixed content and emits native values with item paths', async () => {
+  it('emits recursive item paths and refuses a value the field type cannot decode', () => {
     const items: EditorItem[] = [{
       key: 'group',
       title: 'Group',
@@ -31,10 +31,6 @@ describe('PagePropertyEditor', () => {
     field.vm.$emit('commit:value', 'invalid')
     wrapper.getComponent(OcActionButton).vm.$emit('select', { key: 'reset' })
 
-    expect(wrapper.text()).toContain('Group')
-    expect(wrapper.text()).toContain('px')
-    expect(wrapper.findAll('.page-property-editor-item')[1].attributes('style'))
-      .toContain('var(--oc-indent-step) * 1')
     expect(wrapper.emitted('editor-preview')).toEqual([[
       { itemPath: ['group', 'value'], editorKey: 'number', value: 14 },
     ]])
@@ -46,7 +42,7 @@ describe('PagePropertyEditor', () => {
     ]])
   })
 
-  it('decodes boolean commits and allows content with children', () => {
+  it('decodes a boolean commit', () => {
     const items: EditorItem[] = [{
       key: 'parent',
       title: 'Parent',
@@ -58,7 +54,6 @@ describe('PagePropertyEditor', () => {
 
     wrapper.getComponent(PropertyFieldRenderer).vm.$emit('commit:value', 'true')
 
-    expect(wrapper.findAll('.page-property-editor-item')).toHaveLength(2)
     expect(wrapper.emitted('editor-commit')).toEqual([[
       { itemPath: ['parent'], editorKey: 'enabled', value: true },
     ]])

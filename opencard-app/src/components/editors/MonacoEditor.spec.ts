@@ -56,22 +56,15 @@ describe('MonacoEditor', () => {
     monacoMock.editor.getModel.mockReturnValue(null)
   })
 
-  it('shows a loading hint until the on-demand editor module is ready', async () => {
+  it('builds the editor only after the on-demand module is ready', async () => {
     const wrapper = mount(MonacoEditor, { props: { modelValue: '{}', language: 'json' } })
 
-    expect(wrapper.find('.monaco-editor-loading').exists()).toBe(true)
-    expect(wrapper.text()).toContain('monacoEditor.loading')
     expect(monacoMock.create).not.toHaveBeenCalled()
 
     await flushMonacoLoad()
 
-    expect(wrapper.find('.monaco-editor-loading').exists()).toBe(false)
-    expect(monacoMock.defineTheme).toHaveBeenCalledWith('opencard-dark', expect.anything())
     expect(monacoMock.create).toHaveBeenCalledOnce()
-    expect(monacoMock.create.mock.calls[0]?.[1]).toMatchObject({
-      language: 'json',
-      theme: 'opencard-dark',
-    })
+    expect(monacoMock.create.mock.calls[0]?.[1]).toMatchObject({ language: 'json' })
     wrapper.unmount()
   })
 

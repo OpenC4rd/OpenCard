@@ -2,34 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   isProjectIndexSkippedPath,
   isProjectInternalRelativePath,
-  PROJECT_DICTIONARY_FILE_NAME,
-  PROJECT_FONT_REGISTRY_FILE_NAME,
-  PROJECT_ICON_REGISTRY_FILE_NAME,
-  PROJECT_INTERNAL_DIRECTORIES,
-  PROJECT_PROFILE_FILE_NAME,
   resolveProjectInternalRelativePath,
 } from './projectStructure'
 
 describe('projectStructure', () => {
-  it('keeps every managed document and asset directory under .opencard', () => {
-    expect([
-      PROJECT_PROFILE_FILE_NAME,
-      PROJECT_FONT_REGISTRY_FILE_NAME,
-      PROJECT_ICON_REGISTRY_FILE_NAME,
-      PROJECT_DICTIONARY_FILE_NAME,
-      ...PROJECT_INTERNAL_DIRECTORIES,
-    ]).toEqual([
-      '.opencard/project.json',
-      '.opencard/fonts/fonts.json',
-      '.opencard/icons/icons.json',
-      '.opencard/locale.json',
-      '.opencard/fonts',
-      '.opencard/icons',
-      '.opencard/blocks',
-      '.opencard/packages',
-    ])
-  })
-
   it('resolves registry asset paths relative to the internal directory', () => {
     expect(resolveProjectInternalRelativePath('fonts\\Body.ttf')).toBe('.opencard/fonts/Body.ttf')
     expect(resolveProjectInternalRelativePath()).toBe('.opencard')

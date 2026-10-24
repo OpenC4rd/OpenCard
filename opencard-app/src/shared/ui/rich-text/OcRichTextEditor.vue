@@ -87,27 +87,33 @@
       </div>
     </div>
 
-    <OcFloatingLayer v-if="selectedNodeAnchor && selectedNodeKind === 'projectIcon'" :open="nodeEditOpen"
-      :anchor="selectedNodeAnchor" :owner="editor?.view.dom" placement="top-start">
-      <div class="oc-rich-text-editor__node-edit-layer">
-        <OcActionButton :action="projectIconAction"
-          size="sm" variant="ghost" @mousedown.prevent @select="handleProjectIconAction" />
-      </div>
-    </OcFloatingLayer>
-
     <EditorContent :editor="editor" class="oc-rich-text-editor__surface" :style="baseStyle" />
+
+    <OcOverlayMarker
+      ref="nodeEditLayer"
+      group="rich-text-node-edit"
+      :anchor="nodeEditAnchor"
+      :owner="editor?.view.dom ?? null"
+      placement="top-start"
+      :open="nodeEditLayerOpen"
+      @update:open="nodeEditLayerOpen = $event"
+    >
+      <RichTextNodeEditLayer :action="projectIconAction" @select="handleProjectIconAction" />
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
 import { EditorContent } from '@tiptap/vue-3'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
+import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
 import ReferenceStringPropertyField from '../property-editor/fields/ReferenceStringPropertyField.vue'
-import OcFloatingLayer from '../../../components/standard/OcFloatingLayer.vue'
+import type { OverlayAnchor } from '../../../composables/overlayGroups'
+import RichTextNodeEditLayer from './RichTextNodeEditLayer.vue'
 import { useRichTextEditor, type RichTextEditorProps } from './useRichTextEditor'
 const props = defineProps<RichTextEditorProps>()
 const emit = defineEmits<{ change: [] }>()
@@ -127,6 +133,20 @@ const properties = computed(() => ({
   update: formatting.update, reset: formatting.reset, preview: formatting.previewProperty,
   cancel: interaction.clearPreview, capture: interaction.capture,
 }))
+/** 选中项目图标时浮出替换按钮：层的开关只跟选择走。 */
+const nodeEditLayerOpen = ref(false)
+const nodeEditLayer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
+/** 选区一变就换一个锚点函数：组只在换锚点时重新求值，宿主才会挪到新节点上。 */
+const nodeEditAnchor = computed<OverlayAnchor>(() => () => selectedNodeAnchor.value)
+watch(
+  [nodeEditOpen, selectedNodeKind],
+  ([open, kind]) => { nodeEditLayerOpen.value = open && kind === 'projectIcon' },
+  { flush: 'sync' },
+)
+// 从一个图标节点换到另一个时这一层一直开着：post-flush 时新锚点已经交给 marker，重开一次宿主才跟过去。
+watch(nodeEditAnchor, () => {
+  if (nodeEditLayerOpen.value) nodeEditLayer.value?.open()
+}, { flush: 'post' })
 defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteraction, properties })
 </script>
 
@@ -288,14 +308,4 @@ defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteract
 .oc-rich-text-editor__surface :deep([class~="selectedCell"]) {
   background-color: var(--oc-bg-selected);
 }
-
-.oc-rich-text-editor__node-edit-layer {
-  display: grid;
-  max-width: var(--oc-dialog-width-md);
-  max-height: inherit;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-2xs);
-  overflow: auto;
-}
-
 </style>

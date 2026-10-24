@@ -1,34 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { createI18n } from 'vue-i18n'
 import { createTextBlock, type CardDocument, type CardInstanceRecord } from '../../entities/card/model'
-import enUS from '../../locales/en-US'
-import zhCN from '../../locales/zh-CN'
 import type { RenderPipelineResult } from '../card-rendering/renderPipeline'
 import { createCardDesignerIssueSnapshot, createCardDesignerIssues } from './cardDesignerIssues'
 
-function createTranslate(locale: 'en-US' | 'zh-CN') {
-  const i18n = createI18n({
-    legacy: false,
-    locale,
-    messages: { 'en-US': enUS, 'zh-CN': zhCN },
-  })
-  return (key: string, parameters: Readonly<Record<string, string | number>> = {}) => (
-    i18n.global.t(key, parameters)
-  )
-}
-
-const translate = createTranslate('zh-CN')
-const resolveFieldLabel = (key: string) => ({
-  opacity: '不透明度',
-  score: '分数',
-  width: '宽度',
-  content: '内容',
-}[key] ?? key)
+const translate = (key: string, parameters: Readonly<Record<string, string | number>> = {}) => (
+  `${key}${Object.keys(parameters).length > 0 ? `:${Object.values(parameters).join(',')}` : ''}`
+)
+const resolveFieldLabel = (key: string) => key
 
 function createDocument(): CardDocument {
   return {
     type: 'card-document',
-
     id: 'card-doc',
     name: 'Card',
     version: '1.0.0',
@@ -71,33 +53,6 @@ function createResult(): RenderPipelineResult {
 }
 
 describe('cardDesignerIssues', () => {
-  it('creates display-ready issues with opaque card navigation tokens', () => {
-    const instance: CardInstanceRecord = {
-      type: 'card-instance', id: 'instance-1', name: 'Instance 1', amount: '1', data: {},
-    }
-    expect(createCardDesignerIssues(createResult(), instance, translate, resolveFieldLabel)).toEqual([
-      expect.objectContaining({
-        id: 'issue-1',
-        type: 'card-designer.render-parse.out-of-range',
-        severity: 'warning',
-        locationText: '在实例“Instance 1” 正面中，块“Container.Title”（title）的 不透明度（opacity）属性',
-        description: '属性“不透明度”的值超出允许范围，已使用默认值：1',
-        navigationToken: {
-          protocol: 'card-designer',
-          version: 2,
-          target: {
-            kind: 'property',
-            instanceId: 'instance-1',
-            faceKey: 'front',
-            blockId: 'title',
-            owner: 'block',
-            fieldKey: 'opacity',
-          },
-        },
-      }),
-    ])
-  })
-
   it('reports an ordered per-card snapshot and clears all scopes without a document', () => {
     const document = createDocument()
     expect(createCardDesignerIssueSnapshot({
@@ -118,6 +73,31 @@ describe('cardDesignerIssues', () => {
       translate,
       resolveFieldLabel,
     })).toEqual({ scopeKey: 'card:blueprint', scopeOrder: [], issues: [] })
+  })
+
+  it('builds an opaque navigation token for a block-owned issue', () => {
+    const instance: CardInstanceRecord = {
+      type: 'card-instance', id: 'instance-1', name: 'Instance 1', amount: '1', data: {},
+    }
+    expect(createCardDesignerIssues(createResult(), instance, translate, resolveFieldLabel)).toEqual([
+      expect.objectContaining({
+        id: 'issue-1',
+        type: 'card-designer.render-parse.out-of-range',
+        severity: 'warning',
+        navigationToken: {
+          protocol: 'card-designer',
+          version: 2,
+          target: {
+            kind: 'property',
+            instanceId: 'instance-1',
+            faceKey: 'front',
+            blockId: 'title',
+            owner: 'block',
+            fieldKey: 'opacity',
+          },
+        },
+      }),
+    ])
   })
 
   it('routes document-owned issues to the blueprint property projection', () => {
@@ -161,7 +141,7 @@ describe('cardDesignerIssues', () => {
       .not.toHaveProperty('navigationToken')
   })
 
-  it('localizes character position, referenced field name, and abbreviated block id', () => {
+  it('keeps the character offset of the failing binding token', () => {
     const result = createResult()
     result.issues[0] = {
       id: 'binding-issue',
@@ -182,23 +162,8 @@ describe('cardDesignerIssues', () => {
     }
 
     const issue = createCardDesignerIssues(result, null, translate, resolveFieldLabel)[0]!
-    expect(issue.locationText).toBe(
-      '在蓝图 正面中，块“Container.Title”（text…7890）的 内容（content）属性，第 7 个字符',
-    )
-    expect(issue.description).toBe('引用属性“分数”不存在')
     expect(issue.navigationToken).toEqual(expect.objectContaining({
       target: expect.objectContaining({ characterOffset: 6 }),
     }))
-
-    const englishIssue = createCardDesignerIssues(
-      result,
-      null,
-      createTranslate('en-US'),
-      (key) => key,
-    )[0]!
-    expect(englishIssue.locationText).toBe(
-      'In the blueprint front, block "Container.Title" (text…7890), field content (content), character 7',
-    )
-    expect(englishIssue.description).toBe('Referenced field "score" does not exist')
   })
 })

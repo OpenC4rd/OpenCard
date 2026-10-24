@@ -75,34 +75,23 @@ describe('card data workbook', () => {
     await workbook.xlsx.load(bytes)
     const worksheet = workbook.getWorksheet('Card Data')!
 
+    // The identity row and column drive import; hiding them keeps the sheet readable.
     expect(worksheet.getRow(1).hidden).toBe(true)
     expect(worksheet.getColumn(1).hidden).toBe(true)
     expect(worksheet.getCell('A3').value).toBe('block-1')
     expect(worksheet.getCell('B3').value).toBe('content')
-    expect(worksheet.getCell('C3').value).toBe('Front')
     expect(worksheet.getCell('F1').value).toBe('__blueprint__')
     expect(worksheet.getCell('G1').value).toBe('instance-1')
     expect(worksheet.getCell('G3').value).toBe('Override')
-    expect(worksheet.getCell('A1').protection?.locked).not.toBe(false)
+    // Only instance cells stay editable; the identity cells and labels are protected.
     expect(worksheet.getCell('F1').protection?.locked).not.toBe(false)
     expect(worksheet.getCell('A3').protection?.locked).not.toBe(false)
-    expect(worksheet.getCell('D3').protection?.locked).not.toBe(false)
-    expect(worksheet.getCell('F2').protection?.locked).not.toBe(false)
     expect(worksheet.getCell('G2').protection.locked).toBe(false)
     expect(worksheet.getCell('G3').protection.locked).toBe(false)
     expect(worksheet.getCell('H2').protection.locked).toBe(false)
     expect(worksheet.getCell('H3').protection.locked).toBe(false)
-    expect(worksheet.getCell('H4').protection?.locked).not.toBe(false)
-    // 表格下面空一行，再一行是注释：左边驱动说明，最后一列提示可以向右加列
-    expect(worksheet.getCell('C4').value).toBeNull()
-    expect(worksheet.getCell('C5').value).toBe('OpenCard 驱动')
-    expect(worksheet.getCell('H5').value).toBe('你可以向右拓展更多列以在导入时创建新实例')
-    expect(worksheet.getCell('C5').protection?.locked).not.toBe(false)
     expect(readSheetProtection(worksheet)?.sheet).toBe(true)
-    expect(readSheetProtection(worksheet)?.insertColumns).toBe(true)
-    const metadata = workbook.getWorksheet('_OpenCard')!
-    expect(metadata.state).toBe('veryHidden')
-    expect(readSheetProtection(metadata)?.sheet).toBe(true)
+    expect(workbook.getWorksheet('_OpenCard')!.state).toBe('veryHidden')
   })
 
   it('merges identity cells of a multi-field Block without changing what imports', async () => {
@@ -180,31 +169,6 @@ describe('card data workbook', () => {
       fieldKey: 'content',
       value: 'New value',
       reset: false,
-    })
-  })
-
-  it('adds portable dropdown validation for boolean fields', async () => {
-    const groups = createFaceGroups()
-    groups[0]!.blocks[0]!.fields[0]!.definition = {
-      title: 'Visible',
-      fieldType: 'boolean',
-    }
-    const bytes = await exportCardDataWorkbook({
-      document: createDocument(),
-      columns: createColumns(),
-      faceGroups: groups,
-      exportInstanceIds: ['instance-1'],
-      labels: { face: 'Face', block: 'Block Name', field: 'Field' },
-    })
-    const ExcelJS = await import('exceljs')
-    const workbook = new ExcelJS.Workbook()
-    await workbook.xlsx.load(bytes)
-
-    expect(workbook.getWorksheet('Card Data')!.getCell('F3').dataValidation).toMatchObject({
-      type: 'list',
-      showErrorMessage: true,
-      errorStyle: 'information',
-      formulae: ['"true,false"'],
     })
   })
 

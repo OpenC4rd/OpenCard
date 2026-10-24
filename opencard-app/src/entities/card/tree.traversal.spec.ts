@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { createBlock, type CardDocument } from './model'
 import { findCardBlockInDocument, visitCardBlockTree } from './tree'

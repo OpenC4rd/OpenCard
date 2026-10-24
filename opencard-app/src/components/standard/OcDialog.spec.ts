@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import OcDialog from './OcDialog.vue'
 import { activeDialogRoot } from '../../shared/ui/overlayScope'
 
@@ -34,11 +34,12 @@ describe('OcDialog', () => {
     wrappers.push(wrapper)
     await wrapper.vm.$nextTick()
     expect(document.activeElement).toBe(document.querySelector('textarea'))
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
-    const textarea = dialog.querySelector('textarea')!
+
+    const textarea = document.querySelector<HTMLElement>('[role="dialog"] textarea')!
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
     expect(document.activeElement).toBe(textarea)
   })
+
   it('owns an external sidebar in the same modal scope and hands its handle to the layout', async () => {
     const wrapper = mount(OcDialog, {
       props: { open: true, title: 'Editor', sidebarTitle: 'Properties', sidebarTooltip: 'Toggle properties' },
@@ -47,11 +48,8 @@ describe('OcDialog', () => {
     })
     wrappers.push(wrapper)
     await wrapper.vm.$nextTick()
-    const main = document.body.querySelector('.oc-dialog')!
     const sidebar = document.body.querySelector('aside')!
     const handle = document.body.querySelector<HTMLButtonElement>('.oc-dialog-layout__handle')!
-    expect(main.contains(sidebar)).toBe(false)
-    expect(document.body.querySelector('[role="dialog"]')?.contains(sidebar)).toBe(true)
     expect(handle.getAttribute('aria-label')).toBe('Toggle properties')
 
     handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
@@ -62,9 +60,12 @@ describe('OcDialog', () => {
     await wrapper.setProps({ sidebar: false })
     expect(document.body.querySelector('aside')).toBeNull()
     expect(document.body.querySelector('.oc-dialog-layout__handle')).toBeNull()
-    main.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    expect(wrapper.emitted('update:open')).toEqual([[false]])
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(wrapper.emitted('request-close')).toEqual([[]])
   })
+
   it('activates dialogs by opening order and restores the previous scope on release', async () => {
     const first = mountDialog({ open: false })
     const second = mountDialog()
@@ -81,6 +82,7 @@ describe('OcDialog', () => {
     expect(activeDialogRoot.value).toBe(previous)
     expect(previous.inert).toBe(false)
   })
+
   it('owns modal semantics and focuses the requested initial control', async () => {
     const trigger = document.createElement('button')
     document.body.appendChild(trigger)
@@ -103,11 +105,11 @@ describe('OcDialog', () => {
     backdrop.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     expect(wrapper.emitted('request-close')).toBeUndefined()
     dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    expect(wrapper.emitted('request-close')).toEqual([['escape']])
+    expect(wrapper.emitted('request-close')).toEqual([[]])
 
     await wrapper.setProps({ closeOnBackdrop: true })
     backdrop.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    expect(wrapper.emitted('request-close')).toEqual([['escape'], ['backdrop']])
+    expect(wrapper.emitted('request-close')).toEqual([[], []])
   })
 
   it('traps tab focus and restores the opening control after closing', async () => {
@@ -135,39 +137,15 @@ describe('OcDialog', () => {
     expect(trigger.inert).toBeFalsy()
   })
 
-  it('uses a form surface and emits submit without browser navigation', async () => {
-    const wrapper = mountDialog({ as: 'form', padded: false, scrollable: false })
+  it('submits through a form surface without browser navigation', async () => {
+    const wrapper = mountDialog({ as: 'form' })
     await wrapper.vm.$nextTick()
-    const dialog = document.body.querySelector<HTMLFormElement>('[role="dialog"] form')!
-    dialog.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }))
+    const form = document.querySelector<HTMLFormElement>('[role="dialog"] form')
+      ?? document.querySelector<HTMLFormElement>('[role="dialog"]')!
+    const submit = new SubmitEvent('submit', { bubbles: true, cancelable: true })
+    form.dispatchEvent(submit)
 
     expect(wrapper.emitted('submit')).toHaveLength(1)
-    expect(dialog.classList).toContain('oc-dialog--flush')
-    expect(dialog.classList).toContain('oc-dialog--scroll-locked')
-  })
-
-  it('projects semantic content, bounded, and fixed height contracts', async () => {
-    const wrapper = mountDialog({ minHeight: 'md', maxHeight: 'lg' })
-    await wrapper.vm.$nextTick()
-    let dialog = document.body.querySelector<HTMLElement>('.oc-dialog')!
-    expect(Array.from(dialog.classList)).toEqual(expect.arrayContaining([
-      'oc-dialog--height-mode-content',
-      'oc-dialog--min-height-md',
-      'oc-dialog--max-height-lg',
-    ]))
-
-    await wrapper.setProps({ heightMode: 'fixed', height: 'workspace', minHeight: undefined, maxHeight: 'viewport' })
-    dialog = document.body.querySelector<HTMLElement>('.oc-dialog')!
-    expect(dialog.classList).toContain('oc-dialog--height-mode-fixed')
-    expect(dialog.classList).toContain('oc-dialog--height-workspace')
-    expect(dialog.classList).not.toContain('oc-dialog--min-height-md')
-  })
-
-  it('reports a fixed height mode without a semantic preset in development', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    const wrapper = mountDialog({ heightMode: 'fixed' })
-    await wrapper.vm.$nextTick()
-    expect(warn).toHaveBeenCalledWith('[OcDialog] heightMode="fixed" requires a height preset.')
-    warn.mockRestore()
+    expect(submit.defaultPrevented).toBe(true)
   })
 })

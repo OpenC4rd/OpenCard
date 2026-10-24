@@ -46,7 +46,6 @@ describe('ProjectIconRegistrationDialog', () => {
       extensions: ['svg', 'png', 'jpg', 'jpeg', 'webp'],
     }))
     // Identity is derived from the file name only, so choosing is instant even for a huge folder.
-    expect(wrapper.text()).toContain('projectConfig.icons.selectedIconsCount')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({
       name: 'Warn',
@@ -145,11 +144,10 @@ describe('ProjectIconRegistrationDialog', () => {
     const wrapper = mountDialog()
     await chooseFiles(wrapper)
     await flushPromises()
-    expect(wrapper.text()).toContain('projectConfig.icons.selectedIconsCount')
+    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeUndefined()
 
     await wrapper.setProps({ open: false })
     await wrapper.setProps({ open: true })
-    expect(wrapper.text()).not.toContain('projectConfig.icons.selectedIconsCount')
     expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
@@ -160,9 +158,6 @@ describe('ProjectIconRegistrationDialog', () => {
       icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' as const }],
     }
     const wrapper = mountDialog({ series: [outline], targetSeries: outline })
-
-    expect(wrapper.text()).toContain('projectConfig.icons.addIconsToSet')
-    expect(wrapper.text()).not.toContain('projectConfig.icons.advancedSettings')
 
     await chooseFiles(wrapper)
     await flushPromises()

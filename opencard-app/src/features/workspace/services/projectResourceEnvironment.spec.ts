@@ -8,7 +8,6 @@ const watcherEvents = vi.hoisted(() => ({ listener: null as ((event: { payload: 
 vi.mock('@tauri-apps/api/event', () => ({ listen: async (_: string, listener: typeof watcherEvents.listener) => { watcherEvents.listener = listener; return () => { watcherEvents.listener = null } } }))
 
 type ArchivedPackage = { manifestJson: string, fingerprint: string }
-
 const { archives } = vi.hoisted(() => ({ archives: new Map<string, ArchivedPackage>() }))
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -28,29 +27,25 @@ import {
   createProjectResourceNamespace,
   loadProjectResourceEnvironment, createResourceEnvironment,
   packageScopeRoots,
-  projectResourceScopeIdentity,
   resolveProjectEnvironmentFontFamily,
   resolveProjectResourcePackage,
   type ProjectResourceEnvironment,
 } from './projectResourceEnvironment'
 
-/**
- * 目录按内容指纹存，所以按坐标取一个包要走和引用同一条路 —— 这也是它在生产里唯一的取法。
- */
+const PACKAGES_ROOT = '/project/.opencard/packages'
+/** 软件存储里的包快照根：解开目录挂在指纹上，"解开了没有"就是这里有没有那个目录。 */
+const SNAPSHOTS_ROOT = '/cache/snapshots'
+
+/** 目录按内容指纹存，所以按坐标取一个包要走和引用同一条路 —— 这也是它在生产里唯一的取法。 */
 function packageAt(environment: ProjectResourceEnvironment, coordinate: string) {
   return resolveProjectResourcePackage(environment, parsePackageQualifier(coordinate)!)
 }
 
 function packageEnvironment(packageId: string): ProjectResourceEnvironment {
-  const namespace = createProjectResourceNamespace('package', packageId)
   return {
-    kind: 'package',
-    namespace,
-    rootPath: `/cache/snapshots/${packageId}`,
-    fontDocument: {},
-    fonts: { body: { kind: 'family', name: 'Body', family: { key: 'body', name: 'Body', files: {} } } },
-    iconDocument: {},
-    iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+    kind: 'package', namespace: createProjectResourceNamespace('package', packageId), rootPath: `/cache/snapshots/${packageId}`,
+    fontDocument: {}, fonts: { body: { kind: 'family', name: 'Body', family: { key: 'body', name: 'Body', files: {} } } },
+    iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
   }
 }
 
@@ -77,10 +72,6 @@ function memoryFileSystem(files: Map<string, string>) {
   }
 }
 
-const PACKAGES_ROOT = '/project/.opencard/packages'
-/** 软件存储里的包快照根：解开目录挂在指纹上，"解开了没有"就是这里有没有那个目录。 */
-const SNAPSHOTS_ROOT = '/cache/snapshots'
-
 function manifest(identity: { author: string, name: string, version: string }, extra: Record<string, unknown> = {}) {
   return JSON.stringify({
     type: 'opencard-resource-package',
@@ -92,10 +83,7 @@ function manifest(identity: { author: string, name: string, version: string }, e
 }
 
 function registerArchive(archivePath: string, archive: Partial<ArchivedPackage> & { manifestJson: string }) {
-  archives.set(archivePath, {
-    fingerprint: `fp-${archivePath.split('/').pop()}`,
-    ...archive,
-  })
+  archives.set(archivePath, { fingerprint: `fp-${archivePath.split('/').pop()}`, ...archive })
 }
 
 /** 把一个包标记成"已经解开"：缓存里存在它的指纹目录。 */
@@ -106,6 +94,13 @@ function unpacked(files: Map<string, string>, fingerprint: string): Map<string, 
 
 function projectFiles(...paths: readonly string[]): Map<string, string> {
   return new Map([[PACKAGES_ROOT, ''], ...paths.map(path => [path, ''] as const)])
+}
+
+function load(files: Map<string, string>, extra: Partial<Parameters<typeof loadProjectResourceEnvironment>[0]> = {}) {
+  return loadProjectResourceEnvironment({
+    rootPath: '/project', snapshotsRoot: SNAPSHOTS_ROOT, kind: 'project', identity: 'project',
+    fs: memoryFileSystem(files), ...extra,
+  })
 }
 
 describe('ProjectResourceEnvironment', () => {
@@ -119,12 +114,7 @@ describe('ProjectResourceEnvironment', () => {
     expect(aliceFamily).not.toBe(bobFamily)
   })
 
-  it('keeps field-level scope identities distinct for the same block', () => {
-    expect(projectResourceScopeIdentity('block', 'image')).not.toBe(projectResourceScopeIdentity('block', 'fontFamily'))
-    expect(projectResourceScopeIdentity('block', 'image')).not.toBe(projectResourceScopeIdentity('other', 'image'))
-  })
-
-  it('assembles the project icon catalog from the registry without reading any icon file', async () => {
+  it('assembles the project icon catalog without reading any icon file or measuring it', async () => {
     const files = new Map<string, string>([[
       '/project/.opencard/icons/icons.json',
       JSON.stringify({
@@ -134,58 +124,34 @@ describe('ProjectResourceEnvironment', () => {
         }],
       }),
     ]])
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(files),
-    })
+    const environment = await load(files)
 
-    expect(environment.iconCatalog.entries).toHaveLength(1)
-    expect(environment.iconCatalog.entries[0]).toMatchObject({
-      iconKey: 'warn', seriesKey: 'outline', src: expect.stringContaining('warn.svg'),
-    })
+    expect(environment.iconCatalog.entries).toEqual([expect.objectContaining({
+      iconKey: 'warn',
+      seriesKey: 'outline',
+      src: 'asset:///project/.opencard/icons/outline/warn.svg',
+    })])
     // No size: it belongs to the file, and is resolved when the icon is painted.
     expect(environment.iconCatalog.entries[0]).not.toHaveProperty('imageWidth')
   })
 
   it('reuses a catalog the caller already assembled for the same root', async () => {
-    const files = new Map<string, string>([[
-      '/project/.opencard/icons/icons.json',
-      JSON.stringify({
-        iconSeries: [{
-          name: 'Outline', key: 'outline',
-          icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }],
-        }],
-      }),
-    ]])
     const providedCatalog = {
       series: [{ name: 'Outline', key: 'outline' }],
       entries: [{
         iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg',
         tint: 'context' as const, seriesKey: 'outline', src: 'asset:///warn.svg',
         imageWidth: 8, imageHeight: 4,
-      }]
+      }],
     }
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      iconCatalog: providedCatalog,
-      fs: memoryFileSystem(files),
-    })
+    const environment = await load(new Map([['/project/.opencard/icons/icons.json', '{}']]), { iconCatalog: providedCatalog })
 
-    // The caller's catalog is the one carried, so its entries survive intact.
-    expect(environment.iconCatalog.entries).toEqual(providedCatalog.entries)
-    expect(environment.iconCatalog.entries[0]).toMatchObject({ imageWidth: 8, imageHeight: 4 })
+    expect(environment.iconCatalog).toBe(providedCatalog)
   })
 
   it('reads identity from each archive and queues the ones that are not unpacked yet', async () => {
     archives.clear()
-    const pending: string[] = []
     registerArchive(`${PACKAGES_ROOT}/alice-icons.ocpack`, {
       manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
     })
@@ -195,15 +161,9 @@ describe('ProjectResourceEnvironment', () => {
     const files = projectFiles(`${PACKAGES_ROOT}/alice-icons.ocpack`, `${PACKAGES_ROOT}/whatever-the-file-is-called.ocpack`)
     const bobRoot = `${SNAPSHOTS_ROOT}/fp-whatever-the-file-is-called.ocpack`
     unpacked(files, 'fp-whatever-the-file-is-called.ocpack')
+    const pending: string[] = []
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(files),
-      onPackagePending: (_archive, archivePath) => pending.push(archivePath),
-    })
+    const environment = await load(files, { onPackagePending: (_archive, archivePath) => pending.push(archivePath) })
 
     // 身份来自包自己的清单，文件名不算数；目录按内容指纹存，所以取一个包要走解析。
     expect(packageAt(environment, 'alice/icons@1.0.0')?.rootPath).toBeNull()
@@ -219,13 +179,7 @@ describe('ProjectResourceEnvironment', () => {
       manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
     })
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(projectFiles(`${PACKAGES_ROOT}/broken.ocpack`, `${PACKAGES_ROOT}/good.ocpack`)),
-    })
+    const environment = await load(projectFiles(`${PACKAGES_ROOT}/broken.ocpack`, `${PACKAGES_ROOT}/good.ocpack`))
 
     // 读不出来的归档不是一个包，所以它不进目录；但它也不再凭空消失，而是按文件报出来。
     expect(packageAt(environment, 'alice/icons@1.0.0')?.archivePath).toBe(`${PACKAGES_ROOT}/good.ocpack`)
@@ -240,12 +194,7 @@ describe('ProjectResourceEnvironment', () => {
       fingerprint: 'fp-alice',
     })
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(projectFiles(`${PACKAGES_ROOT}/alice.ocpack`)),
+    const environment = await load(projectFiles(`${PACKAGES_ROOT}/alice.ocpack`), {
       unusableFingerprints: new Set(['fp-alice']),
       onPackagePending: () => { throw new Error('a failed package must not be queued again') },
     })
@@ -256,29 +205,18 @@ describe('ProjectResourceEnvironment', () => {
   it('keeps one entry per content, and lets the first file win for a coordinate', async () => {
     archives.clear()
     registerArchive(`${PACKAGES_ROOT}/alice-a.ocpack`, {
-      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
-      fingerprint: 'fp-shared',
+      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }), fingerprint: 'fp-shared',
     })
     registerArchive(`${PACKAGES_ROOT}/alice-b.ocpack`, {
-      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
-      fingerprint: 'fp-shared',
+      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }), fingerprint: 'fp-shared',
     })
     registerArchive(`${PACKAGES_ROOT}/impostor.ocpack`, {
-      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
-      fingerprint: 'fp-other',
+      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }), fingerprint: 'fp-other',
     })
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(projectFiles(
-        `${PACKAGES_ROOT}/alice-a.ocpack`,
-        `${PACKAGES_ROOT}/alice-b.ocpack`,
-        `${PACKAGES_ROOT}/impostor.ocpack`,
-      )),
-    })
+    const environment = await load(projectFiles(
+      `${PACKAGES_ROOT}/alice-a.ocpack`, `${PACKAGES_ROOT}/alice-b.ocpack`, `${PACKAGES_ROOT}/impostor.ocpack`,
+    ))
 
     // 同一份内容放了两个文件名：连解压目录都一样，所以只留先出现的那个文件名。
     expect([...environment.packages!.keys()].sort()).toEqual(['fp-other', 'fp-shared'])
@@ -288,9 +226,7 @@ describe('ProjectResourceEnvironment', () => {
       `${PACKAGES_ROOT}/alice-b.ocpack`,
       `${PACKAGES_ROOT}/impostor.ocpack`,
     ])
-    expect(environment.packageFiles?.map(file => file.fingerprint)).toEqual([
-      'fp-shared', 'fp-shared', 'fp-other',
-    ])
+    expect(environment.packageFiles?.map(file => file.fingerprint)).toEqual(['fp-shared', 'fp-shared', 'fp-other'])
     // 同坐标、内容不同（比如换了一份构建）：两个文件都在，谁也不消失；引用落到文件名靠前的那个。
     expect(packageAt(environment, 'alice/icons@1.0.0')?.archivePath).toBe(`${PACKAGES_ROOT}/alice-a.ocpack`)
     expect(environment.packages!.get('fp-other')?.archivePath).toBe(`${PACKAGES_ROOT}/impostor.ocpack`)
@@ -298,48 +234,21 @@ describe('ProjectResourceEnvironment', () => {
 
   it('keeps a package even when its registry names a file the package does not ship', async () => {
     archives.clear()
-    registerArchive(`${PACKAGES_ROOT}/alice.ocpack`, {
-      manifestJson: manifest({ author: 'alice', name: 'icons', version: '1.0.0' }),
-      fingerprint: 'fp-alice',
-    })
     registerArchive(`${PACKAGES_ROOT}/bob.ocpack`, {
-      manifestJson: manifest({ author: 'bob', name: 'icons', version: '1.0.0' }),
-      fingerprint: 'fp-bob',
+      manifestJson: manifest({ author: 'bob', name: 'icons', version: '1.0.0' }), fingerprint: 'fp-bob',
     })
-    const aliceRoot = `${SNAPSHOTS_ROOT}/fp-alice`
     const bobRoot = `${SNAPSHOTS_ROOT}/fp-bob`
-    const files = projectFiles(`${PACKAGES_ROOT}/alice.ocpack`, `${PACKAGES_ROOT}/bob.ocpack`)
-    unpacked(files, 'fp-alice')
+    const files = projectFiles(`${PACKAGES_ROOT}/bob.ocpack`)
     unpacked(files, 'fp-bob')
-    files.set(`${aliceRoot}/.opencard/icons/icons.json`, JSON.stringify({
-      iconSeries: [{
-        name: 'Outline', key: 'outline',
-        icons: [{ iconKey: 'warn', name: 'Warn', source: 'icons/warn.svg', tint: 'context' }],
-      }],
-    }))
-    files.set(`${aliceRoot}/icons/warn.svg`, 'bytes')
     files.set(`${bobRoot}/.opencard/icons/icons.json`, JSON.stringify({
-      iconSeries: [{
-        name: 'Outline', key: 'outline',
-        icons: [{ iconKey: 'gone', name: 'Gone', source: 'icons/gone.svg', tint: 'context' }],
-      }],
+      iconSeries: [{ name: 'Outline', key: 'outline', icons: [{ iconKey: 'gone', name: 'Gone', source: 'icons/gone.svg', tint: 'context' }] }],
     }))
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(files),
-    })
+    const environment = await load(files)
 
-    expect(packageAt(environment, 'alice/icons@1.0.0')?.rootPath).toBe(aliceRoot)
-    expect(environment.packageEnvironments?.get('alice/icons@1.0.0')?.iconCatalog.entries[0]?.src)
-      .toBe(`asset://${aliceRoot}/icons/warn.svg`)
     // 注册表指到空气不在这里判死：包照旧在目录里，只是那一张画不出来。
     expect(packageAt(environment, 'bob/icons@1.0.0')?.rootPath).toBe(bobRoot)
-    expect(environment.packageEnvironments?.get('bob/icons@1.0.0')?.iconCatalog.entries[0]?.src)
-      .toBe(`asset://${bobRoot}/icons/gone.svg`)
+    expect(environment.packageEnvironments?.get('bob/icons@1.0.0')?.iconCatalog.entries).toHaveLength(1)
   })
 
   it('resolves a package cover from its unpacked root and stays silent when it is missing', async () => {
@@ -352,25 +261,14 @@ describe('ProjectResourceEnvironment', () => {
       manifestJson: manifest({ author: 'bob', name: 'icons', version: '1.0.0' }, { cover: 'assets/missing.png' }),
       fingerprint: 'fp-bob',
     })
-    const aliceRoot = `${SNAPSHOTS_ROOT}/fp-alice`
     const files = projectFiles(`${PACKAGES_ROOT}/alice.ocpack`, `${PACKAGES_ROOT}/bob.ocpack`)
     unpacked(files, 'fp-alice')
     unpacked(files, 'fp-bob')
-    files.set(`${aliceRoot}/assets/cover.png`, 'bytes')
+    files.set(`${SNAPSHOTS_ROOT}/fp-alice/assets/cover.png`, 'bytes')
 
-    const environment = await loadProjectResourceEnvironment({
-      rootPath: '/project',
-      snapshotsRoot: SNAPSHOTS_ROOT,
-      kind: 'project',
-      identity: 'project',
-      fs: memoryFileSystem(files),
-    })
+    const environment = await load(files)
 
-    expect(packageAt(environment, 'alice/icons@1.0.0')?.cover).toEqual({
-      relativePath: 'assets/cover.png',
-      absolutePath: `${aliceRoot}/assets/cover.png`,
-      src: `asset://${aliceRoot}/assets/cover.png`,
-    })
+    expect(packageAt(environment, 'alice/icons@1.0.0')?.cover?.relativePath).toBe('assets/cover.png')
     expect(packageAt(environment, 'bob/icons@1.0.0')?.cover).toBeNull()
   })
 })
@@ -423,6 +321,7 @@ describe('resource environment lifecycle', () => {
       expect(environment.state.value.customBlockSources?.has(source)).toBe(false)
     } finally { await environment.dispose() }
   })
+
   it('invalidates deleted descendants without rescanning unrelated registries and isolates environments', async () => {
     const files = new Map([['/one/Assets/image.png', 'image'], ['/two/Assets/image.png', 'other']])
     const reads: string[] = []

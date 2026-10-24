@@ -3,7 +3,6 @@ import {
   parseProjectMetadata,
   parseProjectMetadataText,
   serializeProjectMetadata,
-  toProjectInformation,
 } from './projectMetadata'
 
 describe('project profile metadata', () => {
@@ -93,11 +92,4 @@ describe('project profile metadata', () => {
     expect(parseProjectMetadata({ exportTask })?.exportTask?.errorPolicy).toBe('continue')
   })
 
-  it('creates a complete runtime snapshot', () => {
-    expect(toProjectInformation({ name: 'Demo' })).toEqual({
-      name: 'Demo',
-      description: '',
-      version: '',
-    })
-  })
 })

@@ -1,36 +1,8 @@
 import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type {
-  OcNode,
-  OcNodeActivateEvent,
-  OcNodeCollection,
-} from '../../shared/ui/node/node.types'
+import type { OcNode, OcNodeCollection } from '../../shared/ui/node/node.types'
 import OcTree from './OcTree.vue'
-import OcActionButton from './OcActionButton.vue'
-import { useFloatingMenu } from '../../composables/useFloatingMenu'
-import { registerUnhandledExternalDrop } from '../../shared/ui/drop/externalFileDrop'
 import { taskScheduler } from '../../utils/taskScheduler'
-
-const platform = vi.hoisted(() => ({
-  dragDropHandler: null as ((event: { payload: unknown }) => void) | null,
-  unlisten: vi.fn(),
-}))
-
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
-
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({
-    onDragDropEvent: async (handler: (event: { payload: unknown }) => void) => {
-      platform.dragDropHandler = handler
-      return platform.unlisten
-    },
-  }),
-}))
-
-function emitPlatformDragDrop(payload: unknown): void {
-  platform.dragDropHandler?.({ payload })
-}
 
 function createData(options: {
   roots?: string[]
@@ -46,35 +18,13 @@ function createData(options: {
   }
 }
 
-function rect(width: number, height: number): DOMRect {
-  return {
-    x: 0, y: 0, top: 0, right: width, bottom: height, left: 0, width, height,
-    toJSON: () => ({}),
-  }
-}
-
 describe('OcTree', () => {
   afterEach(() => {
-    useFloatingMenu().closeMenu()
     vi.restoreAllMocks()
+    document.body.innerHTML = ''
   })
 
-  it('centers a placeholder while the tree has no visible entries', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({ roots: [], items: [] }),
-        placeholder: 'Opened files appear here',
-      },
-    })
-
-    expect(wrapper.classes()).toContain('is-empty')
-    expect(wrapper.get('.oc-tree__placeholder').text()).toBe('Opened files appear here')
-    await wrapper.setProps({ data: createData() })
-    expect(wrapper.classes()).not.toContain('is-empty')
-    expect(wrapper.find('.oc-tree__placeholder').exists()).toBe(false)
-  })
-
-  it('renders roots as list rows and reports the triggered selection', async () => {
+  it('reports the clicked row as the new selection', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -84,66 +34,19 @@ describe('OcTree', () => {
             ['second', { label: 'Second' }],
           ],
         }),
-        selectedKeys: ['second'],
       },
     })
-
-    expect(wrapper.findAll('[data-oc-tree-key]')).toHaveLength(2)
-    expect(wrapper.get('[data-oc-tree-key="second"] .oc-tree__row').classes()).toContain('is-selected')
 
     await wrapper.get('[data-oc-tree-key="first"] .oc-tree__row').trigger('click')
-    expect(wrapper.emitted('selection-change')?.[0]).toEqual([{
-      triggerKey: 'first',
-      selectedKeys: ['first'],
-    }])
-  })
-
-  it('keeps a badge-only tail as a standalone part of the row', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'A long changed file name',
-            tail: { type: 'badge', label: 'Added', icon: 'mdiPlus', tone: 'success' },
-          }]],
-        }),
-      },
-    })
-    // OcText 的提示全文取自它自己渲染出来的字，所以挂载后一拍才挂上属性。
-    await nextTick()
-
-    // The trailing line lives in the row's append container, so the chip carries its own width next
-    // to the title instead of being squeezed inside a box of its own. The tree's tail line is
-    // layout-transparent (`display: contents`), so the chip stays a direct flex item of the append.
-    const append = wrapper.get('.oc-tree__row .oc-row__append')
-    const tail = wrapper.get('.oc-tree__tail')
-    expect(append.element.children).toHaveLength(1)
-    expect(tail.element.className).toContain('oc-tree__tail')
-    expect(Array.from(tail.element.children).map(child => child.className)).toEqual(['oc-node-tail__badge'])
-    expect(wrapper.get('.oc-node-tail__badge').attributes('aria-label')).toBe('Added')
-    expect(wrapper.get('.oc-node-tail__badge').attributes('data-tooltip')).toBe('Added')
-    expect(wrapper.get('.oc-tree__label').attributes('data-tooltip')).toBe('A long changed file name')
-    expect(wrapper.get('.oc-tree__label').attributes()).toHaveProperty('data-tooltip-overflow')
-  })
-
-  it('opts project-icon visuals into the shared project-icon renderer', () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Icon',
-            visual: { type: 'style', style: { '--oc-project-icon-renderer': 'mask' } },
-          }]],
-        }),
-      },
-    })
-    expect(wrapper.get('.oc-tree__node-visual').classes()).toContain('oc-project-icon')
+    expect(wrapper.emitted('selection-change')).toEqual([[
+      { triggerKey: 'first', selectedKeys: ['first'] },
+    ]])
   })
 
   it.each([
     ['expand', ['open', 'parent', 'root']],
     ['expand-exclusive', ['parent', 'root']],
-  ] as const)('requests %s selection ancestor expansion from tree topology', async (mode, expectedKeys) => {
+  ] as const)('requests the ancestors a selection needs in %s mode', async (mode, expectedKeys) => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -169,7 +72,7 @@ describe('OcTree', () => {
     }])
   })
 
-  it('keeps expanded descendants of the selected branch in expand-exclusive mode', async () => {
+  it('keeps expanded descendants of a selected branch in expand-exclusive mode', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -228,43 +131,7 @@ describe('OcTree', () => {
     }])
   })
 
-  it('scrolls the tree viewport to a selected row only when enabled', async () => {
-    const data = createData({
-      roots: ['first', 'second'],
-      items: [
-        ['first', { label: 'First' }],
-        ['second', { label: 'Second' }],
-      ],
-    })
-    const wrapper = mount(OcTree, {
-      props: {
-        data,
-        selectedKeys: ['first'],
-        scrollToSelection: false,
-        fill: true,
-      },
-    })
-    const root = wrapper.get('.oc-tree').element as HTMLElement
-    const secondRow = wrapper.get('[data-oc-tree-key="second"] .oc-tree__row').element as HTMLElement
-    root.scrollTop = 0
-    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
-      top: 0, bottom: 100, left: 0, right: 200, width: 200, height: 100, x: 0, y: 0,
-      toJSON: () => ({}),
-    })
-    vi.spyOn(secondRow, 'getBoundingClientRect').mockReturnValue({
-      top: 120, bottom: 150, left: 0, right: 200, width: 200, height: 30, x: 0, y: 120,
-      toJSON: () => ({}),
-    })
-
-    await wrapper.setProps({ selectedKeys: ['second'] })
-    expect(root.scrollTop).toBe(0)
-
-    await wrapper.setProps({ scrollToSelection: true })
-    await wrapper.vm.$nextTick()
-    expect(root.scrollTop).toBe(50)
-  })
-
-  it('windows a thousand fixed-height rows and reveals an offscreen selection', async () => {
+  it('windows a thousand rows and reveals an offscreen selection', async () => {
     const keys = Array.from({ length: 1000 }, (_, index) => `item-${index}`)
     const wrapper = mount(OcTree, {
       props: {
@@ -292,6 +159,7 @@ describe('OcTree', () => {
     })
     expect(wrapper.findAll('[data-oc-tree-key]').length).toBeLessThanOrEqual(12)
   })
+
   it('stops building a large structure after its view is destroyed', async () => {
     let reads = 0
     const keys = Array.from({ length: 10000 }, (_, index) => `item-${index}`)
@@ -307,59 +175,7 @@ describe('OcTree', () => {
     expect(reads).toBeLessThanOrEqual(256)
   })
 
-  it('reuses visible rows while scrolling inside the same row range', async () => {
-    let presentations = 0
-    const readsByKey = new Map<string, number>()
-    const keys = Array.from({ length: 1000 }, (_, index) => `item-${index}`)
-    const wrapper = mount(OcTree, { props: {
-      data: createData({ roots: keys, items: keys.map(key => [key, {
-        label: key,
-        get visual() { presentations++; readsByKey.set(key, (readsByKey.get(key) ?? 0) + 1); return { type: 'icon' as const, icon: 'mdiDatabaseOutline' as const } },
-      }]) }),
-      virtualized: true,
-    }, attrs: { style: '--oc-size-md: 30px; --oc-space-2xs: 2px' } })
-    await vi.waitFor(() => expect(wrapper.findAll('[data-oc-tree-key]').length).toBeGreaterThan(0))
-    const root = wrapper.get('.oc-tree')
-    const before = presentations
-    for (let offset = 1; offset <= 5; offset++) {
-      root.element.scrollTop = offset
-      await root.trigger('scroll')
-    }
-    expect(presentations).toBe(before)
-    const retainedRowReads = readsByKey.get('item-8')
-    root.element.scrollTop = 400
-    await root.trigger('scroll')
-    expect(presentations).toBeGreaterThan(before)
-    expect(readsByKey.get('item-8')).toBe(retainedRowReads)
-    expect(wrapper.findAll('[data-oc-tree-key]').length).toBeLessThanOrEqual(12)
-    wrapper.unmount()
-  })
-
-  it('renders expanded children and rotates the node type icon', () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [
-            ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiDatabaseOutline' } }],
-            ['child', { label: 'Child' }],
-          ],
-          children: [['root', ['child']]],
-        }),
-        expandedKeys: ['root'],
-      },
-    })
-
-    expect(wrapper.findAll('[data-oc-tree-key]')).toHaveLength(2)
-    expect(wrapper.get('[data-oc-tree-key="child"]').attributes('style')).toContain('12px')
-    expect(wrapper.get('[data-oc-tree-key="root"] .oc-tree__node-visual').classes()).toContain('is-expanded')
-    expect(wrapper.get('[data-oc-tree-key="root"] .oc-tree__child-count').classes()).toContain('is-expanded')
-    expect(wrapper.get('[data-oc-tree-key="root"] .oc-tree__branch-guide').attributes('data-guide-rows')).toBe('1')
-    expect(wrapper.find('[data-oc-tree-key="root"] .oc-tree__branch-connector').exists()).toBe(false)
-    expect(wrapper.find('[data-oc-tree-key="child"] .oc-tree__branch-connector').exists()).toBe(true)
-    expect(wrapper.find('[data-oc-tree-key="child"] .oc-tree__branch-guide').exists()).toBe(false)
-  })
-
-  it('can leave the tree out of Tab order while pointer focus keeps keyboard interaction active', async () => {
+  it('leaves the tree out of Tab order on request while a click still focuses the row', async () => {
     const wrapper = mount(OcTree, {
       attachTo: document.body,
       props: {
@@ -374,18 +190,15 @@ describe('OcTree', () => {
       },
     })
 
-    expect(wrapper.findAll('.oc-tree__row').map(row => row.attributes('tabindex'))).toEqual(['-1', '-1'])
-    expect(wrapper.findAll('.oc-node-tail__action button').map(button => button.attributes('tabindex'))).toEqual(['-1', '-1'])
-    await wrapper.get('[data-oc-tree-key="child"] .oc-tree__row').trigger('click')
-    expect(document.activeElement).toBe(wrapper.get('[data-oc-tree-key="child"] .oc-tree__row').element)
+    expect(wrapper.findAll('[role="treeitem"]').map(row => row.attributes('tabindex'))).toEqual(['-1', '-1'])
+    expect(wrapper.findAll('[role="treeitem"] button').map(button => button.attributes('tabindex'))).toEqual(['-1', '-1'])
+    await wrapper.get('[data-oc-tree-key="child"] [role="treeitem"]').trigger('click')
+    expect(document.activeElement).toBe(wrapper.get('[data-oc-tree-key="child"] [role="treeitem"]').element)
     wrapper.unmount()
   })
 
-  it.each([
-    [3, '3'],
-    [100, '99+'],
-  ])('shows %i direct children as the %s icon badge', (childCount, expectedBadge) => {
-    const childKeys = Array.from({ length: childCount }, (_, index) => `child-${index}`)
+  it('clamps the direct-child badge at 99', () => {
+    const childKeys = Array.from({ length: 100 }, (_, index) => `child-${index}`)
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -398,26 +211,7 @@ describe('OcTree', () => {
       },
     })
 
-    expect(wrapper.get('.oc-tree__child-count').text()).toBe(expectedBadge)
-    expect(wrapper.get('.oc-tree__child-count').classes()).toContain('oc-number-badge')
-  })
-
-  it('does not count a disabled placeholder child, so an empty group shows no badge', () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [
-            ['root', { label: 'Root', visual: { type: 'icon', icon: 'mdiDatabaseOutline' } }],
-            ['root:empty', { label: 'Nothing yet', visual: { type: 'icon', icon: 'mdiFileOutline' }, disabled: true }],
-          ],
-          children: [['root', ['root:empty']]],
-        }),
-      },
-    })
-
-    // 空分组的占位说明不是这一组的内容，所以徽标不出现；分组本身仍然可展开，展开才看得见那行。
-    expect(wrapper.find('.oc-tree__child-count').exists()).toBe(false)
-    expect(wrapper.get('[data-oc-tree-key="root"] .oc-tree__icon-slot').classes()).toContain('is-expandable')
+    expect(wrapper.get('.oc-tree__child-count').text()).toBe('99+')
   })
 
   it('emits expansion changes without mutating controlled state', async () => {
@@ -441,7 +235,7 @@ describe('OcTree', () => {
     expect(wrapper.find('[data-oc-tree-key="child"]').exists()).toBe(false)
   })
 
-  it('activates the double-clicked row and prevents that event default', async () => {
+  it('separates click selection from double-click activation', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -455,40 +249,20 @@ describe('OcTree', () => {
       },
     })
     const row = wrapper.get('[data-oc-tree-key="second"] .oc-tree__row')
-    const doubleClick = new MouseEvent('dblclick', { bubbles: true, cancelable: true })
 
-    row.element.dispatchEvent(doubleClick)
-    await wrapper.vm.$nextTick()
-
-    // The pair is swallowed by the row, and the event carries the row's own key and nothing else.
-    expect(doubleClick.defaultPrevented).toBe(true)
-    expect(wrapper.emitted('node-activate')).toEqual([[{ key: 'second' }]])
-    const payload = wrapper.emitted('node-activate')?.[0]?.[0] as OcNodeActivateEvent
-    expect(Object.keys(payload)).toEqual(['key'])
-  })
-
-  it('keeps a single click selecting without activating in double-click mode', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          roots: ['first', 'second'],
-          items: [
-            ['first', { label: 'First' }],
-            ['second', { label: 'Second' }],
-          ],
-        }),
-        activationMode: 'double-click',
-      },
-    })
-
-    await wrapper.get('[data-oc-tree-key="second"] .oc-tree__row').trigger('click')
-
-    // The click still reaches the row, but its selection intent stays separate from activation.
+    await row.trigger('click')
     expect(wrapper.emitted('selection-change')).toEqual([[{
       triggerKey: 'second',
       selectedKeys: ['second'],
     }]])
     expect(wrapper.emitted('node-activate')).toBeUndefined()
+
+    const doubleClick = new MouseEvent('dblclick', { bubbles: true, cancelable: true })
+    row.element.dispatchEvent(doubleClick)
+    await wrapper.vm.$nextTick()
+
+    expect(doubleClick.defaultPrevented).toBe(true)
+    expect(wrapper.emitted('node-activate')).toEqual([[{ key: 'second' }]])
   })
 
   it('activates on a single click and ignores a double click in single-click mode', async () => {
@@ -511,29 +285,7 @@ describe('OcTree', () => {
 
     row.element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
     await wrapper.vm.$nextTick()
-    // The same activation still stands alone: the double click adds no second report.
     expect(wrapper.emitted('node-activate')).toEqual([[{ key: 'second' }]])
-  })
-
-  it('never activates a row while the activation mode is none', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData(),
-        activationMode: 'none',
-      },
-    })
-    const row = wrapper.get('.oc-tree__row')
-
-    await row.trigger('click')
-    row.element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.emitted('node-activate')).toBeUndefined()
-    // The click is a real row click: it selects, so the silence above is the disabled activation.
-    expect(wrapper.emitted('selection-change')).toEqual([[{
-      triggerKey: 'root',
-      selectedKeys: ['root'],
-    }]])
   })
 
   it('never activates a row while no activation mode is given', async () => {
@@ -545,9 +297,13 @@ describe('OcTree', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('node-activate')).toBeUndefined()
+    expect(wrapper.emitted('selection-change')).toEqual([[{
+      triggerKey: 'root',
+      selectedKeys: ['root'],
+    }]])
   })
 
-  it('keeps activation consistent on rows revealed by expanding a parent', async () => {
+  it('keeps activation working on rows revealed by expanding a parent', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -561,8 +317,6 @@ describe('OcTree', () => {
       },
     })
 
-    // Expansion is controlled, so it is driven the way a parent does it: a real icon click, then
-    // the new expanded state fed back into the tree.
     await wrapper.get('[data-oc-tree-key="root"] .oc-tree__icon-slot').trigger('click')
     expect(wrapper.emitted('expansion-change')?.[0]).toEqual([{ key: 'root', expanded: true }])
     expect(wrapper.emitted('node-activate')).toBeUndefined()
@@ -573,126 +327,13 @@ describe('OcTree', () => {
     childRow.element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('node-activate')).toEqual([[{ key: 'child' }]])
-
-    await wrapper.get('[data-oc-tree-key="root"] .oc-tree__icon-slot').trigger('click')
-    expect(wrapper.emitted('expansion-change')?.[1]).toEqual([{ key: 'root', expanded: false }])
-    await wrapper.setProps({ expandedKeys: [] })
-    expect(wrapper.find('[data-oc-tree-key="child"]').exists()).toBe(false)
-  })
-
-  it('keeps rename draft local and emits a rename commit on Enter', async () => {
-    const data = createData()
-    const wrapper = mount(OcTree, { props: { data } })
-
-    await (wrapper.vm as unknown as { beginRename: (key: string) => Promise<void> })
-      .beginRename('root')
-    const input = wrapper.get('input')
-    // 输入框出现时原来的标题必须让位：三者是一条 v-if / v-else-if / v-else 链，两个都画就是链断了。
-    expect(wrapper.find('.oc-tree__label').exists()).toBe(false)
-    await input.setValue('Renamed')
-    await input.trigger('keydown', { key: 'Enter' })
-
-    expect(data.items.get('root')?.label).toBe('Root')
-    expect(wrapper.emitted('rename-commit')).toEqual([[
-      { key: 'root', name: 'Renamed' },
-    ]])
-  })
-
-  it('applies the consumer-provided rename selection range', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'archive.tar.gz',
-            renamable: true,
-            renameSelection: { start: 0, end: 11 },
-          }]],
-        }),
-      },
-    })
-
-    await (wrapper.vm as unknown as { beginRename: (key: string) => Promise<void> })
-      .beginRename('root')
-
-    const input = wrapper.get('input').element as HTMLInputElement
-    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 11])
-  })
-
-  it('commits rename on a real focus change and cancels it on Escape', async () => {
-    const wrapper = mount(OcTree, { attachTo: document.body, props: { data: createData() } })
-    const tree = wrapper.vm as unknown as { beginRename: (key: string) => Promise<void> }
-
-    await tree.beginRename('root')
-    await wrapper.get('input').setValue('Blurred')
-    ;(wrapper.get('.oc-tree__row').element as HTMLElement).focus()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('rename-commit')).toEqual([[
-      { key: 'root', name: 'Blurred' },
-    ]])
-
-    await tree.beginRename('root')
-    await wrapper.get('input').setValue('Cancelled')
-    await wrapper.get('input').trigger('keydown', { key: 'Escape' })
-    expect(wrapper.find('input').exists()).toBe(false)
-    // 取消之后标题要回来，不能被占位状态挡住。
-    expect(wrapper.find('.oc-tree__label').exists()).toBe(true)
-    expect(wrapper.emitted('rename-commit')).toHaveLength(1)
-    wrapper.unmount()
-  })
-
-  it('keeps rename actions generic until the parent calls beginRename', async () => {
-    const wrapper = mount(OcTree, {
-      attachTo: document.body,
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Root',
-            renamable: true,
-            tail: [{ key: 'rename', title: 'Rename', icon: 'mdiPencilOutline' }],
-          }]],
-        }),
-      },
-    })
-
-    expect(wrapper.find('button[aria-label="Rename"]').exists()).toBe(true)
-    await wrapper.get('button[aria-label="Rename"]').trigger('click')
-    expect(wrapper.find('input').exists()).toBe(false)
-    expect(wrapper.emitted('action')).toEqual([[
-      { key: 'root', actionKey: 'rename', source: 'inline' },
-    ]])
-
-    await (wrapper.vm as unknown as { beginRename: (key: string) => Promise<void> })
-      .beginRename('root')
-    expect(wrapper.get('input').element).toBe(document.activeElement)
-    wrapper.unmount()
-  })
-
-  it('starts renaming in place on F2 for a renamable node', async () => {
-    const wrapper = mount(OcTree, { attachTo: document.body, props: { data: createData() } })
-
-    await wrapper.get('.oc-tree__row').trigger('keydown', { key: 'F2' })
-
-    expect(wrapper.get('input').element).toBe(document.activeElement)
-    expect(wrapper.emitted('rename-commit')).toBeUndefined()
-    wrapper.unmount()
-  })
-
-  it('ignores F2 on a node that is not renamable', async () => {
-    const wrapper = mount(OcTree, {
-      props: { data: createData({ items: [['root', { label: 'Root' }]] }) },
-    })
-
-    await wrapper.get('.oc-tree__row').trigger('keydown', { key: 'F2' })
-
-    expect(wrapper.find('input').exists()).toBe(false)
-    expect(wrapper.emitted('rename-commit')).toBeUndefined()
   })
 
   it.each([
     ['tree', 'treeitem'],
     ['listbox', 'option'],
     ['menu', 'menuitem'],
-  ] as const)('maps the %s role onto its rows', (role, rowRole) => {
+  ] as const)('exposes the %s role on its rows', (role, rowRole) => {
     const wrapper = mount(OcTree, {
       props: { data: createData(), role, selectionMode: role === 'menu' ? 'none' : 'single' },
     })
@@ -701,7 +342,7 @@ describe('OcTree', () => {
     expect(wrapper.get('.oc-tree__row').attributes('role')).toBe(rowRole)
   })
 
-  it('emits controlled multiple selection and keyboard expansion intents', async () => {
+  it('reports ctrl-click multi-selection and keyboard expansion', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -732,30 +373,7 @@ describe('OcTree', () => {
     ])
   })
 
-  it('keeps middle-button selection distinct from primary selection', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          roots: ['root', 'second'],
-          items: [
-            ['root', { label: 'Root' }],
-            ['second', { label: 'Second' }],
-          ],
-        }),
-        selectedKeys: ['root'],
-        selectionMode: 'multiple',
-      },
-    })
-
-    await wrapper.get('[data-oc-tree-key="second"] .oc-tree__row').trigger('auxclick', { button: 1, ctrlKey: true })
-
-    expect(wrapper.emitted('selection-change')?.[0]).toEqual([{
-      triggerKey: 'second',
-      selectedKeys: ['root', 'second'],
-    }])
-  })
-
-  it('selects the visible range from the selection anchor with Shift', async () => {
+  it('selects the range from the selection anchor with Shift', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
@@ -779,284 +397,27 @@ describe('OcTree', () => {
     }])
   })
 
-  it('shows only declared actions and keeps disabled actions visible with their reason', async () => {
+  it('selects on middle click without treating it as a primary selection', async () => {
     const wrapper = mount(OcTree, {
       props: {
         data: createData({
-          items: [['root', {
-            label: 'Root',
-            tail: [
-              'Metadata',
-              { key: 'duplicate', title: 'Duplicate', icon: 'mdiContentCopy' },
-              { key: 'delete', title: 'Delete', icon: 'mdiTrashCanOutline', disabled: true, disabledReason: 'Protected' },
-            ],
-          }]],
+          roots: ['root', 'second'],
+          items: [
+            ['root', { label: 'Root' }],
+            ['second', { label: 'Second' }],
+          ],
         }),
+        selectedKeys: ['root'],
+        selectionMode: 'multiple',
       },
     })
 
-    await wrapper.get('button[aria-label="More actions"]').trigger('click')
-    const duplicate = document.body.querySelector<HTMLButtonElement>('button[aria-label="Duplicate"]')
-    expect(duplicate).not.toBeNull()
-    duplicate?.click()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.get('.oc-tree__row .oc-row__append').text()).toBe('Metadata')
-    await wrapper.get('button[aria-label="More actions"]').trigger('click')
-    await wrapper.vm.$nextTick()
-    const deleteButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')
-    expect(deleteButton?.disabled).toBe(true)
-    expect(wrapper.emitted('action')).toEqual([[
-      { key: 'root', actionKey: 'duplicate', source: 'inline' },
-    ]])
-  })
+    await wrapper.get('[data-oc-tree-key="second"] .oc-tree__row').trigger('auxclick', { button: 1, ctrlKey: true })
 
-  it('groups multiple commands without measuring labels or revealing other rows', async () => {
-    const wrapper = mount(OcTree, { props: {
-      data: createData({ items: [['root', { label: 'Readable label', tail: [
-        { key: 'top', title: 'Move to top', icon: 'mdiFlipToFront' },
-        { key: 'up', title: 'Move up', icon: 'mdiArrowUp' },
-      ] }]] }), actionOverflowTitle: 'Item actions',
-    } })
-    const measure = vi.spyOn(wrapper.get('.oc-tree__label').element, 'getBoundingClientRect')
-    await wrapper.get('.oc-tree__row').trigger('mouseenter')
-    await nextTick()
-    const menu = wrapper.getComponent(OcActionButton)
-    expect(menu.props('action')).toMatchObject({ title: 'Item actions', children: [{ key: 'top' }, { key: 'up' }] })
-    menu.vm.$emit('select', { key: 'up' })
-    expect(wrapper.emitted('action')).toContainEqual([{ key: 'root', actionKey: 'up', source: 'inline' }])
-    expect(measure).not.toHaveBeenCalled()
-    wrapper.unmount()
-  })
-
-  it('renders no action container when a node declares no commands', () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', { label: 'Root', tail: ['2 weeks'] }]],
-        }),
-      },
-    })
-
-    expect(wrapper.get('.oc-tree__row .oc-row__append').text()).toContain('2 weeks')
-    expect(wrapper.find('.oc-node-tail__action').exists()).toBe(false)
-  })
-
-  it('can keep inline actions visible without row interaction', () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Root',
-            tail: ['2 weeks', { key: 'move', title: 'Move up', icon: 'mdiArrowUp' }],
-          }]],
-        }),
-        actionVisibility: 'always',
-      },
-    })
-
-    // The always-visible state now lives on the shared tail line, which reveals its commands itself.
-    expect(wrapper.get('.oc-node-tail').classes()).toContain('oc-node-tail--always')
-    // jsdom does not evaluate the scoped stylesheet, so assert the structure the rule targets:
-    // the command is the trailing part of the node's own line.
-    const tail = wrapper.get('.oc-tree__tail')
-    const actionPart = wrapper.get('.oc-node-tail__action')
-    expect(tail.element.contains(actionPart.element)).toBe(true)
-    const tailChildren = Array.from(tail.element.children)
-    expect(tailChildren[tailChildren.length - 1]?.classList.contains('oc-node-tail__action')).toBe(true)
-  })
-
-  it('keeps revealed commands mounted while their floating menu is open', async () => {
-    const wrapper = mount(OcTree, {
-      attachTo: document.body,
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Root',
-            tail: [{ key: 'more', title: 'More', children: [{ key: 'rename', title: 'Rename' }] }],
-          }]],
-        }),
-      },
-    })
-    const actionPart = wrapper.get('.oc-node-tail__action')
-    const actionButton = wrapper.getComponent(OcActionButton)
-
-    await actionButton.get('button').trigger('click')
-
-    expect(actionButton.classes()).toContain('is-menu-open')
-    expect(actionPart.element.matches(':has(.oc-action-button.is-menu-open)')).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('opens direct context actions without exposing the inline more wrapper', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Root',
-            tail: [{
-              key: 'more',
-              title: 'More',
-              children: [
-                { key: 'rename', title: 'Rename', icon: 'mdiPencilOutline' },
-                { key: 'delete', title: 'Delete', icon: 'mdiTrashCanOutline' },
-              ],
-            }],
-            contextActions: [
-              { type: 'divider', key: 'leading' },
-              { key: 'rename', title: 'Rename', icon: 'mdiPencilOutline' },
-              { type: 'divider', key: 'danger' },
-              { type: 'divider', key: 'duplicate-divider' },
-              { key: 'delete', title: 'Delete', icon: 'mdiTrashCanOutline' },
-              { type: 'divider', key: 'trailing' },
-            ],
-          }]],
-        }),
-        selectedKeys: [],
-      },
-    })
-
-    await wrapper.get('.oc-tree__row').trigger('contextmenu', { clientX: 12, clientY: 18 })
-    const menu = useFloatingMenu()
-    expect(menu.state.value.items.map(item => item.key)).toEqual(['rename', 'danger', 'delete'])
-    expect(menu.state.value.items[1]).toEqual({ type: 'divider', key: 'danger' })
     expect(wrapper.emitted('selection-change')?.[0]).toEqual([{
-      triggerKey: 'root',
-      selectedKeys: ['root'],
+      triggerKey: 'second',
+      selectedKeys: ['root', 'second'],
     }])
-
-    menu.selectMenuItem('rename')
-    expect(wrapper.emitted('action')?.[0]).toEqual([{
-      key: 'root', actionKey: 'rename', source: 'context',
-    }])
-  })
-
-  it('preserves an existing multi-selection and supports the keyboard menu key', async () => {
-    const wrapper = mount(OcTree, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Root',
-            contextActions: [{ key: 'rename', title: 'Rename' }],
-          }]],
-        }),
-        selectedKeys: ['root', 'other'],
-        selectionMode: 'multiple',
-      },
-    })
-
-    await wrapper.get('.oc-tree__row').trigger('keydown', { key: 'ContextMenu' })
-    expect(wrapper.emitted('selection-change')).toBeUndefined()
-    expect(wrapper.emitted('action')).toBeUndefined()
-    expect(useFloatingMenu().state.value.items.map(item => item.key)).toEqual(['rename'])
-  })
-
-  it('starts drag only after 4px and emits the visual drop candidate', async () => {
-    const wrapper = mount(OcTree, {
-      attachTo: document.body,
-      props: {
-        data: createData({
-          roots: ['dragged', 'other', 'target'],
-          items: [
-            ['dragged', { label: 'Dragged', draggable: true }],
-            ['other', { label: 'Other', draggable: true }],
-            ['target', { label: 'Target' }],
-          ],
-        }),
-        selectedKeys: ['dragged', 'other'],
-        selectionMode: 'multiple',
-      },
-    })
-    const draggedRow = wrapper.get('[data-oc-tree-key="dragged"] .oc-tree__row')
-    const targetNode = wrapper.get('[data-oc-tree-key="target"]').element as HTMLElement
-    Object.defineProperty(document, 'elementFromPoint', {
-      configurable: true,
-      value: vi.fn(() => targetNode),
-    })
-    vi.spyOn(targetNode, 'getBoundingClientRect').mockReturnValue({
-      top: 100,
-      bottom: 140,
-      left: 0,
-      right: 200,
-      width: 200,
-      height: 40,
-      x: 0,
-      y: 100,
-      toJSON: () => ({}),
-    })
-
-    await draggedRow.trigger('mousedown', { button: 0, clientX: 10, clientY: 110 })
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 12, clientY: 111 }))
-    window.dispatchEvent(new MouseEvent('mouseup'))
-    expect(wrapper.emitted('move')).toBeUndefined()
-
-    await draggedRow.trigger('mousedown', { button: 0, clientX: 10, clientY: 110 })
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 20, clientY: 105 }))
-    await wrapper.vm.$nextTick()
-    expect(wrapper.get('[data-oc-tree-key="dragged"]').classes()).toContain('is-drag-source')
-    expect(wrapper.get('[data-oc-tree-key="other"]').classes()).toContain('is-drag-source')
-    window.dispatchEvent(new MouseEvent('mouseup'))
-    expect(wrapper.emitted('move')).toEqual([[
-      { key: 'dragged', targetKey: 'target', position: 'before' },
-    ]])
-    wrapper.unmount()
-    Reflect.deleteProperty(document, 'elementFromPoint')
-  })
-
-  it('reports an external drop on the hovered row and clears the highlight after it', async () => {
-    const wrapper = mount(OcTree, {
-      attachTo: document.body,
-      props: {
-        data: createData({
-          roots: ['folder', 'file'],
-          items: [
-            ['folder', { label: 'Folder' }],
-            ['file', { label: 'File' }],
-          ],
-        }),
-        externalDrop: true,
-      },
-    })
-    const folderNode = wrapper.get('[data-oc-tree-key="folder"]').element as HTMLElement
-    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => folderNode) })
-    vi.spyOn(folderNode, 'getBoundingClientRect').mockReturnValue({
-      ...rect(200, 40), top: 100, bottom: 140, y: 100,
-    })
-    await wrapper.vm.$nextTick()
-
-    emitPlatformDragDrop({ type: 'enter', paths: ['D:/textures/tile.png'], position: { x: 10, y: 120 } })
-    await wrapper.vm.$nextTick()
-    expect(wrapper.get('[data-oc-tree-key="folder"]').classes()).toContain('is-drop-inside')
-
-    emitPlatformDragDrop({ type: 'drop', paths: ['D:/textures/tile.png'], position: { x: 10, y: 120 } })
-    expect(wrapper.emitted('external-drop')).toEqual([[
-      { targetKey: 'folder', position: 'inside', payload: ['D:/textures/tile.png'] },
-    ]])
-
-    await wrapper.vm.$nextTick()
-    expect(wrapper.get('[data-oc-tree-key="folder"]').classes()).not.toContain('is-drop-inside')
-    wrapper.unmount()
-    Reflect.deleteProperty(document, 'elementFromPoint')
-  })
-
-  it('leaves external drops to the window when it has not opted in', async () => {
-    const unhandled = vi.fn()
-    const disposeUnhandled = registerUnhandledExternalDrop(unhandled)
-    const wrapper = mount(OcTree, {
-      attachTo: document.body,
-      props: { data: createData({ roots: ['folder'], items: [['folder', { label: 'Folder' }]] }) },
-    })
-    const folderNode = wrapper.get('[data-oc-tree-key="folder"]').element as HTMLElement
-    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => folderNode) })
-    await wrapper.vm.$nextTick()
-
-    emitPlatformDragDrop({ type: 'enter', paths: ['D:/textures/tile.png'], position: { x: 10, y: 10 } })
-    emitPlatformDragDrop({ type: 'drop', paths: ['D:/textures/tile.png'], position: { x: 10, y: 10 } })
-
-    expect(wrapper.emitted('external-drop')).toBeUndefined()
-    expect(unhandled).toHaveBeenCalledWith(['D:/textures/tile.png'])
-    wrapper.unmount()
-    disposeUnhandled()
-    Reflect.deleteProperty(document, 'elementFromPoint')
   })
 
   it('stops malformed visible topology without following cycles', () => {

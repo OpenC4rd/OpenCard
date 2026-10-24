@@ -16,6 +16,13 @@ export function usePropertyCompletion(getControl: () => HTMLElement | null) {
   const activeDescendantId = computed(() => isMenuOpen.value && activeKey.value
     ? `${autocompleteId}-option-${activeKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
     : undefined)
+  const control = computed(() => getControl())
+  /** 单行输入的光标事实上固定在一行，锚控件就够；多行才需要跟随光标所在行。 */
+  const anchor = computed<HTMLElement | (() => DOMRect | null) | null>(() => {
+    const element = control.value
+    if (!element) return null
+    return element instanceof HTMLTextAreaElement ? () => caretRectOf(element) : element
+  })
 
   watch(suggestions, items => {
     if (!items.some(item => item.key === activeKey.value)) activeKey.value = items[0]?.key ?? null
@@ -81,7 +88,38 @@ export function usePropertyCompletion(getControl: () => HTMLElement | null) {
 
   onBeforeUnmount(clear)
   return { completionState, suggestions, isMenuOpen, isPending, activeKey, autocompleteId, activeDescendantId,
-    refresh, clear, invalidate, handleKeydown }
+    control, anchor, refresh, clear, invalidate, handleKeydown }
+}
+
+/**
+ * 浏览器不提供 input/textarea 的光标矩形，只能复刻排版量一次。
+ * 只在 textarea 路径调用：镜像复刻字体与内距，量到 selectionStart 的偏移。
+ */
+function caretRectOf(control: HTMLTextAreaElement): DOMRect {
+  const style = getComputedStyle(control)
+  const mirror = document.createElement('div')
+  mirror.style.cssText = [
+    'position:fixed', 'left:0', 'top:0', 'visibility:hidden', 'pointer-events:none',
+    'box-sizing:border-box', `width:${control.clientWidth}px`,
+    `padding:${style.padding}`, `font:${style.font}`,
+    `line-height:${style.lineHeight}`, `letter-spacing:${style.letterSpacing}`,
+    'white-space:pre-wrap', 'overflow-wrap:break-word',
+  ].join(';')
+  mirror.textContent = control.value.slice(0, control.selectionStart ?? 0)
+  const marker = document.createElement('span')
+  marker.textContent = '\u200b'
+  mirror.append(marker)
+  document.body.append(mirror)
+  const origin = mirror.getBoundingClientRect()
+  const caret = marker.getBoundingClientRect()
+  mirror.remove()
+  const box = control.getBoundingClientRect()
+  return new DOMRect(
+    box.left + caret.left - origin.left - control.scrollLeft,
+    box.top + caret.top - origin.top - control.scrollTop,
+    0,
+    caret.height || Number.parseFloat(style.lineHeight) || box.height,
+  )
 }
 
 export function matchStaticCompletion(current: string, values: readonly string[]): string {

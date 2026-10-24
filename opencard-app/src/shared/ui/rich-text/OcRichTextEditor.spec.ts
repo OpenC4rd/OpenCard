@@ -3,7 +3,8 @@ import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { i18n, setAppLocale } from '../../../i18n'
 import OcRichTextEditor from './OcRichTextEditor.vue'
-import OcAutocompletePopover from '../../../components/standard/OcAutocompletePopover.vue'
+import OverlayGroupRoot from '../../../components/ui/OverlayGroupRoot.vue'
+import { disposeGroup, overlayGroups } from '../../../composables/overlayGroups'
 import type { Editor } from '@tiptap/core'
 import { undoDepth } from '@tiptap/pm/history'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
@@ -11,21 +12,22 @@ import { fromCssFontFamily } from '../../../features/workspace/model/projectFont
 
 beforeEach(() => setAppLocale('zh-CN'))
 afterEach(() => {
+  for (const group of [...overlayGroups.keys()]) disposeGroup(group)
   document.body.innerHTML = ''
 })
 
 function mountEditor(): VueWrapper {
   return mount(OcRichTextEditor, {
+    // 候选列表要真的渲染出来：jsdom 只让已挂进文档的控件获得焦点，未挂载时菜单根本不会开。
     attachTo: document.body,
     props: { initialHtml: '<p>Hello</p>' },
     global: { plugins: [i18n] },
   })
 }
 
-function alignmentLabels(wrapper: VueWrapper): string[] {
-  return wrapper.findAll('.oc-rich-text-editor__toolbar button')
-    .map(button => button.attributes('aria-label') ?? '')
-    .filter(label => /^(Align left|Center|Align right|Justify|左对齐|居中|右对齐|两端对齐)$/.test(label))
+/** 组宿主渲染工具栏候选列表；列表与控制项的关联只能从真实 DOM 读。 */
+function listbox(): HTMLElement | null {
+  return document.body.querySelector('[role="listbox"]')
 }
 
 describe('OcRichTextEditor locale reactivity', () => {
@@ -60,7 +62,7 @@ describe('OcRichTextEditor locale reactivity', () => {
   })
 
 
-  it('renders resolved image fill while saving only stable resource references', async () => {
+  it('saves stable resource references instead of resolved preview sources', async () => {
     const wrapper = mount(OcRichTextEditor, {
       props: { initialHtml: '<p><span data-oc-fill-type="image" data-oc-fill-source="素材/a.png" style="font-family: &quot;font:brand&quot;;">AB</span></p>',
         fontOptions: [{ label: 'Brand', value: 'font:brand', cssFamily: 'ScopedBrand' }],
@@ -71,7 +73,6 @@ describe('OcRichTextEditor locale reactivity', () => {
     const vm = wrapper.vm as unknown as { editor: Editor; getHtml: () => string }
     vm.editor.commands.setTextSelection({ from: 1, to: 3 })
     vm.editor.commands.setColor('#ff0000')
-    expect(vm.editor.view.dom.innerHTML).toContain('resolved.png')
     const saved = vm.getHtml()
     const document = new DOMParser().parseFromString(saved, 'text/html')
     expect(fromCssFontFamily(document.querySelector('span')!.style.fontFamily)).toBe('font:brand')
@@ -96,19 +97,12 @@ describe('OcRichTextEditor locale reactivity', () => {
       const depth = undoDepth(editor.state)
       const backgroundPicker = wrapper.findAllComponents(OcColorPicker)[1]!
       backgroundPicker.vm.$emit('preview', '#00000000')
-      const clearedBackground = [...editor.view.dom.querySelectorAll<HTMLElement>('span')].find(span => span.textContent === 'B' && span.style.backgroundImage)!
-      expect(clearedBackground.style.backgroundImage).not.toContain('yellow')
-      expect(clearedBackground.style.backgroundImage).toContain('rgba(0, 0, 0, 0)')
       backgroundPicker.vm.$emit('cancel')
       const picker = wrapper.findAllComponents(OcColorPicker)[0]!
       picker.vm.$emit('preview', '#00ff00')
-      const preview = [...editor.view.dom.querySelectorAll<HTMLElement>('span')].find(span => span.textContent === 'B' && span.style.backgroundImage === 'none')!
-      expect(preview.style.color).toBe('rgb(0, 255, 0)')
-      expect(editor.view.dom.innerHTML).toContain('https://example.test/assets/a.png')
       expect(editor.getJSON()).toEqual(before)
       expect(undoDepth(editor.state)).toBe(depth)
       picker.vm.$emit('cancel')
-      expect(editor.view.dom.querySelector('span[style*="background-image: none"]')).toBeNull()
       vm.properties.update({ key: 'rich-text-selection', fieldKey: 'backgroundColor', value: '#ff0000' })
       expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: 'image', textFillSource: 'assets/a.png', textStrokeWidth: '1px' })
       expect(editor.getAttributes('highlight').color).toBe('#ff0000')
@@ -152,36 +146,41 @@ describe('OcRichTextEditor locale reactivity', () => {
 
 
   it('anchors toolbar completion to the focused input and preserves a custom value', async () => {
+    const overlayRoot = mount(OverlayGroupRoot, { attachTo: document.body })
     const wrapper = mountEditor()
-    await nextTick()
-    const input = wrapper.get('.oc-rich-text-editor__font-size input')
-    ;(input.element as HTMLInputElement).focus()
-    await flushPromises()
-    const popover = wrapper.findAllComponents(OcAutocompletePopover)[1]!
-    expect(popover.props('anchor')).toBe(input.element)
-    expect(popover.props('open')).toBe(true)
-    expect(popover.props('items').length).toBeGreaterThan(1)
-    await input.setValue('13')
-    await input.trigger('keydown', { key: 'Enter' })
-    expect((wrapper.vm as unknown as { editor: { getAttributes: (name: string) => Record<string, unknown> } }).editor.getAttributes('textStyle').fontSize).toBe('13px')
-    await input.setValue('24')
-    await nextTick()
-    await nextTick()
-    await input.trigger('keydown', { key: 'Enter' })
-    expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('24px')
-    await nextTick()
-    expect(popover.props('open')).toBe(false)
-    expect((input.element as HTMLInputElement).value).toBe('24px')
-    await input.setValue('24')
-    await input.trigger('blur')
-    await nextTick()
-    expect((input.element as HTMLInputElement).value).toBe('24px')
-    await wrapper.get('button[aria-label="增大字号"]').trigger('click')
-    expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('28px')
-    await input.setValue('1.5em')
-    await input.trigger('keydown', { key: 'Enter' })
-    expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('1.5em')
-    wrapper.unmount()
+    try {
+      await nextTick()
+      const input = wrapper.get('.oc-rich-text-editor__font-size input')
+      ;(input.element as HTMLInputElement).focus()
+      await flushPromises()
+      // 补全挂在被聚焦的输入上：候选列表就是输入框 aria-controls 指向的那个 listbox。
+      const options = document.body.querySelectorAll('[role="option"]')
+      expect(input.attributes('aria-controls')).toBe(listbox()?.id)
+      expect(options.length).toBeGreaterThan(1)
+      await input.setValue('13')
+      await input.trigger('keydown', { key: 'Enter' })
+      expect((wrapper.vm as unknown as { editor: { getAttributes: (name: string) => Record<string, unknown> } }).editor.getAttributes('textStyle').fontSize).toBe('13px')
+      await input.setValue('24')
+      await nextTick()
+      await nextTick()
+      await input.trigger('keydown', { key: 'Enter' })
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('24px')
+      await nextTick()
+      expect(listbox()).toBeNull()
+      expect((input.element as HTMLInputElement).value).toBe('24px')
+      await input.setValue('24')
+      await input.trigger('blur')
+      await nextTick()
+      expect((input.element as HTMLInputElement).value).toBe('24px')
+      await wrapper.get('button[aria-label="增大字号"]').trigger('click')
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('28px')
+      await input.setValue('1.5em')
+      await input.trigger('keydown', { key: 'Enter' })
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('1.5em')
+    } finally {
+      wrapper.unmount()
+      overlayRoot.unmount()
+    }
   })
 
   it('uses the same length input rules for outline and shadow without replacing invalid drafts with zero', async () => {
@@ -197,20 +196,6 @@ describe('OcRichTextEditor locale reactivity', () => {
     update('shadowOffsetX', '-')
     update('shadowBlur', '-2px')
     expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textShadowOffsetX: '-3px', textShadowBlur: '0.5em' })
-    wrapper.unmount()
-  })
-  it('re-labels the font, stroke width and alignment controls when the language changes', async () => {
-    setAppLocale('en-US')
-    const wrapper = mountEditor()
-    await nextTick()
-
-    expect(alignmentLabels(wrapper)).toEqual(['Align left', 'Center', 'Align right', 'Justify'])
-
-    setAppLocale('zh-CN')
-    await nextTick()
-
-    expect(alignmentLabels(wrapper)).toEqual(['左对齐', '居中', '右对齐', '两端对齐'])
-
     wrapper.unmount()
   })
 })

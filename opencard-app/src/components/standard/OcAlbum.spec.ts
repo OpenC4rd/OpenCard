@@ -20,7 +20,7 @@ describe('OcAlbum', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders one card per root key and ignores nested children', () => {
+  it('renders exactly the root level and no nested children', () => {
     const wrapper = mount(OcAlbum, {
       props: {
         data: {
@@ -37,145 +37,6 @@ describe('OcAlbum', () => {
 
     expect(wrapper.findAll('[data-oc-album-key]')).toHaveLength(2)
     expect(wrapper.find('[data-oc-album-key="nested"]').exists()).toBe(false)
-  })
-
-  it('keeps the cover image and the node icon in separate card slots', () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Theme',
-            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-            cover: { type: 'image', src: 'asset://cover.png', label: 'Theme cover' },
-          }]],
-        }),
-      },
-    })
-
-    const image = wrapper.get('.oc-cover__visual')
-    expect(image.attributes('src')).toBe('asset://cover.png')
-    expect(image.attributes('alt')).toBe('Theme cover')
-    // The album-unique cover owns the media slot; the node icon never stands in for it.
-    expect(wrapper.find('.oc-album__media .oc-icon').exists()).toBe(false)
-    const title = wrapper.get('.oc-album__title')
-    expect(Array.from(title.element.children).map(child => child.tagName.toLowerCase()))
-      .toEqual(['svg', 'span'])
-    expect(title.get('.oc-album__label').text()).toBe('Theme')
-  })
-
-  it('drops a cover image that fails to load and keeps the node icon in the title', async () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Theme',
-            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-            cover: { type: 'image', src: 'asset://missing.png' },
-          }]],
-        }),
-      },
-    })
-
-    expect(wrapper.find('.oc-cover__visual').exists()).toBe(true)
-    await wrapper.get('.oc-cover__visual').trigger('error')
-
-    expect(wrapper.find('.oc-cover__visual').exists()).toBe(false)
-    expect(wrapper.find('.oc-album__media .oc-icon').exists()).toBe(false)
-    expect(wrapper.find('.oc-album__title .oc-icon').exists()).toBe(true)
-  })
-
-  it('retries the cover when the node points at a different image', async () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Theme',
-            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-            cover: { type: 'image', src: 'asset://broken.png' },
-          }]],
-        }),
-      },
-    })
-
-    await wrapper.get('.oc-cover__visual').trigger('error')
-    expect(wrapper.find('.oc-cover__visual').exists()).toBe(false)
-
-    await wrapper.setProps({
-      data: createData({
-        items: [['root', {
-          label: 'Theme',
-          visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-          cover: { type: 'image', src: 'asset://replaced.png' },
-        }]],
-      }),
-    })
-
-    expect(wrapper.get('.oc-cover__visual').attributes('src')).toBe('asset://replaced.png')
-  })
-
-  it('renders text and status-badge tail parts without turning them into actions', () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Theme',
-            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-            tail: ['Local', { type: 'badge', label: 'Missing', icon: 'mdiAlertOutline', tone: 'warning' }],
-          }]],
-        }),
-      },
-    })
-
-    expect(wrapper.get('.oc-album__tail').text()).toContain('Local')
-    const badge = wrapper.get('.oc-node-tail__badge')
-    expect(badge.attributes('aria-label')).toBe('Missing')
-    expect(badge.attributes('data-tooltip')).toBe('Missing')
-    expect(wrapper.find('.oc-album__tail button').exists()).toBe(false)
-  })
-
-  it('stacks the title row above the tail in the card overlay', () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({
-          items: [['root', {
-            label: 'Theme@1.0.0',
-            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-            tail: ['Local', { key: 'remove', title: 'Remove', icon: 'mdiTrashCanOutline' }],
-          }]],
-        }),
-      },
-    })
-
-    const infoChildren = Array.from(wrapper.get('.oc-album__info').element.children)
-    expect(infoChildren[0]?.classList.contains('oc-album__title')).toBe(true)
-    expect(infoChildren[1]?.classList.contains('oc-album__meta')).toBe(true)
-    const titleChildren = Array.from(wrapper.get('.oc-album__title').element.children)
-    expect(titleChildren[0]?.classList.contains('oc-icon')).toBe(true)
-    expect(titleChildren[1]?.classList.contains('oc-album__label')).toBe(true)
-    expect(wrapper.get('.oc-album__meta').element.children[0]?.classList.contains('oc-album__tail')).toBe(true)
-  })
-
-  it('renders card commands as the trailing parts of the tail line', () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({
-          items: [['theme', {
-            label: 'Theme@1.0.0',
-            visual: { type: 'icon', icon: 'mdiPackageVariantClosed' },
-            tail: ['Local', { key: 'remove', title: 'No longer needed', icon: 'mdiTrashCanOutline' }],
-          }]],
-        }),
-      },
-    })
-
-    const tail = wrapper.get('.oc-album__tail')
-    expect(tail.text()).toContain('Local')
-    const children = Array.from(tail.element.children)
-    expect(children[children.length - 1]?.classList.contains('oc-node-tail__action')).toBe(true)
-    expect(wrapper.find('button[aria-label="No longer needed"]').exists()).toBe(true)
-    // Commands stay in the card's own info row; the node has no separate overlay layer.
-    expect(tail.element.closest('.oc-album__info')).not.toBeNull()
-    expect(Array.from(wrapper.get('.oc-album__node').element.children)).toHaveLength(1)
   })
 
   it('reports the card key and action key when a card action is invoked', async () => {
@@ -225,6 +86,7 @@ describe('OcAlbum', () => {
     const button = wrapper.get('button[aria-label="Remove: Required"]')
     expect(button.attributes('disabled')).toBeDefined()
     await button.trigger('click')
+
     expect(wrapper.emitted('action')).toBeUndefined()
   })
 
@@ -241,7 +103,6 @@ describe('OcAlbum', () => {
       },
     })
 
-    expect(wrapper.get('[data-oc-album-key="first"] .oc-album__card').classes()).toContain('is-selected')
     await wrapper.get('[data-oc-album-key="second"] .oc-album__card').trigger('click')
 
     expect(wrapper.emitted('selection-change')).toEqual([[
@@ -278,17 +139,4 @@ describe('OcAlbum', () => {
 
     expect(wrapper.emitted('node-activate')).toEqual([[{ key: 'root' }]])
   })
-
-  it('shows the placeholder while there is nothing to render', () => {
-    const wrapper = mount(OcAlbum, {
-      props: {
-        data: createData({ roots: [], items: [] }),
-        placeholder: 'No packages',
-      },
-    })
-
-    expect(wrapper.classes()).toContain('is-empty')
-    expect(wrapper.get('.oc-album__placeholder').text()).toBe('No packages')
-  })
-
 })

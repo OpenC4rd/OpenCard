@@ -41,34 +41,6 @@
             >{{ run.text }}</span>
           </span>
         </div>
-        <OcFloatingLayer
-          :open="Boolean(hoveredFontAnchor)"
-          :anchor="hoveredFontAnchor"
-          placement="top"
-          class="project-font-registry-workbench__font-info-layer"
-          role="tooltip"
-        >
-          <section v-if="hoveredFont" class="project-font-registry-workbench__font-info">
-            <strong>{{ hoveredFont.name }}</strong>
-            <dl>
-              <div>
-                <dt>{{ t('projectConfig.fonts.previewFontKey') }}</dt>
-                <dd>{{ hoveredFont.key }}</dd>
-              </div>
-              <div>
-                <dt>{{ t('projectConfig.fonts.previewFontSource') }}</dt>
-                <dd>{{ hoveredFace?.source ?? projectFontFileEntries(hoveredFont ?? { files: {} }).map(slot => slot.source).join('; ') }}</dd>
-              </div>
-            </dl>
-          </section>
-          <section v-else class="project-font-registry-workbench__font-info">
-            <strong>{{ coverageFailed ? t('projectConfig.fonts.previewCoverageUnavailable')
-              : t('projectConfig.fonts.previewSystemFallback') }}</strong>
-            <OcText tone="muted" size="sm">{{ coverageFailed
-              ? t('projectConfig.fonts.previewCoverageUnavailableDescription')
-              : t('projectConfig.fonts.previewSystemFallbackDescription') }}</OcText>
-          </section>
-        </OcFloatingLayer>
       </template>
       <div v-else class="project-font-registry-workbench__placeholder">
         <OcIcon :name="activePage === 'families' ? 'mdiFormatFont' : 'mdiLayersOutline'" size="lg" tone="muted" />
@@ -77,12 +49,26 @@
         </OcEmpty>
       </div>
     </section>
+
+    <OcOverlayMarker
+      ref="fontInfoLayer"
+      group="font-info"
+      :anchor="fontInfoLayerAnchor"
+      :owner="fontInfoAnchor"
+      placement="top"
+      :open="fontInfoOpen"
+      @update:open="fontInfoOpen = $event"
+    >
+      <FontInfoLayer v-if="fontInfo" :font="fontInfo.font" :face="fontInfo.face"
+        :coverage-failed="fontInfo.coverageFailed" />
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { OverlayAnchor } from '../../composables/overlayGroups'
 import type { ProjectFont, ProjectFontComposition } from '../../features/workspace/model/projectFontRegistry'
 import { createProjectFontCssFamily } from '../../features/workspace/model/projectFonts'
 import { projectFontFileEntries, projectFontWeightValues } from '../../features/workspace/model/projectFontRegistry'
@@ -106,9 +92,10 @@ import type {
 import OcEmpty from '../base/OcEmpty.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
+import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 import OcText from '../base/OcText.vue'
-import OcFloatingLayer from '../standard/OcFloatingLayer.vue'
 import OcTree from '../standard/OcTree.vue'
+import FontInfoLayer from './FontInfoLayer.vue'
 
 const props = withDefaults(defineProps<{
   families: readonly ProjectFont[]
@@ -134,9 +121,21 @@ const selectedCompositionKey = ref<string | null>(null)
 const previewText = ref(t('projectConfig.fonts.previewSample'))
 const characterSets = ref<ReadonlyMap<string, ReadonlySet<number>>>(new Map())
 const failedCoverageKeys = ref<ReadonlySet<string>>(new Set())
-const hoveredFontKey = ref<string | null>(null)
-const hoveredFaceKey = ref<string | null>(null)
-const hoveredFontAnchor = ref<HTMLElement | null>(null)
+/** 悬停信息层的内容快照：只描述被悬停的那一段预览。 */
+type FontInfoContent = {
+  font: ProjectFont | null
+  face: ReturnType<typeof projectFontFileEntries>[number] | null
+  coverageFailed: boolean
+}
+const fontInfoAnchor = ref<HTMLElement | null>(null)
+const fontInfo = ref<FontInfoContent | null>(null)
+const fontInfoOpen = ref(false)
+const fontInfoLayer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
+/** 锚点是「被悬停的那一段预览」；每次换片段都返回一个新函数，marker 才会把新锚点推进组里。 */
+const fontInfoLayerAnchor = computed<OverlayAnchor>(() => {
+  const anchor = fontInfoAnchor.value
+  return () => anchor?.getBoundingClientRect() ?? null
+})
 let coverageGeneration = 0
 const selectedFamily = computed(() => props.families.find(family => family.key === selectedFamilyKey.value) ?? null)
 const selectedComposition = computed(() => props.compositions.find(entry => entry.key === selectedCompositionKey.value) ?? null)
@@ -258,12 +257,6 @@ const previewRuns = computed(() => createProjectFontPreviewRuns(
   previewCandidates.value,
   characterSets.value,
 ))
-const hoveredFont = computed(() => hoveredFontKey.value
-  ? props.families.find(family => family.key.toLocaleLowerCase() === hoveredFontKey.value?.toLocaleLowerCase()) ?? null
-  : null)
-const hoveredFace = computed(() => projectFontFileEntries(hoveredFont.value ?? { files: {} }).find(slot => (
-  previewFaceKey(hoveredFont.value!.key, slot.source) === hoveredFaceKey.value
-)) ?? null)
 const coverageFailed = computed(() => previewFamilies.value.some(family => failedCoverageKeys.value.has(family.key)))
 const shadowedMemberKeys = computed(() => {
   if (activePage.value !== 'compositions' || !selectedComposition.value) return []
@@ -424,15 +417,29 @@ function runStyle(familyKey: string | null, faceKey: string | null): CSSProperti
   }
 }
 function showFontInfo(familyKey: string | null, faceKey: string | null, event: PointerEvent): void {
-  hoveredFontKey.value = familyKey
-  hoveredFaceKey.value = faceKey
-  hoveredFontAnchor.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  const anchor = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  if (!anchor) return
+  const lookupKey = familyKey?.toLocaleLowerCase() ?? null
+  const font = lookupKey
+    ? props.families.find(candidate => candidate.key.toLocaleLowerCase() === lookupKey) ?? null
+    : null
+  const face = font
+    ? projectFontFileEntries(font).find(slot => previewFaceKey(font.key, slot.source) === faceKey) ?? null
+    : null
+  // 被悬停的那一段文字就是锚点：提示跟着它走，离开即收起。
+  fontInfoAnchor.value = anchor
+  fontInfo.value = { font, face, coverageFailed: coverageFailed.value }
+  fontInfoOpen.value = true
 }
 function hideFontInfo(): void {
-  hoveredFontKey.value = null
-  hoveredFaceKey.value = null
-  hoveredFontAnchor.value = null
+  fontInfoOpen.value = false
 }
+/** 提示描述的是预览里的片段：预览换条目或消失时不再保留，免得停在一个已经被替换掉的锚点上。 */
+watch(selectedEntry, () => { fontInfoOpen.value = false })
+// 从一段预览划到另一段时这一层一直开着：post-flush 时新锚点已经交给 marker，重开一次才贴到新片段上。
+watch(fontInfoAnchor, () => {
+  if (fontInfoOpen.value) fontInfoLayer.value?.open()
+}, { flush: 'post' })
 async function navigateToFont(kind: 'family' | 'composition', key: string): Promise<boolean> {
   if (kind === 'family') {
     if (!props.families.some(family => family.key === key)) return false
@@ -480,23 +487,5 @@ defineExpose({ navigateToFont })
   transition: background-color var(--oc-duration-quick) var(--oc-ease);
 }
 .project-font-registry-workbench__preview-run:hover { background-image: var(--oc-overlay-hover); }
-.project-font-registry-workbench__font-info-layer {
-  max-width: var(--oc-content-width-sm);
-  border: var(--oc-border-width) solid var(--oc-border-muted);
-  box-shadow: var(--oc-shadow-md);
-  pointer-events: none;
-}
-.project-font-registry-workbench__font-info { padding: var(--oc-space-sm); }
-.project-font-registry-workbench__font-info strong { display: block; margin-bottom: var(--oc-space-xs); }
-.project-font-registry-workbench__font-info dl { display: grid; gap: var(--oc-space-2xs); margin: 0; }
-.project-font-registry-workbench__font-info dl > div {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--oc-space-xs);
-}
-.project-font-registry-workbench__font-info dt { color: var(--oc-fg-muted); }
-.project-font-registry-workbench__font-info dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .project-font-registry-workbench__placeholder { display: grid; grid-row: 1 / -1; place-content: center; justify-items: center; gap: var(--oc-space-sm); min-width: 0; min-height: 0; }
 </style>
-
-(Background: j-xagavb exited 1.)

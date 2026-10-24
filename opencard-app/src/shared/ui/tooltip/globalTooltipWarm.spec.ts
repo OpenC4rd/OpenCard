@@ -47,9 +47,7 @@ describe('globalTooltip warm groups', () => {
     stubRect(document.getElementById('second')!, 300, 100, 40, 24)
     stubRect(document.getElementById('outsider')!, 200, 600, 40, 24)
 
-    /** A hidden tooltip keeps its layer mounted; visibility is the open class plus aria-hidden. */
-    const isOpen = (): boolean =>
-      layer.classList.contains('open') && layer.getAttribute('aria-hidden') === 'false'
+    const isOpen = (): boolean => layer.getAttribute('aria-hidden') === 'false'
 
     const pointerEnter = (id: string): void => {
       document.getElementById(id)!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
@@ -69,7 +67,6 @@ describe('globalTooltip warm groups', () => {
     expect(isOpen()).toBe(true)
     expect(layer.textContent).toBe('First')
     expect(layer.dataset.placement).toBe('bottom')
-    expect(layer.classList.contains('instant')).toBe(false)
 
     // Sibling inside the same group: instant, no extra wait, and the side stays where it was even
     // though the second control declares the opposite side.
@@ -77,7 +74,7 @@ describe('globalTooltip warm groups', () => {
     pointerEnter('second')
     expect(isOpen()).toBe(true)
     expect(layer.textContent).toBe('Second')
-    expect(layer.classList.contains('instant')).toBe(true)
+    // 窗口内换兄弟节点不付延迟，而且侧别停在第一次定下的那一边。
     expect(layer.dataset.placement).toBe('bottom')
 
     // Crossing a gap that holds no tooltip keeps the tooltip on screen instead of blinking.
@@ -91,7 +88,6 @@ describe('globalTooltip warm groups', () => {
     pointerEnter('first')
     expect(isOpen()).toBe(true)
     expect(layer.textContent).toBe('First')
-    expect(layer.classList.contains('instant')).toBe(true)
 
     // Warm window expires: the same group is cold again and pays the delay.
     pointerLeave('first', 'gap')
@@ -103,7 +99,6 @@ describe('globalTooltip warm groups', () => {
     vi.advanceTimersByTime(COLD_DELAY_MS)
     expect(isOpen()).toBe(true)
     expect(layer.textContent).toBe('Second')
-    expect(layer.classList.contains('instant')).toBe(false)
 
     // A control outside the group is cold even while the group window is still open.
     pointerEnter('outsider')

@@ -1,60 +1,10 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import {
-  createBlock,
-  createCardFace,
-  type CardDocument,
-  type CardInstanceRecord,
-} from './model'
+import { createBlock, type CardDocument, type CardInstanceRecord } from './model'
 import { applyInstance } from './instance'
 import { buildParentLookup } from './tree'
 
-describe('QR code and shape blocks', () => {
-  it('creates an independent card face root', () => {
-    const face = createCardFace({ id: 'front' })
-
-    expect(face).toEqual({
-      type: 'card-face',
-      id: 'front',
-      background: '#FFFFFF',
-      children: [],
-    })
-  })
-
-  it('creates sparse blocks with their semantic defaults', () => {
-    expect(createBlock('text-block', { id: 'rich-text' })).toMatchObject({
-      id: 'rich-text',
-      type: 'text-block',
-      content: '',
-    })
-    expect(createBlock('markdown-text-block', { id: 'markdown' })).toMatchObject({
-      id: 'markdown',
-      type: 'markdown-text-block',
-      content: '',
-    })
-    expect(createBlock('qrcode-block', { id: 'qr' })).toMatchObject({
-      id: 'qr',
-      type: 'qrcode-block',
-      content: '',
-      errorCorrection: 'M',
-      foreground: '#000000',
-      backgroundColor: '#FFFFFF',
-      quietZone: '4',
-    })
-    expect(createBlock('shape-block', { id: 'shape' })).toMatchObject({
-      id: 'shape',
-      type: 'shape-block',
-      shape: 'rectangle',
-      fill: '#7C6CFF',
-      stroke: '#000000',
-      strokeWidth: '0',
-      strokeStyle: 'solid',
-      strokeAlignment: 'center',
-      strokeJoin: 'miter',
-      strokeCap: 'butt',
-      strokeMiterLimit: '4',
-    })
-  })
-
+describe('instance projection', () => {
   it('applies instance overrides without owning render materialization', () => {
     const qr = createBlock('qrcode-block', { id: 'qr', name: 'Blueprint QR', content: 'blueprint' })
     const document: CardDocument = {

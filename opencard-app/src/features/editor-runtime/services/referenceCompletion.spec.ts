@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import {
   resolveReferenceCompletion,
@@ -57,20 +58,17 @@ describe('referenceCompletion', () => {
       .toEqual(['card:amount'])
   })
 
-  it('offers fields from the project scope', () => {
-    expect(resolveReferenceCompletion('{{project:au}}', cursor('{{project:au}}'), context)?.suggestions.map((item) => item.insertText))
-      .toEqual(['project:author'])
-  })
+  it('offers fields from each scope by its own prefix', () => {
+    const suggestions = (value: string) => resolveReferenceCompletion(value, cursor(value), context)?.suggestions
 
-  it('offers current-block fields through the implicit self shorthand', () => {
-    expect(resolveReferenceCompletion('{{ti}}', cursor('{{ti}}'), context)?.suggestions).toContainEqual(
+    // 当前块走隐式简写：不加作用域前缀也建议它的字段。
+    expect(suggestions('{{ti}}')).toContainEqual(
       expect.objectContaining({ insertText: 'title', detail: 'self:title' }),
     )
-  })
-
-  it('offers fields from the dictionary scope', () => {
-    expect(resolveReferenceCompletion('{{dictionary:ti}}', cursor('{{dictionary:ti}}'), context)?.suggestions.map((item) => item.insertText))
-      .toEqual(['dictionary:title'])
+    expect(suggestions('{{project:au}}')?.map(item => item.insertText)).toEqual(['project:author'])
+    expect(suggestions('{{dictionary:ti}}')?.map(item => item.insertText)).toEqual(['dictionary:title'])
+    expect(suggestions('{{face:ba}}')?.map(item => item.insertText)).toEqual(['face:background'])
+    expect(suggestions('{{opposite:ba}}')?.map(item => item.insertText)).toEqual(['opposite:background'])
   })
 
   it('restricts completion to explicitly allowed scopes', () => {
@@ -83,13 +81,6 @@ describe('referenceCompletion', () => {
     expect(resolveReferenceCompletion('{{document:}}', cursor('{{document:}}'), projectOnlyContext)).toBeNull()
     expect(resolveReferenceCompletion('{{project:}}', cursor('{{project:}}'), projectOnlyContext)?.suggestions.map((item) => item.insertText))
       .toEqual(['project:author'])
-  })
-
-  it('offers same-face and opposite-face fields', () => {
-    expect(resolveReferenceCompletion('{{face:ba}}', cursor('{{face:ba}}'), context)?.suggestions.map((item) => item.insertText))
-      .toEqual(['face:background'])
-    expect(resolveReferenceCompletion('{{opposite:ba}}', cursor('{{opposite:ba}}'), context)?.suggestions.map((item) => item.insertText))
-      .toEqual(['opposite:background'])
   })
 
 })

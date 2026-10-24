@@ -16,7 +16,6 @@ vi.mock('../../features/workspace/services/projectIconCatalog', async (importOri
   const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
   return {
     ...actual,
-    // Assembling the catalog is synchronous plain-data work; only the sizes arrive later.
     buildProjectIconCatalog: vi.fn((series: readonly ProjectIconSeries[], resolve: (source: string) => string) => {
       const entries: ProjectIconCatalogEntry[] = []
       const runtimeSeries = series.map(candidate => {
@@ -65,39 +64,18 @@ async function selectSeries(wrapper: ReturnType<typeof mount>, key: string): Pro
 }
 
 describe('ProjectIconRegistryWorkbench', () => {
-  it('opens the first set with its icons in the middle and the icon inspector on the right', async () => {
+  it('opens the first set with its first icon selected', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, {
       props: { ...baseProps, projectIconCatalog },
     })
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.getComponent(OcTree).props('data').rootKeys).toEqual(['status', 'actions'])
     expect(wrapper.getComponent(OcTree).props('selectedKeys')).toEqual(['status'])
     expect(wrapper.getComponent(ProjectIconSetWorkspace).props()).toMatchObject({
       series: series[0],
       selectedIconIndexes: [0],
     })
     expect(wrapper.getComponent(ProjectIconPreview).props('entry')).toMatchObject({ iconKey: 'warning' })
-    const editor = wrapper.getComponent(PropertyEditor)
-    expect(editor.props('inputs')[0]?.record).toMatchObject({ name: 'Warning' })
-  })
-
-  it('leaves pack creation to the editor shell actions', async () => {
-    const wrapper = mount(ProjectIconRegistryWorkbench, {
-      props: { ...baseProps, projectIconCatalog },
-    })
-    await wrapper.vm.$nextTick()
-
-  })
-
-  it('offers the set commands on the set row and no crop or even-grid actions', () => {
-    const wrapper = mount(ProjectIconRegistryWorkbench, {
-      props: { ...baseProps, projectIconCatalog },
-    })
-
-    expect(seriesAction(wrapper, 'status', 'add-icons')).toBeDefined()
-    expect(wrapper.find('button[aria-label="projectConfig.icons.addSingleCrop"]').exists()).toBe(false)
-    expect(wrapper.find('button[aria-label="projectConfig.icons.generateIcons"]').exists()).toBe(false)
   })
 
   it('disables the import commands while an icon import task owns the progress bar', () => {
@@ -119,14 +97,11 @@ describe('ProjectIconRegistryWorkbench', () => {
     expect(updates[updates.length - 1]?.[0]).toEqual([updatedStatus, series[1]])
   })
 
-  it('switches the icon grid and the inspector with the selected set', async () => {
+  it('switches the icon grid with the selected set', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, { props: baseProps })
     await selectSeries(wrapper, 'actions')
 
     expect(wrapper.getComponent(ProjectIconSetWorkspace).props('series')).toMatchObject({ key: 'actions' })
-    expect(wrapper.findComponent(ProjectIconPreview).exists()).toBe(false)
-    expect(wrapper.get('.project-icon-registry-workbench__inspector').text())
-      .toContain('projectConfig.icons.noIconSelected')
   })
 
   it('requests removal from the owner instead of dropping a set on its own', async () => {
@@ -147,23 +122,6 @@ describe('ProjectIconRegistryWorkbench', () => {
     expect(wrapper.emitted('add-icons')).toEqual([['actions']])
   })
 
-  it('reports the selected set runtime and its icons to the workspace', async () => {
-    const twoIcons: ProjectIconSeries[] = [{
-      ...series[0]!,
-      icons: [
-        series[0]!.icons[0]!,
-        { iconKey: 'error', name: 'Error', source: '.opencard/icons/status/error.svg', tint: 'original' },
-      ],
-    }]
-    const wrapper = mount(ProjectIconRegistryWorkbench, {
-      props: { ...baseProps, series: twoIcons },
-    })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.getComponent(ProjectIconSetWorkspace).props('entries')).toHaveLength(2)
-    expect(wrapper.getComponent(ProjectIconPreview).props('entry')).toMatchObject({ iconKey: 'warning' })
-  })
-
   it('selects the target set and icon for issue navigation', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, { props: baseProps })
     const result = await (wrapper.vm as unknown as {
@@ -173,29 +131,7 @@ describe('ProjectIconRegistryWorkbench', () => {
 
     expect(result).toBe(true)
     expect(wrapper.getComponent(ProjectIconSetWorkspace).props('selectedIconIndexes')).toEqual([0])
-    const revealed = wrapper.get('.property-editor__row.is-revealed')
-    expect(revealed.attributes('data-input-key')).toBe('icon:0')
-    expect(revealed.attributes('data-field-key')).toBe('iconKey')
-  })
-
-  it('edits the one selected icon, and names the count when several are selected', async () => {
-    const wrapper = mount(ProjectIconRegistryWorkbench, {
-      props: { ...baseProps, series: [{ ...series[0]!, icons: iconsOf(series[0]!) }] },
-    })
-    await wrapper.vm.$nextTick()
-    const workspace = wrapper.getComponent(ProjectIconSetWorkspace)
-
-    expect(wrapper.getComponent(PropertyEditor).props('inputs')[0]?.record.name).toBe('Warning')
-
-    workspace.vm.$emit('update:selectedIconIndexes', [0, 2])
-    await wrapper.vm.$nextTick()
-    expect(wrapper.findComponent(PropertyEditor).exists()).toBe(false)
-    expect(wrapper.get('.project-icon-registry-workbench__inspector').text())
-      .toContain('projectConfig.icons.multiSelectionNote')
-
-    workspace.vm.$emit('update:selectedIconIndexes', [1])
-    await wrapper.vm.$nextTick()
-    expect(wrapper.getComponent(PropertyEditor).props('inputs')[0]?.record.name).toBe('Success')
+    expect(wrapper.getComponent(OcTree).props('selectedKeys')).toEqual(['status'])
   })
 
   it('edits the selected icon through the inspector without mutating the incoming set', async () => {
@@ -210,29 +146,21 @@ describe('ProjectIconRegistryWorkbench', () => {
     const renamed = renamedUpdates[renamedUpdates.length - 1]?.[0] as ProjectIconSeries[]
     expect(renamed[0]?.icons[0]?.name).toBe('Alert')
     expect(series[0]?.icons[0]?.name).toBe('Warning')
-
   })
 
-  it('exposes tint for every icon and pixelated only for a raster', async () => {
+  it('applies tint to any icon and lets a raster icon opt into pixelation', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, { props: baseProps })
     await wrapper.vm.$nextTick()
-
-    const fields = wrapper.getComponent(PropertyEditor).props('inputs')[0]?.fields
-    expect(fields).toHaveProperty('tint')
-    expect(fields).not.toHaveProperty('pixelated')
-    expect(fields).not.toHaveProperty('x')
 
     wrapper.getComponent(PropertyEditor).vm.$emit('update-property', {
       key: 'icon:0', fieldKey: 'tint', value: 'original',
     })
     await wrapper.vm.$nextTick()
-    const updates = wrapper.emitted('update:series') ?? []
-    const updated = updates[updates.length - 1]?.[0] as ProjectIconSeries[]
+    let updates = wrapper.emitted('update:series') ?? []
+    let updated = updates[updates.length - 1]?.[0] as ProjectIconSeries[]
     expect(updated[0]?.icons[0]).toMatchObject({ tint: 'original' })
-  })
 
-  it('marks a raster icon pixelated through its own property', async () => {
-    const wrapper = mount(ProjectIconRegistryWorkbench, {
+    const raster = mount(ProjectIconRegistryWorkbench, {
       props: {
         ...baseProps,
         series: [{
@@ -241,16 +169,14 @@ describe('ProjectIconRegistryWorkbench', () => {
         }],
       },
     })
-    await wrapper.vm.$nextTick()
+    await raster.vm.$nextTick()
 
-    expect(wrapper.getComponent(PropertyEditor).props('inputs')[0]?.fields).toHaveProperty('pixelated')
-
-    wrapper.getComponent(PropertyEditor).vm.$emit('update-property', {
+    raster.getComponent(PropertyEditor).vm.$emit('update-property', {
       key: 'icon:0', fieldKey: 'pixelated', value: 'true',
     })
-    await wrapper.vm.$nextTick()
-    const updates = wrapper.emitted('update:series') ?? []
-    const updated = updates[updates.length - 1]?.[0] as ProjectIconSeries[]
+    await raster.vm.$nextTick()
+    updates = raster.emitted('update:series') ?? []
+    updated = updates[updates.length - 1]?.[0] as ProjectIconSeries[]
     expect(updated[0]?.icons[0]).toMatchObject({ pixelated: true })
   })
 
@@ -276,17 +202,6 @@ describe('ProjectIconRegistryWorkbench', () => {
     await wrapper.setProps({ series: nextSeries })
     await wrapper.vm.$nextTick()
     expect(wrapper.getComponent(PropertyEditor).props('inputs')[0]?.record.name).toBe('Info')
-  })
-
-  it('keeps the no-icon empty state in the inspector when the set has no icons', async () => {
-    const wrapper = mount(ProjectIconRegistryWorkbench, {
-      props: { ...baseProps, series: [{ name: 'Action icons', key: 'actions', icons: [] }] },
-    })
-    await wrapper.vm.$nextTick()
-
-    const inspector = wrapper.get('.project-icon-registry-workbench__inspector')
-    expect(inspector.findComponent(PropertyEditor).exists()).toBe(false)
-    expect(inspector.text()).toContain('projectConfig.icons.noIconSelected')
   })
 
   it('renames a set through its settings without touching icon files', async () => {

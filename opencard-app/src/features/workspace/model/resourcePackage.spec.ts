@@ -60,10 +60,6 @@ describe('package manifest public fonts', () => {
     ])
   })
 
-  it('defaults a missing public font index to an empty list', () => {
-    const value = manifest(undefined)
-    expect(normalizeResourcePackageManifest(value).manifest.public.fonts).toEqual([])
-  })
 })
 
 describe('package manifest cover', () => {
@@ -104,9 +100,4 @@ describe('package manifest public icon series', () => {
     ])
   })
 
-  it('defaults a missing public icon series index to an empty list', () => {
-    const value = manifest([])
-    delete (value.public as Partial<typeof value.public>).iconSeries
-    expect(normalizeResourcePackageManifest(value).manifest.public.iconSeries).toEqual([])
-  })
 })

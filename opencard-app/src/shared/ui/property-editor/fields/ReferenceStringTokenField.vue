@@ -31,19 +31,25 @@
         @keydown="handleKeydown" @keyup="handleCursorKeyup" @paste="handlePaste" />
     </OcFieldFrame>
 
-    <OcAutocompletePopover
-      :id="autocompleteId"
+    <OcOverlayMarker
+      ref="layer"
+      :group="`completion:${autocompleteId}`"
+      :anchor="completionAnchor"
+      :owner="completionControl"
+      placement="bottom-start"
+      :max-height="220"
       :open="isMenuOpen"
-      :anchor="activeInput"
-      :items="suggestions"
-      :active-key="activeKey"
-      @select="acceptSuggestionByKey"
-    />
+      @update:open="isMenuOpen = $event"
+      @close="isMenuOpen = false"
+    >
+      <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activeKey"
+        @select="acceptSuggestionByKey" />
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
   PropertyCompletionItem,
@@ -57,10 +63,11 @@ import {
   splitReferenceStringTokens,
   type ReferenceStringListSeparator,
 } from './referenceStringTokens'
-import OcAutocompletePopover from '../../../../components/standard/OcAutocompletePopover.vue'
+import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
 import OcButton from '../../../../components/base/OcButton.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+import OcOverlayMarker from '../../../../components/standard/OcOverlayMarker.vue'
 
 import { usePropertyCompletion } from './usePropertyCompletion'
 
@@ -88,8 +95,12 @@ const draft = ref(initial.draft)
 /** 自己发出去的值回传时不重新解析，否则正在输入的那一项会被规范化（去空白）打断。 */
 let lastEmitted = ''
 const activeInput = ref<TextControl | null>(null)
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const completion = usePropertyCompletion(() => activeInput.value)
-const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId } = completion
+const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId,
+  anchor: completionAnchor, control: completionControl } = completion
+// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
+onBeforeUnmount(() => layer.value?.close())
 
 /** 补全 provider 拿到的是整串 + 整串光标，所以尾巴要补回已提交项的前缀。 */
 const editedValue = computed(() => `${referenceStringTokenPrefix(tokens.value, separator.value)}${draft.value}`)

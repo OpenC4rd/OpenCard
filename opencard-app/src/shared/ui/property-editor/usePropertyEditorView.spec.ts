@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { PropertyEditorInput } from './propertyEditor.types'
@@ -16,7 +17,7 @@ function createView(inputs: PropertyEditorInput[]) {
 }
 
 describe('usePropertyEditorView', () => {
-  it('groups only from prepared field and category definitions', () => {
+  it('groups fields into the declared categories and leaves unmatched keys in Other', () => {
     const { displaySources } = createView([{
       key: 'text',
       record: { id: 'text-1', content: 'Hello', score: 12 },
@@ -27,12 +28,8 @@ describe('usePropertyEditorView', () => {
       },
     }])
 
-    expect(displaySources.value[0]?.categories.map((category) => [category.title, category.icon]))
-      .toEqual([
-        ['Identity', 'mdiKeyOutline'],
-        ['Content', 'mdiFormatText'],
-        ['Other', 'mdiFileTreeOutline'],
-      ])
+    expect(displaySources.value[0]?.categories.map((category) => category.entries.map(entry => entry.key)))
+      .toEqual([['id'], ['content'], ['score']])
   })
 
   it('puts unknown categories in Other and keeps missing native fields addable', () => {

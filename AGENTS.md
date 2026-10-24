@@ -6,11 +6,19 @@
 
 ## Coding
 
-- Develop incrementally; avoid bulk generation and mass file operations.
+- Develop incrementally: land one coherent step at a time. Incremental means ordered progress, not the smallest possible diff — see Change Scope.
 - Preserve unrelated worktree changes and keep the user in control of scope.
 - Treat every successful edit as invalidating all older anchors for that file. Use only anchors from the latest read or edit response; re-read before editing any location not present in the latest anchor block.
 - When editing templates, CSS, or object literals, verify tag, brace, and delimiter pairing in the full affected block. Do not stack corrective patches onto an unverified structural edit.
 - If HMR reports a template, CSS, or transform error, stop subsequent edits and repair that error first. Re-read the complete affected structure after repair.
+
+## Change Scope
+
+- Choose the best change, not the smallest diff. A patch that shrinks the diff by leaving the wrong structure in place is a second bug with extra steps.
+- When the correct shape requires replacing a module, replace it: rewrite the module and update every reference in the same change. Deleting the old path is part of the change, not a follow-up.
+- Do not keep a compatibility layer, a parallel path, or a half-migrated call site alive just to keep the diff small. That is the same "preserve the old shape" failure described under Refactoring Discipline, only slower.
+- Incremental governs order, not size: each unit may be a rewrite that touches all of its callers.
+- Scope still belongs to the user: a rewrite covers the problem being solved, not neighboring modules that merely look similar.
 
 ## Early-Stage Compatibility
 
@@ -40,16 +48,30 @@
 - Progress reports must distinguish observed facts, hypotheses, production-code changes, automated verification, and pending manual verification. Never describe unverified UI behavior as complete.
 - During implementation, proactively report at each meaningful phase boundary (diagnosis complete, production edit complete, verification complete) and whenever a command stalls or work takes unexpectedly long. Do not remain silent through extended tool use; keep the user informed about current findings, changes, blockers, and next steps.
 
-## Test Selection
+## Tests
 
-- Read production code and its complete call chain before changing it. Running tests never substitutes for investigation.
-- File size does not determine whether a test is needed. Keep a test only when it detects a meaningful failure.
-- Do not test trivial configuration, constants, mappings, forwarding, names, or wording separately.
-- Prefer existing feature tests. Do not create a test suite for a small helper or add speculative guards.
-- Delete obsolete, duplicate, and implementation-detail tests. Keep minimal checks for data loss, cancellation, async ownership, parsing, and trust boundaries.
-- Mocks must not replace the integration path being verified. Passing mocked tests is not runtime evidence.
-- Run affected tests during development. Run the remaining full suite once after a repository-wide cleanup; do not repeat it without a new reason.
-- A test must justify its setup and assertions. Reduce redundant fixtures and assertions instead of preserving scaffolding for its own sake.
+A test exists to pin a decision the code must keep making. Everything else is maintenance debt.
+
+**Write**
+- One `it` is one decision. The title states the rule being protected (`refuses …`, `keeps … when …`, `stops … before …`), never the steps that reached it.
+- Assert the seam that can actually break: returned values, resulting state, raised issues, effects on disk or in the store. Assert the payload, not that something was called.
+- Cover data loss and persistence, cancellation and ordering, state-transition guards, parsing and validation boundaries (malformed input, escapes, cycles, limits), and trust boundaries.
+- Prefer the real collaborator; mock only the process boundary (Tauri, network, clock, filesystem). A mocked test is not runtime evidence.
+- Pure-logic specs declare `// @vitest-environment node`; mounting is for behavior that exists only in the DOM.
+- Read the production path and its call chain before touching its spec. Running tests never substitutes for reading.
+
+**Never**
+- Assert CSS class names, DOM nesting, child combinators, inline styles, or the concatenated text of a layout container — `findAll('.x > span')`, `.classes()`, `attributes('style')`, golden arrays of rendered text.
+- Assert that a stub, mock, or component wrapper exists.
+- Snapshot tests, or `.skip` / `.only` in committed code.
+- Tests for constants, mappings, prop forwarding, labels, or wording.
+- Production branches, props, or exports that exist only to make a test easier.
+
+**Size**: a spec over ~300 lines or ~25 cases gets split or trimmed, never extended. If it needs a 300-line fixture, the production shape is the bug — report it instead of building the fixture.
+
+**Earn the test**: name the change that should turn it red. If you cannot, delete it. Deleting a test is a normal change, not a regression, and a green suite is not evidence of coverage.
+
+**Run**: run the specs you touched while working; run the full suite once after a cleanup. A spec that no workflow runs is wired into CI or deleted, never left green in a corner.
 
 ## Release Notes
 

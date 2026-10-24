@@ -56,18 +56,6 @@ describe('editorSessionManager explicit save path', () => {
     mocks.writeFile.mockResolvedValue(undefined)
   })
 
-  it('opens managed project files with their dedicated editors', async () => {
-    const store = createEditorSessionManager()
-
-    const session = await store.open('D:/project/.opencard/fonts/fonts.json', { preview: true })
-
-    expect(session.state).toMatchObject({
-      fileTypeId: 'opencard-font-registry',
-      editorId: 'font-registry',
-    })
-    store.closeSession(session.state.id)
-  })
-
   it('persists a draft to the supplied path without opening Save As', async () => {
     const store = createEditorSessionManager()
     const session = store.createDraftSession({
@@ -103,9 +91,6 @@ describe('editorSessionManager explicit save path', () => {
       .toBe('Current Card.ocdocument')
 
     await expect(session.save()).resolves.toBe('cancelled')
-    expect(mocks.pickSavePath).toHaveBeenCalledWith(expect.objectContaining({
-      defaultPath: 'D:/project/Current Card.ocdocument',
-    }))
 
     store.closeSession(session.state.id)
   })

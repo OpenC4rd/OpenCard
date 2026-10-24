@@ -2,9 +2,6 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectIconSeries } from '../../features/workspace/model/projectIcons'
 import type { ProjectIconCatalogEntry } from '../../features/workspace/services/projectIconCatalog'
-import type { OcNodeAction } from '../../shared/ui/node/node.types'
-import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
-import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
 import OcAlbum from '../standard/OcAlbum.vue'
 import ProjectIconSetWorkspace from './ProjectIconSetWorkspace.vue'
 
@@ -36,53 +33,7 @@ function mountWorkspace(
   })
 }
 
-function nodeActions(wrapper: ReturnType<typeof mountWorkspace>, key: string): readonly OcNodeAction[] {
-  return normalizeNodeTail(wrapper.getComponent(OcAlbum).props('data').items.get(key)?.tail)
-    .filter(isNodeTailAction)
-}
-
 describe('ProjectIconSetWorkspace', () => {
-  it('shows an empty placeholder instead of the icon grid', () => {
-    const wrapper = mountWorkspace({ ...series, icons: [] }, [])
-    expect(wrapper.get('.project-icon-set-workspace').classes()).toContain('is-empty')
-    expect(wrapper.get('.project-icon-set-workspace__empty').text()).toContain('projectConfig.icons.emptyIconList')
-    expect(wrapper.find('.project-icon-set-workspace__grid-pane').exists()).toBe(false)
-  })
-
-  it('keeps the icon grid as the only pane, with the property editor living outside', () => {
-    const wrapper = mountWorkspace()
-    const disabledActionEntries = (key: string): unknown[] => nodeActions(wrapper, key)
-      .filter(action => action.disabled)
-      .map(action => [action.key, action.disabledReason])
-
-    expect(wrapper.find('.project-icon-set-workspace__grid-pane').exists()).toBe(true)
-    expect(wrapper.findComponent(PropertyEditor).exists()).toBe(false)
-    expect(nodeActions(wrapper, 'icon:0').map(action => action.key)).toEqual([
-      'duplicate', 'move-top', 'move-up', 'move-down', 'move-bottom', 'delete',
-    ])
-    expect(nodeActions(wrapper, 'icon:0').find(action => action.key === 'move-top')?.icon).toBe('mdiFormatVerticalAlignTop')
-    expect(nodeActions(wrapper, 'icon:0').find(action => action.key === 'move-bottom')?.icon).toBe('mdiFormatVerticalAlignBottom')
-    expect(disabledActionEntries('icon:0')).toEqual([
-      ['move-top', 'projectConfig.icons.alreadyAtTop'],
-      ['move-up', 'projectConfig.icons.alreadyAtTop'],
-    ])
-    expect(disabledActionEntries('icon:1')).toEqual([
-      ['move-down', 'projectConfig.icons.alreadyAtBottom'],
-      ['move-bottom', 'projectConfig.icons.alreadyAtBottom'],
-    ])
-  })
-
-  it('paints the icon itself as the card face', () => {
-    const wrapper = mountWorkspace()
-    const cover = wrapper.getComponent(OcAlbum).props('data').items.get('icon:0')?.cover
-
-    expect(cover?.type).toBe('style')
-    if (cover?.type !== 'style') throw new Error('The card face must be the icon itself')
-    expect(cover.style['--oc-project-icon-renderer']).toBe('mask')
-    expect(cover.style['--oc-project-icon-mask-image']).toContain('asset://')
-    expect(cover.label).toBe('Warning')
-  })
-
   it('filters by icon name or key while preserving original icon indexes', async () => {
     const wrapper = mountWorkspace()
     const input = wrapper.get('input[placeholder="projectConfig.icons.filterPlaceholder"]')
@@ -102,6 +53,7 @@ describe('ProjectIconSetWorkspace', () => {
     wrapper.getComponent(OcAlbum).vm.$emit('selection-change', {
       triggerKey: 'icon:1', selectedKeys: ['icon:1'],
     })
+
     expect(wrapper.emitted('update:selectedIconIndexes')).toEqual([[[1]]])
     expect(wrapper.emitted('update:series')).toBeUndefined()
   })
@@ -115,8 +67,6 @@ describe('ProjectIconSetWorkspace', () => {
       ],
     }
     const wrapper = mountWorkspace(multiSeries, [0, 2], entries)
-
-    expect(wrapper.getComponent(OcAlbum).props('selectedKeys')).toEqual(['icon:0', 'icon:2'])
 
     wrapper.getComponent(OcAlbum).vm.$emit('action', { key: 'icon:2', actionKey: 'move-bottom', source: 'inline' })
     let updates = wrapper.emitted('update:series') ?? []

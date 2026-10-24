@@ -47,16 +47,20 @@
       @dblclick.stop="startEditing"
     >{{ bindingLabel }}</span>
 
-    <OcAutocompletePopover
-      :id="autocompleteId"
+    <OcOverlayMarker
+      ref="layer"
+      :group="`completion:${autocompleteId}`"
+      :anchor="completionAnchor"
+      :owner="completionControl"
+      placement="bottom-start"
+      :max-height="220"
       :open="menuOpen"
-      :anchor="inputElement"
-      :items="suggestions"
-      :active-key="activeKey"
-      detail-layout="inline"
-      :match-anchor-width="false"
-      @select="acceptSuggestionByKey"
-    />
+      @update:open="menuOpen = $event"
+      @close="menuOpen = false"
+    >
+      <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activeKey"
+        detail-layout="inline" @select="acceptSuggestionByKey" />
+    </OcOverlayMarker>
   </NodeViewWrapper>
 </template>
 
@@ -66,7 +70,8 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
-import OcAutocompletePopover from '../../../components/standard/OcAutocompletePopover.vue'
+import OcAutocompleteList from '../../../components/standard/OcAutocompleteList.vue'
+import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
 import type { BindingNodeOptions } from './bindingNode'
 import type { PropertyCompletionItem } from '../property-editor/propertyEditor.types'
 import { usePropertyCompletion } from '../property-editor/fields/usePropertyCompletion'
@@ -82,13 +87,16 @@ const tr = (key: string, fallback: string, parameters?: Record<string, unknown>)
 const openBrace = '{{'
 const closeBrace = '}}'
 const input = ref<ComponentPublicInstance | null>(null)
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const editSession = ref<{ original: string, draft: string } | null>(null)
 const completion = usePropertyCompletion(() => inputElement.value)
-const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, suggestions } = completion
+const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, suggestions,
+  anchor: completionAnchor, control: completionControl } = completion
 let composing = false
 let disposed = false
 let blurTimer: ReturnType<typeof setTimeout> | undefined
-onBeforeUnmount(() => { disposed = true; clearTimeout(blurTimer); editSession.value = null })
+// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
+onBeforeUnmount(() => { disposed = true; clearTimeout(blurTimer); editSession.value = null; layer.value?.close() })
 
 const expression = computed(() => String(props.node.attrs.expression ?? '').trim())
 const editing = computed(() => editSession.value !== null)

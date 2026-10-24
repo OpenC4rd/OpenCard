@@ -1,7 +1,6 @@
 import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { nextTick, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { normalizeNodeTail } from '../../../shared/ui/node/node.types'
 import type { EditorIssue } from '../../editor-runtime/model/editorIssue'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import {
@@ -38,7 +37,7 @@ function createIssue(id: string, severity: EditorIssue['severity'] = 'warning'):
 describe('workspace issue projection', () => {
   const COPY_ISSUE_LABEL = 'Copy error information'
 
-  it('projects severity presentation and opaque navigation targets', () => {
+  it('projects issue counts and opaque navigation targets', () => {
     const session = createSession('a', 'Card A')
     const projection = buildWorkspaceIssueProjection(
       [session],
@@ -52,20 +51,11 @@ describe('workspace issue projection', () => {
     expect(projection.highestSeverity).toBe('error')
     expect(projection.treeData.rootKeys).toEqual(['workspace-issue-session:a'])
     const issueKey = projection.treeData.children.get('workspace-issue-session:a')?.[0]
-    expect(projection.treeData.items.get(issueKey!)).toMatchObject({
-      label: 'Card A / title: invalid issue',
-      visual: { type: 'icon', icon: 'mdiAlertCircleOutline', iconTone: 'danger' },
-    })
-    expect(normalizeNodeTail(projection.treeData.items.get(issueKey!)?.tail)).toEqual([{
-      key: 'copy-issue',
-      title: COPY_ISSUE_LABEL,
-      icon: 'mdiContentCopy',
-      iconTone: 'muted',
-    }])
     expect(projection.navigationTargets.get(issueKey!)).toEqual({
       sessionId: 'a',
       token: { protocol: 'test', id: 'invalid' },
     })
+    // 分组行只是显示用的容器，不是可跳转目标。
     expect(projection.navigationTargets.has('workspace-issue-session:a')).toBe(false)
   })
 

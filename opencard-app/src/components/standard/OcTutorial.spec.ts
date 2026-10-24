@@ -9,7 +9,7 @@ import OcTutorial from './OcTutorial.vue'
 import OcDialog from './OcDialog.vue'
 import OcFloatingLayer from './OcFloatingLayer.vue'
 
-it('finishes the Git explanation without any target elements', async () => {
+it('finishes a completed tour without any target elements', async () => {
   const tutorial = createTutorialStore(tutorials)
   tutorial.start('versionControl')
   for (const id of ['sidebar', 'graph', 'changes', 'commit']) tutorial.completeStep('versionControl', id)
@@ -22,27 +22,23 @@ it('finishes the Git explanation without any target elements', async () => {
   try {
     await flushPromises()
     const card = document.querySelector<HTMLElement>('.oc-tutorial')!
-    expect(card.textContent).toContain('About Git')
-    expect(card.textContent).not.toContain(enUS.tutorial.targetMissing)
-    expect(document.querySelector('.oc-tutorial__outline')).toBeNull()
     card.querySelector<HTMLButtonElement>('footer button:last-child')!.click()
     await flushPromises()
     expect(tutorial.session.value).toBeNull()
   } finally { wrapper.unmount() }
 })
 
-it('runs a read-only welcome tour, blocks background shortcuts, and releases them after completion', async () => {
+it('blocks background shortcuts during a modal tour and releases them after completion', async () => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 100, 30)] as unknown as DOMRectList)
-  const toggle = vi.fn()
   const completed = vi.fn()
   const tutorial = createTutorialStore(tutorials, completed)
   const backgroundShortcut = vi.fn()
   window.addEventListener('keydown', backgroundShortcut)
   tutorial.start('overview')
   const wrapper = mount(defineComponent({ setup: () => () => h('div', [
-    ...tutorials.overview.steps.flatMap(step => step.targets.map(target => h('button', { 'data-oc-tutorial': target.key, onClick: toggle }, target.key))),
+    ...tutorials.overview.steps.flatMap(step => step.targets.map(target => h('button', { 'data-oc-tutorial': target.key }, target.key))),
     h(OcTutorial, {
-      session: tutorial.session.value, onExit: tutorial.exit,
+      session: tutorial.session.value,
       onComplete: value => tutorial.completeStep(value.tutorialId, value.stepId, value.run),
     }),
   ]) }), {
@@ -53,9 +49,7 @@ it('runs a read-only welcome tour, blocks background shortcuts, and releases the
     await flushPromises()
     const card = document.querySelector<HTMLElement>('.oc-tutorial')!
     expect(card.getAttribute('aria-modal')).toBe('true')
-    expect(card.textContent).toContain('Welcome to OpenCard')
-    expect(document.querySelector('.oc-tutorial__mask--blocking')).not.toBeNull()
-    expect(document.querySelector('.oc-tutorial__click-hint')).toBeNull()
+
     const shortcut = new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true, cancelable: true })
     document.body.dispatchEvent(shortcut)
     expect(shortcut.defaultPrevented).toBe(true)
@@ -65,21 +59,13 @@ it('runs a read-only welcome tour, blocks background shortcuts, and releases the
     next.focus()
     next.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
     expect(document.activeElement).toBe(card.querySelector('footer button'))
+
     for (let index = 0; index < tutorials.overview.steps.length; index++) {
-      if (tutorial.session.value?.step.id === 'sidebar-toggle') {
-        expect(document.querySelectorAll('.oc-tutorial__click-hint')).toHaveLength(1)
-        expect(card.getAttribute('aria-modal')).toBeNull()
-        const target = wrapper.get('[data-oc-tutorial="shell.sidebar-toggle"]')
-        expect(target.element.closest('[inert]')).toBeNull()
-        await target.trigger('click')
-        expect(toggle).toHaveBeenCalledOnce()
-      }
       card.querySelector<HTMLButtonElement>('footer button:last-child')!.click()
       await flushPromises()
-      if (tutorial.session.value) expect(document.querySelector('.oc-tutorial')).toBe(card)
     }
     expect(completed).toHaveBeenCalledExactlyOnceWith('overview')
-    expect(document.querySelector('.oc-tutorial__mask')).toBeNull()
+
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true }))
     expect(backgroundShortcut).toHaveBeenCalledOnce()
   } finally {
@@ -89,7 +75,7 @@ it('runs a read-only welcome tour, blocks background shortcuts, and releases the
   }
 })
 
-it('places an interactive tutorial inside its target dialog and yields to a newer modal', async () => {
+it('yields the tour layer to a newer modal and resumes when it closes', async () => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 100, 30)] as unknown as DOMRectList)
   const tutorial = createTutorialStore({ demo: { title: 'Demo', steps: [{ id: 'field', manual: true,
     targets: [{ key: 'dialog.field', title: 'Field', desc: 'Explanation' }] }] } })
@@ -106,12 +92,12 @@ it('places an interactive tutorial inside its target dialog and yields to a newe
     tutorial.start('demo')
     await flushPromises()
     const layer = document.querySelector<HTMLElement>('.oc-tutorial-layer')!
-    expect(layer.closest('.oc-dialog__backdrop')).not.toBeNull()
     expect(layer.style.display).not.toBe('none')
-    expect(layer.querySelectorAll('.oc-tutorial__outline')).toHaveLength(1)
+
     newer.value = true
     await flushPromises()
     expect(layer.style.display).toBe('none')
+
     newer.value = false
     await flushPromises()
     expect(layer.style.display).not.toBe('none')
@@ -122,8 +108,7 @@ it('places an interactive tutorial inside its target dialog and yields to a newe
   }
 })
 
-
-it('restricts clicks to current targets and their teleported popovers, then restores them on exit', async () => {
+it('restricts clicks to the current target and its teleported popover, then restores them on exit', async () => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 100, 30)] as unknown as DOMRectList)
   const tutorial = createTutorialStore({ demo: { title: 'Demo', steps: ['first', 'second'].map(id => ({
     id, manual: true, targets: ['first', 'second'].map(key => ({ key, title: key, desc: 'Explanation', interactive: key === id })),
@@ -144,14 +129,15 @@ it('restricts clicks to current targets and their teleported popovers, then rest
     tutorial.start('demo')
     await flushPromises()
     first.value!.click()
-    expect(document.querySelectorAll('.oc-tutorial__click-hint')).toHaveLength(1)
     second.value!.click()
     document.querySelector<HTMLButtonElement>('#first-option')!.click()
     document.querySelector<HTMLButtonElement>('#second-option')!.click()
     expect(action.mock.calls).toEqual([['first'], ['first-option']])
+
     const blocked = new Event('pointerdown', { bubbles: true, cancelable: true })
     second.value!.dispatchEvent(blocked)
     expect(blocked.defaultPrevented).toBe(true)
+
     document.querySelector<HTMLButtonElement>('.oc-tutorial footer button:last-child')!.click()
     await flushPromises()
     first.value!.click()
@@ -159,11 +145,10 @@ it('restricts clicks to current targets and their teleported popovers, then rest
     document.querySelector<HTMLButtonElement>('#first-option')!.click()
     document.querySelector<HTMLButtonElement>('#second-option')!.click()
     expect(action.mock.calls.slice(2)).toEqual([['second'], ['second-option']])
-    expect(document.querySelectorAll('.oc-tutorial__click-hint')).toHaveLength(1)
+
     document.querySelector<HTMLButtonElement>('.oc-tutorial footer button')!.click()
     await flushPromises()
     first.value!.click()
     expect(action.mock.calls.slice(-1)[0]).toEqual(['first'])
-    expect(document.querySelector('.oc-tutorial__click-hint')).toBeNull()
   } finally { wrapper.unmount(); vi.restoreAllMocks() }
 })

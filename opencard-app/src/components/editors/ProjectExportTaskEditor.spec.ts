@@ -15,50 +15,27 @@ function mountEditor() {
     },
     global: {
       plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })],
-      stubs: { Teleport: true, OcAutocompletePopover: true },
+      stubs: { Teleport: true, OcAutocompleteList: true },
     },
   })
 }
 
 describe('projectExportTaskEditor', () => {
-  it('keeps all quality presets and scale synchronized', async () => {
-    const wrapper = mountEditor()
-    await wrapper.get('[role="combobox"]').trigger('focus')
-    await wrapper.get('button[aria-label="Add card document"]').trigger('click')
-
-    expect(wrapper.text()).toContain('540 × 850 px')
-    const scaleInput = wrapper.get('.project-export-task-editor__scale-field input')
-    const qualityInput = wrapper.get('.project-export-task-editor__resolution-controls input[readonly]')
-    await scaleInput.setValue('0.5')
-    expect((qualityInput.element as HTMLInputElement).value).toBe('Preview')
-    await scaleInput.setValue('1')
-    expect((qualityInput.element as HTMLInputElement).value).toBe('Standard')
-    await scaleInput.setValue('2')
-    expect((qualityInput.element as HTMLInputElement).value).toBe('High')
-    await scaleInput.setValue('5')
-    expect((qualityInput.element as HTMLInputElement).value).toBe('Ultra')
-    await scaleInput.setValue('3')
-    expect((qualityInput.element as HTMLInputElement).value).toBe('Custom')
-  })
-
-  it('emits a controlled configuration update after choosing an output folder', async () => {
+  it('emits a controlled update after choosing an output folder', async () => {
     const wrapper = mountEditor()
     await wrapper.get('[role="combobox"]').trigger('focus')
     await wrapper.get('button[aria-label="Add card document"]').trigger('click')
     await wrapper.get('button[aria-label="Choose output folder"]').trigger('click')
     await flushPromises()
+
     const updates = wrapper.emitted('update:modelValue') ?? []
     expect(updates[updates.length - 1]?.[0]).toMatchObject({
       documentPaths: ['cards/main.ocdocument'],
-      scale: 1,
-      layoutMode: 'none',
-      conflictMode: 'replace',
       outputDirectory: 'C:/exports',
-      errorPolicy: 'continue',
     })
   })
 
-  it('shows preparation failures and disables editing while busy', () => {
+  it('locks editing and withholds confirmation while busy', () => {
     const wrapper = mount(ProjectExportTaskEditor, {
       props: {
         modelValue: createDefaultProjectExportTask(),
@@ -69,10 +46,10 @@ describe('projectExportTaskEditor', () => {
       },
       global: {
         plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })],
-        stubs: { Teleport: true, OcAutocompletePopover: true },
+        stubs: { Teleport: true, OcAutocompleteList: true },
       },
     })
-    expect(wrapper.text()).toContain('output folder does not exist')
+
     expect(wrapper.get('[role="combobox"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
   })

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { createTextBlock, createSimpleContainerBlock } from '../../../entities/card/model'
 import {

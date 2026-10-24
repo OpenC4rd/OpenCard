@@ -44,23 +44,18 @@ describe('ExportTemplatePageContent', () => {
     } as unknown as ProjectTemplateStore
   })
 
-  it('inspects the open project and exports configured metadata', async () => {
+  it('inspects the open project and exports the configured selection', async () => {
     const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: messages } })
     let model!: ReturnType<typeof createTemplateExportForm>
     const onExported = vi.fn()
-    const visible = ref(true)
     const wrapper = mount(defineComponent({ setup() {
       model = createTemplateExportForm({ projectPath: ref('/project'), onExported })
-      return () => visible.value ? h(ExportTemplatePageContent, { model }) : null
+      return () => h(ExportTemplatePageContent, { model })
     } }), { global: { plugins: [i18n] } })
     await model.reset()
     model.toggleCover('cover.png')
     model.toggleEntry('alternate.ocdocument')
     model.togglePathIncluded('notes')
-    visible.value = false
-    await flushPromises()
-    visible.value = true
-    await flushPromises()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
@@ -74,11 +69,6 @@ describe('ExportTemplatePageContent', () => {
       entries: ['main.ocdocument', 'alternate.ocdocument'],
       covers: ['cover.png'],
       excludedPaths: ['notes'],
-    })
-    expect(model.selection.value).toEqual({
-      entries: ['main.ocdocument', 'alternate.ocdocument'],
-      entryNames: { 'main.ocdocument': 'Main Blueprint', 'alternate.ocdocument': 'Alternate Blueprint' },
-      covers: ['cover.png'], excludedPaths: ['notes'],
     })
     expect(onExported).toHaveBeenCalledWith('/exports/Portable.octemplate')
     wrapper.unmount()

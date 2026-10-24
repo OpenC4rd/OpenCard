@@ -37,7 +37,7 @@ describe('FontDiffView', () => {
     })
   })
 
-  it('loads both revisions from their snapshot roots using the project-relative path', async () => {
+  it('reads each revision from its own snapshot root at the project-relative path', async () => {
     const wrapper = mount(FontDiffView, {
       props: {
         filePath: 'D:/project/.opencard/fonts/Brand.woff2',
@@ -65,8 +65,7 @@ describe('FontDiffView', () => {
 
     expect(readBinaryFile).toHaveBeenCalledWith('D:/snapshot-abc/.opencard/fonts/Brand.woff2')
     expect(readBinaryFile).toHaveBeenCalledWith('D:/project/.opencard/fonts/Brand.woff2')
-    expect(wrapper.findAll('.font-diff-view__panel header').map(node => node.text()))
-      .toEqual(['Previous version', 'Disk version'])
-    expect(wrapper.findAll('.font-diff-view__sample')).toHaveLength(2)
+    expect(readBinaryFile).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 })

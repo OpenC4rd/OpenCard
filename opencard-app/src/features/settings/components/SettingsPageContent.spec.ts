@@ -1,37 +1,39 @@
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import PagePropertyEditor from '../../../shared/ui/property-editor/PagePropertyEditor.vue'
+import type { EditorItem } from '../../../shared/ui/property-editor/propertyEditor.types'
 import SettingsPageContent from './SettingsPageContent.vue'
 import type { SettingsCategoryViewModel } from '../composables/useSettingsViewModel'
 
-describe('SettingsPageContent', () => {
-  it('renders one card per settings group and forwards row events', async () => {
-    const viewModel: SettingsCategoryViewModel = {
-      key: 'general',
-      title: 'General',
-      cards: [{
-        key: 'interface',
-        title: 'Interface',
-        icon: 'mdiCogOutline',
-        actions: [],
-        items: [{
-          key: 'appearance.baseFontSize',
-          title: 'Base font size',
-          content: [{
-            type: 'editor',
-            key: 'value',
-            value: 12,
-            definition: { title: 'Base font size', fieldType: 'number', presentation: 'slider', min: 10, max: 16 },
-          }],
-        }],
-      }],
-    }
-    const wrapper = mount(SettingsPageContent, { props: { viewModel } })
-    expect(wrapper.findAllComponents({ name: 'OcCard' })).toHaveLength(1)
+function row(key: string, value: unknown): EditorItem {
+  return {
+    key,
+    title: key,
+    content: [{ type: 'editor', key: 'value', value, definition: { title: key, fieldType: 'string' } }],
+  }
+}
 
-    const editor = wrapper.findComponent({ name: 'PropertyFieldRenderer' })
-    editor.vm.$emit('preview:value', '14')
-    editor.vm.$emit('commit:value', '15')
+function category(overrides: Partial<SettingsCategoryViewModel> = {}): SettingsCategoryViewModel {
+  return { key: 'general', title: 'General', cards: [], ...overrides }
+}
+
+describe('SettingsPageContent', () => {
+  it('turns row previews and commits into setting intents', () => {
+    const wrapper = mount(SettingsPageContent, {
+      props: {
+        viewModel: category({
+          cards: [{
+            key: 'interface', title: 'Interface', actions: [],
+            items: [row('appearance.baseFontSize', 12)],
+          }],
+        }),
+      },
+    })
+
+    const editor = wrapper.getComponent(PagePropertyEditor)
+    editor.vm.$emit('editor-preview', { itemPath: ['appearance.baseFontSize'], editorKey: 'value', value: 14 })
+    editor.vm.$emit('editor-commit', { itemPath: ['appearance.baseFontSize'], editorKey: 'value', value: 15 })
 
     expect(wrapper.emitted('intent')).toEqual([
       [{ type: 'setting.preview', key: 'appearance.baseFontSize', value: 14 }],
@@ -39,128 +41,76 @@ describe('SettingsPageContent', () => {
     ])
   })
 
-  it('turns theme card actions and theme rows into theme intents', () => {
-    const viewModel: SettingsCategoryViewModel = {
-      key: 'appearance',
-      title: 'Appearance',
-      cards: [{
-        key: 'theme:dark',
-        title: 'Dark theme',
-        icon: 'mdiPaletteOutline',
-        actions: [
-          { key: 'theme.copy', title: 'Copy this theme preset', icon: 'mdiContentCopy' },
-          { key: 'theme.read', title: 'Read a theme preset from the clipboard', icon: 'mdiImport' },
-          { key: 'theme-preset.delete', title: 'Delete imported theme', icon: 'mdiTrashCanOutline' },
-        ],
-        items: [{
-          key: 'preset',
-          title: 'Preset',
-          content: [{
-            type: 'editor',
-            key: 'value',
-            value: 'user:Forest',
-            definition: { title: 'Preset', fieldType: 'string', presentation: 'select', options: ['user:Forest'] },
+  it('routes theme rows and card actions to the theme they belong to', () => {
+    const wrapper = mount(SettingsPageContent, {
+      props: {
+        viewModel: category({
+          key: 'appearance',
+          title: 'Appearance',
+          cards: [{
+            key: 'theme:dark',
+            title: 'Dark theme',
+            actions: [{ key: 'theme-preset.delete', title: 'Delete imported theme' }],
+            items: [row('preset', 'user:Forest'), row('name', 'Forest')],
           }],
-        }, {
-          key: 'name',
-          title: 'Theme name',
-          content: [{
-            type: 'editor',
-            key: 'value',
-            value: 'Forest',
-            definition: { title: 'Theme name', fieldType: 'string', commitMode: 'blur' },
-          }],
-        }],
-      }],
-    }
-    const wrapper = mount(SettingsPageContent, { props: { viewModel } })
+        }),
+      },
+    })
 
-    const card = wrapper.findComponent({ name: 'OcCard' })
-    card.vm.$emit('action', { key: 'theme-preset.delete' })
-    card.vm.$emit('action', { key: 'theme.read' })
-    const rows = wrapper.findAllComponents({ name: 'PropertyFieldRenderer' })
-    rows[0]!.vm.$emit('commit:value', 'user:Forest')
-    rows[1]!.vm.$emit('commit:value', '  My theme  ')
+    const editor = wrapper.getComponent(PagePropertyEditor)
+    editor.vm.$emit('editor-commit', { itemPath: ['name'], editorKey: 'value', value: '  My theme  ' })
+    editor.vm.$emit('editor-commit', { itemPath: ['preset'], editorKey: 'value', value: 'user:Forest' })
+    editor.vm.$emit('editor-commit', { itemPath: ['font'], editorKey: 'value', value: '   ' })
 
     expect(wrapper.emitted('intent')).toEqual([
-      [{ type: 'theme-preset.delete', themeId: 'dark', presetId: 'user:Forest' }],
-      [{ type: 'theme.read', themeId: 'dark' }],
-      [{ type: 'theme-preset.change', themeId: 'dark', presetId: 'user:Forest' }],
       [{ type: 'theme-name.change', themeId: 'dark', name: 'My theme' }],
+      [{ type: 'theme-preset.change', themeId: 'dark', presetId: 'user:Forest' }],
+      [{ type: 'theme-font.change', themeId: 'dark', value: 'system' }],
     ])
   })
 
-  it('maps the author and project workspace card actions', () => {
-    const viewModel: SettingsCategoryViewModel = {
-      key: 'general',
-      title: 'General',
-      cards: [
-        {
-          key: 'identity',
-          title: 'Author identity',
-          actions: [{ key: 'identity.regenerate', title: 'Generate a new author ID', icon: 'mdiRefresh' }],
-          items: [],
-        },
-        {
-          key: 'file-tree',
-          title: 'File tree',
-          actions: [{ key: 'project-workspace.reset', title: 'Reset this project’s interface state', icon: 'mdiRestart' }],
-          items: [],
-        },
-      ],
-    }
-    const wrapper = mount(SettingsPageContent, { props: { viewModel } })
-    const cards = wrapper.findAllComponents({ name: 'OcCard' })
-    cards[0]!.vm.$emit('action', { key: 'identity.regenerate' })
-    cards[1]!.vm.$emit('action', { key: 'project-workspace.reset' })
+  it('refuses to delete a theme preset that is not a saved user preset', () => {
+    const mountWithPreset = (preset: string) => mount(SettingsPageContent, {
+      props: {
+        viewModel: category({
+          key: 'appearance',
+          cards: [{
+            key: 'theme:dark',
+            title: 'Dark theme',
+            actions: [{ key: 'theme-preset.delete', title: 'Delete imported theme' }],
+            items: [row('preset', preset)],
+          }],
+        }),
+      },
+    })
 
-    expect(wrapper.emitted('intent')).toEqual([
-      [{ type: 'identity.regenerate' }],
-      [{ type: 'project-workspace.reset' }],
+    const builtin = mountWithPreset('default')
+    builtin.getComponent({ name: 'OcCard' }).vm.$emit('action', { key: 'theme-preset.delete' })
+    expect(builtin.emitted('intent')).toBeUndefined()
+
+    const saved = mountWithPreset('user:Forest')
+    saved.getComponent({ name: 'OcCard' }).vm.$emit('action', { key: 'theme-preset.delete' })
+    expect(saved.emitted('intent')).toEqual([
+      [{ type: 'theme-preset.delete', themeId: 'dark', presetId: 'user:Forest' }],
     ])
   })
 
-  it('keeps the appearance preview above the cards', () => {
-    const viewModel: SettingsCategoryViewModel = {
-      key: 'appearance', title: 'Appearance', preview: { glassIntensity: 72 }, cards: [],
-    }
-    const wrapper = mount(SettingsPageContent, { props: { viewModel } })
-    expect(wrapper.find('.settings-content__preview-glass').exists()).toBe(true)
-    expect(wrapper.find('.settings-content__cards').exists()).toBe(true)
-  })
-
-  it('brings the row named by focusKey into view and highlights it', async () => {
+  it('scrolls the row named by focusKey into view and ignores a key that is not on the page', async () => {
     const scrollIntoView = vi.fn()
     const original = Element.prototype.scrollIntoView
     Element.prototype.scrollIntoView = scrollIntoView
+    const viewModel = category({
+      cards: [{ key: 'committer', title: 'Commit identity', actions: [], items: [row('versionControl.committerEmail', '')] }],
+    })
     try {
-      const viewModel: SettingsCategoryViewModel = {
-        key: 'versionControl',
-        title: 'Version control',
-        cards: [{
-          key: 'committer',
-          title: 'Commit identity',
-          actions: [],
-          items: [{
-            key: 'versionControl.committerEmail',
-            title: 'Committer email',
-            content: [{
-              type: 'editor',
-              key: 'value',
-              value: '',
-              definition: { title: 'Committer email', fieldType: 'string', commitMode: 'blur' },
-            }],
-          }],
-        }],
-      }
-      const wrapper = mount(SettingsPageContent, {
-        props: { viewModel, focusKey: 'versionControl.committerEmail' },
-      })
+      const missing = mount(SettingsPageContent, { props: { viewModel, focusKey: 'versionControl.unknown' } })
       await nextTick()
+      expect(scrollIntoView).not.toHaveBeenCalled()
+      missing.unmount()
 
-      expect(scrollIntoView).toHaveBeenCalled()
-      expect(wrapper.get('[data-item-key="versionControl.committerEmail"]').classes())
-        .toContain('is-settings-focus')
+      mount(SettingsPageContent, { props: { viewModel, focusKey: 'versionControl.committerEmail' } })
+      await nextTick()
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
     } finally {
       Element.prototype.scrollIntoView = original
     }

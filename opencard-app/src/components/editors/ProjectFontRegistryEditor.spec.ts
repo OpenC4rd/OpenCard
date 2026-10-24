@@ -1,6 +1,5 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
-import type { OcNodeCollection } from '../../shared/ui/node/node.types'
 import OcTree from '../standard/OcTree.vue'
 import ProjectFontRegistryEditor from './ProjectFontRegistryEditor.vue'
 
@@ -17,13 +16,9 @@ const mountWorkbench = () => mount(ProjectFontRegistryEditor, {
 })
 
 describe('ProjectFontRegistryEditor', () => {
-  it('offers one add action on each tree root and routes it to its own command', () => {
+  it('routes the add command of each tree root to its own event', () => {
     const wrapper = mountWorkbench()
     const tree = wrapper.getComponent(OcTree)
-    const data = tree.props('data') as OcNodeCollection
-
-    expect(data.items.get('families')?.tail).toMatchObject([{ key: 'add-family', icon: 'mdiPlus' }])
-    expect(data.items.get('compositions')?.tail).toMatchObject([{ key: 'add-composition', icon: 'mdiPlus' }])
 
     tree.vm.$emit('action', { key: 'families', actionKey: 'add-family', source: 'inline' })
     tree.vm.$emit('action', { key: 'compositions', actionKey: 'add-composition', source: 'inline' })

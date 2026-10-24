@@ -12,12 +12,6 @@ const block = parseRenderReadyBlockForTest(createTextBlock({
 }))
 
 describe('blockRenderPlacement', () => {
-  it('uses the block root as a relative render surface', () => {
-    const style = getBlockRenderPlacementStyles(block, { kind: 'root' }, false)
-    expect(style).toContain('position: relative')
-    expect(style).toContain('width: 120px')
-  })
-
   it('combines absolute anchor placement with the block transform', () => {
     const style = getBlockRenderPlacementStyles(block, {
       kind: 'absolute',

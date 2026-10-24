@@ -43,64 +43,42 @@
       </button>
     </OcFieldFrame>
 
-    <OcFloatingLayer
-      :open="open"
+    <OcOverlayMarker
+      ref="layer"
+      :group="selectId"
       :anchor="triggerRef"
+      :owner="rootRef"
       placement="bottom-start"
-      :match-anchor-width="true"
       :max-height="maxHeight"
-      class="oc-select__floating oc-floating-layer--surface"
+      :open="open"
+      @update:open="open = $event"
     >
-      <div :id="listboxId" class="oc-select__listbox" role="listbox">
-        <OcRow
-          v-for="(option, index) in options"
-          :id="optionId(index)"
-          :key="option.value"
-          as="button"
-          type="button"
-          class="oc-select__option"
-          :class="{
-            'is-active': index === activeIndex,
-            'is-selected': option.value === modelValue,
-          }"
-          role="option"
-          tabindex="-1"
-          :aria-selected="option.value === modelValue"
-          :disabled="option.disabled"
-          @pointerenter="setActiveIndex(index)"
-          @mousedown.prevent
-          @click="selectOption(option)"
-        >
-          <template #title>
-            <span class="oc-select__option-label" :style="option.labelStyle"
-              :data-tooltip="option.label" data-tooltip-overflow>{{ option.label }}</span>
-          </template>
-          <template v-if="option.value === modelValue" #append>
-            <OcIcon name="mdiCheck" size="sm" />
-          </template>
-        </OcRow>
-        <div v-if="options.length === 0" class="oc-select__empty">{{ emptyText }}</div>
+      <div class="oc-select__dropdown" :style="dropdownStyle">
+        <OcSelectList
+          :id="listboxId"
+          :options="options"
+          :active-index="activeIndex"
+          :model-value="modelValue"
+          :empty-text="emptyText"
+          @activate="setActiveIndex"
+          @select="selectOption"
+        />
       </div>
-    </OcFloatingLayer>
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script lang="ts">
-export interface OcSelectOption {
-  value: string
-  label: string
-  disabled?: boolean
-  labelStyle?: Readonly<Record<string, string>>
-}
+export type { OcSelectOption } from './OcSelectList.vue'
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useAttrs, useId, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch, type CSSProperties } from 'vue'
 import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcIcon from '../base/OcIcon.vue'
-import OcFloatingLayer from './OcFloatingLayer.vue'
-import OcRow from './OcRow.vue'
+import OcOverlayMarker from './OcOverlayMarker.vue'
+import OcSelectList, { type OcSelectOption } from './OcSelectList.vue'
 
 defineOptions({ name: 'OcSelect', inheritAttrs: false })
 
@@ -137,12 +115,17 @@ const emit = defineEmits<{
 }>()
 
 const attrs = useAttrs()
+const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
-const open = ref(false)
 const activeIndex = ref(-1)
+/** 每个实例一个组：下拉之间不需要互斥，点外部由 dismiss 负责。 */
 const selectId = `oc-select-${useId().replace(/:/g, '')}`
 const listboxId = `${selectId}-listbox`
+/** 由宿主同步出来的打开状态：它既是渲染输入（aria/箭头），也是 marker 的打开意图。 */
+const open = ref(false)
+const triggerWidth = ref(0)
+let triggerObserver: ResizeObserver | null = null
 let typeahead = ''
 let typeaheadTimer: number | null = null
 
@@ -154,29 +137,54 @@ const selectedOption = computed(() => props.options.find(option => option.value 
 const activeOptionId = computed(() => (
   open.value && activeIndex.value >= 0 ? optionId(activeIndex.value) : undefined
 ))
+/** 列表与触发器同宽：宿主没有这个能力，宽度由调用点喂给内容盒。 */
+const dropdownStyle = computed<CSSProperties>(() => (
+  triggerWidth.value > 0 ? { width: `${triggerWidth.value}px` } : {}
+))
 
+useOverlayDismiss(() => open.value, () => rootRef.value, () => closeSelect(true))
+
+// 选项换了就回到初始项（已选中项，否则首个可用项），与键盘当前位置无关。
 watch(() => props.options, () => {
   if (!open.value) return
   activeIndex.value = resolveInitialIndex()
+}, { flush: 'sync' })
+watch(open, value => {
+  emit('open-change', value)
+  if (!value) clearTypeahead()
 })
 watch(() => props.disabled || props.readonly, blocked => {
   if (blocked) closeSelect(false)
 })
 
-useOverlayDismiss(() => open.value, () => rootRef.value, () => closeSelect(false))
+onMounted(() => {
+  const trigger = triggerRef.value
+  if (!trigger) return
+  triggerWidth.value = trigger.offsetWidth
+  if (typeof ResizeObserver === 'undefined') return
+  triggerObserver = new ResizeObserver(() => { triggerWidth.value = trigger.offsetWidth })
+  triggerObserver.observe(trigger)
+})
+
 onBeforeUnmount(() => {
+  layer.value?.close()
+  triggerObserver?.disconnect()
+  triggerObserver = null
   clearTypeahead()
 })
 
 function optionId(index: number): string {
-  return `${selectId}-option-${index}`
+  return `${listboxId}-option-${index}`
 }
 
 function setOpen(next: boolean): void {
   if (open.value === next) return
-  open.value = next
-  if (next) activeIndex.value = resolveInitialIndex()
-  emit('open-change', next)
+  if (!next) {
+    closeSelect(false)
+    return
+  }
+  activeIndex.value = resolveInitialIndex()
+  open.value = true
 }
 
 function toggleOpen(): void {
@@ -185,7 +193,7 @@ function toggleOpen(): void {
 }
 
 function closeSelect(restoreFocus: boolean): void {
-  setOpen(false)
+  open.value = false
   clearTypeahead()
   if (restoreFocus) triggerRef.value?.focus()
 }
@@ -328,24 +336,9 @@ function clearTypeahead(): void {
 .oc-select__chevron.is-open {
   transform: rotate(180deg);
 }
-</style>
 
-<style>
-.oc-select__floating {
-  overflow: hidden;
-}
-
-.oc-select__listbox {
-  box-sizing: border-box;
+/* 列表的 max-height 从这里继承：宿主内容盒 → 这一层 → listbox，滚动仍归 listbox。 */
+.oc-select__dropdown {
   max-height: inherit;
-  padding: var(--oc-space-2xs);
-  overflow-y: auto;
-}
-
-.oc-select__empty {
-  padding: var(--oc-space-sm);
-  color: var(--oc-fg-muted);
-  font-size: var(--oc-text-sm);
-  text-align: center;
 }
 </style>

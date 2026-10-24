@@ -3,38 +3,39 @@ import { defineComponent, nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { useFeedbackDiagnostics } from './useFeedbackDiagnostics'
 
-function mountCapture() {
-  return mount(defineComponent({
+type Diagnostics = ReturnType<typeof useFeedbackDiagnostics>
+
+function mountOwner() {
+  let diagnostics!: Diagnostics
+  const wrapper = mount(defineComponent({
     setup() {
-      const capture = useFeedbackDiagnostics()
-      return capture
+      diagnostics = useFeedbackDiagnostics()
+      return () => null
     },
-    template: '<div />',
   }))
+  return { diagnostics, wrapper }
 }
 
 describe('useFeedbackDiagnostics', () => {
   it('keeps the latest uncaught error in memory after immediate redaction', async () => {
-    const wrapper = mountCapture()
+    const { diagnostics, wrapper } = mountOwner()
     const error = new Error('Failed to read C:\\Users\\Alice\\secret.ocdocument')
     window.dispatchEvent(new ErrorEvent('error', { error, message: error.message }))
     await nextTick()
 
-    expect(wrapper.vm.latestDiagnostics).toBeDefined()
-    expect(wrapper.vm.latestDiagnostics!.errorMessage).toContain('<local-path>')
-    expect(wrapper.vm.latestDiagnostics!.errorMessage).not.toContain('Alice')
+    expect(diagnostics.latestDiagnostics.value?.errorMessage).toContain('<local-path>')
+    expect(diagnostics.latestDiagnostics.value?.errorMessage).not.toContain('Alice')
     wrapper.unmount()
   })
 
   it('removes global listeners when its owner unmounts', async () => {
-    const wrapper = mountCapture()
+    const { diagnostics, wrapper } = mountOwner()
     window.dispatchEvent(new ErrorEvent('error', { message: 'first' }))
     await nextTick()
-    expect(wrapper.vm.latestDiagnostics).toBeDefined()
-    expect(wrapper.vm.latestDiagnostics!.errorMessage).toBe('first')
+    expect(diagnostics.latestDiagnostics.value?.errorMessage).toBe('first')
 
     wrapper.unmount()
     window.dispatchEvent(new ErrorEvent('error', { message: 'second' }))
-    expect(wrapper.vm.latestDiagnostics!.errorMessage).toBe('first')
+    expect(diagnostics.latestDiagnostics.value?.errorMessage).toBe('first')
   })
 })

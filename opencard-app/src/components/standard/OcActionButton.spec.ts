@@ -1,131 +1,43 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OcActionButton from './OcActionButton.vue'
-import { setupGlobalTooltip } from '../../shared/ui/tooltip/globalTooltip'
+import OverlayGroupRoot from '../ui/OverlayGroupRoot.vue'
+import { disposeGroup, overlayGroups } from '../../composables/overlayGroups'
 
-function rect(left: number, top: number, width: number, height: number): DOMRect {
-  return {
-    left,
-    top,
-    right: left + width,
-    bottom: top + height,
-    width,
-    height,
-    x: left,
-    y: top,
-    toJSON: () => ({}),
-  }
-}
-
+/** The menu is rendered by the group host, so every menu interaction needs that host mounted. */
 describe('OcActionButton', () => {
+  let overlayRoot: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    overlayRoot = mount(OverlayGroupRoot, { attachTo: document.body })
+  })
+
   afterEach(() => {
+    overlayRoot?.unmount()
+    overlayRoot = null
+    for (const group of [...overlayGroups.keys()]) disposeGroup(group)
     vi.useRealTimers()
     vi.restoreAllMocks()
-    vi.unstubAllGlobals()
     document.body.innerHTML = ''
   })
 
-  it('shows a submenu trigger tooltip on hover and dismisses it when clicked', async () => {
-    vi.useFakeTimers()
-    const wrapper = mount(OcActionButton, {
-      attachTo: document.body,
-      props: { action: { key: 'export', title: 'Export images', children: [{ key: 'front', title: 'Front' }] } },
-    })
-    setupGlobalTooltip()
-    try {
-      await wrapper.get('button').trigger('mouseover')
-      await vi.advanceTimersByTimeAsync(350)
-      const tooltip = document.getElementById('oc-tooltip-layer')!
-      expect(tooltip.getAttribute('aria-hidden')).toBe('false')
-      expect(tooltip.textContent).toBe('Export images')
-      expect(document.body.querySelector('.oc-action-menu')).toBeNull()
-      await wrapper.get('button').trigger('pointerdown')
-      await wrapper.get('button').trigger('click')
-      await flushPromises()
-      expect(tooltip.getAttribute('aria-hidden')).toBe('true')
-      expect(document.body.querySelector('.oc-action-menu')).not.toBeNull()
-    } finally { wrapper.unmount() }
-  })
+  function menus(): HTMLElement[] {
+    return [...document.body.querySelectorAll<HTMLElement>('[role="menu"]')]
+  }
 
-
-  it('renders an action badge without changing the button contract', () => {
-    const wrapper = mount(OcActionButton, {
+  it('derives a plain accessible name from marked-up titles and badges', () => {
+    const badged = mount(OcActionButton, {
       props: { action: { key: 'feedback', title: 'Feedback', badge: 3, badgeLabel: '3 unread replies' } },
     })
+    expect(badged.get('button').attributes('aria-label')).toBe('Feedback, 3 unread replies')
 
-    expect(wrapper.get('.oc-action-button__badge').text()).toBe('3')
-    expect(wrapper.get('button').attributes('aria-label')).toBe('Feedback, 3 unread replies')
-  })
-
-  it('keeps marked-up tooltip copy but exposes a plain accessible label', () => {
-    const wrapper = mount(OcActionButton, {
+    const markedUp = mount(OcActionButton, {
       props: { action: { key: 'fill', title: 'Fill [key]F[/key]' } },
     })
-
-    expect(wrapper.get('button').attributes('data-tooltip')).toBe('Fill [key]F[/key]')
-    expect(wrapper.get('button').attributes('aria-label')).toBe('Fill F')
+    expect(markedUp.get('button').attributes('aria-label')).toBe('Fill F')
   })
 
-
-
-  it('mounts floating behavior and the outside listener only when needed', async () => {
-    const addListener = vi.spyOn(document, 'addEventListener')
-    const wrapper = mount(OcActionButton, {
-      attachTo: document.body,
-      props: {
-        action: {
-          key: 'more',
-          title: 'More',
-          children: [{ key: 'delete', title: 'Delete' }],
-        },
-      },
-    })
-
-    expect(document.body.querySelector('.oc-floating-layer')).toBeNull()
-    expect(addListener.mock.calls.some(([type]) => type === 'pointerdown')).toBe(false)
-
-    await wrapper.get('button').trigger('click')
-    await flushPromises()
-    expect(document.body.querySelector('.oc-floating-layer')).not.toBeNull()
-    expect(wrapper.classes()).toContain('is-menu-open')
-    expect(addListener.mock.calls.some(([type]) => type === 'pointerdown')).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('uses the shared floating layer and flips above the anchor', async () => {
-    vi.stubGlobal('innerWidth', 300)
-    vi.stubGlobal('innerHeight', 200)
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      if (this.classList.contains('oc-action-button')) return rect(0, 170, 30, 24)
-      if (this.classList.contains('oc-floating-layer')) return rect(0, 0, 156, 80)
-      return rect(0, 0, 0, 0)
-    })
-
-    const wrapper = mount(OcActionButton, {
-      attachTo: document.body,
-      props: {
-        action: {
-          key: 'add',
-          title: 'Add',
-          children: [{ key: 'text', title: 'Text' }],
-        },
-      },
-    })
-
-    await wrapper.get('button').trigger('click')
-    await flushPromises()
-
-    const layer = document.body.querySelector<HTMLElement>('.oc-action-button__floating')
-    const menu = document.body.querySelector<HTMLElement>('.oc-action-menu')
-    expect(layer?.style.position).toBe('fixed')
-    expect(layer?.style.visibility).toBe('visible')
-    expect(layer?.dataset.placement).toMatch(/^top-/)
-    expect(menu).not.toBeNull()
-
-    wrapper.unmount()
-  })
-
-  it('keeps a clicked menu open when the pointer leaves the action button', async () => {
+  it('keeps a clicked menu open after the pointer leaves and reports the chosen command', async () => {
     const wrapper = mount(OcActionButton, {
       attachTo: document.body,
       props: {
@@ -139,25 +51,53 @@ describe('OcActionButton', () => {
 
     await wrapper.get('button[aria-label="More"]').trigger('click')
     await flushPromises()
-    expect(document.body.querySelector('.oc-action-menu')).not.toBeNull()
+    expect(menus()).toHaveLength(1)
 
     await wrapper.trigger('pointerleave')
     await new Promise((resolve) => window.setTimeout(resolve, 120))
     await flushPromises()
-    const revealButton = document.body.querySelector<HTMLButtonElement>(
-      '.oc-action-menu__button[aria-label="Reveal in File Manager"]',
+    const reveal = document.body.querySelector<HTMLButtonElement>(
+      '[role="menuitem"][data-oc-action-key="reveal"]',
     )
-    expect(revealButton).not.toBeNull()
+    expect(reveal).not.toBeNull()
 
-    revealButton?.click()
+    reveal?.click()
     await flushPromises()
-    expect(wrapper.emitted('select')).toEqual([[{ key: 'reveal' }]])
-    expect(document.body.querySelector('.oc-action-menu')).toBeNull()
 
+    expect(wrapper.emitted('select')).toEqual([[{ key: 'reveal' }]])
+    expect(menus()).toHaveLength(0)
     wrapper.unmount()
   })
 
-  it('selects a leaf through four teleported menu levels without dismissing its ancestors', async () => {
+  it('lets a menu opened in the same group replace the open one', async () => {
+    const first = mount(OcActionButton, {
+      attachTo: document.body,
+      props: { action: { key: 'first', title: 'First', children: [{ key: 'a', title: 'First command' }] } },
+    })
+    const second = mount(OcActionButton, {
+      attachTo: document.body,
+      props: { action: { key: 'second', title: 'Second', children: [{ key: 'b', title: 'Second command' }] } },
+    })
+    try {
+      await first.get('button').trigger('click')
+      await flushPromises()
+      expect(menus()).toHaveLength(1)
+      expect(menus()[0]!.textContent).toContain('First command')
+
+      await second.get('button').trigger('click')
+      await flushPromises()
+
+      // 同组只保留一份宿主：抢占换的是内容，不是再叠一层。
+      expect(menus()).toHaveLength(1)
+      expect(menus()[0]!.textContent).toContain('Second command')
+      expect(menus()[0]!.textContent).not.toContain('First command')
+    } finally {
+      first.unmount()
+      second.unmount()
+    }
+  })
+
+  it('selects a leaf through four nested menu levels without dismissing its ancestors', async () => {
     const wrapper = mount(OcActionButton, {
       attachTo: document.body,
       props: {
@@ -181,29 +121,28 @@ describe('OcActionButton', () => {
       },
     })
 
-    await wrapper.trigger('pointerenter')
-    await flushPromises()
     await wrapper.get('button[aria-label="More"]').trigger('click')
+    await flushPromises()
 
     for (let depth = 1; depth < 4; depth += 1) {
-      const layersBeforeOpen = document.body.querySelectorAll<HTMLElement>('.oc-floating-layer')
-      const parentLayer = layersBeforeOpen[layersBeforeOpen.length - 1]
-      parentLayer?.querySelector<HTMLElement>('.oc-action-menu__item')
+      const beforeOpen = menus()
+      const parentMenu = beforeOpen[beforeOpen.length - 1]
+      parentMenu?.querySelector<HTMLElement>('.oc-action-menu__item')
         ?.dispatchEvent(new Event('pointerenter'))
       await flushPromises()
 
-      const layersAfterOpen = document.body.querySelectorAll<HTMLElement>('.oc-floating-layer')
-      expect(layersAfterOpen).toHaveLength(depth + 1)
-      parentLayer?.dispatchEvent(new Event('pointerleave'))
-      layersAfterOpen[layersAfterOpen.length - 1]?.dispatchEvent(new Event('pointerenter'))
+      const afterOpen = menus()
+      expect(afterOpen).toHaveLength(depth + 1)
+      // 父层离开会把这一层排进延迟关闭；子层接手后它必须被撤销，否则整条父链会闪断。
+      parentMenu?.dispatchEvent(new Event('pointerleave'))
+      afterOpen[afterOpen.length - 1]?.dispatchEvent(new Event('pointerenter'))
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, 120))
-    expect(document.body.querySelectorAll('.oc-floating-layer')).toHaveLength(4)
-    expect(document.body.querySelectorAll('.oc-action-menu')).toHaveLength(4)
+    expect(menus()).toHaveLength(4)
 
     const confirmButton = document.body.querySelector<HTMLButtonElement>(
-      '.oc-action-menu__button[aria-label="Confirm Delete"]',
+      '[data-oc-action-key="confirm-delete"]',
     )
     expect(confirmButton).not.toBeNull()
     confirmButton?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }))
@@ -213,7 +152,7 @@ describe('OcActionButton', () => {
     confirmButton?.click()
     await flushPromises()
     expect(wrapper.emitted('select')).toEqual([[{ key: 'confirm-delete' }]])
-    expect(document.body.querySelectorAll('.oc-floating-layer')).toHaveLength(0)
+    expect(menus()).toHaveLength(0)
 
     wrapper.unmount()
   })

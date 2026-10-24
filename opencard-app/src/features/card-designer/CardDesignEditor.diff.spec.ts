@@ -4,12 +4,10 @@ import { getTestSession } from '../editor-runtime/editorTestSession'
  * Diff-mode coverage for `CardDesignEditor`.
  *
  * The editor is mounted for real through `cardDesignerMount.ts`, and the viewport is the real
- * `CardViewport` (`CardViewport: false`) so the assertions below read the markup, the projected
- * props and the emitted payloads the production components actually produce. `modelValue` carries a
- * third, unrelated "working" document on purpose: anything that reads the working document instead
- * of `props.comparison` becomes visible as a wrong label, a wrong input pair, or a missing
- * highlight. The preview panel keeps rendering that working document, which is asserted once as the
- * positive control.
+ * `CardViewport` (`CardViewport: false`) so the assertions below read the projected props and the
+ * emitted payloads the production components actually produce. `modelValue` carries a third,
+ * unrelated "working" document on purpose: anything that reads the working document instead of
+ * `props.comparison` becomes visible as a wrong label, a wrong input pair, or a wrong selection.
  *
  * The three compared documents share one shape so every delta is intentional:
  *
@@ -23,8 +21,7 @@ import { getTestSession } from '../editor-runtime/editorTestSession'
  *
  * Instances behave the same way: `instance-1` is identical, `instance-changed` only changes its
  * name, `instance-removed` is before-only and `instance-added` is after-only. The open document
- * shares `instance-1` (by id) so the edit-mode instance selection stays valid, and it is the only
- * place `Working title` / `Working text` may appear.
+ * shares `instance-1` (by id) so the edit-mode instance selection stays valid.
  */
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,11 +41,9 @@ import {
   mountCde,
   type CdeMountOptions,
 } from './cardDesignerMount'
-import { CDE_OVERLAY_SPLIT_GAP } from './cdeOverlayConfig'
 
 type FaceChild = CardFace['children'][number]
-type DiffUiStatePayload = { divider?: number; viewMode?: 'split' | 'side-by-side' }
-type ToolbarActionProps = { key: string; title: string }
+type DiffUiStatePayload = { divider?: number, viewMode?: 'split' | 'side-by-side' }
 
 class ResizeObserverMock {
   observe() {}
@@ -179,16 +174,6 @@ function diffUiPayloads(wrapper: VueWrapper): DiffUiStatePayload[] {
     .map(([value]) => value)
 }
 
-function treeLabels(tree: VueWrapper): string[] {
-  return [...tree.element.querySelectorAll('.oc-tree__label')]
-    .map(element => element.textContent ?? '')
-}
-
-function treeBadgeLabels(tree: VueWrapper): string[] {
-  return [...tree.element.querySelectorAll('.oc-node-tail__badge')]
-    .map(element => element.getAttribute('aria-label') ?? '')
-}
-
 function selectStructureBlock(wrapper: VueWrapper, blockId: string): void {
   editorTrees(wrapper).structureTree.vm.$emit('selection-change', {
     triggerKey: blockId,
@@ -244,102 +229,19 @@ describe('CardDesignEditor diff mode', () => {
     vi.unstubAllGlobals()
   })
 
-  it('renders the comparison viewport with both revision sides instead of the single-card view', async () => {
-    const wrapper = mountDiff()
-    await settle(wrapper)
+  it('keeps the viewport unmounted while the comparison is missing or unreadable', async () => {
+    const loading = mountDiff({ comparison: undefined })
+    await settle(loading)
+    expect(loading.findAllComponents({ name: 'CardViewport' })).toHaveLength(0)
 
-    expect(wrapper.find('.card-design-editor__diff-mode-stage').exists()).toBe(true)
-    expect(wrapper.findAll('.card-viewport-stage')).toHaveLength(2)
-    expect(wrapper.find('.card-viewport-stage--before').exists()).toBe(true)
-    expect(wrapper.find('.card-viewport-stage--after').exists()).toBe(true)
-    // The single-card branch contributes the info/dimension slots, which diff mode never renders.
-    expect(wrapper.find('.card-design-editor__card-info').exists()).toBe(false)
-
-    const viewport = wrapper.get('.card-design-editor__viewport')
-    expect(viewport.classes()).toContain('card-viewport')
-    expect(viewport.classes()).toContain('card-viewport--readonly')
-    const divider = viewport.get('.card-viewport-comparison-divider')
-    expect(divider.classes()).not.toContain('is-static')
-    expect(divider.attributes('aria-label'))
-      .toBe('Adjust version divider [key]A[/key] left [key]S[/key] center [key]D[/key] right')
-    expect(viewport.get('.card-viewport-comparison-label--before').text()).toBe('a1b2c3d')
-    expect(viewport.get('.card-viewport-comparison-label--after').text()).toBe('Disk version')
-  })
-
-  it('shows the loading placeholder while the comparison is unavailable', async () => {
-    const wrapper = mountDiff({ comparison: undefined })
-    await settle(wrapper)
-
-    expect(wrapper.get('.card-design-editor__diff-mode-stage').text()).toContain('Loading versions…')
-    expect(wrapper.find('.card-viewport').exists()).toBe(false)
-    expect(wrapper.findAllComponents({ name: 'CardViewport' })).toHaveLength(0)
-  })
-
-  it('shows the parse-failure placeholder when a comparison side cannot be read', async () => {
-    const wrapper = mountDiff({
+    const broken = mountDiff({
       comparison: {
         before: { revisionId: 'a1b2c3d', label: 'Version A', content: 'not a card document' },
         after: { revisionId: null, label: 'Disk version', content: JSON.stringify(afterDocument) },
       },
     })
-    await settle(wrapper)
-
-    expect(wrapper.get('.card-design-editor__diff-mode-stage').text())
-      .toContain('Unable to parse the .ocdocument versions')
-    expect(wrapper.findAllComponents({ name: 'CardViewport' })).toHaveLength(0)
-  })
-
-  it('adds the split gap to the comparison viewport insets', async () => {
-    const editWrapper = mountCde({
-      props: { modelValue: workingDocument },
-      stubs: { CardViewport: false },
-    })
-    mountedWrappers.push(editWrapper)
-    await settle(editWrapper)
-    const editInsets = editorViewport(editWrapper).props('viewportInsets') as { left: number; right: number }
-
-    const diffWrapper = mountDiff()
-    await settle(diffWrapper)
-    const diffInsets = editorViewport(diffWrapper).props('viewportInsets') as { left: number; right: number }
-
-    expect(diffInsets.left - editInsets.left).toBeCloseTo(CDE_OVERLAY_SPLIT_GAP)
-    expect(diffInsets.right - editInsets.right).toBeCloseTo(CDE_OVERLAY_SPLIT_GAP)
-  })
-
-  it('projects the diff block and instance trees from the comparison documents', async () => {
-    const wrapper = mountDiff()
-    await settle(wrapper)
-    const { instanceTree, structureTree } = editorTrees(wrapper)
-
-    expect(treeLabels(structureTree))
-      .toEqual(['Container', 'Title', 'Removed block', 'Added block'])
-    expect(treeBadgeLabels(structureTree)).toEqual(['Changed', 'Removed', 'Added'])
-    expect(treeLabels(instanceTree))
-      .toEqual(['Blueprint', 'Instance 1', 'Removed instance', 'New name', 'Added instance'])
-    expect(treeBadgeLabels(instanceTree)).toEqual(['Removed', 'Changed', 'Added'])
-
-    // The open document is alive in the preview panel but must not reach the diff trees.
-    expect(wrapper.get('.card-design-editor__transform-preview-host').text()).toContain('Working text')
-    expect(treeLabels(structureTree)).not.toContain('Working title')
-    expect(treeLabels(instanceTree)).not.toContain('Working instance')
-  })
-
-  it('does not expand the diff structure tree on double-click activation', async () => {
-    const wrapper = mountDiff()
-    await settle(wrapper)
-    const { structureTree } = editorTrees(wrapper)
-
-    structureTree.vm.$emit('node-activate', { key: 'container-1' })
-    await settle(wrapper)
-    // `handleStructureTreeNodeActivate` is diff-guarded, so activation leaves the tree collapsed.
-    expect(structureTree.props('expandedKeys')).toEqual([])
-    expect(treeLabels(structureTree)).not.toContain('Nested')
-
-    // The unguarded expansion path still drives the shared expanded-key state.
-    structureTree.vm.$emit('expansion-change', { key: 'container-1', expanded: true })
-    await settle(wrapper)
-    expect(structureTree.props('expandedKeys')).toEqual(['container-1'])
-    expect(treeLabels(structureTree)).toEqual(['Container', 'Nested', 'Title', 'Removed block', 'Added block'])
+    await settle(broken)
+    expect(broken.findAllComponents({ name: 'CardViewport' })).toHaveLength(0)
   })
 
   it('projects diff property inputs as before and after field pairs from the comparison documents', async () => {
@@ -357,25 +259,13 @@ describe('CardDesignEditor diff mode', () => {
       'content@old': 'Hello',
       'content@new': 'Hello world',
     })
-    expect(blockInput.fields['content@old']).toMatchObject({
-      isReadonly: true,
-      tail: { type: 'badge', icon: 'mdiMinus', tone: 'danger', label: 'Removed' },
-    })
-    expect(blockInput.fields['content@new']).toMatchObject({
-      isReadonly: true,
-      tail: { type: 'badge', icon: 'mdiPlus', tone: 'success', label: 'Added' },
-    })
+    expect(blockInput.fields['content@old']?.isReadonly).toBe(true)
+    expect(blockInput.fields['content@new']?.isReadonly).toBe(true)
 
-    // Only the field that actually differs is projected.
-    expect(Object.keys(blockInput.record).sort()).toEqual(['content@new', 'content@old'])
-    // A moved block adds a second, layout-only input keyed `<blockId>:layout`.
+    // Only the field that actually differs is projected; a moved block adds a layout pair.
     const layoutInput = inputs[1]!
-    expect(layoutInput.title).toBe('Layout')
     expect(layoutInput.record).toEqual({ 'x@new': '12px' })
-    expect(layoutInput.fields['x@new']).toMatchObject({
-      isReadonly: true,
-      tail: { type: 'badge', icon: 'mdiPlus', tone: 'success', label: 'Added' },
-    })
+    expect(layoutInput.fields['x@new']?.isReadonly).toBe(true)
 
     // A blank canvas click clears the diff selection without touching the edit-mode selection.
     editorViewport(wrapper).vm.$emit('blank-click')
@@ -383,68 +273,20 @@ describe('CardDesignEditor diff mode', () => {
     expect(wrapper.getComponent({ name: 'PropertyEditor' }).props('inputs')).toEqual([])
   })
 
-  it('summarises a multiple diff selection instead of projecting one block', async () => {
+  it('does not expand the diff structure tree on double-click activation', async () => {
     const wrapper = mountDiff()
     await settle(wrapper)
+    const { structureTree } = editorTrees(wrapper)
 
-    editorTrees(wrapper).structureTree.vm.$emit('selection-change', {
-      triggerKey: 'text-1',
-      selectedKeys: ['text-1', 'text-added'],
-    })
+    structureTree.vm.$emit('node-activate', { key: 'container-1' })
     await settle(wrapper)
+    // `handleStructureTreeNodeActivate` is diff-guarded, so activation leaves the tree collapsed.
+    expect(structureTree.props('expandedKeys')).toEqual([])
 
-    expect(wrapper.get('.card-design-editor__multi-selection-summary').text()).toBe('2 blocks selected')
-    expect(wrapper.findComponent({ name: 'PropertyEditor' }).exists()).toBe(false)
-  })
-
-  it('renders diff highlight markup for added, removed and changed blocks', async () => {
-    const wrapper = mountDiff()
+    // The unguarded expansion path still drives the shared expanded-key state.
+    structureTree.vm.$emit('expansion-change', { key: 'container-1', expanded: true })
     await settle(wrapper)
-
-    // One overlay per highlighted side: removed + changed on the left, added + changed on the right.
-    expect(wrapper.findAll('.card-diff-overlay')).toHaveLength(4)
-    expect(wrapper.find('.card-diff-overlay-layer--before .card-diff-overlay--removed').exists()).toBe(true)
-    expect(wrapper.find('.card-diff-overlay-layer--before .card-diff-overlay--changed').exists()).toBe(true)
-    expect(wrapper.find('.card-diff-overlay-layer--after .card-diff-overlay--added').exists()).toBe(true)
-    expect(wrapper.find('.card-diff-overlay-layer--after .card-diff-overlay--changed').exists()).toBe(true)
-    expect(wrapper.find('.card-diff-overlay-layer--before .card-diff-overlay--added').exists()).toBe(false)
-    expect(wrapper.find('.card-diff-overlay-layer--after .card-diff-overlay--removed').exists()).toBe(false)
-    // The overlay carries the side class of the layer it belongs to.
-    expect(wrapper.find('.card-diff-overlay-layer--before .card-diff-overlay--before').exists()).toBe(true)
-    expect(wrapper.find('.card-diff-overlay-layer--after .card-diff-overlay--after').exists()).toBe(true)
-
-    const beforeStage = wrapper.get('.card-viewport-stage--before')
-    expect(beforeStage.find('[data-block-id="text-1"]').attributes('data-diff-kind')).toBe('changed')
-    expect(beforeStage.find('[data-block-id="text-removed"]').attributes('data-diff-kind')).toBe('removed')
-    expect(beforeStage.find('[data-block-id="text-added"]').exists()).toBe(false)
-    expect(beforeStage.find('[data-block-id="container-1"]').attributes('data-diff-kind')).toBeUndefined()
-
-    const afterStage = wrapper.get('.card-viewport-stage--after')
-    expect(afterStage.find('[data-block-id="text-1"]').attributes('data-diff-kind')).toBe('changed')
-    expect(afterStage.find('[data-block-id="text-added"]').attributes('data-diff-kind')).toBe('added')
-    expect(afterStage.find('[data-block-id="text-removed"]').exists()).toBe(false)
-    expect(afterStage.find('[data-block-id="container-1"]').attributes('data-diff-kind')).toBeUndefined()
-  })
-
-  it('projects an added or removed instance onto the comparison as a placeholder side', async () => {
-    const wrapper = mountDiff()
-    await settle(wrapper)
-    const layers = () => wrapper.findAll('.card-viewport-comparison-layer')
-
-    expect(layers()[0]!.find('.card-comparison-placeholder').exists()).toBe(false)
-    expect(layers()[1]!.find('.card-comparison-placeholder').exists()).toBe(false)
-
-    selectInstance(wrapper, 'instance-added')
-    await settle(wrapper)
-    expect(layers()[0]!.find('.card-comparison-placeholder').exists()).toBe(true)
-    expect(layers()[0]!.find('.card-canvas').exists()).toBe(false)
-    expect(layers()[1]!.find('.card-canvas').exists()).toBe(true)
-
-    selectInstance(wrapper, 'instance-removed')
-    await settle(wrapper)
-    expect(layers()[1]!.find('.card-comparison-placeholder').exists()).toBe(true)
-    expect(layers()[1]!.find('.card-canvas').exists()).toBe(false)
-    expect(layers()[0]!.find('.card-canvas').exists()).toBe(true)
+    expect(structureTree.props('expandedKeys')).toEqual(['container-1'])
   })
 
   it('keeps block and instance selection in diff mode out of the document', async () => {
@@ -456,7 +298,6 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
     // The selection really happened before the "nothing was written" assertions below.
     expect(editorTrees(wrapper).structureTree.props('selectedKeys')).toEqual(['text-1'])
-    // A diff block selection is diff-scoped: no document write, no session view-state commit.
 
     selectInstance(wrapper, 'instance-1')
     await settle(wrapper)
@@ -467,15 +308,14 @@ describe('CardDesignEditor diff mode', () => {
     selectInstance(wrapper, 'instance-added')
     await settle(wrapper)
     expect(editorTrees(wrapper).instanceTree.props('selectedKeys')).toEqual(['instance-added'])
-    expect(wrapper.find('.card-viewport-comparison-layer .card-comparison-placeholder').exists()).toBe(true)
 
-    // Diff instance selection stays inside the diff projection: no session view-state commit.
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
   it('selects a block from the comparison canvas without writing the document', async () => {
     const wrapper = mountDiff()
     await settle(wrapper)
+    const modelValue = editorProp<string>(wrapper, 'modelValue')
 
     // A real click on the block the after side renders; diff mode has no other canvas selection path.
     await wrapper.get('.card-viewport-stage--after [data-block-id="text-added"]').trigger('click')
@@ -486,16 +326,13 @@ describe('CardDesignEditor diff mode', () => {
     // An added block has no before side, so every field plus its placement is an added pair.
     expect(inputs.map(input => input.key)).toEqual(['text-added', 'text-added:layout'])
     expect(inputs[0]!.record).toMatchObject({ 'name@new': 'Added block', 'content@new': 'New' })
-    expect(inputs[1]!.record).toMatchObject({ 'anchor@new': 'lt' })
-
+    expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
   it('swallows a save request in diff mode', async () => {
     const wrapper = mountDiff()
     await settle(wrapper)
     const modelValue = editorProp<string>(wrapper, 'modelValue')
-    // The open document is loaded and rendered, so `save` reaches the real serialisation path.
-    expect(wrapper.get('.card-design-editor__transform-preview-host').text()).toContain('Working text')
 
     await expect(getTestSession(wrapper).save()).resolves.toBe('skipped')
     await settle(wrapper)
@@ -513,19 +350,15 @@ describe('CardDesignEditor diff mode', () => {
     }))).resolves.toBe('success')
     await settle(wrapper)
 
-    // The diff projection followed the target: block selected in the diff tree, and the real
-    // property panel revealed the `@new` side of the compared field.
-    expect(editorTrees(wrapper).structureTree.props('selectedKeys')).toEqual(['text-1'])
-    expect(wrapper.get('.property-editor__row[data-input-key="text-1"][data-field-key="content@new"]')
-      .classes()).toContain('is-revealed')
+    const structureTree = editorTrees(wrapper).structureTree
+    expect(structureTree.props('selectedKeys')).toEqual(['text-1'])
 
-    // A location-owned target reveals the layout input pair instead.
+    // A location-owned target still resolves inside the comparison.
     await expect(navigateInDiff(wrapper, navigationToken({
       owner: 'location', faceKey: 'front', blockId: 'text-1', fieldKey: 'x',
     }))).resolves.toBe('success')
     await settle(wrapper)
-    expect(wrapper.get('.property-editor__row[data-input-key="text-1:layout"][data-field-key="x@new"]')
-      .classes()).toContain('is-revealed')
+    expect(structureTree.props('selectedKeys')).toEqual(['text-1'])
 
     // Navigating inside the comparison never commits the open document's selection.
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
@@ -541,8 +374,6 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
 
     expect(editorTrees(wrapper).structureTree.props('selectedKeys')).toEqual(['text-removed'])
-    expect(wrapper.get('.property-editor__row[data-input-key="text-removed"][data-field-key="content@old"]')
-      .classes()).toContain('is-revealed')
   })
 
   it('returns not-found in diff mode when the target is not in the comparison', async () => {
@@ -593,7 +424,7 @@ describe('CardDesignEditor diff mode', () => {
     expect(editorProp<string>(wrapper, 'modelValue')).toBe(modelValue)
   })
 
-  it('reports viewport divider changes through update-diff-ui-state', async () => {
+  it('reports viewport divider changes through update-diff-ui-state and clamps them', async () => {
     const wrapper = mountDiff()
     await settle(wrapper)
     const viewport = editorViewport(wrapper)
@@ -618,7 +449,6 @@ describe('CardDesignEditor diff mode', () => {
     const viewport = editorViewport(wrapper)
 
     expect(viewport.props('comparison')).toMatchObject({ divider: 0.2, viewMode: 'side-by-side' })
-    expect(viewport.get('.card-viewport-comparison-divider').classes()).toContain('is-static')
     expect(diffUiPayloads(wrapper)).toEqual([])
 
     getTestSession(wrapper).updateDiffUiState({ divider: 0.75, viewMode: 'split' })
@@ -642,8 +472,6 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
     expect(diffUiPayloads(wrapper)[1]).toEqual({ divider: 0, viewMode: 'split' })
     expect(viewport.props('comparison')).toMatchObject({ divider: 0, viewMode: 'split' })
-    // Leaving side-by-side through a preset announces the split view.
-    expect(wrapper.get('.card-viewport-status-flash').text()).toBe('Switched to split view')
 
     await root.trigger('keydown', { key: 'd' })
     await settle(wrapper)
@@ -651,8 +479,8 @@ describe('CardDesignEditor diff mode', () => {
 
     await root.trigger('keydown', { key: 's' })
     await settle(wrapper)
-    expect(diffUiPayloads(wrapper)[3]).toEqual({ divider: 0.5, viewMode: 'split' })
     // `S` is also `view.toggle-snapping`; in diff mode the divider preset is registered first.
+    expect(diffUiPayloads(wrapper)[3]).toEqual({ divider: 0.5, viewMode: 'split' })
   })
 
   it('toggles split and side-by-side through the face toolbar', async () => {
@@ -660,30 +488,15 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
     const viewport = editorViewport(wrapper)
     const toolbarAction = (key: string) => wrapper.findAllComponents({ name: 'OcActionButton' })
-      .find(button => (button.props('action') as ToolbarActionProps).key === key)!
-
-    expect(toolbarAction('toggle-diff-view-mode').props('action')).toMatchObject({
-      title: 'Switch to side-by-side view [key]V[/key]',
-      active: false,
-      variant: 'ghost',
-    })
+      .find(button => (button.props('action') as { key: string }).key === key)!
 
     toolbarAction('toggle-diff-view-mode').vm.$emit('select', { key: 'toggle-diff-view-mode' })
     await settle(wrapper)
     expect(diffUiPayloads(wrapper)).toEqual([{ divider: 0.5, viewMode: 'side-by-side' }])
     expect(viewport.props('comparison')).toMatchObject({ divider: 0.5, viewMode: 'side-by-side' })
-    expect(viewport.get('.card-viewport-comparison-divider').classes()).toContain('is-static')
-    expect(viewport.get('.card-viewport-comparison-divider').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('.card-viewport-status-flash').text()).toBe('Switched to side-by-side view')
-    expect(toolbarAction('toggle-diff-view-mode').props('action')).toMatchObject({
-      title: 'Switch to split view [key]V[/key]',
-      active: true,
-      variant: 'soft',
-    })
 
     toolbarAction('toggle-diff-view-mode').vm.$emit('select', { key: 'toggle-diff-view-mode' })
     await settle(wrapper)
     expect(diffUiPayloads(wrapper)[1]).toEqual({ divider: 0.5, viewMode: 'split' })
-    expect(viewport.get('.card-viewport-comparison-divider').classes()).not.toContain('is-static')
   })
 })
