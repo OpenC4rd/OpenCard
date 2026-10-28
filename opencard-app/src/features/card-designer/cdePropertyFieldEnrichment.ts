@@ -1,17 +1,14 @@
 /** Pure helpers for projecting Card Designer fields into PropertyEditor definitions. */
-import { formatPackageCoordinate, formatPackageIdentity, parsePackageQualifier } from '../workspace/model/packageCoordinate'
 import {
   exposesCardFieldReference,
   getCardFieldDefinition,
   getCardFieldKeys,
   getCardFieldValueKind,
 } from '../../entities/card/model'
-import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
 import type {
   PropertyCompletionProvider,
   PropertyEditorFieldDefinition,
 } from '../../shared/ui/property-editor/propertyEditor.types'
-import { chainPropertyCompletionProviders } from '../../shared/ui/property-editor/propertyCompletion'
 import {
   exposesProjectFieldReference,
   getProjectFieldKeys,
@@ -19,17 +16,11 @@ import {
   type ProjectInformation,
 } from '../workspace/model/projectMetadata'
 import type { ProjectFontRegistry } from '../workspace/model/projectFontRegistry'
-import { toCssFontFamily, type FontCatalogEntry } from '../workspace/model/projectFonts'
+import { toCssFontFamily } from '../workspace/model/projectFonts'
 import type { ProjectIconSeries } from '../workspace/model/projectIcons'
-import { EMPTY_PROJECT_ICON_CATALOG, type ProjectIconCatalog } from '../workspace/services/projectIconCatalog'
-import {
-  createProjectIconCompletionProvider,
-  type ProjectIconSource,
-} from '../workspace/services/projectIconCompletion'
-import { createCustomBlockCompletionProvider } from '../workspace/services/customBlockCompletion'
+import type { ProjectIconCatalog } from '../workspace/services/projectIconCatalog'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
-import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage } from '../workspace/services/projectResourceEnvironment'
-import { buildResourceFontCatalog } from '../workspace/services/resourceReference'
+import { resolveProjectEnvironmentFontFamily } from '../workspace/services/projectResourceEnvironment'
 import {
   resolveReferenceCompletion,
   type ReferenceCompletionContext,
@@ -106,112 +97,42 @@ export function createCdeDictionaryReferenceScope(
 }
 
 export function enrichCardPropertyFieldDefinition(options: {
-  translate: Translate
   definition: CardPropertyFieldDefinition
-  fieldKey: string
   record: Readonly<Record<string, unknown>>
   referenceContext?: ReferenceCompletionContext | null
-  fontCatalog: readonly FontCatalogEntry[]
-  directoryProvider?: FilePathDirectoryProvider
-  projectIconCatalog?: ProjectIconCatalog | null
   resourceEnvironment?: ProjectResourceEnvironment
-  project?: Readonly<ProjectInformation> | null
-  dictionary?: Readonly<Record<string, string>> | null
 }): PropertyEditorFieldDefinition {
   const bindingProvider = options.referenceContext
     && options.definition.acceptsBinding !== false
     && options.definition.fieldType !== 'object'
     ? createReferenceCompletionProvider(options.referenceContext)
     : undefined
-  const fontCatalog = options.resourceEnvironment
-    ? buildResourceFontCatalog(options.resourceEnvironment)
-    : options.fontCatalog
-  const fontProvider = options.fieldKey === 'fontFamily'
-    ? createFontCompletionProvider(fontCatalog, options.translate('propertyEditor.references.project'), options.resourceEnvironment)
-    : undefined
-  const iconSources: readonly ProjectIconSource[] = [
-    {
-      packageKey: null,
-      label: options.translate('propertyEditor.references.project'),
-      catalog: options.projectIconCatalog ?? EMPTY_PROJECT_ICON_CATALOG,
-    },
-    ...Array.from(options.resourceEnvironment?.packageEnvironments ?? []).flatMap(([packageKey, environment]) => {
-      const qualifier = parsePackageQualifier(packageKey)
-      const pkg = qualifier && options.resourceEnvironment
-        ? resolveProjectResourcePackage(options.resourceEnvironment, qualifier)
-        : null
-      return pkg && environment.iconCatalog.entries.length
-        ? [{
-          packageKey: formatPackageCoordinate(pkg.coordinate),
-          label: pkg.manifest.title,
-          catalog: environment.iconCatalog,
-        }]
-        : []
-    }),
-  ]
-  // Rich text stores the `[[...]]` token; an image source stores the bare reference.
-  const iconProvider = (options.fieldKey === 'content' || options.fieldKey === 'source' || options.fieldKey === 'maskSource')
-    ? createProjectIconCompletionProvider(iconSources, {
-      mode: options.fieldKey === 'content' ? 'rich-text' : 'reference',
-    })
-    : undefined
-  const customBlockProvider = options.fieldKey === 'source'
-    && options.record.type === 'custom-block'
-    && options.resourceEnvironment
-    ? createCustomBlockCompletionProvider(options.resourceEnvironment)
-    : undefined
-  const provider = bindingProvider || fontProvider || iconProvider || customBlockProvider
-    ? chainPropertyCompletionProviders([bindingProvider, fontProvider, iconProvider, customBlockProvider])
-    : undefined
-  const fontOptions = options.definition.fieldType === 'string' && options.definition.richText
-    ? fontCatalog.map(font => ({
-        label: font.label,
-        value: font.value,
-        cssFamily: font.cssFamily ?? toCssFontFamily(font.value),
-      }))
-    : undefined
-  const richTextBaseStyle = options.definition.fieldType === 'string' && options.definition.richText
+  const richTextBaseStyle = options.definition.fieldType === 'richText'
     ? {
         ...(typeof options.record.fontSize === 'string' && options.record.fontSize
           ? { fontSize: options.record.fontSize }
           : {}),
         ...(typeof options.record.fontFamily === 'string' && options.record.fontFamily
-          ? { fontFamily: options.resourceEnvironment ? resolveProjectEnvironmentFontFamily(options.record.fontFamily, options.resourceEnvironment) : toCssFontFamily(options.record.fontFamily) }
+          ? {
+              fontFamily: options.resourceEnvironment
+                ? resolveProjectEnvironmentFontFamily(options.record.fontFamily, options.resourceEnvironment)
+                : toCssFontFamily(options.record.fontFamily),
+            }
           : {}),
       }
     : undefined
-  const richTextImageCompletionProvider = options.definition.fieldType === 'string' && options.definition.richText
-    ? createProjectIconCompletionProvider(iconSources, { mode: 'reference' })
-    : undefined
-  const richTextImageResolver = options.definition.fieldType === 'string' && options.definition.richText
-    ? (reference: string) => {
-        const result = options.resourceEnvironment?.asset?.(reference)
-        return result?.status === 'ready' ? result.src ?? null : null
-      }
-    : undefined
-  const richTextImageDirectoryProvider = options.definition.fieldType === 'string' && options.definition.richText
-    ? options.directoryProvider
-    : undefined
-  const directoryProvider = options.definition.fieldType === 'filePath'
-    ? options.directoryProvider
-    : undefined
 
-  if (!provider && !fontOptions && !richTextBaseStyle && !richTextImageDirectoryProvider && !richTextImageCompletionProvider && !richTextImageResolver) return options.definition
+  if (!bindingProvider && !richTextBaseStyle) return options.definition
   return {
     ...options.definition,
-    ...(fontOptions ? { fontOptions } : {}),
     ...(richTextBaseStyle ? { richTextBaseStyle } : {}),
-    ...(richTextImageDirectoryProvider ? { richTextImageDirectoryProvider } : {}),
-    ...(richTextImageCompletionProvider ? { richTextImageCompletionProvider } : {}),
-    ...(richTextImageResolver ? { richTextImageResolver } : {}),
-    ...(directoryProvider ? { directoryProvider } : {}),
-    ...(bindingProvider || iconProvider ? { autoPairs: [
-      ...(bindingProvider ? [{ open: '{{', close: '}}' }] : []),
-      ...(iconProvider ? [{ open: '[[', close: ']]' }] : []),
-    ] } : {}),
-    ...(bindingProvider ? { binding: { provider: bindingProvider } } : {}),
-    ...(iconProvider ? { projectIcon: { provider: iconProvider, catalog: options.projectIconCatalog ?? undefined, sources: iconSources } } : {}),
-    ...(provider ? { completion: { ...options.definition.completion, provider } } : {}),
+    ...(bindingProvider
+      ? {
+          autoPairs: [{ open: '{{', close: '}}' }],
+          binding: { provider: bindingProvider },
+          completion: { ...options.definition.completion, provider: bindingProvider },
+        }
+      : {}),
   } as PropertyEditorFieldDefinition
 }
 
@@ -232,62 +153,6 @@ function createReferenceCompletionProvider(
         keepOpen: suggestion.kind === 'scope',
         ...(suggestion.kind === 'field' ? { value: `{{${suggestion.insertText}}}` } : {}),
       })),
-    }
-  }
-}
-
-function createFontCompletionProvider(
-  fontCatalog: readonly FontCatalogEntry[],
-  projectLabel: string,
-  environment?: ProjectResourceEnvironment,
-): PropertyCompletionProvider {
-  const scopes = new Map<string, string>()
-  for (const font of fontCatalog) {
-    if (font.source !== 'project') continue
-    const prefix = font.value.slice(0, font.value.indexOf('font:') + 5)
-    // 引用里写的是**完整坐标**，而资源环境也按坐标索引：解析出来那个包，才拿得到显示名。
-    const qualifier = prefix.includes('#') ? parsePackageQualifier(prefix.slice(0, prefix.indexOf('#'))) : null
-    const pkg = qualifier && environment ? resolveProjectResourcePackage(environment, qualifier) : null
-    scopes.set(prefix, qualifier ? pkg?.manifest.title || formatPackageIdentity(qualifier) : projectLabel)
-  }
-  return async ({ value, cursor }) => {
-    const position = Math.min(cursor, value.length)
-    const replaceStart = value.lastIndexOf(';', Math.max(0, position - 1)) + 1
-    const nextSeparator = value.indexOf(';', position)
-    const replaceEnd = nextSeparator < 0 ? value.length : nextSeparator
-    const fragment = value.slice(replaceStart, position).trim().toLocaleLowerCase()
-    const insertionPrefix = replaceStart > 0 ? ' ' : ''
-    const scope = [...scopes.keys()].find(prefix => fragment.startsWith(prefix.toLocaleLowerCase()))
-    const query = scope ? fragment.slice(scope.length) : fragment
-    return {
-      replaceStart,
-      replaceEnd,
-      items: [
-        ...(!scope ? [...scopes].filter(([prefix, label]) => !fragment
-          || prefix.toLocaleLowerCase().includes(fragment) || label.toLocaleLowerCase().includes(fragment))
-          .map(([prefix, label]) => ({
-            key: `font-scope:${prefix}`, label,
-            insertText: `${insertionPrefix}${prefix}`, keepOpen: true,
-          })) : []),
-        ...fontCatalog
-        .filter(font => scope ? font.value.startsWith(scope) : font.source === 'system' || font.source === 'project-file')
-        .filter(font => !query
-          || font.label.toLocaleLowerCase().includes(query)
-          || (scope ? font.value.slice(scope.length) : font.value).toLocaleLowerCase().includes(query))
-        .map(font => ({
-          key: `font:${font.value}`,
-          label: font.label,
-          labelStyle: { fontFamily: font.cssFamily ?? toCssFontFamily(font.value) },
-          insertText: `${insertionPrefix}${font.value}`,
-          value: `${insertionPrefix}${font.value}`,
-        })),
-      ],
-      ...(scope ? {
-        parent: {
-          key: 'font-scope:parent', label: '..', icon: 'mdiArrowUp' as const,
-          insertText: insertionPrefix, keepOpen: true,
-        },
-      } : {}),
     }
   }
 }

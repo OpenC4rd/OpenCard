@@ -35,6 +35,7 @@ function createAdapter(
   exportRendererRef = ref<{
     getCanvasElement?: () => HTMLElement | undefined
   }>(),
+  refresh = vi.fn(async (_paths?: readonly string[]) => undefined),
 ) {
   return {
     adapter: useProjectExport({
@@ -44,6 +45,11 @@ function createAdapter(
         project: null,
         dictionary: null,
         projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+        projectResourceEnvironment: {
+          kind: 'project' as const, namespace: 'test', rootPath: 'D:/project',
+          fontDocument: {}, fonts: {}, iconDocument: {},
+          iconCatalog: EMPTY_PROJECT_ICON_CATALOG, refresh,
+        },
       }),
       readProjectFile,
       resolveProjectPath: path => `D:/project/${path}`,
@@ -134,6 +140,23 @@ it('cancels single-card rendering and waits for its active resource step before 
   await closing
   expect(adapter.isRunning.value).toBe(false)
   vi.unstubAllGlobals()
+})
+
+it('invalidates written files only when they land inside the project', async () => {
+  const { prepareCardRender } = await import('../../card-rendering/renderPipeline')
+  const { parseCardDocument } = await import('../../../entities/card/storage')
+  const refresh = vi.fn(async (_paths?: readonly string[]) => undefined)
+  const render = prepareCardRender({ document: parseCardDocument(JSON.parse(content('100'))), instance: null, resourceRootPath: 'D:/project', sourceFilePath: null, environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG } })
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 0 })
+  const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockResolvedValue(undefined)
+  const { adapter } = createAdapter([], undefined, ref({ getCanvasElement: () => document.createElement('div') }), refresh)
+  try {
+    await adapter.renderCardImages(render, ['front'], 1, new Map([['front', 'D:/exports/front.png']]))
+    expect(refresh).not.toHaveBeenCalled()
+
+    await adapter.renderCardImages(render, ['front'], 1, new Map([['front', 'D:/project/exports/front.png']]))
+    expect(refresh).toHaveBeenCalledWith(['D:/project/exports/front.png'])
+  } finally { write.mockRestore(); vi.unstubAllGlobals() }
 })
 
 it('reports a single-card write failure and waits for an ongoing write on cancellation', async () => {

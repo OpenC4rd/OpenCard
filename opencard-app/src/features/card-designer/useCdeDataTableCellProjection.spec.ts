@@ -1,12 +1,12 @@
+// @vitest-environment node
 import { ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   createSimpleContainerBlock,
   createTextBlock,
   type CardDocument,
 } from '../../entities/card/model'
 import { buildParentLookup } from '../../entities/card/tree'
-import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
 import type { CardPropertyFieldDefinition } from '../card-properties/cardPropertyFieldDefinitions'
 import type { CdePropertyProjectContext } from './cdePropertyFieldEnrichment'
 import { useCdeDataTableCellProjection } from './useCdeDataTableCellProjection'
@@ -22,7 +22,6 @@ function createHarness() {
   })
   const document: CardDocument = {
     type: 'card-document',
-
     id: 'document',
     name: 'Blueprint',
     version: '1.0.0',
@@ -63,16 +62,12 @@ function createHarness() {
     information: { name: 'Project', description: '', version: '2.0.0' },
     dictionary: { greeting: 'Hello' },
   })
-  const directoryProvider = ref<FilePathDirectoryProvider | undefined>(
-    vi.fn(async () => [{ name: 'portrait.png' }]),
-  )
   const locale = ref('en-US')
   const state = useCdeDataTableCellProjection({
     cardDoc,
     documentRevision,
     parentLookup: ref(buildParentLookup(document)),
     projectContext,
-    directoryProvider,
     locale,
     blueprintCardId: '__blueprint__',
     translate: (key, parameters) => parameters?.depth ? `${key}:${parameters.depth}` : key,
@@ -80,7 +75,6 @@ function createHarness() {
   })
   return {
     cardDoc,
-    directoryProvider,
     documentRevision,
     locale,
     projectContext,
@@ -142,7 +136,7 @@ describe('useCdeDataTableCellProjection', () => {
   })
 
   it('reuses definitions until a cache context dependency changes', () => {
-    const { directoryProvider, documentRevision, locale, projectContext, state } = createHarness()
+    const { documentRevision, locale, projectContext, state } = createHarness()
     const cell = { cardId: 'instance', identity: 'instance\0text\0content' }
     let previous = state.getDataTableCellDefinition('text', contentField, cell)
     expect(state.getDataTableCellDefinition('text', contentField, cell)).toBe(previous)
@@ -160,10 +154,6 @@ describe('useCdeDataTableCellProjection', () => {
     projectContext.value = { ...projectContext.value, dictionary: { farewell: 'Bye' } }
     next = state.getDataTableCellDefinition('text', contentField, cell)
     expect(next).not.toBe(previous)
-    previous = next
-
-    directoryProvider.value = vi.fn(async () => [])
-    expect(state.getDataTableCellDefinition('text', contentField, cell)).not.toBe(previous)
   })
 
   it('does no eager work and returns an invalid Block fallback without caching it', () => {

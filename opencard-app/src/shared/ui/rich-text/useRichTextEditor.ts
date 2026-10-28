@@ -19,26 +19,18 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import { useEditor } from '@tiptap/vue-3'
 import type { OcActionDefinition, OcActionSelectPayload } from '../action/action.types'
-import type { FilePathDirectoryProvider } from '../../model/filePath'
 import type {
   PropertyCompletionItem,
   PropertyCompletionProvider,
   PropertyEditorFieldDefinition,
+  PropertyFieldCapabilities,
+  PropertyIconEntry,
+  PropertyIconScope,
 } from '../property-editor/propertyEditor.types'
 import type { IconToken } from '../icon/iconRegistry'
 import { BindingNode } from './bindingNode'
-
 import { ProjectIconNode } from './projectIconNode'
-import {
-  createProjectIconStyle,
-  createProjectIconPreviewStyle,
-  findProjectIcon,
-  type ProjectIconCatalog,
-  type ProjectIconCatalogEntry,
-} from '../../../features/workspace/services/projectIconCatalog'
-import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
-import { formatProjectIconPath, parseProjectIconPath } from '../../rich-text/projectIconReference'
-import { readProjectIconSize } from '../../../features/workspace/services/projectIconDimensionResolver'
+import { parseProjectIconPath } from '../../rich-text/projectIconReference'
 import {
   projectIconRecentIdentity,
   recentProjectIconIdentities,
@@ -49,39 +41,18 @@ import {
   richTextFormatCategories,
 } from './richTextFormat'
 
-type RichTextFontOption = {
-  label: string
-  value: string
-  cssFamily?: string
-}
-
-type RichTextFontSelectOption = RichTextFontOption & {
-  key: string
-  labelStyle?: Readonly<Record<string, string>>
-}
-
 export type RichTextEditorProps = {
   /** 本次会话的初始 HTML。挂载后内容由编辑器文档持有。 */
   initialHtml: string
   /** 行内表达式补全服务。 */
   bindingCompletion?: PropertyCompletionProvider
-  /** 当前作用域的项目图标目录。 */
-  projectIconCatalog?: ProjectIconCatalog
-  /** Icon sources the toolbar offers: the current project first, then packages that ship icons. */
-  packageIconSources?: readonly ProjectIconSource[]
-  /** 字体稳定引用、显示名称和当前作用域的 CSS 字体。 */
-  fontOptions?: readonly RichTextFontOption[]
   /** 编辑区继承的基础字体与字号。 */
   baseStyle?: {
     fontFamily?: string
     fontSize?: string
   }
-  /** 图片填充的目录浏览服务。 */
-  imageDirectoryProvider?: FilePathDirectoryProvider
-  /** 图片填充的引用补全服务。 */
-  imageCompletionProvider?: PropertyCompletionProvider
-  /** 将图片稳定引用解析为当前作用域的显示地址。 */
-  resolveImageSource?: (reference: string) => string | null
+  /** 环境资源能力（项目与资源包字体、图标、图片文件与预览解析器）。 */
+  capabilities?: PropertyFieldCapabilities
 }
 
 export function useRichTextEditor(props: RichTextEditorProps, onChange: () => void) {
@@ -97,11 +68,15 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   const interaction = createRichTextInteraction(() => editor.value, (node, previewStyle) => {
     const attributes = node.marks.find(mark => mark.type.name === 'textStyle')?.attrs ?? {}
     const highlight = node.marks.find(mark => mark.type.name === 'highlight')
-    return resolveRichTextStyle({
-      style: `${highlight ? `background-color: ${highlight.attrs.color || '#ffff00'};` : ''}${previewStyle}`,
-      'data-oc-fill-type': String(attributes.textFillType ?? ''),
-      'data-oc-fill-source': String(attributes.textFillSource ?? ''),
-    }, () => null, reference => props.resolveImageSource?.(reference) ?? null)
+    return resolveRichTextStyle(
+      {
+        style: `${highlight ? `background-color: ${highlight.attrs.color || '#ffff00'};` : ''}${previewStyle}`,
+        'data-oc-fill-type': String(attributes.textFillType ?? ''),
+        'data-oc-fill-source': String(attributes.textFillSource ?? ''),
+      },
+      () => null,
+      reference => props.capabilities?.resolveImagePreview?.(reference) ?? null,
+    )
   })
   const formatting = useRichTextFormatting(() => editor.value, toolbarRevision, interaction, () => props.baseStyle?.fontSize)
   function captureInteraction(event: Event) {
@@ -110,17 +85,18 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   }
   function colorOpen(open: boolean) { if (open) interaction.capture(); else interaction.clearPreview() }
 
-  const fontOptions = computed<readonly RichTextFontSelectOption[]>(() => [
-    { key: '', label: tr('propertyEditor.richText.defaultFont', '默认字体'), value: '' },
-    ...(props.fontOptions ?? []).map(option => ({
-      ...option,
-      key: option.value,
-      labelStyle: { fontFamily: option.cssFamily ?? option.value },
-    })),
-  ])
   const strokeWidthCompletionProvider = createToolbarCompletion(
-    [0, 0.5, 1, 1.5, 2, 3].map(size => ({ key: `${size}px`, label: `${size}px` })))
-  const fontVariables = computed(() => Object.fromEntries(fontOptions.value.filter(option => option.value).map(option => [fontVariable(option.value), option.cssFamily ?? option.value])))
+    [0, 0.5, 1, 1.5, 2, 3].map(size => ({ key: `${size}px`, label: `${size}px` })),
+  )
+  const fontVariables = computed(() => {
+    const vars: Record<string, string> = {}
+    for (const scope of props.capabilities?.fonts ?? []) {
+      for (const option of scope.entries) {
+        if (option.value) vars[fontVariable(option.value)] = option.cssFamily ?? option.value
+      }
+    }
+    return vars
+  })
   const alignments = computed<ReadonlyArray<{
     value: 'left' | 'center' | 'right' | 'justify'
     icon: IconToken
@@ -142,7 +118,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     const options = sizes.map(size => ({ key: `${size}px`, label: `${size}px` }))
     return current && !current.endsWith('px') ? [{ key: current, label: current }, ...options] : options
   })
-  function createToolbarCompletion(items: readonly { key: string, label: string, labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
+  function createToolbarCompletion(items: readonly { key: string; label: string; labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
     return ({ value }) => {
       const raw = value.trim().toLocaleLowerCase()
       const query = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw) ? `${raw}px` : raw
@@ -155,11 +131,13 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     }
   }
   type StringFieldDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }>
-  const fontFieldDefinition = computed<StringFieldDefinition>(() => ({
-    title: tr('propertyEditor.richText.font', '字体'), fieldType: 'string',
+  type FontFamilyFieldDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'fontFamily' }>
+  const fontFieldDefinition = computed<FontFamilyFieldDefinition>(() => ({
+    title: tr('propertyEditor.richText.font', '字体'),
+    fieldType: 'fontFamily',
     placeholder: formatting.state.value.fontFamily.kind === 'mixed'
-      ? tr('propertyEditor.richText.mixed', '混合') : tr('propertyEditor.richText.defaultFont', '默认字体'),
-    completion: { provider: createToolbarCompletion(fontOptions.value) },
+      ? tr('propertyEditor.richText.mixed', '混合')
+      : tr('propertyEditor.richText.defaultFont', '默认字体'),
   }))
   const fontSizeFieldDefinition = computed<StringFieldDefinition>(() => ({
     title: tr('propertyEditor.richText.fontSize', '字号'), fieldType: 'string',
@@ -173,7 +151,8 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     completion: { provider: strokeWidthCompletionProvider },
   }))
   const lengthCompletionProvider = createToolbarCompletion(
-    [0, 1, 2, 4, 8, 12].map(size => ({ key: `${size}px`, label: `${size}px` })))
+    [0, 1, 2, 4, 8, 12].map(size => ({ key: `${size}px`, label: `${size}px` })),
+  )
   const propertyCategories = computed(() => richTextFormatCategories(tr))
   const propertyInputs = computed(() => {
     toolbarRevision.value
@@ -189,70 +168,74 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
         fontField: fontFieldDefinition.value,
         fontSizeField: fontSizeFieldDefinition.value,
         strokeWidthField: strokeWidthFieldDefinition.value,
-        imageDirectoryProvider: props.imageDirectoryProvider,
-        imageCompletionProvider: props.imageCompletionProvider,
         lengthCompletionProvider,
       },
     })]
   })
-  const iconCatalogs = computed(() => {
-    const catalogs = new Map<string, ProjectIconCatalog>()
-    for (const source of props.packageIconSources ?? []) catalogs.set(source.packageKey ?? '', source.catalog)
-    if (!catalogs.has('') && props.projectIconCatalog) catalogs.set('', props.projectIconCatalog)
-    return catalogs
-  })
-  const hasProjectIconSources = computed(() => [...iconCatalogs.value.values()]
-    .some(catalog => catalog.entries.length > 0))
 
-  function projectIconSelectionKey(packageKey: string | null, entry: ProjectIconCatalogEntry): string {
+  const iconScopes = computed<readonly PropertyIconScope[]>(() => props.capabilities?.icons ?? [])
+  const hasProjectIconSources = computed(() =>
+    iconScopes.value.some(scope => scope.series.some(series => series.entries.length > 0)),
+  )
+
+  function projectIconSelectionKey(packageKey: string | null, entry: PropertyIconEntry): string {
     return `project-icon:${packageKey ?? ''}:${entry.seriesKey}/${entry.iconKey}`
   }
 
-  function projectIconSeriesGroups(packageKey: string | null, catalog: ProjectIconCatalog) {
-    return catalog.series.map(series => ({
-      key: `project-icon-series:${packageKey ?? ''}:${series.key}`,
-      title: series.name,
-      icon: 'mdiStickerEmoji' as const,
-      children: catalog.entries
-        .filter(entry => entry.seriesKey.toLocaleLowerCase() === series.key.toLocaleLowerCase())
-        .map(entry => ({
-          key: projectIconSelectionKey(packageKey, entry),
+  function projectIconSeriesGroups(scope: PropertyIconScope) {
+    return scope.series
+      .map(series => ({
+        key: `project-icon-series:${scope.packageKey ?? ''}:${series.key}`,
+        title: series.name,
+        icon: 'mdiStickerEmoji' as const,
+        children: series.entries.map(entry => ({
+          key: projectIconSelectionKey(scope.packageKey, entry),
           title: entry.name,
-          thumbnailStyle: createProjectIconStyle(entry, readProjectIconSize),
+          thumbnailStyle: entry.inlineStyle,
           thumbnailLabel: entry.name,
         })),
-    })).filter(series => series.children.length > 0)
+      }))
+      .filter(series => series.children.length > 0)
   }
 
   const projectIconEntriesByActionKey = computed(() => new Map(
-    [...iconCatalogs.value].flatMap(([packageKey, catalog]) => catalog.entries.map(entry => [
-      projectIconSelectionKey(packageKey || null, entry),
-      { packageKey: packageKey || null, entry },
-    ] as const)),
+    iconScopes.value.flatMap(scope =>
+      scope.series.flatMap(series =>
+        series.entries.map(entry => [
+          projectIconSelectionKey(scope.packageKey, entry),
+          { packageKey: scope.packageKey, entry },
+        ] as const),
+      ),
+    ),
   ))
-  const recentProjectIconEntries = computed(() => recentProjectIconIdentities.value.flatMap(identity => {
-    // The recent row lists current-project icons; the identity still carries the package so a
-    // package icon and a project icon sharing collection and icon keys cannot collide.
-    const entry = iconCatalogs.value.get('')?.entries.find(candidate => (
-      projectIconRecentIdentity(null, candidate.seriesKey, candidate.iconKey) === identity
-    ))
-    return entry ? [entry] : []
-  }))
+
+  const recentProjectIconEntries = computed(() => {
+    const hostScope = iconScopes.value.find(scope => scope.packageKey === null)
+    const hostEntries = hostScope?.series.flatMap(series => series.entries) ?? []
+    return recentProjectIconIdentities.value.flatMap(identity => {
+      const entry = hostEntries.find(
+        candidate => projectIconRecentIdentity(null, candidate.seriesKey, candidate.iconKey) === identity,
+      )
+      return entry ? [entry] : []
+    })
+  })
+
   const projectIconActionChildren = computed(() => {
-    const host = [...iconCatalogs.value]
-      .filter(([packageKey]) => packageKey === '')
-      .flatMap(([, catalog]) => projectIconSeriesGroups(null, catalog))
-    const packages = (props.packageIconSources ?? [])
-      .filter(source => source.packageKey !== null)
-      .map(source => ({
-        key: `project-icon-package:${source.packageKey}`,
-        title: source.label,
+    const host = iconScopes.value
+      .filter(scope => scope.packageKey === null)
+      .flatMap(scope => projectIconSeriesGroups(scope))
+    const packages = iconScopes.value
+      .filter(scope => scope.packageKey !== null)
+      .map(scope => ({
+        key: `project-icon-package:${scope.packageKey}`,
+        title: scope.label,
         icon: 'mdiPackageVariantClosed' as const,
-        children: projectIconSeriesGroups(source.packageKey, source.catalog),
+        children: projectIconSeriesGroups(scope),
       }))
       .filter(group => group.children.length > 0)
     return [...host, ...packages]
   })
+
   const projectIconAction = computed<OcActionDefinition>(() => {
     toolbarRevision.value
     return {
@@ -265,6 +248,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       children: projectIconActionChildren.value,
     }
   })
+
   const tableAction = computed<OcActionDefinition>(() => {
     toolbarRevision.value
     return {
@@ -287,8 +271,8 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       ],
     }
   })
+
   const selectedNodeKind = computed<'binding' | 'projectIcon' | null>(() => {
-    // 选择变化只递增 toolbarRevision；不读它的话这个 computed 会一直缓存首次的 null。
     toolbarRevision.value
     const node = editor.value?.state.selection instanceof NodeSelection
       ? editor.value.state.selection.node
@@ -298,6 +282,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     if (node.type.name === 'projectIcon') return 'projectIcon'
     return null
   })
+
   const selectedNodeAnchor = computed<DOMRect | null>(() => {
     toolbarRevision.value
     const currentEditor = editor.value
@@ -352,7 +337,6 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     },
   })
   watch(editor, current => { if (current) originalDocument = current.state.doc }, { flush: 'sync' })
-  // Re-evaluate resource decorations when their reactive environment changes, without a document edit.
   watchEffect(() => {
     const current = editor.value
     if (current && !current.isDestroyed) current.view.updateState(current.state)
@@ -436,26 +420,17 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     }).run(), true)
   }
 
-  /** A chosen icon plus the package it belongs to: the stored reference needs both. */
   type ProjectIconSelection = {
     packageKey: string | null
-    entry: ProjectIconCatalogEntry
+    entry: PropertyIconEntry
   }
 
-  function projectIconPath(selection: ProjectIconSelection): string {
-    return formatProjectIconPath({
-      packageKey: selection.packageKey,
-      seriesKey: selection.entry.seriesKey,
-      iconKey: selection.entry.iconKey,
-    })
-  }
-
-  /** Resolves a stored reference: the caller's resolver first, then any catalog the toolbar offers. */
-  function resolveProjectIconReference(reference: string): ProjectIconCatalogEntry | null {
+  function resolveProjectIconReference(reference: string): PropertyIconEntry | null {
     const parsed = parseProjectIconPath(reference)
     if (!parsed) return null
-    const catalog = iconCatalogs.value.get(parsed.packageKey ?? '')
-    return catalog ? findProjectIcon(catalog, parsed.seriesKey, parsed.iconKey) : null
+    const scope = iconScopes.value.find(candidate => (candidate.packageKey ?? null) === (parsed.packageKey ?? null))
+    const series = scope?.series.find(candidate => candidate.key.toLocaleLowerCase() === parsed.seriesKey.toLocaleLowerCase())
+    return series?.entries.find(candidate => candidate.iconKey.toLocaleLowerCase() === parsed.iconKey.toLocaleLowerCase()) ?? null
   }
 
   function hasSelectedProjectIcon(): boolean {
@@ -471,13 +446,13 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     if (selection) insertProjectIconEntry(selection)
   }
 
-  function insertRecentProjectIcon(entry: ProjectIconCatalogEntry): void {
+  function insertRecentProjectIcon(entry: PropertyIconEntry): void {
     insertProjectIconEntry({ packageKey: null, entry })
   }
 
   function insertProjectIconEntry(selection: ProjectIconSelection): void {
     interaction.run(currentEditor => {
-      const attrs = { iconPath: projectIconPath(selection) }
+      const attrs = { iconPath: selection.entry.iconPath }
       if (hasSelectedProjectIcon()) {
         const position = currentEditor.state.selection.from
         currentEditor.chain().focus().updateAttributes('projectIcon', attrs).setNodeSelection(position).run()
@@ -509,9 +484,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     runCommand, insertTable, tableAction, handleTableAction, insertBinding,
     hasProjectIconSources, projectIconAction, handleProjectIconAction,
     recentProjectIconEntries, projectIconSelectionKey, insertRecentProjectIcon,
-    createProjectIconPreviewStyle, readProjectIconSize,
     foregroundColor, backgroundColor, alignments, tr,
     selectedNodeAnchor, selectedNodeKind, nodeEditOpen, propertyInputs, propertyCategories,
   }
 }
-

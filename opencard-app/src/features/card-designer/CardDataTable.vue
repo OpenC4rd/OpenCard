@@ -137,6 +137,7 @@
                       <PropertyFieldRenderer appearance="embedded"
                         :definition="resolveCellDefinition(block.key, field, cell)"
                         :value="cell.value"
+                        :capabilities="capabilities"
                         :editor-id="resolveCellEditorState(block.key, field, cell).editorId"
                         @update:value="handleCellValueUpdate(block.key, field, cell, $event)" />
                       <PropertyFieldActionRail
@@ -185,7 +186,11 @@ import OcActionMenu from '../../components/standard/OcActionMenu.vue'
 import OcOverlayMarker from '../../components/standard/OcOverlayMarker.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
-import type { PropertyEditorBindingInterpreter, PropertyEditorFieldDefinition } from '../../shared/ui/property-editor/propertyEditor.types'
+import type {
+  PropertyEditorBindingInterpreter,
+  PropertyEditorFieldDefinition,
+  PropertyFieldCapabilities,
+} from '../../shared/ui/property-editor/propertyEditor.types'
 import PropertyFieldActionRail from '../../shared/ui/property-editor/PropertyFieldActionRail.vue'
 import PropertyFieldRenderer from '../../shared/ui/property-editor/PropertyFieldRenderer.vue'
 import OcDataGridColumnResizeHandle from '../../shared/ui/data-grid/OcDataGridColumnResizeHandle.vue'
@@ -219,6 +224,7 @@ const props = defineProps<{
   catalogFaceGroups: readonly CdeDataTableFaceCatalog[]
   faceGroups: readonly CdeDataTableFaceGroup[]
   bindingInterpreter?: PropertyEditorBindingInterpreter
+  capabilities?: PropertyFieldCapabilities
   getCellDefinition?: (
     blockId: string,
     field: CdeDataTableFieldRow,
@@ -293,7 +299,8 @@ function formatCellPreview(value: unknown): string {
 }
 
 function isMultilineField(field: CdeDataTableFieldRow): boolean {
-  return field.definition.fieldType === 'string' && Boolean(field.definition.multiline)
+  return field.definition.fieldType === 'richText'
+    || (field.definition.fieldType === 'string' && Boolean(field.definition.multiline))
 }
 
 function resolveCellDefinition(

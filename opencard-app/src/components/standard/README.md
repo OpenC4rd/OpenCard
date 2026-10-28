@@ -5,6 +5,7 @@
 - `OcActionButton`：定义式 action 渲染与意图输出。
 - `OcBar`、`OcCard`：结构化 section；`OcCard` 直接绘制表面，不嵌套 Surface/Stack。
 - `OcColorField`：复用 `OcColorPicker` 的完整颜色字段变体，统一色值输入、取色弹层与提交语义，并按领域需要选择是否开放 Alpha。
+- `OcFilePicker`：基于 `OcTree` 与搜索框的多作用域文件/文件夹选择器，支持通配符与正则过滤。
 - `OcOptionGroup`：互斥选择、radiogroup 语义与 roving tabindex。
 - `OcTree`：key-only tree view model 与统一 intent；可选择接收外部文件拖放并上报落点。
 - `OcNodeTail`：节点视图共用的尾部行（文本、状态徽标、命令）；命令只在交互时显示。

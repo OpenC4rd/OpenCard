@@ -808,7 +808,7 @@ describe('CardDesignEditor issue navigation', () => {
     expect(dialog.props('open')).toBe(false)
   })
 
-  it('provides file and font completion to data-table Cells', async () => {
+  it('provides resource capabilities and semantic field definitions to data-table cells', async () => {
     const document = createCdeDocument()
     document.faces.front.children.push({
       block: createImageBlock({ id: 'image-1', name: 'Portrait', source: '' }),
@@ -852,27 +852,24 @@ describe('CardDesignEditor issue navigation', () => {
       blockId: string,
       field: { key: string, cells: Array<{ cardId: string, identity: string }> },
       cell: { cardId: string, identity: string },
-    ) => {
-      completion?: { provider?: (request: { value: string, cursor: number }) => unknown }
-      directoryProvider?: (directory: string) => Promise<Array<{ name: string }>>
-      fontOptions?: Array<{ value: string }>
+    ) => { fieldType: string }
+    const capabilities = table.props('capabilities') as {
+      files?: Array<{ readDirectory: (directory: string) => Promise<Array<{ name: string }>> }>
     }
     const textBlock = faceGroups[0]!.blocks.find(block => block.key === 'text-1')!
     const fontField = textBlock.fields.find(field => field.key === 'fontFamily')!
     const fontDefinition = getDefinition('text-1', fontField, fontField.cells[0]!)
-    const fontResult = await Promise.resolve(fontDefinition.completion?.provider?.({ value: 'Arial', cursor: 5 })) as {
-      items?: Array<{ value?: string }>
-    } | null
     const contentField = textBlock.fields.find(field => field.key === 'content')!
     const contentDefinition = getDefinition('text-1', contentField, contentField.cells[0]!)
 
     const imageBlock = faceGroups[0]!.blocks.find(block => block.key === 'image-1')!
     const imageField = imageBlock.fields.find(field => field.key === 'source')!
     const imageDefinition = getDefinition('image-1', imageField, imageField.cells[0]!)
-    const imageEntries = await imageDefinition.directoryProvider?.('')
+    const imageEntries = await capabilities.files?.[0]?.readDirectory('')
 
-    expect(fontResult?.items).toEqual([])
-    expect(contentDefinition.fontOptions).toEqual([])
+    expect(fontDefinition.fieldType).toBe('fontFamily')
+    expect(contentDefinition.fieldType).toBe('richText')
+    expect(imageDefinition.fieldType).toBe('imageSource')
     expect(imageEntries?.map(item => item.name)).toContain('portrait.png')
     expect(readDirectoryEntries).toHaveBeenCalledWith('D:/Project', 1)
     readDirectoryEntries.mockRestore(); wrapper.unmount(); await resourceEnvironment.dispose()

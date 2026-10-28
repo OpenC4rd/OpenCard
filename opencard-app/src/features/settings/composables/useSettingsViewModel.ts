@@ -7,8 +7,8 @@ import { CACHE_GIB_BYTES, formatCacheUsage, type AppCacheUsage } from '../../../
 import type {
   EditorItem,
   EditorItemEditorPart,
-  PropertyCompletionProvider,
   PropertyEditorFieldDefinition,
+  PropertyFieldCapabilities,
 } from '../../../shared/ui/property-editor/propertyEditor.types'
 import type { AppLocaleOption } from '../../../i18n/appLocale'
 import { tutorials } from '../../tutorials/tutorials'
@@ -62,6 +62,7 @@ export interface SettingsCategoryViewModel {
   key: SettingsCategoryKey
   title: string
   cards: readonly SettingsCardViewModel[]
+  capabilities?: PropertyFieldCapabilities
   preview?: {
     glassIntensity: number
   }
@@ -343,24 +344,6 @@ export function useSettingsViewModel(
         const [key, fallback] = labels[presetId]
         return options.translate(`settings.values.${key}`, fallback)
       }
-      const fontCompletion: PropertyCompletionProvider = ({ value, cursor }) => {
-        const start = value.lastIndexOf(';', Math.max(0, cursor - 1)) + 1
-        const nextSeparator = value.indexOf(';', cursor)
-        const end = nextSeparator < 0 ? value.length : nextSeparator
-        const fragment = value.slice(start, cursor).trim().toLocaleLowerCase()
-        return {
-          replaceStart: start,
-          replaceEnd: end,
-          items: systemFontFamilies.value
-            .filter(font => !fragment || font.toLocaleLowerCase().includes(fragment))
-            .map(font => ({
-              key: font,
-              label: font,
-              labelStyle: { fontFamily: font },
-              insertText: start > 0 ? ` ${font}` : font,
-            })),
-        }
-      }
       const themeCard = (themeId: OcThemeId): SettingsCardViewModel => {
         const presetValue = settings.appearance.themes[themeId].presetId
         const presetOptions = [
@@ -408,11 +391,10 @@ export function useSettingsViewModel(
             ...colorItems,
             fieldItem('font', {
               title: options.translate('settings.fields.uiFont', 'UI font'),
-              fieldType: 'string', commitMode: 'blur',
+              fieldType: 'fontFamily',
               placeholder: options.translate('settings.values.systemFont', 'System'),
-              completion: { provider: fontCompletion },
             }, settings.appearance.themes[themeId].fontFamily === 'system' ? '' : settings.appearance.themes[themeId].fontFamily,
-            options.translate('settings.descriptions.uiFont', 'Leave empty to use the system font; separate several families with semicolons.')),
+            options.translate('settings.descriptions.uiFont', 'Leave empty to use the system font.')),
             fieldItem('angle', {
               title: options.translate('settings.fields.accentNeighborAngle', 'Secondary color phase angle'),
               fieldType: 'number', presentation: 'slider', min: -180, max: 180, step: 1, suffix: '°',
@@ -439,6 +421,19 @@ export function useSettingsViewModel(
         key: categoryKey,
         title: categoryLabels.value.appearance,
         preview: { glassIntensity: settings.appearance.glassIntensity },
+        capabilities: {
+          fonts: [{
+            key: 'system',
+            label: options.translate('settings.values.systemFont', 'System'),
+            packageKey: null,
+            entries: systemFontFamilies.value.map(font => ({
+              key: font,
+              value: font,
+              label: font,
+              cssFamily: font,
+            })),
+          }],
+        },
         cards: [
           themeCard('dark'),
           themeCard('light'),
@@ -475,10 +470,10 @@ export function useSettingsViewModel(
               fieldType: 'number', presentation: 'slider', min: 0, max: 100, step: 1, suffix: '%',
             }, settings.appearance.glassIntensity),
             fieldItem('appearance.micaBackground', {
-              title: options.translate('settings.fields.micaBackground', 'Mica window background'),
+              title: options.translate('settings.fields.micaBackground', 'Window material'),
               fieldType: 'boolean',
             }, settings.appearance.micaBackground,
-            options.translate('settings.descriptions.micaBackground', 'Uses the Windows 11 window material; falls back to an opaque background elsewhere.')),
+            options.translate('settings.descriptions.micaBackground', 'Uses the system window material; falls back to an opaque background elsewhere.')),
           ], { icon: 'mdiRulerSquare' }),
         ],
       }

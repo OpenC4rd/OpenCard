@@ -96,7 +96,8 @@
           <div class="card-design-editor__data-table-view" :class="{ 'is-active': workspaceMode === 'data-table' }">
             <CardDataTable ref="cardDataTableRef" :readonly="editorState.mode === 'diff'" :columns="dataTableColumns"
               :catalog-face-groups="dataTableCatalogFaceGroups" :face-groups="dataTableFaceGroups"
-              :binding-interpreter="propertyBindingInterpreter" :get-cell-definition="getDataTableCellDefinition"
+              :binding-interpreter="propertyBindingInterpreter" :capabilities="propertyCapabilities"
+              :get-cell-definition="getDataTableCellDefinition"
               @add-instance="createInstance" @rename-instance="renameInstance" @duplicate-card="duplicateDataTableCard"
               @delete-instance="deleteInstance" @set-instance-exported="setDataTableInstanceExported"
               @add-block="includeDataTableBlock" @remove-block="removeDataTableBlock"
@@ -202,6 +203,7 @@
                   :categories="propertyCategories" :sort-mode="propertySortMode"
                   :allow-raw-string-editor="true"
                   :binding-interpreter="propertyBindingInterpreter"
+                  :capabilities="propertyCapabilities"
                   :delete-mode="editorState.mode === 'diff' ? false : propertyDeleteMode"
                   :field-warnings="propertyFieldWarnings" @update-property="updateBlockProp"
                   @add-property="addBlockProp" @reset-property="resetBlockProp" @delete-property="deleteProperty" />
@@ -219,7 +221,8 @@
     <AdditionalFieldCreateDialog :open="additionalFieldCreateDialogOpen" :field-types="additionalFieldTypeOptions"
       :mode="additionalFieldDialogMode" :initial-definition="additionalFieldEditDefinition"
       :field-type="additionalFieldCreateDraft.fieldType" :field-key="additionalFieldCreateDraft.fieldKey"
-      :title="additionalFieldCreateDraft.title" :error-text="additionalFieldCreateErrorText"
+      :title="additionalFieldCreateDraft.title" :capabilities="propertyCapabilities"
+      :error-text="additionalFieldCreateErrorText"
       :invalid="Boolean(additionalFieldCreateError)" @update-field-type="updateAdditionalFieldType"
       @update-field-key="updateAdditionalFieldKey" @update-title="updateAdditionalFieldTitle"
       @close="closeAdditionalFieldDialog" @remove="removeAdditionalFieldDefinition"
@@ -326,7 +329,7 @@ import OcCard, { type OcCardAction } from '../../components/standard/OcCard.vue'
 import type { CardDesignerProps, CardDesignerSessionView, CardDesignerViewState } from './cardDesigner.types'
 import { createCardDesignerIssueSnapshot } from './cardDesignerIssues'
 import { isBindingExpression } from '../editor-runtime/model/binding'
-import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
+import type { PropertyFieldCapabilities } from '../../shared/ui/property-editor/propertyEditor.types'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import {
   cloneClipboardBlocksWithNewIds,
@@ -336,7 +339,7 @@ import {
 import { readOcClipboard, writeOcClipboard } from '../../shared/model/clipboard/ocClipboardService'
 import { fileSystemService } from '../workspace/services/fileSystemService'
 import { notifyError } from '../notifications/titlebarNotices'
-import { createResourceDirectoryProvider } from '../workspace/services/resourceDirectoryProvider'
+import { createResourcePropertyCapabilities } from '../workspace/services/propertyResourceCapabilities'
 import {
   isCardDesignerNavigationToken,
   type CardDesignerNavigationResult,
@@ -1107,20 +1110,15 @@ const propertyProjectContext = computed(() => ({
   projectIconCatalog: environment.value.projectIconCatalog,
   resourceEnvironment: props.resourceEnvironment?.state.value,
 }))
-const propertyDirectoryProvider = computed<FilePathDirectoryProvider | undefined>(() => {
-  const rootPath = props.resourceRootPath
-  return rootPath && props.resourceEnvironment
-    ? createResourceDirectoryProvider(
-        rootPath,
-        props.resourceEnvironment.state.value,
-        fileSystemService,
-        {
-          hideDotFiles: settingsStore.settings.value.workspace.hideDotFiles,
-          iconEntryLabel: t('projectConfig.icons.title'),
-        },
-      )
-    : undefined
-})
+const propertyCapabilities = computed<PropertyFieldCapabilities>(() =>
+  createResourcePropertyCapabilities({
+    projectLabel: t('propertyEditor.references.project'),
+    rootPath: props.resourceRootPath,
+    fs: fileSystemService,
+    resourceEnvironment: props.resourceEnvironment?.state.value,
+    projectIconCatalog: environment.value.projectIconCatalog,
+  }),
+)
 const { propertyEditorInputs } = useCdePropertyEditorProjection({
   cardDoc,
   documentRevision,
@@ -1130,7 +1128,6 @@ const { propertyEditorInputs } = useCdePropertyEditorProjection({
   parentLookup,
   rawPropertyInputs,
   projectContext: propertyProjectContext,
-  directoryProvider: propertyDirectoryProvider,
   blueprintCardId: BLUEPRINT_CARD_ID,
   translate: (messageKey, parameters) => parameters ? t(messageKey, parameters) : t(messageKey),
   hasMessage: messageKey => te(messageKey),
@@ -1140,7 +1137,6 @@ const { getDataTableCellDefinition } = useCdeDataTableCellProjection({
   documentRevision,
   parentLookup,
   projectContext: propertyProjectContext,
-  directoryProvider: propertyDirectoryProvider,
   locale,
   blueprintCardId: BLUEPRINT_CARD_ID,
   translate: (messageKey, parameters) => parameters ? t(messageKey, parameters) : t(messageKey),
@@ -1215,8 +1211,7 @@ const selectionCommandActions = computed<OcActionDefinition[]>(() => {
   const input = propertyEditorInputs.value.find(candidate => candidate.key === block.id)
   const definition = input?.fields.content ?? getCardFieldDefinition(block, 'content')
   if (
-    definition?.fieldType !== 'string'
-    || !definition.richText
+    definition?.fieldType !== 'richText'
     || definition.isReadonly
     || isBindingExpression(input?.record.content)
   ) return actions

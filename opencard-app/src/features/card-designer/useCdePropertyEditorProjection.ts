@@ -10,9 +10,7 @@ import {
   type CardFaceKey,
 } from '../../entities/card/model'
 import type { ParentLookup } from '../../entities/card/tree'
-import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
 import type { PropertyEditorInput } from '../../shared/ui/property-editor/propertyEditor.types'
-import { buildFontCatalog } from '../workspace/model/projectFonts'
 import type {
   ReferenceCompletionContext,
   ReferenceCompletionScope,
@@ -35,7 +33,6 @@ type UseCdePropertyEditorProjectionOptions = {
   parentLookup: Readonly<Ref<ParentLookup>>
   rawPropertyInputs: Readonly<Ref<readonly CardPropertyEditorInput[]>>
   projectContext: Readonly<Ref<CdePropertyProjectContext>>
-  directoryProvider: Readonly<Ref<FilePathDirectoryProvider | undefined>>
   blueprintCardId: string
   translate: (messageKey: string, parameters?: Record<string, unknown>) => string
   hasMessage: (messageKey: string) => boolean
@@ -48,7 +45,6 @@ export function useCdePropertyEditorProjection(options: UseCdePropertyEditorProj
     if (!document) return []
 
     const projectContext = options.projectContext.value
-    const fontCatalog = buildFontCatalog(projectContext.fonts)
     const selectedCard = !options.selectedCardId.value
       || options.selectedCardId.value === options.blueprintCardId
       ? null
@@ -124,17 +120,10 @@ export function useCdePropertyEditorProjection(options: UseCdePropertyEditorProj
               : definition.fieldType === 'object' ? 'object' : 'string',
         } : undefined
         return [fieldKey, enrichCardPropertyFieldDefinition({
-          translate: options.translate,
           definition,
-          fieldKey,
           record: input.record,
           referenceContext,
-          fontCatalog,
-          projectIconCatalog: projectContext.projectIconCatalog,
           resourceEnvironment: projectContext.resourceEnvironment,
-          project: projectContext.information,
-          dictionary: projectContext.dictionary,
-          directoryProvider: options.directoryProvider.value,
         })]
       })),
     }))

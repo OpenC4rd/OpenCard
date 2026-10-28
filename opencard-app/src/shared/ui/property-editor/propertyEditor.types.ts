@@ -1,7 +1,5 @@
 import type { IconToken } from '../icon/iconRegistry'
-import type { FilePathDirectoryProvider, FilePathFilter } from '../../model/filePath'
-import type { ProjectIconCatalog } from '../../../features/workspace/services/projectIconCatalog'
-import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
+import type { FilePathFilter, FilePathScope } from '../../model/filePath'
 import type { OcNodeTailDisplayPart } from '../node/node.types'
 import type { OcActionDefinition } from '../action/action.types'
 
@@ -55,6 +53,81 @@ export type PropertyCompletion = {
   provider?: PropertyCompletionProvider
 }
 
+export type PropertyFontEntry = {
+  key: string
+  label: string
+  value: string
+  cssFamily?: string
+  detail?: string
+}
+
+export type PropertyFontScope = {
+  key: string
+  label: string
+  packageKey: string | null
+  entries: readonly PropertyFontEntry[]
+  previewCss?: string
+}
+
+export type PropertyIconEntry = {
+  key: string
+  name: string
+  seriesKey: string
+  iconKey: string
+  /** 写入字段的完整图标引用（如 `icon:<series>/<icon>` 或 `<coord>#icon:<series>/<icon>`）。 */
+  value: string
+  /** 富文本 `<span data-oc-icon-path="...">` 使用的图标路径（如 `<series>/<icon>` 或 `<coord>#<series>/<icon>`）。 */
+  iconPath: string
+  /** 行内文本/节点渲染用的样式。 */
+  inlineStyle: Readonly<Record<string, string>>
+  /** 按钮/缩略图预览用的样式。 */
+  previewStyle: Readonly<Record<string, string>>
+}
+
+export type PropertyIconSeriesGroup = {
+  key: string
+  name: string
+  entries: readonly PropertyIconEntry[]
+}
+
+export type PropertyIconScope = {
+  key: string
+  label: string
+  packageKey: string | null
+  series: readonly PropertyIconSeriesGroup[]
+}
+
+export type PropertyCustomBlockEntry = {
+  key: string
+  name: string
+  collectionKey: string
+  blockKey: string
+  /** 写入字段的完整引用（如 `block:<collection>/<block>` 或 `<coord>#block:<collection>/<block>`）。 */
+  value: string
+  source?: string
+}
+
+export type PropertyCustomBlockCollectionGroup = {
+  key: string
+  name: string
+  entries: readonly PropertyCustomBlockEntry[]
+}
+
+export type PropertyCustomBlockScope = {
+  key: string
+  label: string
+  packageKey: string | null
+  collections: readonly PropertyCustomBlockCollectionGroup[]
+}
+
+export type PropertyFieldCapabilities = {
+  files?: readonly FilePathScope[]
+  fonts?: readonly PropertyFontScope[]
+  icons?: readonly PropertyIconScope[]
+  customBlocks?: readonly PropertyCustomBlockScope[]
+  resolveImagePreview?: (reference: string) => string | null
+}
+
 export type PropertyFieldConstraintMap = {
   string: {
     minLength?: number
@@ -65,17 +138,41 @@ export type PropertyFieldConstraintMap = {
     optionLabels?: Readonly<Record<string, string>>
     placeholder?: string
     multiline?: boolean
-    richText?: boolean
     /** 多项输入的分隔符。设置后这个字段按分隔符分项编辑：回车或该分隔符成一项，值仍是单个字符串。 */
     listSeparator?: 'semicolon' | 'comma' | 'newline'
     /** 判断一项是否可用；不可用项会被标出，输入框也带 aria-invalid。 */
     listInvalid?: (token: string) => boolean
   }
+  richText: {
+    minLength?: number
+    maxLength?: number
+    placeholder?: string
+    baseStyle?: {
+      fontFamily?: string
+      fontSize?: string
+    }
+  }
   filePath: {
     minLength?: number
     maxLength?: number
+    placeholder?: string
+    root?: string
     filter?: FilePathFilter
-    directoryProvider?: FilePathDirectoryProvider
+  }
+  imageSource: {
+    minLength?: number
+    maxLength?: number
+    placeholder?: string
+    root?: string
+    filter?: FilePathFilter
+  }
+  fontFamily: {
+    placeholder?: string
+  }
+  customBlockSource: {
+    placeholder?: string
+    root?: string
+    filter?: FilePathFilter
   }
   anchorPosition: Record<never, never>
   alignPosition: Record<never, never>
@@ -103,7 +200,15 @@ export type PropertyFieldConstraintMap = {
 export type BasePropertyFieldType = keyof PropertyFieldConstraintMap
 export type PropertyArrayElementType = Extract<
   BasePropertyFieldType,
-  'string' | 'filePath' | 'number' | 'boolean' | 'color'
+  | 'string'
+  | 'richText'
+  | 'filePath'
+  | 'imageSource'
+  | 'fontFamily'
+  | 'customBlockSource'
+  | 'number'
+  | 'boolean'
+  | 'color'
 >
 export type PropertyArrayFieldType = `${PropertyArrayElementType}[]`
 export type PropertyFieldType = BasePropertyFieldType | PropertyArrayFieldType
@@ -126,26 +231,8 @@ type PropertyEditorFieldBase = {
   resettable?: boolean
   autoPairs?: readonly PropertyInputPair[]
   completion?: PropertyCompletion
-  fontOptions?: readonly {
-    label: string
-    value: string
-    cssFamily?: string
-  }[]
-  richTextBaseStyle?: {
-    fontFamily?: string
-    fontSize?: string
-  }
-  richTextImageDirectoryProvider?: FilePathDirectoryProvider
-  richTextImageCompletionProvider?: PropertyCompletionProvider
-  richTextImageResolver?: (reference: string) => string | null
   binding?: {
     provider?: PropertyCompletionProvider
-  }
-  projectIcon?: {
-    provider?: PropertyCompletionProvider
-    catalog?: ProjectIconCatalog
-    /** Icon sources the editor may offer: the current project first, then packages that ship icons. */
-    sources?: readonly ProjectIconSource[]
   }
   /** Display-only tail; a property row's commands go through its action rail instead. */
   tail?: OcNodeTailDisplayPart | readonly OcNodeTailDisplayPart[]

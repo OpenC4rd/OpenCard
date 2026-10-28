@@ -3,7 +3,7 @@
     :class="{ 'is-selected': selected, 'is-missing': !entry }"
     contenteditable="false" tabindex="-1"
     :aria-label="tr('propertyEditor.richText.selectProjectIcon', '点击选中项目图标')" @mousedown.stop @click="selectIconNode">
-    <span v-if="entry" class="project-icon-node__image oc-project-icon" :style="iconStyle" role="img"
+    <span v-if="entry" class="project-icon-node__image oc-project-icon" :style="entry.inlineStyle" role="img"
       :aria-label="entry.name" :data-tooltip="entry.name" />
     <span v-else class="project-icon-node__missing">{{ tr('propertyEditor.richText.iconUnavailable', '图标不可用') }}</span>
   </NodeViewWrapper>
@@ -14,8 +14,6 @@ import type { NodeViewProps } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, getCurrentInstance } from 'vue'
-import { createProjectIconStyle } from '../../../features/workspace/services/projectIconCatalog'
-import { readProjectIconSize } from '../../../features/workspace/services/projectIconDimensionResolver'
 import type { ProjectIconNodeOptions } from './projectIconNode'
 
 const props = defineProps<NodeViewProps>()
@@ -31,9 +29,6 @@ const entry = computed(() => {
   const reference = String(props.node.attrs.iconPath ?? '')
   return reference ? options.value.resolve?.(reference) ?? null : null
 })
-const iconStyle = computed(() => entry.value
-  ? createProjectIconStyle(entry.value, readProjectIconSize)
-  : undefined)
 
 function selectIconNode(): void {
   const position = props.getPos()

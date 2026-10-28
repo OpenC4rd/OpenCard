@@ -1,4 +1,3 @@
-import type { FilePathDirectoryProvider } from '../../model/filePath'
 import type { RichTextFormatValue } from './useRichTextFormatting'
 import type {
   PropertyCompletionProvider,
@@ -13,8 +12,6 @@ export type RichTextFormatOptions = {
   fontField: PropertyEditorFieldDefinition
   fontSizeField: PropertyEditorFieldDefinition
   strokeWidthField: PropertyEditorFieldDefinition
-  imageDirectoryProvider?: FilePathDirectoryProvider
-  imageCompletionProvider?: PropertyCompletionProvider
   lengthCompletionProvider: PropertyCompletionProvider
 }
 
@@ -62,9 +59,7 @@ export function createRichTextFormatInput(options: {
     ...foregroundType === 'image' ? {
       foregroundSource: {
         title: labels('propertyEditor.richText.fillSource', '来源'),
-        fieldType: 'filePath', category: 'foreground',
-        directoryProvider: format.imageDirectoryProvider,
-        completion: format.imageCompletionProvider ? { provider: format.imageCompletionProvider } : undefined,
+        fieldType: 'imageSource', category: 'foreground',
       } satisfies PropertyEditorFieldDefinition,
     } : {},
     strokeWidth: { ...format.strokeWidthField, title: labels('propertyEditor.richText.width', '宽度'), category: 'outline' },
@@ -107,7 +102,12 @@ export function createRichTextFormatInput(options: {
     field.order = order
     field.valueState = state[key]?.kind
     field.resettable = state[key]?.explicit ?? false
-    if (field.fieldType === 'string' || field.fieldType === 'color') {
+    if (
+      field.fieldType === 'string'
+      || field.fieldType === 'color'
+      || field.fieldType === 'fontFamily'
+      || field.fieldType === 'imageSource'
+    ) {
       field.placeholder = state[key]?.kind === 'mixed'
         ? labels('propertyEditor.richText.mixed', '混合')
         : state[key]?.kind === 'unset' ? labels('propertyEditor.richText.inherited', '继承') : undefined

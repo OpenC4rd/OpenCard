@@ -6,11 +6,10 @@ import { disposeGroup, overlayGroups } from '../../../../composables/overlayGrou
 import { i18n, setAppLocale } from '../../../../i18n'
 import OcRichTextEditor from '../../rich-text/OcRichTextEditor.vue'
 import PropertyEditor from '../PropertyEditor.vue'
-import RichTextStringPropertyField from './RichTextStringPropertyField.vue'
+import RichTextPropertyField from './RichTextPropertyField.vue'
 import type { PropertyCompletionResult } from '../propertyEditor.types'
 import { sanitizeRichTextHtml } from '../../../rich-text/richTextHtml'
 
-// 视图切换、保存与取消只有本地化 label 作为可点入口。
 const SAVE = '[aria-label="保存富文本编辑"]'
 const CANCEL = '[aria-label="取消富文本编辑"]'
 const SOURCE_MODE = '[role="radio"][aria-label="HTML 源码"]'
@@ -29,18 +28,18 @@ afterEach(() => {
 })
 
 function mountField(value: string, definition: Record<string, unknown> = {}): VueWrapper {
-  return mount(RichTextStringPropertyField, {
+  return mount(RichTextPropertyField, {
     attachTo: document.body,
     global: { plugins: [i18n] },
     props: {
-      definition: { title: 'Content', fieldType: 'string', richText: true, ...definition },
+      definition: { title: 'Content', fieldType: 'richText', ...definition },
       value,
     },
   })
 }
 
 async function openEditor(wrapper: VueWrapper): Promise<FieldVm> {
-  await wrapper.get('.rich-text-string-field__preview').trigger('click')
+  await wrapper.get('.rich-text-field__preview').trigger('click')
   await nextTick()
   return wrapper.getComponent(OcRichTextEditor).vm as unknown as FieldVm
 }
@@ -58,7 +57,6 @@ async function switchMode(mode: string): Promise<void> {
   await nextTick()
 }
 
-/** 侧栏是对话框 slot 的 teleport 内容：只能从 PropertyEditor 实例上取到它的 DOM。 */
 function panel(wrapper: VueWrapper) {
   return wrapper.getComponent(PropertyEditor)
 }
@@ -69,7 +67,7 @@ async function resetField(wrapper: VueWrapper, fieldKey: string): Promise<void> 
   await button().trigger('click')
 }
 
-describe('RichTextStringPropertyField', () => {
+describe('RichTextPropertyField', () => {
   it('opens empty content and saves nothing when the empty source is unchanged', async () => {
     const wrapper = mountField('')
     try {
@@ -96,7 +94,7 @@ describe('RichTextStringPropertyField', () => {
   it('resets explicit formatting by removing it, including values equal to inheritance and paragraph alignment', async () => {
     const wrapper = mountField(
       '<p style="text-align:left"><span style="font-size:16px;color:red">a</span>b</p>',
-      { richTextBaseStyle: { fontSize: '16px' } },
+      { baseStyle: { fontSize: '16px' } },
     )
     try {
       const vm = await openEditor(wrapper)
@@ -158,7 +156,7 @@ describe('RichTextStringPropertyField', () => {
   it('recognizes inherited size and equivalent CSS colors as common selection values without rewriting them', async () => {
     const wrapper = mountField(
       '<p><strong><span style="color:red">A</span><span style="font-size:20px;color:#ff0000">B</span></strong></p>',
-      { richTextBaseStyle: { fontSize: '20px' } },
+      { baseStyle: { fontSize: '20px' } },
     )
     try {
       const { editor } = await openEditor(wrapper)
@@ -278,7 +276,7 @@ describe('RichTextStringPropertyField', () => {
     try {
       await openEditor(wrapper)
       expect(sourceArea().value).toBe(source)
-      expect(document.querySelector('.rich-text-string-popover__diagnostics')?.textContent).toContain('script')
+      expect(document.querySelector('.rich-text-popover__diagnostics')?.textContent).toContain('script')
       expect(wrapper.emitted('update:value')).toBeUndefined()
     } finally { wrapper.unmount() }
   })

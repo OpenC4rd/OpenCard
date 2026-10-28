@@ -1,11 +1,11 @@
 import { mergeAttributes, Node } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import type { ProjectIconCatalogEntry } from '../../../features/workspace/services/projectIconCatalog'
+import type { PropertyIconEntry } from '../property-editor/propertyEditor.types'
 import ProjectIconNodeView from './ProjectIconNodeView.vue'
 
 export type ProjectIconNodeOptions = {
   /** Resolves a stored icon reference, which may name an icon owned by a package. */
-  resolve?: (reference: string) => ProjectIconCatalogEntry | null
+  resolve?: (reference: string) => PropertyIconEntry | null
 }
 
 export const ProjectIconNode = Node.create<ProjectIconNodeOptions>({

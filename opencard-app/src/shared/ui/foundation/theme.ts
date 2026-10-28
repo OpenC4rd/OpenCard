@@ -334,7 +334,7 @@ export function setOcGlassIntensity(value: number): void {
 }
 
 /**
- * 云母由 Windows 绘制在窗口底层：开启时让窗口基色透明，材质才透得上来。
+ * 窗口材质由系统绘制在窗口底层（Windows 云母 / macOS 毛玻璃）：开启时让窗口基色透明，材质才透得上来。
  * 仅在效果确认应用成功后调用，避免留下一个没有任何材质的透明窗口。
  */
 export function setOcMicaBackdrop(enabled: boolean): void {

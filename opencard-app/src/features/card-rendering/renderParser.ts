@@ -425,12 +425,16 @@ function createLocationContext(
   }
 }
 
+const dynamicImageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] as const
+
 function dynamicRenderContract(
   definition: ReturnType<typeof resolvePropertyEditorSchema>['fields'][string],
  ): RenderFieldContract | null {
   let kind: RenderFieldContract['kind']
   switch (definition.fieldType) {
     case 'filePath':
+    case 'imageSource':
+    case 'customBlockSource':
       kind = 'file-path'
       break
     case 'number':
@@ -441,6 +445,8 @@ function dynamicRenderContract(
       kind = 'color'
       break
     case 'string':
+    case 'richText':
+    case 'fontFamily':
       kind = 'string'
       break
     case 'object':
@@ -456,6 +462,19 @@ function dynamicRenderContract(
     ...(definition.min !== undefined ? { min: definition.min } : {}),
     ...(definition.max !== undefined ? { max: definition.max } : {}),
     ...(definition.fieldType === 'filePath' && definition.allowRemote ? { allowRemote: true } : {}),
+    ...(definition.fieldType === 'imageSource'
+      ? {
+          extensions: dynamicImageExtensions,
+          allowRemote: definition.allowRemote ?? true,
+          acceptsReferences: ['icon'] as const,
+        }
+      : {}),
+    ...(definition.fieldType === 'customBlockSource'
+      ? {
+          extensions: ['ocblock'] as const,
+          acceptsReferences: ['block'] as const,
+        }
+      : {}),
     ...(allowedValues ? { options: allowedValues } : {}),
   }
 }

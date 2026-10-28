@@ -168,7 +168,7 @@ async function refreshCompletion(
   cursor = referenceStringTokenPrefix(tokens.value, separator.value).length + (control.selectionStart ?? draft.value.length),
 ): Promise<void> {
   activeInput.value = control
-  const provider = props.definition.completion?.provider
+  const provider = props.definition.completion?.provider ?? props.definition.binding?.provider
   if (!provider || props.definition.isReadonly) return completion.clear()
   await completion.refresh(() => provider({ value, cursor }))
 }
@@ -230,7 +230,9 @@ function acceptSuggestion(suggestion: PropertyCompletionItem): void {
   if (!state || !control) return
 
   const current = editedValue.value
-  const nextValue = `${current.slice(0, state.replaceStart)}${suggestion.insertText}${current.slice(state.replaceEnd)}`
+  const replaceStart = suggestion.replaceStart ?? state.replaceStart
+  const replaceEnd = suggestion.replaceEnd ?? state.replaceEnd
+  const nextValue = `${current.slice(0, replaceStart)}${suggestion.insertText}${current.slice(replaceEnd)}`
   const parsed = splitReferenceStringTokens(nextValue, separator.value)
   tokens.value = parsed.tokens
   draft.value = parsed.draft

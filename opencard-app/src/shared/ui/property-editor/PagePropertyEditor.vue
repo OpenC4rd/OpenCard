@@ -8,6 +8,7 @@
         :item="item"
         :parent-path="[]"
         :depth="0"
+        :capabilities="capabilities"
         @editor-preview="emit('editor-preview', $event)"
         @editor-commit="emit('editor-commit', $event)"
         @editor-cancel="emit('editor-cancel', $event)"
@@ -24,10 +25,12 @@ import type {
   EditorItemActionIntent,
   EditorItemCancelIntent,
   EditorItemValueIntent,
+  PropertyFieldCapabilities,
 } from './propertyEditor.types'
 
 defineProps<{
   items: readonly EditorItem[]
+  capabilities?: PropertyFieldCapabilities
 }>()
 
 const emit = defineEmits<{

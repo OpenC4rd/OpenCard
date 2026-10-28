@@ -130,7 +130,10 @@ async function bootstrap(): Promise<void> {
       return;
     }
 
-    const applied = await applyMicaBackdrop(resolveTheme());
+    const applied = await applyMicaBackdrop(
+      resolveTheme(),
+      settingsStore.settings.value.appearance.theme === "system",
+    );
     if (generation !== backdropGeneration) return;
     setOcMicaBackdrop(applied);
   };
@@ -145,9 +148,12 @@ async function bootstrap(): Promise<void> {
   document.addEventListener("visibilitychange", reassertBackdropMaterial);
   window.addEventListener("focus", reassertBackdropMaterial);
 
+  // 主题设置本身也要重放：从「深色」切回「跟随系统」时解析结果可能没变，
+  // 但窗口外观得交还给系统，否则之后系统明暗切换就传不进来了。
   watch(
     () => [
       settingsStore.settings.value.appearance.micaBackground,
+      settingsStore.settings.value.appearance.theme,
       resolveTheme(),
     ] as const,
     () => {

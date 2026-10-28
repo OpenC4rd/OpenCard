@@ -56,7 +56,8 @@
           <span>{{ t('propertyEditor.customFields.preview') }}</span>
           <div class="additional-field-dialog__preview-field">
             <span>{{ title.trim() || fieldKey || t('propertyEditor.customFields.previewFallback') }}</span>
-            <PropertyFieldRenderer :definition="previewDefinition" :value="previewValue" editor-id="field"
+            <PropertyFieldRenderer :definition="previewDefinition" :value="previewValue"
+              :capabilities="capabilities" editor-id="field"
               @update:value="previewValue = $event" />
           </div>
         </section>
@@ -84,7 +85,7 @@ import { useI18n } from 'vue-i18n'
 import { getAdditionalFieldPropertyDefinition, type AdditionalFieldDefinition } from '../../../entities/card/model'
 import { createPropertyDefaultValue } from '../../../entities/card/schema'
 import type { PropertyEditorCategoryDefinition, PropertyEditorFieldDefinition,
-  PropertyEditorInput, PropertyEditorMutation, PropertyEditorFieldIntent } from './propertyEditor.types'
+  PropertyEditorInput, PropertyEditorMutation, PropertyEditorFieldIntent, PropertyFieldCapabilities } from './propertyEditor.types'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
@@ -101,6 +102,7 @@ const props = defineProps<{
   fieldKey: string
   title: string
   initialDefinition?: AdditionalFieldDefinition | null
+  capabilities?: PropertyFieldCapabilities
   errorText?: string
   invalid?: boolean
 }>()
@@ -140,6 +142,20 @@ const definitionFields = computed<Record<string, PropertyEditorFieldDefinition>>
     multiline: { ...common, title: t('propertyEditor.customFields.constraints.multiline'), fieldType: 'boolean' },
     options: { ...common, title: t('propertyEditor.customFields.constraints.options'), fieldType: 'string[]' },
     presentation: { ...common, title: t('propertyEditor.customFields.constraints.presentation'), fieldType: 'string', options: ['select', 'stepper'] },
+  }).filter(([, value]) => value !== undefined)) as Record<string, PropertyEditorFieldDefinition>
+  if (props.fieldType === 'filePath') return Object.fromEntries(Object.entries({
+    target: {
+      ...common,
+      title: t('propertyEditor.customFields.constraints.target'),
+      fieldType: 'string',
+      options: ['file', 'directory', 'both'],
+      optionLabelKeys: {
+        file: 'propertyEditor.customFields.constraints.targets.file',
+        directory: 'propertyEditor.customFields.constraints.targets.directory',
+        both: 'propertyEditor.customFields.constraints.targets.both',
+      },
+    },
+    pattern: { ...common, title: t('propertyEditor.customFields.constraints.pattern'), fieldType: 'string' },
   }).filter(([, value]) => value !== undefined)) as Record<string, PropertyEditorFieldDefinition>
   if (props.fieldType === 'number') return Object.fromEntries(Object.entries({
     min: { ...common, title: t('propertyEditor.customFields.constraints.min'), fieldType: 'number' },
@@ -203,6 +219,13 @@ function readDefinitionConstraints(
   definition: AdditionalFieldDefinition | null | undefined,
 ): Record<string, unknown> {
   if (!definition) return {}
+  if (definition.fieldType === 'filePath') {
+    const filter = definition.filter
+    return {
+      ...(filter?.target ? { target: filter.target } : {}),
+      ...(filter?.pattern ? { pattern: filter.pattern } : {}),
+    }
+  }
   const source = definition as unknown as Record<string, unknown>
   const keys = definition.fieldType === 'string'
     ? STRING_CONSTRAINT_KEYS
@@ -266,6 +289,20 @@ function buildDefinition(): AdditionalFieldDefinition {
       ...(options.length ? { options } : {}),
       ...(options.length && (definitionRecord.value.presentation === 'select' || definitionRecord.value.presentation === 'stepper')
         ? { presentation: definitionRecord.value.presentation } : {}),
+    }
+  }
+  if (props.fieldType === 'filePath') {
+    const rawTarget = definitionRecord.value.target
+    const target = rawTarget === 'file' || rawTarget === 'directory' || rawTarget === 'both'
+      ? rawTarget
+      : undefined
+    const pattern = typeof definitionRecord.value.pattern === 'string' && definitionRecord.value.pattern.trim()
+      ? definitionRecord.value.pattern.trim()
+      : undefined
+    return {
+      ...base,
+      fieldType: 'filePath',
+      ...(target || pattern ? { filter: { ...(target ? { target } : {}), ...(pattern ? { pattern } : {}) } } : {}),
     }
   }
   if (props.fieldType === 'number') {

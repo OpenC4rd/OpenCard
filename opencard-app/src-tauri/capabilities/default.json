@@ -23,6 +23,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-internal-toggle-maximize",
     "core:window:allow-set-effects",
+    "core:window:allow-set-theme",
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [

@@ -72,4 +72,26 @@ describe('AdditionalFieldCreateDialog', () => {
     await remove.trigger('click')
     expect(wrapper.emitted('remove')).toEqual([[]])
   })
+
+  it('submits filePath target and pattern filter constraints', async () => {
+    const wrapper = mountDialog({
+      fieldTypes: ['string', 'filePath'],
+      fieldType: 'filePath',
+      fieldKey: 'assetPath',
+      title: 'Asset',
+    })
+    await wrapper.get('.additional-field-dialog__advanced-toggle').trigger('click')
+    const editor = wrapper.getComponent({ name: 'PropertyEditor' })
+    editor.vm.$emit('add-property', { key: 'additional-field-definition', fieldKey: 'target', value: 'file' })
+    editor.vm.$emit('add-property', { key: 'additional-field-definition', fieldKey: 'pattern', value: ' *.ocblock ' })
+    await nextTick()
+
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toEqual([[{
+      fieldType: 'filePath',
+      title: 'Asset',
+      filter: { target: 'file', pattern: '*.ocblock' },
+    }]])
+  })
 })

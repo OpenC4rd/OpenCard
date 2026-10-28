@@ -1,6 +1,7 @@
 /** CDE-local command table and global keyboard routing. */
 import { onMounted, onUnmounted, type Ref } from 'vue'
 import type { OcShortcutPart } from '../../components/standard/OcShortcut.vue'
+import { isMacPlatform } from '../../shared/model/platform'
 
 export type CdeShortcutCommandKey =
   | 'selection.fill-parent'
@@ -193,8 +194,4 @@ function matchesBinding(event: KeyboardEvent, binding: CdeShortcutBinding): bool
 function displayKey(key: string): string {
   if (key === 'Delete') return 'Del'
   return key.length === 1 ? key.toUpperCase() : key
-}
-
-function isMacPlatform(): boolean {
-  return typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent)
 }

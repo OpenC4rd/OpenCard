@@ -37,14 +37,19 @@ export type PropertyConstraintMap = {
         presentation?: 'select' | 'stepper'
         autocomplete?: readonly string[]
         multiline?: boolean
-        richText?: boolean
     }
+    richText: {}
     filePath: {
         minLength?: number
         maxLength?: number
         filter?: FilePathFilter
         allowRemote?: boolean
     }
+    imageSource: {
+        allowRemote?: boolean
+    }
+    fontFamily: {}
+    customBlockSource: {}
     anchorPosition: {}
     alignPosition: {}
     verticalAlignPosition: {}
@@ -71,14 +76,19 @@ type AdditionalFieldDefinitionBase<T extends PropertyFieldType> = AdditionalFiel
 export type AdditionalFieldDefinition =
     | (AdditionalFieldDefinitionBase<'string'> & PropertyConstraintMap['string'])
     | (AdditionalFieldDefinitionBase<'filePath'> & PropertyConstraintMap['filePath'])
+    | (AdditionalFieldDefinitionBase<'imageSource'> & PropertyConstraintMap['imageSource'])
     | (AdditionalFieldDefinitionBase<'number'> & PropertyConstraintMap['number'])
-    | AdditionalFieldDefinitionBase<Exclude<(typeof additionalFieldTypes)[number], 'string' | 'filePath' | 'number'>>
+    | AdditionalFieldDefinitionBase<Exclude<(typeof additionalFieldTypes)[number], 'string' | 'filePath' | 'imageSource' | 'number'>>
 export type AdditionalFieldDefinitionMap = Record<string, AdditionalFieldDefinition>
 export type AdditionalFieldKeyError = 'required' | 'invalid' | 'duplicate' | 'unsupported-field-type'
 export type { BindingValueKind } from '../../features/editor-runtime/model/binding'
 export const additionalFieldTypes = [
     'string',
+    'richText',
     'filePath',
+    'imageSource',
+    'fontFamily',
+    'customBlockSource',
     'anchorPosition',
     'alignPosition',
     'verticalAlignPosition',
@@ -142,7 +152,6 @@ export function parseAdditionalFieldDefinitions(
                 ...(minLength !== undefined ? { minLength } : {}),
                 ...(maxLength !== undefined ? { maxLength } : {}),
                 ...(typeof source.multiline === 'boolean' ? { multiline: source.multiline } : {}),
-                ...(typeof source.richText === 'boolean' ? { richText: source.richText } : {}),
                 ...(options ? { options } : {}),
                 ...(autocomplete ? { autocomplete } : {}),
                 ...(optionLabelKeys ? { optionLabelKeys } : {}),
@@ -158,6 +167,11 @@ export function parseAdditionalFieldDefinitions(
                 ...(minLength !== undefined ? { minLength } : {}),
                 ...(maxLength !== undefined ? { maxLength } : {}),
                 ...(filter ? { filter } : {}),
+            } as AdditionalFieldDefinition
+        } else if (fieldType === 'imageSource') {
+            definitions[normalizedFieldKey] = {
+                ...base,
+                ...(typeof source.allowRemote === 'boolean' ? { allowRemote: source.allowRemote } : {}),
             } as AdditionalFieldDefinition
         } else if (fieldType === 'number') {
             const min = parseFiniteNumber(source.min)
@@ -228,8 +242,15 @@ function parseFilePathFilter(value: unknown): FilePathFilter | undefined {
     const target = source.target === 'file' || source.target === 'directory' || source.target === 'both'
         ? source.target
         : undefined
-    const extensions = Array.isArray(source.extensions) ? parseStringOptions(source.extensions) : undefined
-    return target || extensions ? { ...(target ? { target } : {}), ...(extensions ? { extensions } : {}) } : undefined
+    const pattern = typeof source.pattern === 'string' && source.pattern.trim()
+        ? source.pattern.trim()
+        : undefined
+    return target || pattern
+        ? {
+            ...(target ? { target } : {}),
+            ...(pattern ? { pattern } : {}),
+        }
+        : undefined
 }
 
 export function validateAdditionalFieldKey(
@@ -332,8 +353,7 @@ const textWritingModeOptions = ['horizontal-tb', 'vertical-rl', 'vertical-lr'] a
 const textFontWeightOptions = ['light', 'normal', 'bold'] as const
 const imageFitOptions = ['cover', 'contain', 'fill'] as const
 const imageSourceField: EditorPropertyDefinition = {
-    fieldType: 'filePath', allowRemote: true, minLength: 0, categoryId: 'content', icon: 'mdiImageOutline',
-    filter: { target: 'file', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] },
+    fieldType: 'imageSource', allowRemote: true, categoryId: 'content', icon: 'mdiImageOutline',
 }
 const qrErrorCorrectionOptions = ['L', 'M', 'Q', 'H'] as const
 const shapeOptions = ['rectangle', 'ellipse', 'line', 'triangle', 'diamond'] as const
@@ -374,7 +394,7 @@ function createBaseBlockPropertyEditorSchema(): Record<string, EditorPropertyDef
 function createCustomBlockPropertyEditorSchema(): Record<string, EditorPropertyDefinition> {
     return {
         name: { fieldType: 'string', categoryId: 'general' },
-        source: { fieldType: 'string', unremovable: true, categoryId: 'data', acceptsBinding: false, icon: 'mdiToyBrickOutline' },
+        source: { fieldType: 'customBlockSource', unremovable: true, categoryId: 'data', acceptsBinding: false, icon: 'mdiToyBrickOutline' },
         id: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         additionalFieldDefinition: { fieldType: 'object', objectType: 'AdditionalFieldDefinition', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
@@ -384,13 +404,10 @@ function createCustomBlockPropertyEditorSchema(): Record<string, EditorPropertyD
 function createTextContentBlockPropertyEditorSchema(richText: boolean): Record<string, EditorPropertyDefinition> {
     return {
         ...createBaseBlockPropertyEditorSchema(),
-        content: {
-            fieldType: 'string',
-            multiline: true,
-            ...(richText ? { richText: true } : {}),
-            categoryId: 'content',
-        },
-        fontFamily: { fieldType: 'string', categoryId: 'textStyle' },
+        content: richText
+            ? { fieldType: 'richText', categoryId: 'content' }
+            : { fieldType: 'string', multiline: true, categoryId: 'content' },
+        fontFamily: { fieldType: 'fontFamily', categoryId: 'textStyle' },
         fontSize: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'textStyle' },
         fontWeight: {
             fieldType: 'string',
@@ -691,8 +708,8 @@ export type ResolvedPropertyEditorSchema = {
 }
 
 const editorConstraintKeys = [
-    'minLength', 'maxLength', 'options', 'optionLabelKeys', 'presentation', 'autocomplete', 'multiline', 'richText',
-    'filter', 'min', 'max', 'step', 'objectType', 'isArray', 'defaultValue',
+    'minLength', 'maxLength', 'options', 'optionLabelKeys', 'presentation', 'autocomplete', 'multiline',
+    'filter', 'allowRemote', 'min', 'max', 'step', 'objectType', 'isArray', 'defaultValue',
 ] as const
 
 function createDefinitionForFieldType(
@@ -724,7 +741,6 @@ function applyAdditionalConstraints(
         if (optionLabelKeys) target.optionLabelKeys = optionLabelKeys
         if (source.presentation === 'select' || source.presentation === 'stepper') target.presentation = source.presentation
         if (typeof source.multiline === 'boolean') target.multiline = source.multiline
-        if (typeof source.richText === 'boolean') target.richText = source.richText
         return
     }
     if (fieldType === 'filePath') {
@@ -734,6 +750,10 @@ function applyAdditionalConstraints(
         if (minLength !== undefined) target.minLength = minLength
         if (maxLength !== undefined) target.maxLength = maxLength
         if (filter) target.filter = filter
+        return
+    }
+    if (fieldType === 'imageSource') {
+        if (typeof source.allowRemote === 'boolean') target.allowRemote = source.allowRemote
         return
     }
     if (fieldType === 'number') {
@@ -810,7 +830,11 @@ export function createPropertyDefaultValue(definition: EditorPropertyDefinition)
     switch (definition.fieldType) {
         case 'string':
             return definition.options?.[0] ?? ''
+        case 'richText':
         case 'filePath':
+        case 'imageSource':
+        case 'fontFamily':
+        case 'customBlockSource':
         case 'color':
             return ''
         case 'anchorPosition':

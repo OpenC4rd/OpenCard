@@ -1,6 +1,7 @@
-/** 把窗口底层的系统材质（Windows 云母）应用到当前窗口。 */
+/** 把窗口底层的系统材质应用到当前窗口：Windows 用云母，macOS 用系统毛玻璃（NSVisualEffectView）。 */
 import { isTauri } from '@tauri-apps/api/core'
-import { Effect, getCurrentWindow } from '@tauri-apps/api/window'
+import { Effect, EffectState, getCurrentWindow } from '@tauri-apps/api/window'
+import { isMacPlatform } from '../../../shared/model/platform'
 
 export type WindowBackdropTheme = 'dark' | 'light'
 
@@ -20,6 +21,15 @@ const MICA_EFFECT_BY_THEME = {
   light: Effect.TabbedLight,
 } satisfies Record<WindowBackdropTheme, Effect>
 
+/**
+ * macOS 的材质没有明暗变体，由 NSVisualEffectView 按窗口外观渲染，
+ * 整窗一层的语义材质是 underWindowBackground，激活状态交给系统跟随。
+ */
+const MACOS_EFFECTS = {
+  effects: [Effect.UnderWindowBackground],
+  state: EffectState.FollowsWindowActiveState,
+} satisfies { effects: Effect[]; state: EffectState }
+
 interface UserAgentDataHints {
   getHighEntropyValues?: (hints: readonly string[]) => Promise<{ platformVersion?: string }>
 }
@@ -34,6 +44,7 @@ export function isMicaPlatformVersion(platformVersion: string | undefined): bool
  */
 export async function isMicaBackdropAvailable(): Promise<boolean> {
   if (!isTauri() || typeof navigator === 'undefined') return false
+  if (isMacPlatform()) return true
   const userAgentData = (navigator as unknown as { userAgentData?: UserAgentDataHints }).userAgentData
   if (!userAgentData?.getHighEntropyValues) return false
 
@@ -45,12 +56,25 @@ export async function isMicaBackdropAvailable(): Promise<boolean> {
   }
 }
 
-/** 应用与当前主题一致的云母变体，返回窗口底层的材质是否已经生效。 */
-export async function applyMicaBackdrop(theme: WindowBackdropTheme): Promise<boolean> {
+/**
+ * 应用与当前主题一致的材质，返回窗口底层的材质是否已经生效。
+ * macOS 的明暗跟着窗口外观走，所以界面强制明暗时把外观一并设过去；跟随系统时交还给系统，
+ * 否则顶上去的外观会把之后监听的 prefers-color-scheme 一起钉死。
+ */
+export async function applyMicaBackdrop(
+  theme: WindowBackdropTheme,
+  followsSystemTheme: boolean,
+): Promise<boolean> {
   if (!isTauri()) return false
 
+  const window = getCurrentWindow()
   try {
-    await getCurrentWindow().setEffects({ effects: [MICA_EFFECT_BY_THEME[theme]] })
+    if (!isMacPlatform()) {
+      await window.setEffects({ effects: [MICA_EFFECT_BY_THEME[theme]] })
+      return true
+    }
+    await window.setTheme(followsSystemTheme ? null : theme)
+    await window.setEffects(MACOS_EFFECTS)
     return true
   } catch {
     return false
@@ -59,5 +83,7 @@ export async function applyMicaBackdrop(theme: WindowBackdropTheme): Promise<boo
 
 export async function clearMicaBackdrop(): Promise<void> {
   if (!isTauri()) return
-  await getCurrentWindow().clearEffects().catch(() => undefined)
+  const window = getCurrentWindow()
+  await window.clearEffects().catch(() => undefined)
+  if (isMacPlatform()) await window.setTheme(null).catch(() => undefined)
 }

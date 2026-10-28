@@ -1,5 +1,5 @@
 <!-- 业务 欢迎页引力背景：远端生成的球体被中心按平方反比加速度吸进去，形状之间平滑融合，
-     边缘用屏幕空间颗粒做出磨砂玻璃式的沙面过渡。 -->
+     边缘保持干净的渐变过渡。 -->
 <template>
   <canvas ref="canvasElement" class="welcome-gravity-field" aria-hidden="true" />
 </template>
@@ -37,8 +37,8 @@ const MAX_SUBSTEP_SECONDS = 1 / 240
 const FROST_BAND_WIDTH = 5
 /** 颗粒格子边长（CSS 像素），写入 uniform 时乘画布像素比；格子越小颗粒越细。 */
 const GRAIN_PIXEL_SIZE = 1.2
-/** 颗粒对磨砂带内覆盖率的扰动强度，1 表示能抖到完全不透明或完全透明。 */
-const GRAIN_AMOUNT = 1
+/** 关闭磨砂带边缘的颗粒扰动，保留干净的渐变边缘。 */
+const GRAIN_AMOUNT = 0
 
 type Blob = {
   angle: number
@@ -98,8 +98,7 @@ void main() {
     field += (blob.z * blob.z) / max(dot(offset, offset), 1e-8);
   }
 
-  // 边缘不再是干净的羽化：先留出比抗锯齿更宽的磨砂带，再用屏幕空间的颗粒抖动带内覆盖率，
-  // 过渡因此变成磨砂玻璃那样的沙面；band 只在带中段有值，形状内外都保持干净。
+  // 边缘保留比抗锯齿更宽的平滑过渡带；band 只在带中段有值。
   float coverage = smoothstep(1.0 - frostWidth(field), 1.0 + edgeWidth(field), field);
   float band = 4.0 * coverage * (1.0 - coverage);
   float grain = grainNoise(gl_FragCoord.xy);

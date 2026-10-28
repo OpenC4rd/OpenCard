@@ -81,3 +81,18 @@ jobs:
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           updaterJsonPreferNsis: true
+
+      # Tauri's bundled bundle_dmg.sh sets the Finder background through a
+      # relative HFS reference, which macOS 26+ accepts but never records, so
+      # the image would ship with a plain window. Restyle it and replace the
+      # asset tauri-action already uploaded.
+      - name: Restyle macOS disk image
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dmg=$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -n 1)
+          node scripts/restyle-dmg.mjs "$dmg"
+          gh release upload "$GITHUB_REF_NAME" "$dmg" --clobber

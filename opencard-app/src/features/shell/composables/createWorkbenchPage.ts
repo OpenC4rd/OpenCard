@@ -11,6 +11,7 @@ import { useTutorialStore } from '../../tutorials/tutorialStore'
 import { useStoredResourcePackageStore } from '../../workspace/store/storedResourcePackageStore'
 import type { AppSettingKey } from '../../settings/model/appSettings'
 import { getPathDirectory } from '../../../shared/model/filePath'
+import { isMacPlatform } from '../../../shared/model/platform'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import { notifyAppError, notifyError, notifySuccess } from '../../notifications/titlebarNotices'
 import { editorHistoryManager } from '../../editor-runtime/history/editorHistoryManager'
@@ -638,13 +639,13 @@ export function createWorkbenchPage(options: {
   })
 
   const menuContribution = computed<NonNullable<SpacePage['menuContribution']>['value']>(() => {
-    const primary = (key: string, shift = false) => /Macintosh|Mac OS X/.test(navigator.userAgent)
+    const primary = (key: string, shift = false) => isMacPlatform()
       ? [...(shift ? ['⇧'] : []), '⌘', key.toUpperCase()] : ['Ctrl', ...(shift ? ['Shift'] : []), key.toUpperCase()]
     const options = {
       projectPath: projectPath.value, autoSave: settingsStore.settings.value.workspace.autoSave,
       buildResourcePackageActionKey: BUILD_RESOURCE_PACKAGE_ACTION_KEY,
       editor: visibleEditorSession.value ? { isDiff: isDiffMode.value, canUndo: canUndoActiveEditor.value, canRedo: canRedoActiveEditor.value } : null,
-      shortcuts: { save: primary('s'), undo: primary('z'), redo: /Macintosh|Mac OS X/.test(navigator.userAgent) ? primary('z', true) : primary('y') },
+      shortcuts: { save: primary('s'), undo: primary('z'), redo: isMacPlatform() ? primary('z', true) : primary('y') },
     }
     const actions: Partial<Record<'file' | 'edit', import('../shell.types').ShellMenuContribution['actions']>> = { file: [
       { type: 'divider', key: 'file-save-divider' },

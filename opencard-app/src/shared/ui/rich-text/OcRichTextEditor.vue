@@ -10,9 +10,9 @@
             :disabled="!editor.can().chain().focus().redo().run()" @mousedown.prevent @click="runCommand('redo')" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.font', '字体')">
-          <ReferenceStringPropertyField class="oc-rich-text-editor__font" :definition="fontFieldDefinition"
-            :value="activeFontFamily" @update:value="formatting.apply('fontFamily', $event)" />
-          <ReferenceStringPropertyField class="oc-rich-text-editor__font-size" :definition="fontSizeFieldDefinition"
+          <FontFamilyPropertyField class="oc-rich-text-editor__font" :definition="fontFieldDefinition"
+            :value="activeFontFamily" :capabilities="capabilities" @update:value="formatting.apply('fontFamily', $event)" />
+          <StringPropertyField class="oc-rich-text-editor__font-size" :definition="fontSizeFieldDefinition"
             :value="activeFontSize" @update:value="formatting.apply('fontSize', $event)" />
         </div>
         <div class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupTypography', '文字')">
@@ -54,7 +54,7 @@
             :aria-label="tr('propertyEditor.richText.insertRecentIcon', `插入最近图标：${entry.name}`, { name: entry.name })" @mousedown.prevent @click="insertRecentProjectIcon(entry)">
             <template #icon>
               <span class="oc-rich-text-editor__recent-icon-image oc-project-icon"
-                :style="createProjectIconPreviewStyle(entry, readProjectIconSize)" aria-hidden="true" />
+                :style="entry.previewStyle" aria-hidden="true" />
             </template>
           </OcButton>
         </div>
@@ -111,10 +111,12 @@ import OcIcon from '../../../components/base/OcIcon.vue'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
 import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
-import ReferenceStringPropertyField from '../property-editor/fields/ReferenceStringPropertyField.vue'
+import FontFamilyPropertyField from '../property-editor/fields/FontFamilyPropertyField.vue'
+import StringPropertyField from '../property-editor/fields/StringPropertyField.vue'
 import type { OverlayAnchor } from '../../../composables/overlayGroups'
 import RichTextNodeEditLayer from './RichTextNodeEditLayer.vue'
 import { useRichTextEditor, type RichTextEditorProps } from './useRichTextEditor'
+
 const props = defineProps<RichTextEditorProps>()
 const emit = defineEmits<{ change: [] }>()
 const {
@@ -124,7 +126,6 @@ const {
   runCommand, insertTable, tableAction, handleTableAction, insertBinding,
   hasProjectIconSources, projectIconAction, handleProjectIconAction,
   recentProjectIconEntries, projectIconSelectionKey, insertRecentProjectIcon,
-  createProjectIconPreviewStyle, readProjectIconSize,
   foregroundColor, backgroundColor, alignments, tr,
   selectedNodeAnchor, selectedNodeKind, nodeEditOpen, propertyInputs, propertyCategories,
 } = useRichTextEditor(props, () => emit('change'))
@@ -212,7 +213,7 @@ defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteract
 }
 
 .oc-rich-text-editor__font {
-  width: 124px;
+  width: 148px;
 }
 
 .oc-rich-text-editor__font-size {

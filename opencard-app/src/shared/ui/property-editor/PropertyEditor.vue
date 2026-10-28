@@ -72,6 +72,7 @@
                   :definition="row.entry.definition"
                   :value="row.entry.value"
                   :editor-id="resolveFieldEditorState(row.category.inputKey, row.entry).editorId"
+                  :capabilities="capabilities"
                   @update:value="handleFieldValueUpdate(row.category.inputKey, row.entry, $event)"
                   @preview:value="emit('preview-property', { key: row.category.inputKey, fieldKey: row.entry.fieldKey, value: $event })"
                   @cancel:value="emit('cancel-property', { key: row.category.inputKey, fieldKey: row.entry.fieldKey })"
@@ -125,6 +126,7 @@ import type {
   PropertyEditorAddMutation,
   PropertyEditorMutation,
   PropertyEditorSortMode,
+  PropertyFieldCapabilities,
 } from './propertyEditor.types'
 import { isPropertyRemovable } from './propertyRemovability'
 import {
@@ -171,6 +173,7 @@ const props = withDefaults(defineProps<{
   allowRawStringEditor?: boolean
   deleteMode?: boolean
   fieldWarnings?: ReadonlyMap<string, string>
+  capabilities?: PropertyFieldCapabilities
 }>(), {
   allowRawStringEditor: false,
 })

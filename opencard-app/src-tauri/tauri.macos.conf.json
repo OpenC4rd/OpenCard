@@ -5,11 +5,12 @@
       {
         "title": "OpenCard",
         "decorations": true,
+        "transparent": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {
           "x": 14,
-          "y": 13
+          "y": 22
         },
         "minWidth": 1280,
         "minHeight": 720,
@@ -17,5 +18,24 @@
         "height": 720
       }
     ]
+  },
+  "bundle": {
+    "macOS": {
+      "dmg": {
+        "background": "dmg/background.png",
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        }
+      }
+    }
   }
 }

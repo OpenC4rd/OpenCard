@@ -6,7 +6,7 @@
  */
 import { nextTick, readonly, ref, shallowRef, type Ref } from 'vue'
 import { parseCardDocument } from '../../../entities/card/storage'
-import { normalizePath } from '../../../shared/model/filePath'
+import { isSameOrDescendantPath, normalizePath } from '../../../shared/model/filePath'
 import { prepareExportTask } from '../../exporting/exportPlanner'
 import { runExportPlan } from '../../exporting/exportRunner'
 import type {
@@ -182,7 +182,17 @@ export function useProjectExport(options: UseProjectExportOptions) {
   const destination = {
     exists: (path: string) => fileSystemService.fileExists(path),
     ensureDirectory: (path: string) => fileSystemService.createDirectory(path),
-    write: (path: string, bytes: Uint8Array) => fileSystemService.writeBinaryFile(path, bytes),
+    /*
+     * 产物落在项目里时要自己宣告失效：它可能正是某张卡引用的资源，而目录监听要等
+     * 批量窗口（120ms）再加前端防抖（150ms），同一轮导出里排在前面的写入就会
+     * 让后面的卡片读到旧图。写完立刻 refresh，导出才是「按顺序看得到前面写的东西」。
+     */
+    write: async (path: string, bytes: Uint8Array) => {
+      await fileSystemService.writeBinaryFile(path, bytes)
+      const environment = options.renderEnvironment.value.projectResourceEnvironment
+      if (!environment?.refresh || !isSameOrDescendantPath(path, options.resolveProjectPath(''))) return
+      await environment.refresh([normalizePath(path)]).catch(() => undefined)
+    },
   }
 
   async function prepare(task: ProjectExportTask): Promise<ExportPreparationResult> {

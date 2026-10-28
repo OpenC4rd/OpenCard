@@ -1,88 +1,60 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import type { ProjectIconSeries } from '../workspace/model/projectIcons'
-import { buildProjectIconCatalog } from '../workspace/services/projectIconCatalog'
 import { enrichCardPropertyFieldDefinition } from './cdePropertyFieldEnrichment'
+import { EMPTY_PROJECT_ICON_CATALOG } from '../workspace/services/projectIconCatalog'
 import type { ProjectResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 
-const iconSeries: ProjectIconSeries[] = [{
-  name: 'Status icons',
-  key: 'status',
-  icons: [{ iconKey: 'warning', name: 'Warning', source: 'assets/icons/warning.svg', tint: 'context' }],
-}]
-
-/** The image block's `source` field exactly as entities/card/schema.ts declares it. */
-const imageSourceDefinition = {
-  title: 'Source',
-  fieldType: 'filePath' as const,
-  allowRemote: true,
-  minLength: 0,
-  categoryId: 'content' as const,
-  filter: { target: 'file' as const, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] },
-}
-
-const translate = (key: string) => key
-
 describe('card property field enrichment', () => {
-  it('completes package icons in block content when packages are indexed by fingerprint', async () => {
-    const coordinate = { author: 'demo', name: 'icons', version: '1.0.0' }
-    const packageKey = 'demo/icons@1.0.0'
-    const packageEnvironment: ProjectResourceEnvironment = {
-      kind: 'package', namespace: 'demo-icons', rootPath: '/cache/icons',
-      fontDocument: {}, fonts: {}, iconDocument: {},
-      iconCatalog: buildProjectIconCatalog(iconSeries, source => `asset://${source}`),
-    }
+  it('resolves rich-text base style from the block record and resource environment', () => {
     const resourceEnvironment: ProjectResourceEnvironment = {
-      ...packageEnvironment, kind: 'project', namespace: 'project', rootPath: '/project',
-      packages: new Map([['content-fingerprint', {
-        coordinate, fingerprint: 'content-fingerprint', rootPath: '/cache/icons',
-        archivePath: '/project/.opencard/packages/icons.ocpack', cover: null,
-        manifest: { type: 'opencard-resource-package', ...coordinate, title: 'Package icons',
-          public: { fonts: [], iconSeries: [{ key: 'status', title: 'Status icons', count: 1 }] } },
-      }]]),
-      packageEnvironments: new Map([[packageKey, packageEnvironment]]),
+      kind: 'project',
+      namespace: 'project',
+      rootPath: '/project',
+      fontDocument: {},
+      fonts: {
+        body: {
+          kind: 'family',
+          name: 'Body Font',
+          family: { key: 'body', name: 'Body Font', files: { normal: { upright: 'fonts/body.ttf' } } },
+        },
+      },
+      iconDocument: {},
+      iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
     }
     const definition = enrichCardPropertyFieldDefinition({
-      translate, definition: { title: 'Content', fieldType: 'string', multiline: true },
-      fieldKey: 'content', record: {}, fontCatalog: [], resourceEnvironment,
+      definition: { title: 'Content', fieldType: 'richText' },
+      record: { fontFamily: 'font:body', fontSize: '20px' },
+      resourceEnvironment,
     })
-    const provider = definition.completion!.provider!
-    const packages = await provider({ value: '[[', cursor: 2 })
-    expect(packages?.items).toContainEqual(expect.objectContaining({
-      label: 'Package icons', insertText: `${packageKey}#icon:`,
-    }))
-    const collectionPrefix = `[[${packageKey}#icon:`
-    const collections = await provider({ value: collectionPrefix, cursor: collectionPrefix.length })
-    expect(collections?.items).toContainEqual(expect.objectContaining({ insertText: 'status/' }))
-    const iconPrefix = `${collectionPrefix}status/`
-    const icons = await provider({ value: iconPrefix, cursor: iconPrefix.length })
-    expect(icons?.items).toContainEqual(expect.objectContaining({
-      label: 'Warning', insertText: `[[${packageKey}#icon:status/warning]]`,
-    }))
+
+    expect(definition).toMatchObject({
+      fieldType: 'richText',
+      richTextBaseStyle: {
+        fontFamily: '"OpenCardResource-project-body"',
+        fontSize: '20px',
+      },
+    })
   })
-  it('offers project icons while an image source holds an icon reference', async () => {
+
+  it('attaches binding completion and auto-pairs only when a reference context is provided', async () => {
     const definition = enrichCardPropertyFieldDefinition({
-      translate,
-      definition: imageSourceDefinition,
-      fieldKey: 'source',
+      definition: { title: 'Source', fieldType: 'imageSource' },
       record: {},
-      fontCatalog: [],
-      projectIconCatalog: buildProjectIconCatalog(iconSeries, source => `asset://${source}`),
+      referenceContext: {
+        currentCard: {
+          label: 'Current Card',
+          fields: [{ key: 'avatar', label: 'Avatar', valueKind: 'string' }],
+        },
+        getAncestor: () => undefined,
+        targetKind: 'string',
+      },
     })
 
-    const provider = definition.completion?.provider
-    expect(provider).toBeTruthy()
-
-    const seriesResult = await provider!({ value: 'icon:', cursor: 5 })
-    expect(seriesResult?.items).toContainEqual(expect.objectContaining({
-      label: 'Status icons',
-      insertText: 'status/',
-    }))
-
-    const iconValue = 'icon:status/'
-    const iconResult = await provider!({ value: iconValue, cursor: iconValue.length })
-    expect(iconResult?.items).toContainEqual(expect.objectContaining({
-      label: 'Warning',
-      insertText: 'icon:status/warning',
+    expect(definition.autoPairs).toEqual([{ open: '{{', close: '}}' }])
+    const result = await definition.binding?.provider?.({ value: '{{card:}}', cursor: 7 })
+    expect(result?.items).toContainEqual(expect.objectContaining({
+      label: 'Avatar',
+      insertText: 'card:avatar',
     }))
   })
 })

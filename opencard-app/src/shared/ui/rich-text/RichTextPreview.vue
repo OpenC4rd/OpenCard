@@ -1,33 +1,44 @@
 <script setup lang="ts">
 import { computed, h, type VNodeChild } from 'vue'
-import {
-  createProjectIconStyle,
-  findProjectIcon,
-  type ProjectIconCatalog,
-  type ProjectIconCatalogEntry,
-} from '../../../features/workspace/services/projectIconCatalog'
-import type { ProjectIconSource } from '../../../features/workspace/services/projectIconCompletion'
 import { parseRichTextHtml, type RichTextIconNode } from '../../rich-text/richTextHtml'
-import { readProjectIconSize } from '../../../features/workspace/services/projectIconDimensionResolver'
+import type {
+  PropertyFieldCapabilities,
+  PropertyIconEntry,
+} from '../property-editor/propertyEditor.types'
 import { renderRichTextDocument } from './renderRichTextDocument'
 
 const props = defineProps<{
   html: string
-  projectIconCatalog?: ProjectIconCatalog
-  /** Icon sources including packages; the host catalog alone cannot resolve a package icon. */
-  packageIconSources?: readonly ProjectIconSource[]
-  fontOptions?: readonly { value: string; cssFamily?: string }[]
-  resolveImageSource?: (reference: string) => string | null
+  capabilities?: PropertyFieldCapabilities
 }>()
 
 const document = computed(() => parseRichTextHtml(props.html).document)
 
-function resolveIconEntry(node: RichTextIconNode): ProjectIconCatalogEntry | null {
-  const source = props.packageIconSources?.find(candidate => (
-    (candidate.packageKey ?? '') === (node.packageKey ?? '')
-  ))
-  if (source) return findProjectIcon(source.catalog, node.seriesKey, node.iconKey)
-  return node.packageKey ? null : findProjectIcon(props.projectIconCatalog, node.seriesKey, node.iconKey)
+const fontFamilyByValue = computed(() => {
+  const map = new Map<string, string>()
+  for (const scope of props.capabilities?.fonts ?? []) {
+    for (const entry of scope.entries) {
+      map.set(entry.value, entry.cssFamily ?? entry.value)
+    }
+  }
+  return map
+})
+
+function resolveIconEntry(node: RichTextIconNode): PropertyIconEntry | null {
+  const targetPkg = node.packageKey ?? null
+  const scope = (props.capabilities?.icons ?? []).find(
+    candidate => (candidate.packageKey ?? null) === targetPkg,
+  )
+  if (!scope) return null
+  const series = scope.series.find(
+    candidate => candidate.key.toLocaleLowerCase() === node.seriesKey.toLocaleLowerCase(),
+  )
+  if (!series) return null
+  return (
+    series.entries.find(
+      candidate => candidate.iconKey.toLocaleLowerCase() === node.iconKey.toLocaleLowerCase(),
+    ) ?? null
+  )
 }
 
 function renderIcon(node: RichTextIconNode): VNodeChild {
@@ -35,18 +46,20 @@ function renderIcon(node: RichTextIconNode): VNodeChild {
   return entry
     ? h('span', {
         class: 'rich-text-preview__icon',
-        style: createProjectIconStyle(entry, readProjectIconSize),
+        style: entry.inlineStyle,
         role: 'img',
         'aria-label': entry.name,
       })
     : h('span', { class: 'rich-text-preview__missing' }, '[icon]')
 }
 
-const rendered = computed(() => renderRichTextDocument(document.value.children, {
-  resolveFont: reference => props.fontOptions?.find(font => font.value === reference)?.cssFamily ?? reference,
-  resolveImage: reference => props.resolveImageSource?.(reference) ?? null,
-  renderIcon,
-}))
+const rendered = computed(() =>
+  renderRichTextDocument(document.value.children, {
+    resolveFont: reference => fontFamilyByValue.value.get(reference) ?? reference,
+    resolveImage: reference => props.capabilities?.resolveImagePreview?.(reference) ?? null,
+    renderIcon,
+  }),
+)
 </script>
 
 <template>

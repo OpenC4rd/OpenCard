@@ -73,12 +73,9 @@ describe('property binding schema policy', () => {
 
   it('marks only text block content as rich-editable', () => {
     expect(getTypePropertyEditorSchema('text-block').content).toMatchObject({
-      fieldType: 'string',
-      multiline: true,
-      richText: true,
+      fieldType: 'richText',
     })
     const markdown = getTypePropertyEditorSchema('markdown-text-block').content
     expect(markdown).toMatchObject({ fieldType: 'string', multiline: true })
-    expect(markdown?.richText).toBeUndefined()
   })
 })

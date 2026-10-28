@@ -84,6 +84,7 @@
       >
         <PagePropertyEditor
           :items="card.items"
+          :capabilities="viewModel.capabilities"
           @editor-preview="intent => handleEditorPreview(card, intent)"
           @editor-commit="intent => handleEditorCommit(card, intent)"
           @editor-cancel="intent => handleEditorCancel(card, intent)"

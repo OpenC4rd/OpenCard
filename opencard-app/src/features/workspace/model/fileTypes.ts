@@ -6,6 +6,7 @@ export { RESOURCE_PACKAGE_EXTENSION, RESOURCE_PACKAGE_SUFFIX } from './resourceP
  * - 只返回文件语义结果 不处理编辑器渲染流程
  */
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
+import { globMatches } from '../../../shared/model/filePath'
 import {
   PROJECT_ICON_DIRECTORY,
   PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
@@ -260,14 +261,6 @@ const fileTypes: FileTypeDefinition[] = [
     editorId: 'monaco',
   },
 ]
-
-function globMatches(value: string, pattern: string, caseInsensitive: boolean): boolean {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*/g, '.*')
-    .replace(/\*/g, '[^/]*')
-    .replace(/\?/g, '[^/]')
-  return new RegExp(`^${escaped}$`, caseInsensitive ? 'i' : '').test(value)
-}
 
 function normalizeSegment(value: string): string {
   return value.trim().toLowerCase()

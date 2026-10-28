@@ -13,6 +13,7 @@
     "lint:naming": "node scripts/lint-naming.mjs --check",
     "lint:ui": "node scripts/lint-naming.mjs --check && node scripts/lint-icons.mjs && node scripts/lint-controls.mjs",
     "preview": "vite preview",
+    "dmg:restyle": "node scripts/restyle-dmg.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -50,7 +51,7 @@
     "vue-i18n": "^11.3.2"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/fontkit": "^2.0.9",
     "@types/markdown-it": "^14.1.2",
     "@types/qrcode": "^1.5.6",

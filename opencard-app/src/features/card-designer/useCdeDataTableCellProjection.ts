@@ -10,9 +10,7 @@ import {
 } from '../../entities/card/model'
 import { isInstanceBlockFieldOverridable } from '../../entities/card/instance'
 import { isBlockContainer, type ParentLookup } from '../../entities/card/tree'
-import type { FilePathDirectoryProvider } from '../../shared/model/filePath'
 import type { PropertyEditorFieldDefinition } from '../../shared/ui/property-editor/propertyEditor.types'
-import { buildFontCatalog } from '../workspace/model/projectFonts'
 import type {
   ReferenceCompletionContext,
   ReferenceCompletionScope,
@@ -41,7 +39,6 @@ type UseCdeDataTableCellProjectionOptions = {
   documentRevision: Readonly<Ref<number>>
   parentLookup: Readonly<Ref<ParentLookup>>
   projectContext: Readonly<Ref<CdePropertyProjectContext>>
-  directoryProvider: Readonly<Ref<FilePathDirectoryProvider | undefined>>
   locale: Readonly<Ref<string>>
   blueprintCardId: string
   translate: (messageKey: string, parameters?: Record<string, unknown>) => string
@@ -53,7 +50,6 @@ type CacheContext = {
   revision: number
   locale: string
   project: CdePropertyProjectContext
-  directoryProvider: FilePathDirectoryProvider | undefined
 }
 
 export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjectionOptions) {
@@ -85,11 +81,9 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
       )),
     } as Record<string, unknown>
     const definition = enrichCardPropertyFieldDefinition({
-      translate: options.translate,
       definition: canOverride
         ? field.definition
         : { ...field.definition, isReadonly: true, resettable: false },
-      fieldKey: field.key,
       record,
       referenceContext: createCellReferenceContext(
         document,
@@ -98,10 +92,7 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
         cell.cardId,
         field,
       ),
-      fontCatalog: buildFontCatalog(options.projectContext.value.fonts),
-      projectIconCatalog: options.projectContext.value.projectIconCatalog,
       resourceEnvironment: options.projectContext.value.resourceEnvironment,
-      directoryProvider: options.directoryProvider.value,
     })
     definitionCache.set(cell.identity, definition)
     return definition
@@ -202,14 +193,12 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
       revision: options.documentRevision.value,
       locale: options.locale.value,
       project: options.projectContext.value,
-      directoryProvider: options.directoryProvider.value,
     }
     if (!cacheContext
       || next.document !== cacheContext.document
       || next.revision !== cacheContext.revision
       || next.locale !== cacheContext.locale
-      || next.project !== cacheContext.project
-      || next.directoryProvider !== cacheContext.directoryProvider) {
+      || next.project !== cacheContext.project) {
       definitionCache.clear()
       cacheContext = next
     }

@@ -64,9 +64,18 @@ describe('OcRichTextEditor locale reactivity', () => {
 
   it('saves stable resource references instead of resolved preview sources', async () => {
     const wrapper = mount(OcRichTextEditor, {
-      props: { initialHtml: '<p><span data-oc-fill-type="image" data-oc-fill-source="素材/a.png" style="font-family: &quot;font:brand&quot;;">AB</span></p>',
-        fontOptions: [{ label: 'Brand', value: 'font:brand', cssFamily: 'ScopedBrand' }],
-        resolveImageSource: () => 'https://example.test/resolved.png' },
+      props: {
+        initialHtml: '<p><span data-oc-fill-type="image" data-oc-fill-source="素材/a.png" style="font-family: &quot;font:brand&quot;;">AB</span></p>',
+        capabilities: {
+          fonts: [{
+            key: 'project',
+            label: 'Current Project',
+            packageKey: null,
+            entries: [{ key: 'font:brand', label: 'Brand', value: 'font:brand', cssFamily: 'ScopedBrand' }],
+          }],
+          resolveImagePreview: () => 'https://example.test/resolved.png',
+        },
+      },
       global: { plugins: [i18n] },
     })
     await nextTick()
@@ -83,8 +92,12 @@ describe('OcRichTextEditor locale reactivity', () => {
 
   it('composes image fill, background and outline through previews, undo and source handoff', async () => {
     const wrapper = mount(OcRichTextEditor, {
-      props: { initialHtml: '<p><mark style="background-color:yellow;color:inherit"><span data-oc-fill-type="image" data-oc-fill-source="assets/a.png" style="color:red;-webkit-text-stroke-width:1px;-webkit-text-stroke-color:blue">ABC</span></mark></p>',
-        resolveImageSource: reference => `https://example.test/${reference}` },
+      props: {
+        initialHtml: '<p><mark style="background-color:yellow;color:inherit"><span data-oc-fill-type="image" data-oc-fill-source="assets/a.png" style="color:red;-webkit-text-stroke-width:1px;-webkit-text-stroke-color:blue">ABC</span></mark></p>',
+        capabilities: {
+          resolveImagePreview: reference => `https://example.test/${reference}`,
+        },
+      },
       global: { plugins: [i18n] },
     })
     try {

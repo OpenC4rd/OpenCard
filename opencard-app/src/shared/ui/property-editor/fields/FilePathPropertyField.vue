@@ -1,325 +1,209 @@
-<!--
-  使用说明：
-  - 输入已解析的 filePath definition 与当前值。
-  - 动态候选完全由 definition.completion.provider 提供。
-
-  职责边界：
-  - 负责路径文本、候选菜单、键盘选择和异步请求竞态处理。
-  - 不读取 Project Store，不查询文件系统，不解释 extension 业务规则。
--->
+<!-- 文件路径属性字段：以浮层文件选择器（OcFilePicker）在当前项目与资源包作用域中选取文件或目录。 -->
 <template>
-  <div class="file-path-field">
-    <OcFieldInput
-      as="input"
-      full-width
-      :value="stringValue"
-      :readonly="definition.isReadonly"
-      autocomplete="off"
-      spellcheck="false"
-      role="combobox"
-      aria-autocomplete="list"
-      aria-haspopup="listbox"
-      :aria-expanded="isMenuOpen && items.length > 0"
-      :aria-controls="autocompleteId"
-      :aria-activedescendant="activeDescendantId"
-      @focus="handleFocus"
-      @blur="handleBlur"
-      @click="handleCursorChange"
-      @input="handleInput"
-      @keydown="handleKeydown"
-      @keyup="handleCursorKeyup"
-    />
+  <div ref="rootRef" class="file-path-field">
+    <OcFieldFrame full-width :readonly="definition.isReadonly">
+      <button
+        ref="triggerRef"
+        type="button"
+        class="file-path-field__trigger"
+        :disabled="definition.isReadonly"
+        :aria-label="definition.title"
+        :aria-expanded="open"
+        aria-haspopup="dialog"
+        @click="togglePopover"
+        @keydown="handleTriggerKeydown"
+      >
+        <OcIcon :name="leadingIcon" size="sm" tone="muted" />
+        <span
+          class="file-path-field__value"
+          :class="{ 'is-placeholder': !stringValue }"
+          :data-tooltip="stringValue || placeholderText"
+          data-tooltip-overflow
+        >
+          {{ stringValue || placeholderText }}
+        </span>
+        <OcIcon
+          class="file-path-field__chevron"
+          :class="{ 'is-open': open }"
+          name="mdiChevronDown"
+          size="sm"
+          tone="muted"
+        />
+      </button>
+      <template v-if="stringValue && !definition.isReadonly" #suffix>
+        <OcButton
+          icon-only
+          size="sm"
+          variant="ghost"
+          icon="mdiClose"
+          :aria-label="clearLabel"
+          :data-tooltip="clearLabel"
+          @click.stop="clearValue"
+        />
+      </template>
+    </OcFieldFrame>
 
     <OcOverlayMarker
       ref="layer"
-      :group="`completion:${autocompleteId}`"
-      :anchor="completionAnchor"
-      :owner="completionControl"
+      :group="pickerId"
+      :anchor="triggerRef"
+      :owner="rootRef"
       placement="bottom-start"
-      :max-height="220"
-      :open="isMenuOpen"
-      @update:open="isMenuOpen = $event"
-      @close="isMenuOpen = false"
+      :max-height="320"
+      :open="open"
+      @update:open="open = $event"
+      @close="open = false"
     >
-      <OcAutocompleteList :id="autocompleteId" :items="items" :active-key="activeKey"
-        @select="applySuggestionByKey" />
+      <div
+        class="file-path-field__popover"
+        role="dialog"
+        :aria-label="definition.title"
+        @keydown.esc.stop.prevent="closePopover(true)"
+      >
+        <OcFilePicker
+          :model-value="stringValue"
+          :scopes="capabilities?.files ?? []"
+          :root="definition.root"
+          :filter="definition.filter"
+          :resolve-thumbnail-src="capabilities?.resolveImagePreview"
+          :search-placeholder="tr('propertyEditor.filePath.searchPlaceholder', '搜索文件...')"
+          :clear-search-label="tr('propertyEditor.filePath.clearSearch', '清空搜索')"
+          :empty-text="tr('propertyEditor.filePath.empty', '没有匹配的文件')"
+          @update:model-value="handleSelect"
+        />
+      </div>
     </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { reportAppError } from '../../../../features/logging/appErrorCatalog'
-import type {
-  PropertyCompletionItem,
-  PropertyCompletionResult,
-  PropertyEditorFieldDefinition,
-} from '../propertyEditor.types'
-import type {
-  FilePathDirectoryEntry,
-  FilePathFilter,
-} from '../../../model/filePath'
-import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
-import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
+import { computed, getCurrentInstance } from 'vue'
+import OcButton from '../../../../components/base/OcButton.vue'
+import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
+import OcIcon from '../../../../components/base/OcIcon.vue'
+import OcFilePicker from '../../../../components/standard/OcFilePicker.vue'
 import OcOverlayMarker from '../../../../components/standard/OcOverlayMarker.vue'
-
-import { usePropertyCompletion } from './usePropertyCompletion'
+import { useFieldPopover } from './useFieldPopover'
+import type {
+  PropertyEditorFieldDefinition,
+  PropertyFieldCapabilities,
+} from '../propertyEditor.types'
 
 type FilePathDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'filePath' }>
-type PathBrowseContext = {
-  directory: string
-  fragment: string
-}
 
 const props = defineProps<{
+  /** 字段 schema 定义。决定标题、只读态、起始子目录及过滤规则。 */
   definition: FilePathDefinition
+  /** 当前路径值。展示在触发器文本区并在浮层树中高亮选中项。 */
   value: unknown
+  /** 环境资源能力（项目与资源包文件作用域等）。提供浮层文件选择器的作用域列表。 */
+  capabilities?: PropertyFieldCapabilities
 }>()
 
 const emit = defineEmits<{
+  /** 选中文件或清空时触发。 */
   (e: 'update:value', value: string): void
 }>()
-const { t } = useI18n()
 
-const activeInput = ref<HTMLInputElement | null>(null)
-const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
-const completion = usePropertyCompletion(() => activeInput.value)
-const { completionState: completionResult, suggestions: items, isMenuOpen, activeKey,
-  autocompleteId, activeDescendantId, anchor: completionAnchor, control: completionControl,
-  clear: clearCompletion } = completion
-// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
-onBeforeUnmount(() => layer.value?.close())
+const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
+  | ((key: string, parameters?: Record<string, unknown>) => string)
+  | undefined
+const tr = (key: string, fallback: string, parameters?: Record<string, unknown>): string =>
+  translate?.(key, parameters) ?? fallback
+
+const {
+  rootRef,
+  triggerRef,
+  layer,
+  pickerId,
+  open,
+  togglePopover,
+  closePopover,
+  handleTriggerKeydown,
+  openPopover,
+} = useFieldPopover('file-path-picker', {
+  isReadonly: () => props.definition.isReadonly,
+})
 
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)).replace(/\\/g, '/'))
-watch(
-  [
-    () => props.definition.completion?.provider,
-    () => props.definition.directoryProvider,
-    () => props.definition.filter,
-  ],
-  () => {
-    const control = activeInput.value
-    if (control && document.activeElement === control && (isMenuOpen.value || completion.isPending.value)) {
-      void refreshCompletion(control.value.replace(/\\/g, '/'), control.selectionStart ?? control.value.length)
-    } else clearCompletion()
-  },
-  { deep: true },
+const leadingIcon = computed(() =>
+  props.definition.filter?.target === 'directory' ? ('mdiFolder' as const) : ('mdiFileOutline' as const),
 )
+const placeholderText = computed(
+  () => props.definition.placeholder ?? tr('propertyEditor.filePath.placeholder', '选择文件...'),
+)
+const clearLabel = computed(() => tr('propertyEditor.filePath.clearSelection', '清除已选文件'))
 
-async function refreshCompletion(
-  value: string,
-  cursor: number,
-): Promise<void> {
-  if (props.definition.isReadonly) return clearCompletion()
-  try {
-    await completion.refresh(async () => {
-      const genericResult = await props.definition.completion?.provider?.({ value, cursor })
-      if (genericResult) return genericResult
-      const directoryProvider = props.definition.directoryProvider
-      const context = resolveBrowseContext(value)
-      if (!directoryProvider || !context) return null
-      const entries = await directoryProvider(context.directory)
-      return createPathCompletionResult(value, context, entries, props.definition.filter)
-    })
-  } catch (error) {
-    reportAppError('OC-E4005', error)
-    clearCompletion()
-  }
+function handleSelect(nextValue: string): void {
+  emit('update:value', nextValue.replace(/\\/g, '/'))
+  closePopover(true)
 }
 
-function handleInput(event: Event): void {
-  const control = event.target as HTMLInputElement
-  activeInput.value = control
-  const value = control.value.replace(/\\/g, '/')
-  emit('update:value', value)
-  void refreshCompletion(value, control.selectionStart ?? value.length)
+function clearValue(): void {
+  if (props.definition.isReadonly) return
+  emit('update:value', '')
 }
 
-function handleFocus(event: FocusEvent): void {
-  const control = event.target as HTMLInputElement
-  activeInput.value = control
-  void refreshCompletion(stringValue.value, control.selectionStart ?? stringValue.value.length)
-}
-
-function handleCursorChange(event: MouseEvent): void {
-  const control = event.target as HTMLInputElement
-  void refreshCompletion(control.value.replace(/\\/g, '/'), control.selectionStart ?? control.value.length)
-}
-
-function handleCursorKeyup(event: KeyboardEvent): void {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  const control = event.target as HTMLInputElement
-  void refreshCompletion(control.value.replace(/\\/g, '/'), control.selectionStart ?? control.value.length)
-}
-
-function handleBlur(): void {
-  clearCompletion()
-}
-
-function applySuggestionByKey(key: string): void {
-  const item = items.value.find((candidate) => candidate.key === key)
-  const result = completionResult.value
-  if (!item || !result) return
-
-  const currentValue = activeInput.value?.value.replace(/\\/g, '/') ?? stringValue.value
-  const replaceStart = item.replaceStart ?? result.replaceStart
-  const replaceEnd = item.replaceEnd ?? result.replaceEnd
-  const nextValue = `${currentValue.slice(0, replaceStart)}${item.insertText}${currentValue.slice(replaceEnd)}`
-  const nextCursor = replaceStart + item.insertText.length
-  emit('update:value', nextValue)
-  if (activeInput.value) {
-    activeInput.value.value = nextValue
-    activeInput.value.setSelectionRange(nextCursor, nextCursor)
-  }
-
-  if (item.keepOpen) {
-    isMenuOpen.value = true
-    void nextTick(() => {
-      const control = activeInput.value
-      if (!control || document.activeElement !== control) return
-      control.setSelectionRange(nextCursor, nextCursor)
-      void refreshCompletion(nextValue, nextCursor)
-    })
-  } else {
-    clearCompletion()
-  }
-}
-
-function handleKeydown(event: KeyboardEvent): void {
-  completion.handleKeydown(event, item => applySuggestionByKey(item.key))
-}
-
-function resolveBrowseContext(
-  value: string,
-): PathBrowseContext | null {
-  const normalizedValue = value.replace(/\\/g, '/')
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(normalizedValue) || normalizedValue.includes('{{')) return null
-
-  const withoutTrailingSlash = normalizedValue.replace(/\/+$/, '')
-  if (!withoutTrailingSlash) return { directory: '', fragment: '' }
-  if (normalizedValue.endsWith('#')) {
-    return { directory: normalizedValue, fragment: '' }
-  }
-  if (normalizedValue.endsWith('/')) {
-    return { directory: withoutTrailingSlash, fragment: '' }
-  }
-
-  return {
-    directory: getPathDirectory(withoutTrailingSlash),
-    fragment: getPathBasename(withoutTrailingSlash).toLocaleLowerCase(),
-  }
-}
-
-function createPathCompletionResult(
-  value: string,
-  context: PathBrowseContext,
-  entries: readonly FilePathDirectoryEntry[],
-  filter: FilePathFilter | undefined,
-): PropertyCompletionResult | null {
-  const normalizedExtensions = (filter?.extensions ?? []).map(extension => (
-    extension.startsWith('.') ? extension.toLocaleLowerCase() : `.${extension.toLocaleLowerCase()}`
-  ))
-  const target = filter?.target ?? 'both'
-  const preparedCandidates = entries
-    .map(entry => toPathCompletionItem(entry, context.directory))
-    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
-    .filter(candidate => candidate.isDirectory || target !== 'directory')
-    .filter(candidate => candidate.isDirectory
-      || normalizedExtensions.length === 0
-      || normalizedExtensions.some(extension => candidate.label.toLocaleLowerCase().endsWith(extension)))
-  const normalizedValue = value.replace(/\\/g, '/').replace(/\/+$/, '').toLocaleLowerCase()
-  if (preparedCandidates.some(candidate => (
-    !candidate.isDirectory
-    && candidate.insertText.replace(/\/+$/, '').toLocaleLowerCase() === normalizedValue
-  ))) {
-    const directory = getPathDirectory(value.replace(/\\/g, '/').replace(/\/+$/, ''))
-    return {
-      replaceStart: 0,
-      replaceEnd: value.length,
-      items: [{
-        key: `clear-file:${normalizedValue}`,
-        label: t('propertyEditor.filePath.clearSelection'),
-        icon: 'mdiClose',
-        insertText: directory ? `${directory.replace(/\/+$/, '')}/` : '',
-        keepOpen: true,
-      }],
-    }
-  }
-
-  const candidates = preparedCandidates
-    .filter(candidate => !context.fragment || candidate.label.toLocaleLowerCase().startsWith(context.fragment)
-      || candidate.insertText.toLocaleLowerCase().startsWith(context.fragment))
-    .sort((left, right) => {
-      if (left.isDirectory !== right.isDirectory) return left.isDirectory ? -1 : 1
-      const leftStarts = left.label.toLocaleLowerCase().startsWith(context.fragment)
-      const rightStarts = right.label.toLocaleLowerCase().startsWith(context.fragment)
-      if (leftStarts !== rightStarts) return leftStarts ? -1 : 1
-      return left.label.localeCompare(right.label, undefined, { sensitivity: 'base' })
-    })
-    .map(({ isDirectory: _isDirectory, ...item }) => item)
-
-  const parent = createParentCompletionItem(context.directory)
-  return candidates.length > 0 || parent
-    ? { replaceStart: 0, replaceEnd: value.length, items: candidates, ...(parent ? { parent } : {}) }
-    : null
-}
-
-function toPathCompletionItem(entry: FilePathDirectoryEntry, directory: string) {
-  const normalizedEntry = entry.name.replace(/\\/g, '/').replace(/\/+$/, '')
-  const directoryPrefix = directory.endsWith('#') ? directory : `${directory}/`
-  const path = directory
-    && normalizedEntry !== directory
-    && !normalizedEntry.startsWith(directoryPrefix)
-    ? `${directory}${directory.endsWith('#') ? '' : '/'}${normalizedEntry}`
-    : normalizedEntry
-  const label = entry.label ?? (path.endsWith('#') ? path.slice(0, -1) : getPathBasename(path))
-  if (!label) return null
-  const isDirectory = Boolean(entry.isDirectory)
-  return {
-    key: `path:${path}`,
-    label,
-    icon: entry.icon ?? (isDirectory ? 'mdiFolder' as const : 'mdiFileOutline' as const),
-    insertText: isDirectory && !path.endsWith('#') && !path.endsWith(':') ? `${path}/` : path,
-    keepOpen: true,
-    isDirectory,
-  }
-}
-
-function createParentCompletionItem(directory: string): PropertyCompletionItem | null {
-  if (!directory || /^[a-z]:\/?$/i.test(directory)) return null
-  const parent = directory.endsWith('#') ? '' : getPathDirectory(directory)
-  return {
-    key: `parent:${directory}`,
-    label: '..',
-    icon: 'mdiArrowUp',
-    insertText: parent ? `${parent}/` : '',
-    keepOpen: true,
-  }
-}
-
-function getPathDirectory(path: string): string {
-  const slashIndex = path.lastIndexOf('/')
-  if (slashIndex < 0) {
-    const packageSeparator = path.indexOf('#')
-    return packageSeparator >= 0 ? path.slice(0, packageSeparator + 1) : ''
-  }
-  if (slashIndex === 2 && /^[a-z]:\//i.test(path)) return path.slice(0, 3)
-  return path.slice(0, slashIndex)
-}
-
-function getPathBasename(path: string): string {
-  const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('#'))
-  return path.slice(separatorIndex + 1)
-}
-
+defineExpose({ activate: openPopover })
 </script>
 
 <style scoped>
 .file-path-field {
-  position: relative;
-  flex: 1;
+  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
 }
 
+.file-path-field__trigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  gap: var(--oc-space-xs);
+  padding: var(--oc-field-content-padding, 0 var(--oc-space-xs));
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.file-path-field__trigger:disabled {
+  cursor: not-allowed;
+}
+
+.file-path-field__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-path-field__value.is-placeholder {
+  color: var(--oc-fg-muted);
+}
+
+.file-path-field__chevron {
+  flex: 0 0 auto;
+  transition: transform var(--oc-duration-quick) var(--oc-ease);
+}
+
+.file-path-field__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.file-path-field__popover {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  height: 280px;
+  max-height: inherit;
+  padding: var(--oc-space-xs);
+  overflow: hidden;
+}
 </style>

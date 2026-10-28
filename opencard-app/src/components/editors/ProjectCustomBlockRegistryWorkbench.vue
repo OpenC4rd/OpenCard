@@ -29,7 +29,7 @@
           <OcText size="sm" tone="muted">{{ selectedEntry.source }}</OcText>
           <OcButton v-if="preview" size="sm" @click="previewViewport?.fitView()">{{ t('cardDesigner.shortcuts.fitViewport') }}</OcButton>
         </div>
-        <PropertyEditor :inputs="propertyInputs" :categories="categories"
+        <PropertyEditor :inputs="propertyInputs" :categories="categories" :capabilities="propertyCapabilities"
           sort-mode="category" @update-property="updateProperty" />
       </template>
       <div v-else class="custom-block-registry-workbench__empty">
@@ -57,6 +57,8 @@ import { prepareCardRender } from '../../features/card-rendering/renderPipeline'
 import CardViewport from '../../features/card-rendering/components/CardViewport.vue'
 import type { ResourceEnvironment } from '../../features/workspace/services/projectResourceEnvironment'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../../features/workspace/services/projectIconCatalog'
+import { fileSystemService } from '../../features/workspace/services/fileSystemService'
+import { createResourcePropertyCapabilities } from '../../features/workspace/services/propertyResourceCapabilities'
 
 const props = defineProps<{ collections: readonly CustomBlockCollection[]; resourceEnvironment?: ResourceEnvironment | null }>()
 const emit = defineEmits<{
@@ -123,6 +125,12 @@ const categories = computed<ReadonlyMap<string, PropertyEditorCategoryDefinition
   ['identity', { title: t('customBlockRegistry.identity'), icon: 'mdiCodeBraces' }],
   ['source', { title: t('customBlockRegistry.sourceCategory'), icon: 'mdiToyBrickOutline' }],
 ]))
+const propertyCapabilities = computed(() => createResourcePropertyCapabilities({
+  projectLabel: t('propertyEditor.references.project'),
+  rootPath: environment.value?.rootPath ?? null,
+  fs: fileSystemService,
+  resourceEnvironment: environment.value,
+}))
 const propertyInputs = computed<PropertyEditorInput[]>(() => {
   const entry = selectedEntry.value
   if (!entry) return []
@@ -132,7 +140,7 @@ const propertyInputs = computed<PropertyEditorInput[]>(() => {
     record: entry,
     fields: {
       key: { title: t('customBlockRegistry.key'), fieldType: 'string', category: 'identity', order: 1, unremovable: true, commitMode: 'blur' },
-      source: { title: t('customBlockRegistry.source'), fieldType: 'string', category: 'source', order: 1, unremovable: true, commitMode: 'blur' },
+      source: { title: t('customBlockRegistry.source'), fieldType: 'filePath', filter: { target: 'file', pattern: '*.ocblock' }, category: 'source', order: 1, unremovable: true },
     },
   }]
 })

@@ -89,13 +89,13 @@ describe('PropertyEditor records protocol', () => {
     expect(writeText).toHaveBeenCalledWith('opacity')
   })
 
-  it('dispatches explicitly marked strings to the rich-text editor', async () => {
+  it('dispatches richText fields to the rich-text editor', async () => {
     const wrapper = mountEditor({
         inputs: [{
           key: 'text',
           record: { content: '<p>Hello</p>' },
           fields: {
-            content: { title: 'Content', fieldType: 'string', richText: true },
+            content: { title: 'Content', fieldType: 'richText' },
           },
         }],
     })
@@ -123,7 +123,7 @@ describe('PropertyEditor records protocol', () => {
           fields: {
             extends: {
               title: 'Extends',
-              fieldType: 'filePath[]',
+              fieldType: 'string[]',
               defaultValue: [],
               completion: { provider: completion },
             },

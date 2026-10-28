@@ -30,6 +30,7 @@
           :class="{ 'is-compact': part.definition.fieldType === 'boolean' }"
           :definition="part.definition"
           :value="encodeValue(part)"
+          :capabilities="capabilities"
           editor-id="field"
           @preview:value="handlePreview(part, $event)"
           @commit:value="handleCommit(part, $event)"
@@ -61,6 +62,7 @@
     :item="child"
     :parent-path="currentPath"
     :depth="depth + 1"
+    :capabilities="capabilities"
     @editor-preview="emit('editor-preview', $event)"
     @editor-commit="emit('editor-commit', $event)"
     @editor-cancel="emit('editor-cancel', $event)"
@@ -82,6 +84,7 @@ import type {
   EditorItemEditorPart,
   EditorItemPart,
   EditorItemValueIntent,
+  PropertyFieldCapabilities,
 } from './propertyEditor.types'
 
 defineOptions({ name: 'PagePropertyEditorItem' })
@@ -90,6 +93,7 @@ const props = defineProps<{
   item: EditorItem
   parentPath: readonly string[]
   depth: number
+  capabilities?: PropertyFieldCapabilities
 }>()
 
 const emit = defineEmits<{

@@ -91,6 +91,8 @@ export type ProjectResourceEnvironment = {
   readonly rootPath: string | null
   readonly isDisposed?: () => boolean
   readonly waitForResources?: () => Promise<void>
+  /** 让这个作用域的商品资源立刻失效：应用自己写文件后用它，不必等目录监听转一圈回来。 */
+  readonly refresh?: (paths?: readonly string[]) => Promise<void>
   readonly profile?: ProjectProfile | null
   readonly dictionary?: ProjectDictionary | null
   readonly diagnostics?: Readonly<Record<string, string>>
@@ -538,7 +540,7 @@ export async function createResourceEnvironment(folder: string, options: {
       if (closed) return
       const key = [...facts].find(([, fact]) => fact.src === src)?.[0]
       if (key) facts.set(key, { status: 'decode-failed', message })
-    }, isDisposed: () => closed, waitForResources, readCustomBlockSource(path) {
+    }, isDisposed: () => closed, waitForResources, refresh, readCustomBlockSource(path) {
       const sourcePath = `${scope.rootPath}/${path}`
       const key = trackPath(sourcePath)
       const existing = scope.customBlockSources?.get(path) ?? sources.get(key)

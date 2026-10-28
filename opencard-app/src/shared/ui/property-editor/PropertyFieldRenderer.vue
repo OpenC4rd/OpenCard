@@ -1,7 +1,7 @@
 <!-- 纯字段 Renderer：按上级指定的 editorId 渲染编辑器，不拥有模式或 Action。 -->
 <template>
   <div class="property-field-renderer" :class="`property-field-renderer--${appearance}`">
-    <ReferenceStringPropertyField
+    <StringPropertyField
       v-if="editorId === 'raw-string'"
       ref="fieldComponent"
       :definition="rawStringDefinition"
@@ -17,6 +17,7 @@
       :element-component="getArrayPropertyElementComponent(definition.fieldType)"
       :element-definition="toArrayPropertyElementDefinition(definition)"
       :value="value"
+      :capabilities="capabilities"
       @update:value="handleCommit"
       @preview:value="emit('preview:value', $event)"
       @cancel:value="emit('cancel:value')"
@@ -27,6 +28,7 @@
       :is="getPropertyFieldComponent(definition)"
       :definition="definition"
       :value="value"
+      :capabilities="capabilities"
       @update:value="handleCommit"
       @preview:value="emit('preview:value', $event)"
       @cancel:value="emit('cancel:value')"
@@ -36,11 +38,14 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { PropertyEditorFieldDefinition } from './propertyEditor.types'
+import type {
+  PropertyEditorFieldDefinition,
+  PropertyFieldCapabilities,
+} from './propertyEditor.types'
 import { isArrayPropertyFieldType } from './propertyEditor.types'
 import type { PropertyFieldEditorId } from './propertyFieldEditorMode'
 import ArrayPropertyField from './fields/ArrayPropertyField.vue'
-import ReferenceStringPropertyField from './fields/ReferenceStringPropertyField.vue'
+import StringPropertyField from './fields/StringPropertyField.vue'
 import {
   getArrayPropertyElementComponent,
   getPropertyFieldComponent,
@@ -54,6 +59,7 @@ const props = defineProps<{
   value: unknown
   editorId: PropertyFieldEditorId
   appearance?: 'default' | 'embedded'
+  capabilities?: PropertyFieldCapabilities
 }>()
 
 const emit = defineEmits<{

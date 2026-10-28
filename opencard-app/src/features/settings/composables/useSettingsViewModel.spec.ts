@@ -93,4 +93,28 @@ describe('useSettingsViewModel', () => {
     expect(actionOf('general', 'cache', 'cache.clear').disabled).toBe(true)
     expect(actionOf('workspace', 'file-tree', 'project-workspace.reset').disabled).toBe(false)
   })
+
+  it('provides system font capabilities for appearance fontFamily editors', () => {
+    const category = useSettingsViewModel({
+      settings: ref(createDefaultAppSettings()),
+      categoryKey: ref('appearance'),
+      projectOpen: ref(false),
+      systemFontFamilies: ref(['Inter', 'Noto Sans SC']),
+      cacheUsage,
+      appLocales,
+      translate: (_key, fallback) => fallback,
+    }).activeCategory.value
+
+    const fontEditor = editor(rowOf(category, 'font'))
+    expect(fontEditor.definition).toMatchObject({ fieldType: 'fontFamily' })
+    expect(category.capabilities?.fonts).toEqual([{
+      key: 'system',
+      label: 'System',
+      packageKey: null,
+      entries: [
+        { key: 'Inter', value: 'Inter', label: 'Inter', cssFamily: 'Inter' },
+        { key: 'Noto Sans SC', value: 'Noto Sans SC', label: 'Noto Sans SC', cssFamily: 'Noto Sans SC' },
+      ],
+    }])
+  })
 })

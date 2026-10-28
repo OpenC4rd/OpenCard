@@ -6,6 +6,7 @@
         class="array-property-field__control"
         :definition="elementDefinition"
         :value="item"
+        :capabilities="capabilities"
         @update:value="updateItem(index, $event)"
       />
       <span class="array-property-field__actions">
@@ -61,6 +62,7 @@ import OcButton from '../../../../components/base/OcButton.vue'
 import type {
   BasePropertyFieldType,
   PropertyEditorFieldDefinition,
+  PropertyFieldCapabilities,
 } from '../propertyEditor.types'
 
 type ElementDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: BasePropertyFieldType }>
@@ -70,6 +72,7 @@ const props = defineProps<{
   elementComponent: Component
   elementDefinition: ElementDefinition
   value: unknown
+  capabilities?: PropertyFieldCapabilities
 }>()
 
 const emit = defineEmits<{

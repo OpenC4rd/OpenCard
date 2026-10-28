@@ -14,12 +14,14 @@ import AnchorPositionPropertyField from './fields/AnchorPositionPropertyField.vu
 import ArrayPropertyField from './fields/ArrayPropertyField.vue'
 import BooleanPropertyField from './fields/BooleanPropertyField.vue'
 import ColorPropertyField from './fields/ColorPropertyField.vue'
+import CustomBlockSourcePropertyField from './fields/CustomBlockSourcePropertyField.vue'
 import FilePathPropertyField from './fields/FilePathPropertyField.vue'
 import FlowDirectionPropertyField from './fields/FlowDirectionPropertyField.vue'
+import FontFamilyPropertyField from './fields/FontFamilyPropertyField.vue'
+import ImageSourcePropertyField from './fields/ImageSourcePropertyField.vue'
 import NumberPropertyField from './fields/NumberPropertyField.vue'
 import NumberSliderPropertyField from './fields/NumberSliderPropertyField.vue'
 import ObjectPropertyField from './fields/ObjectPropertyField.vue'
-import ReferenceStringPropertyField from './fields/ReferenceStringPropertyField.vue'
 import ReferenceStringTokenField from './fields/ReferenceStringTokenField.vue'
 import StringPropertyField from './fields/StringPropertyField.vue'
 import VerticalAlignPositionPropertyField from './fields/VerticalAlignPositionPropertyField.vue'
@@ -35,14 +37,20 @@ const formatReadonlyValue = (value: unknown): string => {
   if (typeof value === 'string') return value
   try { return JSON.stringify(value) ?? String(value) } catch { return String(value) }
 }
-const formatReadonlyBoolean = (value: unknown): string => value === true ? 'true' : value === false ? 'false' : formatReadonlyValue(value)
+const formatReadonlyBoolean = (value: unknown): string =>
+  value === true ? 'true' : value === false ? 'false' : formatReadonlyValue(value)
 
-const RichTextStringPropertyField = defineAsyncComponent(
-  () => import('./fields/RichTextStringPropertyField.vue'),
+const RichTextPropertyField = defineAsyncComponent(
+  () => import('./fields/RichTextPropertyField.vue'),
 )
 
 const propertyFieldEditorMap: Record<BasePropertyFieldType, PropertyFieldEditorRegistration> = {
   string: { component: StringPropertyField, icon: 'mdiFormatText', readonlyPresenter: formatReadonlyValue },
+  richText: { component: RichTextPropertyField, icon: 'mdiFormatTextVariantOutline', readonlyPresenter: formatReadonlyValue },
+  filePath: { component: FilePathPropertyField, icon: 'mdiFileOutline', readonlyPresenter: formatReadonlyValue },
+  imageSource: { component: ImageSourcePropertyField, icon: 'mdiImageOutline', readonlyPresenter: formatReadonlyValue },
+  fontFamily: { component: FontFamilyPropertyField, icon: 'mdiFormatFont', readonlyPresenter: formatReadonlyValue },
+  customBlockSource: { component: CustomBlockSourcePropertyField, icon: 'mdiToyBrickOutline', readonlyPresenter: formatReadonlyValue },
   anchorPosition: { component: AnchorPositionPropertyField, icon: 'mdiCompassOutline', readonlyPresenter: formatReadonlyValue },
   alignPosition: { component: AlignPositionPropertyField, icon: 'mdiFormatListBulletedSquare', readonlyPresenter: formatReadonlyValue },
   verticalAlignPosition: { component: VerticalAlignPositionPropertyField, icon: 'mdiLayersOutline', readonlyPresenter: formatReadonlyValue },
@@ -50,7 +58,6 @@ const propertyFieldEditorMap: Record<BasePropertyFieldType, PropertyFieldEditorR
   number: { component: NumberPropertyField, icon: 'mdiNumeric', readonlyPresenter: formatReadonlyValue },
   boolean: { component: BooleanPropertyField, icon: 'mdiToggleSwitchOutline', readonlyPresenter: formatReadonlyBoolean },
   color: { component: ColorPropertyField, icon: 'mdiPaletteOutline', readonlyPresenter: formatReadonlyValue },
-  filePath: { component: FilePathPropertyField, icon: 'mdiFileOutline', readonlyPresenter: formatReadonlyValue },
   object: { component: ObjectPropertyField, icon: 'mdiCodeBraces', readonlyPresenter: formatReadonlyValue },
 }
 
@@ -77,11 +84,6 @@ export function getPropertyFieldComponent(definition: PropertyEditorFieldDefinit
   if (definition.fieldType === 'string[]' && definition.listSeparator) return ReferenceStringTokenField
   if (definition.fieldType === 'number' && definition.presentation === 'slider') {
     return NumberSliderPropertyField
-  }
-  if (definition.fieldType === 'string' && definition.richText) return RichTextStringPropertyField
-  if (definition.fieldType === 'string' && !definition.options
-    && (definition.completion?.provider || definition.listSeparator)) {
-    return ReferenceStringPropertyField
   }
   if (isArrayPropertyFieldType(definition.fieldType)) return ArrayPropertyField
   return (propertyFieldEditorMap[definition.fieldType] ?? propertyFieldEditorMap.string).component
