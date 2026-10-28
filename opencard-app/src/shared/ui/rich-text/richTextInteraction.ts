@@ -52,7 +52,7 @@ export function createRichTextInteraction(
             if (style) decorations.push(Decoration.inline(from, to, { style }))
           }
         })
-        return DecorationSet.create(state.doc, decorations)
+        return DecorationSet.create(state.doc, decorations) as any
       },
     },
   })

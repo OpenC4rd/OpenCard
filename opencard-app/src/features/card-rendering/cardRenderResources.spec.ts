@@ -272,6 +272,22 @@ describe('cardRenderResources', () => {
       .toEqual(unavailable('package-unavailable', 'Package is not installed: alice/theme@1.0.0'))
   })
 
+  it('returns pending while asset status is pending or materializing', () => {
+    const environment: ProjectResourceEnvironment = {
+      kind: 'project', namespace: 'project-root', rootPath: '/project',
+      fontDocument: {}, fonts: {},
+      iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG,
+      asset: reference => reference.endsWith('loading.png') ? { status: 'pending' } : { status: 'missing' },
+    }
+    const context = createCardRenderResourceContext({
+      resourceRootPath: '/project',
+      hostEnvironment: environment,
+    })
+
+    expect(resolveCardResource({ value: 'images/loading.png', expect: 'asset' }, context))
+      .toEqual({ kind: 'pending' })
+  })
+
   it('resolves package-qualified font references with a package namespace', () => {
     const packageEnvironment: ProjectResourceEnvironment = {
       kind: 'package',

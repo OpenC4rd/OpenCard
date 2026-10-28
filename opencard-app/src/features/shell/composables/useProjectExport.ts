@@ -146,8 +146,22 @@ async function waitForImageSource(source: string): Promise<void> {
 }
 
 async function waitForExportAssets(root: HTMLElement): Promise<void> {
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    try { await document.fonts.ready } catch { /* best effort */ }
+  }
   await Promise.all([
-    ...Array.from(root.querySelectorAll('img')).map(waitForImageElement),
+    ...Array.from(root.querySelectorAll('img')).map(async image => {
+      await waitForImageElement(image)
+      if (image.complete && image.naturalWidth > 0) {
+        const parentBlock = image.closest('.image-block')
+        if (parentBlock) {
+          const placeholder = parentBlock.querySelector('.image-block__placeholder')
+          if (placeholder instanceof HTMLElement) placeholder.style.display = 'none'
+          image.classList.add('is-loaded')
+          image.style.opacity = '1'
+        }
+      }
+    }),
     ...projectIconPaintSources(root).map(waitForImageSource),
   ])
   await waitForNextPaint()
@@ -234,6 +248,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
       if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
       const restoreProjectIcons = await inlineProjectIconSources(canvas)
       try {
+        await waitForNextPaint()
         return dataUrlToBytes(await domtoimage.toPng(canvas, { scale: request.scale }))
       } finally {
         restoreProjectIcons()
@@ -326,6 +341,8 @@ export function useProjectExport(options: UseProjectExportOptions) {
     start()
     const result = new Map<CardFaceKey, Uint8Array>()
     try {
+      await options.renderEnvironment.value.projectResourceEnvironment?.waitForResources?.()
+      await render.resources.hostEnvironment.waitForResources?.()
       for (const faceKey of faceKeys) {
         result.set(faceKey, await renderer.render({
           sourcePath: '',

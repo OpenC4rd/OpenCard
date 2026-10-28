@@ -200,7 +200,13 @@ const iconTreeData = computed<OcNodeCollection>(() =>
       label: entry.name,
       searchText: `${entry.name} ${entry.iconKey} ${series.name} ${entry.value}`,
       node: {
-        visual: { type: 'style', style: entry.previewStyle, label: entry.name },
+        visual: {
+          type: 'style',
+          get style() {
+            return entry.previewStyle
+          },
+          label: entry.name,
+        },
         tail: `${series.key}/${entry.iconKey}`,
       },
     }),

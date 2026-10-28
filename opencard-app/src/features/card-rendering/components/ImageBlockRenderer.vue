@@ -34,6 +34,7 @@
         <img
             v-if="resolvedSource.kind === 'image'"
             :key="resolvedSource.src"
+            ref="imageRef"
             class="image-block__image"
             :class="{ 'is-loaded': imageLoadState === 'loaded' }"
             :src="resolvedSource.src"
@@ -45,7 +46,7 @@
     </div>
 </template>
 <script setup lang="ts">
-import { computed, getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import ProjectIconGraphic from './ProjectIconGraphic.vue'
 import { useCardEditorContext } from './cardEditorContext'
@@ -124,6 +125,27 @@ function resolvedSourceIdentity(source: ImageSourceView): string {
     return source.kind === 'image' ? `image:${source.src}` : source.kind
 }
 
+const imageRef = ref<HTMLImageElement>()
+
+function checkImageStatus(imageElement?: HTMLImageElement | null): void {
+  const image = imageElement ?? imageRef.value
+  if (!image) return
+  if (image.complete) {
+    if (image.naturalWidth > 0) {
+      if (imageLoadState.value !== 'loaded') {
+        imageLoadState.value = 'loaded'
+        readinessTicket?.settle()
+      }
+    } else if (image.naturalWidth === 0 && image.src) {
+      if (imageLoadState.value !== 'error') {
+        imageLoadState.value = 'error'
+        editorContext.resources.reportError?.(expectedImageSrc, 'Image could not be decoded')
+        readinessTicket?.settle()
+      }
+    }
+  }
+}
+
 watch(() => resolvedSourceIdentity(resolvedSource.value), () => {
     const source = resolvedSource.value
     readinessTicket = readinessSlot?.begin() ?? null
@@ -131,8 +153,16 @@ watch(() => resolvedSourceIdentity(resolvedSource.value), () => {
     imageLoadState.value = source.kind === 'image'
         ? 'loading'
         : source.kind === 'unavailable' ? 'error' : 'empty'
-    if (source.kind !== 'image') readinessTicket?.settle()
+    if (source.kind !== 'image' && source.kind !== 'pending') {
+      readinessTicket?.settle()
+    } else if (source.kind === 'image') {
+      void nextTick(() => checkImageStatus())
+    }
 }, { immediate: true })
+
+onMounted(() => {
+  checkImageStatus()
+})
 
 function isCurrentImageEvent(event: Event): boolean {
     const image = event.currentTarget

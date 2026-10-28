@@ -11,7 +11,14 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const DEFAULT_GITIGNORE: &str = ".opencard-init-*\n";
+const DEFAULT_GITIGNORE: &str = "\
+.opencard-init-*
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+";
 static REVISION_SNAPSHOTS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
 static GIT_OPERATION_LOCK: Mutex<()> = Mutex::new(());
 
@@ -2786,6 +2793,8 @@ mod tests {
         initialize_repository(directory.path().to_str().unwrap(), &identity()).unwrap();
         std::fs::write(directory.path().join("visible.txt"), "visible").unwrap();
         std::fs::write(directory.path().join(".opencard-init-hidden"), "hidden").unwrap();
+        std::fs::write(directory.path().join(".DS_Store"), "mac").unwrap();
+        std::fs::write(directory.path().join("Thumbs.db"), "win").unwrap();
 
         let status = read_status(directory.path().to_str().unwrap()).unwrap();
         assert!(status
@@ -2796,6 +2805,14 @@ mod tests {
             .entries
             .iter()
             .any(|entry| entry.path.contains("hidden")));
+        assert!(!status
+            .entries
+            .iter()
+            .any(|entry| entry.path.contains(".DS_Store")));
+        assert!(!status
+            .entries
+            .iter()
+            .any(|entry| entry.path.contains("Thumbs.db")));
     }
 
     /// 已跟踪文件的修改必须带 modified 标志：这种多位判定要用 `intersects`，

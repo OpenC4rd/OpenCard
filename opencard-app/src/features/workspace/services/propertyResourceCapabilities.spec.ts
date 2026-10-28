@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ProjectIconSeries } from '../model/projectIcons'
 import { buildProjectIconCatalog } from './projectIconCatalog'
 import type { ProjectResourceEnvironment } from './projectResourceEnvironment'
@@ -154,5 +154,23 @@ describe('createResourcePropertyCapabilities', () => {
       expect.objectContaining({ name: 'pack.png' }),
     ])
     expect(capabilities.resolveImagePreview?.('assets/hero.png')).toBe('resolved://assets/hero.png')
+  })
+
+  it('defers icon dimension reading until inlineStyle or previewStyle is accessed', () => {
+    const readIconDimensions = vi.fn(() => ({ width: 32, height: 32 }))
+    const capabilities = createResourcePropertyCapabilities({
+      projectLabel: 'Project',
+      projectIconCatalog: buildProjectIconCatalog(iconSeries, source => `asset://${source}`),
+      readIconDimensions,
+    })
+
+    expect(readIconDimensions).not.toHaveBeenCalled()
+
+    const entry = capabilities.icons?.[0]?.series[0]?.entries[0]
+    expect(entry).toBeDefined()
+    expect(readIconDimensions).not.toHaveBeenCalled()
+
+    expect(entry?.previewStyle).toBeDefined()
+    expect(readIconDimensions).toHaveBeenCalledOnce()
   })
 })

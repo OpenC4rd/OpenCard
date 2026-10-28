@@ -42,6 +42,17 @@ function buildIconScope(
   readDimensions: ProjectIconDimensionReader,
 ): PropertyIconScope {
   const prefix = packageKey ? `${packageKey}#` : ''
+  const entriesBySeries = new Map<string, ProjectIconCatalog['entries'][number][]>()
+  for (const entry of catalog.entries) {
+    const seriesKey = entry.seriesKey.toLocaleLowerCase()
+    let list = entriesBySeries.get(seriesKey)
+    if (!list) {
+      list = []
+      entriesBySeries.set(seriesKey, list)
+    }
+    list.push(entry)
+  }
+
   return {
     key,
     packageKey,
@@ -49,18 +60,20 @@ function buildIconScope(
     series: catalog.series.map(series => ({
       key: series.key,
       name: series.name,
-      entries: catalog.entries
-        .filter(entry => entry.seriesKey.toLocaleLowerCase() === series.key.toLocaleLowerCase())
-        .map(entry => ({
-          key: `${entry.seriesKey}/${entry.iconKey}`,
-          value: `${prefix}icon:${entry.seriesKey}/${entry.iconKey}`,
-          iconPath: `${prefix}${entry.seriesKey}/${entry.iconKey}`,
-          seriesKey: entry.seriesKey,
-          iconKey: entry.iconKey,
-          name: entry.name,
-          inlineStyle: createProjectIconStyle(entry, readDimensions),
-          previewStyle: createProjectIconPreviewStyle(entry, readDimensions),
-        })),
+      entries: (entriesBySeries.get(series.key.toLocaleLowerCase()) ?? []).map(entry => ({
+        key: `${entry.seriesKey}/${entry.iconKey}`,
+        value: `${prefix}icon:${entry.seriesKey}/${entry.iconKey}`,
+        iconPath: `${prefix}${entry.seriesKey}/${entry.iconKey}`,
+        seriesKey: entry.seriesKey,
+        iconKey: entry.iconKey,
+        name: entry.name,
+        get inlineStyle() {
+          return createProjectIconStyle(entry, readDimensions)
+        },
+        get previewStyle() {
+          return createProjectIconPreviewStyle(entry, readDimensions)
+        },
+      })),
     })),
   }
 }

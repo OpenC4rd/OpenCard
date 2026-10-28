@@ -191,7 +191,9 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
         children: series.entries.map(entry => ({
           key: projectIconSelectionKey(scope.packageKey, entry),
           title: entry.name,
-          thumbnailStyle: entry.inlineStyle,
+          get thumbnailStyle() {
+            return entry.inlineStyle
+          },
           thumbnailLabel: entry.name,
         })),
       }))

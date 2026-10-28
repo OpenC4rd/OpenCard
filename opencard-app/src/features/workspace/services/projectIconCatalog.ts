@@ -65,7 +65,18 @@ export function buildProjectIconCatalog(
 
   for (const item of series) {
     for (const icon of item.icons) {
-      entries.push({ ...icon, seriesKey: item.key, get src() { return resolveAssetSrc(icon.source) }, ...(readDimensions ? { readDimensions } : {}) })
+      let cachedSrc: string | undefined
+      entries.push({
+        ...icon,
+        seriesKey: item.key,
+        get src() {
+          if (cachedSrc === undefined) {
+            cachedSrc = resolveAssetSrc(icon.source)
+          }
+          return cachedSrc
+        },
+        ...(readDimensions ? { readDimensions } : {}),
+      })
     }
   }
 

@@ -79,6 +79,7 @@ export type ResourceRequest = {
 
 export type ResolvedResource =
   | { kind: 'empty' }
+  | { kind: 'pending' }
   | { kind: 'url', src: string }
   | { kind: 'icon', entry: ProjectIconCatalog['entries'][number] }
   | { kind: 'font', cssFamily: string }
@@ -145,8 +146,8 @@ function resolveImageResource(
   const parsed = parseResourceReference(value)
   if (parsed.reference?.kind === 'icon') {
     const resolved = resolveIconReference(value, context, request.blockId, fieldKey)
-    // 包正在解开：现在没有图可画，但它不是缺包 —— 出口与"这个字段是空的"完全一样。
-    if (resolved.pending) return { kind: 'empty' }
+    // 包正在解开：现在没有图可画，但它不是缺包 —— 出口与"等待中"完全一样。
+    if (resolved.pending) return { kind: 'pending' }
     return resolved.value
       ? { kind: 'icon', entry: resolved.value }
       : unavailable(resolved.diagnostics, 'Referenced icon is unavailable')
@@ -217,7 +218,11 @@ function resolveAssetResource(
       return { kind: 'unavailable', code: 'unsafe-path', message: `Resource scheme is not permitted: ${value}` }
     }
     const src = context.resolveRemoteResource ? context.resolveRemoteResource(value) : value
-    return src ? { kind: 'url', src } : context.remoteResourceStatus?.(value) === 'failed' ? { kind: 'unavailable', code: 'read-failed', message: `Unable to load remote resource: ${value}` } : { kind: 'empty' }
+    if (src) return { kind: 'url', src }
+    if (context.remoteResourceStatus?.(value) === 'failed') {
+      return { kind: 'unavailable', code: 'read-failed', message: `Unable to load remote resource: ${value}` }
+    }
+    return { kind: 'pending' }
   }
   const projectRootPath = context.resourceRootPath ?? context.hostEnvironment.rootPath ?? environment.rootPath
   const scopeRootPath = environment.rootPath ?? context.hostEnvironment.rootPath
@@ -232,12 +237,12 @@ function resolveAssetResource(
   })
   if (resolved.ok) {
     const fact = context.hostEnvironment.asset?.(resolved.value)
-    if (fact?.status === 'pending') return { kind: 'empty' }
+    if (fact?.status === 'pending') return { kind: 'pending' }
     if (fact?.status === 'missing' || fact?.status === 'failed' || fact?.status === 'decode-failed') return { kind: 'unavailable', code: fact.status === 'failed' ? 'read-failed' : fact.status, message: fact.message ?? 'Resource unavailable' }
     return { kind: 'url', src: fact?.src ?? convertFileSrc(resolved.value) }
   }
   // 包正在解开时，它的文件还没有落到磁盘上；这是"再等一下"，不是缺包。
-  if (resolved.code === 'package-unavailable' && isMaterializingReference(context, value)) return { kind: 'empty' }
+  if (resolved.code === 'package-unavailable' && isMaterializingReference(context, value)) return { kind: 'pending' }
   return { kind: 'unavailable', code: pathIssueCode(resolved.code), message: resolved.message }
 }
 

@@ -6,11 +6,11 @@
   color-scheme: light;
 }
 
-/* 材质开启时窗口底层交给系统：html 铺一层 72% 的主题底色，材质只当底色纹理，
+/* 材质开启时窗口底层交给系统：html 铺一层 75% 的主题底色，材质只当底色纹理，
    壁纸或背后的窗口不会把界面配色带跑；界面里的 base 层统一撤下颜色。
    薄纱落在 html 上只画一次，body 只负责把窗口层交给 --oc-bg-window。 */
 :root[data-oc-mica-backdrop='on'] {
-  background: color-mix(in srgb, var(--oc-bg-base) 72%, transparent);
+  background: color-mix(in srgb, var(--oc-bg-base) 75%, transparent);
 }
 
 :root[data-oc-mica-backdrop='on'] body {

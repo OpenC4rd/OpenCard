@@ -65,9 +65,8 @@
 </template>
 
 <script setup lang="ts">
-import type { NodeViewProps } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
 import OcAutocompleteList from '../../../components/standard/OcAutocompleteList.vue'
@@ -76,7 +75,7 @@ import type { BindingNodeOptions } from './bindingNode'
 import type { PropertyCompletionItem } from '../property-editor/propertyEditor.types'
 import { usePropertyCompletion } from '../property-editor/fields/usePropertyCompletion'
 
-const props = defineProps<NodeViewProps>()
+const props = defineProps(nodeViewProps)
 
 const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
   | ((key: string, parameters?: Record<string, unknown>) => string)

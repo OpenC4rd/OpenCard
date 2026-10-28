@@ -10,13 +10,12 @@
 </template>
 
 <script setup lang="ts">
-import type { NodeViewProps } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, getCurrentInstance } from 'vue'
 import type { ProjectIconNodeOptions } from './projectIconNode'
 
-const props = defineProps<NodeViewProps>()
+const props = defineProps(nodeViewProps)
 
 const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
   | ((key: string, parameters?: Record<string, unknown>) => string)

@@ -85,6 +85,32 @@ describe('ImageBlockRenderer', () => {
     expect(settle).toHaveBeenCalledOnce()
   })
 
+  it('keeps visual readiness pending while resource resolution is pending', async () => {
+    const settle = vi.fn()
+    const begin = vi.fn(() => ({ settle }))
+    const resources = {
+      resolve: () => ({ kind: 'pending' as const }),
+      resolveIconDimensions: () => undefined,
+      withScopes: () => resources,
+    }
+    mount(ImageBlockRenderer, {
+      props: { block: createBlock('/image.png'), placement: { kind: 'root' } },
+      global: {
+        provide: {
+          [cardEditorContextKey as symbol]: {
+            transformDisabledBlockIds: computed(() => new Set<string>()),
+            handleBlockClick: () => undefined,
+            resources,
+            visualReadiness: { createSlot: () => ({ begin, dispose: vi.fn() }) },
+          },
+        },
+      },
+    })
+
+    expect(begin).toHaveBeenCalledOnce()
+    expect(settle).not.toHaveBeenCalled()
+  })
+
   it('retries a broken image when its source changes', async () => {
     const wrapper = mount(ImageBlockRenderer, {
       props: { block: createBlock('/missing.png'), placement: { kind: 'root' } },
