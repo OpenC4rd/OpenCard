@@ -29,7 +29,6 @@ function block(id: string, zIndex: number, visible = true): RenderReadyTextBlock
     zIndex,
     rotation: 0,
     opacity: 1,
-    customCss: '',
     content: id,
     fontSize: '16px',
     fontFamily: '',

@@ -310,7 +310,7 @@ Agent 在 `shared/ui/foundation/themes.ts` 中新增语义 token 时，`OC_THEME
 
 **jsdom 层的边界**：测试跑在 jsdom 上，它没有图片解码、canvas 与 WebGL 实现，也不做真实排版。以下行为在这一层**无法**被验证，只能在真实窗口里人工确认，提交信息和进度报告都不得把它们写成"已验证"：
 
-- **光栅化输出本身**：`utils/exportCard.ts` 经 `dom-to-image-more` 生成 PNG/JPEG，测试必须 mock 该库，因此只覆盖选项映射与错误处理，不覆盖像素。
+- **光栅化输出本身**：`src/features/card-rendering/export/renderFaceToPng.ts` 经 Canvas 2D / OffscreenCanvas 生成 PNG 字节流，无头单测（jsdom/Node）仅验证 PNG 魔数、缩放倍率、图层与资源预加载调用，不覆盖像素着色。
 - **canvas / WebGL 画面**：`OcPhaseImage`、`WelcomeGravityField`、`AppearanceShaderPreview` 的实际渲染结果。
 - **依赖真实排版的几何**：jsdom 不做布局，`getBoundingClientRect` 一律为 0，基于它测量出来的位置与尺寸都需要真实窗口复核。
 - **`window.matchMedia`**：jsdom 不提供，读取前一律走 `shared/ui/foundation/prefersReducedMotion.ts`，不得直接读全局。

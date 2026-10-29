@@ -576,6 +576,18 @@ export function useSettingsViewModel(
           ],
         }),
         card('canvas-assist', options.translate('settings.cards.canvasAssist', 'Canvas assist'), [
+          fieldItem('workspace.cdeDotGridSpacingMm', {
+            title: options.translate('settings.fields.cdeDotGridSpacingMm', 'Canvas dot grid'),
+            fieldType: 'string', presentation: 'select',
+            options: ['0', '2.5', '5', '10'],
+            optionLabels: {
+              '0': options.translate('settings.values.cdeDotGridSpacingMm.off', 'Off'),
+              '2.5': options.translate('settings.values.cdeDotGridSpacingMm.compact', '2.5 mm (Dense)'),
+              '5': options.translate('settings.values.cdeDotGridSpacingMm.default', '5 mm (Default)'),
+              '10': options.translate('settings.values.cdeDotGridSpacingMm.loose', '10 mm (Sparse)'),
+            },
+          }, String(settings.workspace.cdeDotGridSpacingMm),
+          options.translate('settings.descriptions.cdeDotGridSpacingMm', 'Background dot grid spacing for the card design editor.')),
           fieldItem('workspace.showSelectionPositionOnMove', {
             title: options.translate('settings.fields.showSelectionPositionOnMove', 'Show guides while moving'), fieldType: 'boolean',
           }, settings.workspace.showSelectionPositionOnMove,

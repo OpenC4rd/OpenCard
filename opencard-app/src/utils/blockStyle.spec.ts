@@ -24,7 +24,6 @@ function createBlock(overrides: Partial<RenderReadyBaseBlock> = {}): RenderReady
         zIndex: 0,
         rotation: 0,
         opacity: 1,
-        customCss: '',
         ...overrides,
     }
 }
@@ -35,7 +34,7 @@ describe('getBlockBoxStyles', () => {
             borderColor: '#ff0000',
             borderWidth: 3,
             borderStyle: 'dashed',
-        }), { disableTransform: false })
+        }))
 
         expect(styles).toContain('width: 120px')
         expect(styles).toContain('height: 80px')
@@ -48,13 +47,13 @@ describe('getBlockBoxStyles', () => {
             borderColor: '#ff0000',
             borderWidth: 0,
             borderStyle: 'solid',
-        }), { disableTransform: false })
+        }))
 
         expect(styles).not.toContain('outline:')
     })
 
     it('keeps invisible blocks measurable while hiding their content', () => {
-        const styles = getBlockBoxStyles(createBlock({ visible: false }), { disableTransform: false })
+        const styles = getBlockBoxStyles(createBlock({ visible: false }))
 
         expect(styles).toContain('visibility: hidden')
         expect(styles).toContain('width: 120px')

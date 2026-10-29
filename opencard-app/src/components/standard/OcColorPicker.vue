@@ -2,22 +2,6 @@
   <span ref="rootRef" class="oc-color-picker" :class="[{ 'is-open': open }, attrs.class]" :style="attrs.style">
     <OcFieldFrame v-if="variant === 'field'" class="oc-color-picker__field"
       size="md" full-width :disabled="disabled" :style="fieldStyle">
-      <template #prefix>
-        <button
-          ref="triggerRef"
-          v-bind="triggerAttrs"
-          type="button"
-          class="oc-color-picker__field-trigger"
-          :disabled="disabled"
-          :aria-label="label"
-          :aria-expanded="open"
-          aria-haspopup="dialog"
-          @click="togglePicker"
-          @keydown.esc.stop="closePicker(true)"
-        >
-          <span class="oc-color-picker__field-dot" />
-        </button>
-      </template>
       <OcFieldInput
         class="oc-color-picker__field-input"
         variant="plain"
@@ -34,6 +18,22 @@
         @keydown.enter.prevent="commitInlineDraft"
         @keydown.esc.stop.prevent="restoreInlineDraft"
       />
+      <template #suffix>
+        <button
+          ref="triggerRef"
+          v-bind="triggerAttrs"
+          type="button"
+          class="oc-color-picker__field-trigger"
+          :disabled="disabled"
+          :aria-label="label"
+          :aria-expanded="open"
+          aria-haspopup="dialog"
+          @click="togglePicker"
+          @keydown.esc.stop="closePicker(true)"
+        >
+          <span class="oc-color-picker__field-dot" />
+        </button>
+      </template>
     </OcFieldFrame>
     <button
       v-else
@@ -60,7 +60,7 @@
     <OcOverlayMarker
       ref="layer"
       :group="pickerKey"
-      :anchor="triggerRef"
+      :anchor="variant === 'field' ? rootRef : triggerRef"
       :owner="rootRef"
       placement="bottom-start"
       :max-height="360"
@@ -559,6 +559,8 @@ function clampUnit(value: number): number {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .oc-color-picker__field-dot {
@@ -571,9 +573,9 @@ function clampUnit(value: number): number {
 
 .oc-color-picker__field-input {
   height: 100%;
-  padding: 0 var(--oc-space-xs) 0 0;
+  padding: 0 0 0 var(--oc-space-xs);
   font-size: var(--oc-text-xs);
-  text-align: right;
+  text-align: left;
   text-transform: uppercase;
 }
 

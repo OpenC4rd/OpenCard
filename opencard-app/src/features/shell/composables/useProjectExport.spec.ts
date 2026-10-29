@@ -1,9 +1,9 @@
 import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { EMPTY_PROJECT_ICON_CATALOG } from '../../workspace/services/projectIconCatalog'
-import { inlineProjectIconSources, useProjectExport } from './useProjectExport'
+import { useProjectExport } from './useProjectExport'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 
 const notificationMocks = vi.hoisted(() => ({
@@ -13,10 +13,14 @@ const notificationMocks = vi.hoisted(() => ({
   notifyWarning: vi.fn(),
 }))
 
-vi.mock('dom-to-image-more', () => ({
-  default: { toPng: vi.fn(async () => 'data:image/png;base64,AQ==') },
-}))
 vi.mock('../../notifications/titlebarNotices', () => notificationMocks)
+vi.mock('../../card-rendering/export/renderFaceToPng', () => ({
+  renderFaceToPng: vi.fn(async () => new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])),
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 function content(width: string): string {
   return JSON.stringify({
@@ -32,15 +36,11 @@ function content(width: string): string {
 function createAdapter(
   sessions: EditorSession[],
   readProjectFile = vi.fn(async () => content('640')),
-  exportRendererRef = ref<{
-    getCanvasElement?: () => HTMLElement | undefined
-  }>(),
   refresh = vi.fn(async (_paths?: readonly string[]) => undefined),
 ) {
   return {
     adapter: useProjectExport({
       sessions: ref(sessions),
-      exportRendererRef,
       renderEnvironment: ref({
         project: null,
         dictionary: null,
@@ -92,32 +92,6 @@ describe('useProjectExport document source', () => {
   })
 })
 
-describe('useProjectExport project icon assets', () => {
-  it('temporarily replaces icon source URLs stored in project-icon CSS variables', async () => {
-    const root = document.createElement('div')
-    const icon = document.createElement('span')
-    icon.className = 'oc-project-icon'
-    icon.style.setProperty('--oc-project-icon-background-image', 'url("asset://atlas.png")')
-    icon.style.setProperty('--oc-project-icon-mask-image', 'url("asset://warn.svg")')
-    root.appendChild(icon)
-    vi.stubGlobal('fetch', vi.fn(async (source: string) => ({
-      ok: true,
-      blob: async () => new Blob([source], { type: 'image/png' }),
-    })))
-
-    const restore = await inlineProjectIconSources(root)
-
-    expect(icon.style.getPropertyValue('--oc-project-icon-background-image')).toMatch(/^url\("data:image\/png;base64,/)
-    expect(icon.style.getPropertyValue('--oc-project-icon-mask-image')).toMatch(/^url\("data:image\/png;base64,/)
-    expect(fetch).toHaveBeenCalledTimes(2)
-    restore()
-    expect(icon.style.getPropertyValue('--oc-project-icon-background-image')).toBe('url("asset://atlas.png")')
-    expect(icon.style.getPropertyValue('--oc-project-icon-mask-image')).toBe('url("asset://warn.svg")')
-    vi.unstubAllGlobals()
-  })
-})
-
-
 it('cancels single-card rendering and waits for its active resource step before releasing', async () => {
   const { prepareCardRender } = await import('../../card-rendering/renderPipeline')
   const { parseCardDocument } = await import('../../../entities/card/storage')
@@ -127,8 +101,7 @@ it('cancels single-card rendering and waits for its active resource step before 
     projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG, projectResourceEnvironment: { kind: 'project', namespace: 'test', rootPath: null, fontDocument: {}, fonts: {}, iconDocument: {}, iconCatalog: EMPTY_PROJECT_ICON_CATALOG, waitForResources: () => resources },
   } })
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 0 })
-  const canvas = document.createElement('div')
-  const { adapter } = createAdapter([], undefined, ref({ getCanvasElement: () => canvas }))
+  const { adapter } = createAdapter([])
   const exporting = adapter.renderCardImages(render, ['front'], 1)
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
   let released = false
@@ -149,7 +122,7 @@ it('invalidates written files only when they land inside the project', async () 
   const render = prepareCardRender({ document: parseCardDocument(JSON.parse(content('100'))), instance: null, resourceRootPath: 'D:/project', sourceFilePath: null, environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG } })
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 0 })
   const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockResolvedValue(undefined)
-  const { adapter } = createAdapter([], undefined, ref({ getCanvasElement: () => document.createElement('div') }), refresh)
+  const { adapter } = createAdapter([], undefined, refresh)
   try {
     await adapter.renderCardImages(render, ['front'], 1, new Map([['front', 'D:/exports/front.png']]))
     expect(refresh).not.toHaveBeenCalled()
@@ -165,7 +138,7 @@ it('reports a single-card write failure and waits for an ongoing write on cancel
   const render = prepareCardRender({ document: parseCardDocument(JSON.parse(content('100'))), instance: null, resourceRootPath: null, sourceFilePath: null, environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG } })
   const write = vi.spyOn(fileSystemService, 'writeBinaryFile').mockRejectedValueOnce(new Error('disk full'))
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 0 })
-  const { adapter } = createAdapter([], undefined, ref({ getCanvasElement: () => document.createElement('div') }))
+  const { adapter } = createAdapter([])
   try {
     expect(await adapter.renderCardImages(render, ['front'], 1, new Map([['front', '/out/front.png']]))).toBeNull()
     expect(notificationMocks.notifyAppError).toHaveBeenCalledWith('OC-E5006', expect.objectContaining({ message: 'disk full' }))
@@ -180,4 +153,97 @@ it('reports a single-card write failure and waits for an ongoing write on cancel
     finish(); await exporting; await closing
     expect(adapter.isRunning.value).toBe(false)
   } finally { write.mockRestore(); vi.unstubAllGlobals() }
+})
+
+it('shares preloaded CanvasAssetStore across multi-card faces in a batch export', async () => {
+  const renderFaceToPngModule = await import('../../card-rendering/export/renderFaceToPng')
+  const renderSpy = vi.spyOn(renderFaceToPngModule, 'renderFaceToPng').mockImplementation(async () => {
+    return new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  })
+  const { prepareCardRender } = await import('../../card-rendering/renderPipeline')
+  const { parseCardDocument } = await import('../../../entities/card/storage')
+
+  const render = prepareCardRender({
+    document: parseCardDocument(JSON.parse(content('200'))),
+    instance: null,
+    resourceRootPath: null,
+    sourceFilePath: null,
+    environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG },
+  })
+
+  const { adapter } = createAdapter([])
+  try {
+    await adapter.renderCardImages(render, ['front', 'back'], 1)
+
+    expect(renderSpy).toHaveBeenCalledTimes(2)
+    const firstAssets = renderSpy.mock.calls[0]?.[1]?.assets
+    const secondAssets = renderSpy.mock.calls[1]?.[1]?.assets
+
+    expect(firstAssets).toBeDefined()
+    expect(secondAssets).toBeDefined()
+    expect(firstAssets).toBe(secondAssets)
+  } finally {
+    renderSpy.mockRestore()
+  }
+})
+
+it('clears the shared CanvasAssetStore on export completion, cancellation, and error', async () => {
+  const renderFaceToPngModule = await import('../../card-rendering/export/renderFaceToPng')
+  let sharedAssetsInstance: import('../../card-rendering/painter/canvasAssetStore').CanvasAssetStore | null = null
+  const renderSpy = vi.spyOn(renderFaceToPngModule, 'renderFaceToPng').mockImplementation(async (_scene, options) => {
+    sharedAssetsInstance = options?.assets ?? null
+    return new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  })
+
+  const { prepareCardRender } = await import('../../card-rendering/renderPipeline')
+  const { parseCardDocument } = await import('../../../entities/card/storage')
+
+  const render = prepareCardRender({
+    document: parseCardDocument(JSON.parse(content('200'))),
+    instance: null,
+    resourceRootPath: null,
+    sourceFilePath: null,
+    environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG },
+  })
+
+  const { adapter } = createAdapter([])
+
+  try {
+    // 1. Success case
+    await adapter.renderCardImages(render, ['front'], 1)
+    expect(sharedAssetsInstance).not.toBeNull()
+    const clearSpy = vi.spyOn(sharedAssetsInstance!, 'clear')
+
+    // Run another export to verify clear is called in finally block
+    await adapter.renderCardImages(render, ['front'], 1)
+    expect(clearSpy).toHaveBeenCalled()
+
+    // 2. Cancellation case
+    clearSpy.mockClear()
+    let pauseResolve!: () => void
+    const pausePromise = new Promise<void>(res => { pauseResolve = res })
+    renderSpy.mockImplementationOnce(async (_scene, options) => {
+      sharedAssetsInstance = options?.assets ?? null
+      await pausePromise
+      if (options?.signal?.aborted) throw new DOMException('Export cancelled', 'AbortError')
+      return new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    })
+
+    const pendingExport = adapter.renderCardImages(render, ['front'], 1)
+    await Promise.resolve()
+    adapter.cancel()
+    pauseResolve()
+    await pendingExport
+    expect(clearSpy).toHaveBeenCalled()
+
+    // 3. Error case
+    clearSpy.mockClear()
+    renderSpy.mockImplementationOnce(async () => {
+      throw new Error('Rendering engine failure')
+    })
+    await adapter.renderCardImages(render, ['front'], 1)
+    expect(clearSpy).toHaveBeenCalled()
+  } finally {
+    renderSpy.mockRestore()
+  }
 })

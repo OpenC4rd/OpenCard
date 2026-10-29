@@ -54,7 +54,6 @@ type RenderParseFailure =
   | 'invalid-object'
   const blockTypes: readonly BlockType[] = [
   'text-block',
-  'markdown-text-block',
   'image-block',
   'qrcode-block',
   'shape-block',
@@ -86,6 +85,7 @@ export function parseRenderDocument(
 
   const width = fields.number('width')
   const height = fields.number('height')
+  const dpi = typeof source.dpi === 'number' && Number.isFinite(source.dpi) && source.dpi > 0 ? source.dpi : undefined
   const faces = toRecord(source.faces)
   const document: RenderReadyCardDocument = {
     type: 'card-document',
@@ -94,9 +94,10 @@ export function parseRenderDocument(
     version: fields.string('version'),
     description: fields.optionalString('description'),
     notes: fields.optionalString('notes'),
+    dpi,
     faces: {
-      front: parseFace(faces.front, 'front', width, height, id, context.instanceId, issues),
-      back: parseFace(faces.back, 'back', width, height, id, context.instanceId, issues),
+      front: parseFace(faces.front, 'front', width, height, id, context.instanceId, issues, dpi),
+      back: parseFace(faces.back, 'back', width, height, id, context.instanceId, issues, dpi),
     },
   }
 
@@ -161,6 +162,7 @@ function parseFace(
   documentId: string,
   instanceId: string | null,
   issues: CardPipelineIssue[],
+  dpi?: number,
 ): RenderReadyCardFace {
   const source = toRecord(faceValue)
   const context: IssueContext = {
@@ -182,6 +184,7 @@ function parseFace(
     faceKey,
     width,
     height,
+    dpi,
     background: fields.string('background'),
     children: fields.array('children').map((childValue) => {
       const child = toRecord(childValue)
@@ -216,7 +219,7 @@ function parseBlock(
     typeName: type,
   }
   const fields = createFieldReader(source, context, issues, allowTypedLiterals)
-  const base = parseBaseBlock(source, fields)
+  const base = parseBaseBlock(source, fields, context, issues)
 
   context.blockId = base.id || undefined
   context.owner = { kind: 'block', id: base.id }
@@ -224,7 +227,6 @@ function parseBlock(
 
   switch (type) {
     case 'text-block':
-    case 'markdown-text-block':
       return {
         ...base,
         type,
@@ -324,7 +326,12 @@ function readyBlockName(block: RenderReadyCardBlock): string {
   return typeof block.name === 'string' ? block.name : block.id
 }
 
-function parseBaseBlock(source: SourceRecord, fields: FieldReader): RenderReadyBaseBlock {
+function parseBaseBlock(
+  source: SourceRecord,
+  fields: FieldReader,
+  context: IssueContext,
+  issues: CardPipelineIssue[],
+): RenderReadyBaseBlock {
   const ready: RenderReadyBaseBlock = {
     id: fields.string('id'),
     name: fields.string('name'),
@@ -345,8 +352,26 @@ function parseBaseBlock(source: SourceRecord, fields: FieldReader): RenderReadyB
     zIndex: fields.number('zIndex'),
     rotation: fields.number('rotation'),
     opacity: fields.number('opacity'),
-    customCss: fields.string('customCss'),
   }
+
+  if (typeof source.customCss === 'string' && source.customCss.trim() !== '') {
+    issues.push(createCardPipelineIssue({
+      type: 'card-designer.render-parse.deprecated-property',
+      location: {
+        documentId: context.documentId,
+        instanceId: context.instanceId,
+        faceKey: context.faceKey,
+        owner: context.owner,
+        ...(context.blockId ? { blockId: context.blockId } : {}),
+        ...(context.blockPath ? { blockPath: context.blockPath } : {}),
+        fieldKey: 'customCss',
+      },
+      parameters: {
+        propertyName: 'customCss',
+      },
+    }))
+  }
+
   const schema = resolvePropertyEditorSchema(source)
   for (const fieldKey of schema.customKeys) {
     if (!Object.prototype.hasOwnProperty.call(source, fieldKey)) continue
@@ -695,6 +720,26 @@ function resolveBlockType(
   const rawType = source.type
   if (typeof rawType === 'string' && blockTypes.includes(rawType as BlockType)) {
     return rawType as BlockType
+  }
+  /** 旧文档里的独立 Markdown 块已并入文本块：记录废弃警告并安全归位为文本块。 */
+  if (rawType === 'markdown-text-block') {
+    issues.push(createCardPipelineIssue({
+      type: 'card-designer.render-parse.deprecated-block-type',
+      location: {
+        documentId,
+        instanceId,
+        faceKey,
+        owner: { kind: 'block', id: primitiveString(source.id) },
+        ...(primitiveString(source.id) ? { blockId: primitiveString(source.id) } : {}),
+        ...(parentPath ? { blockPath: joinBlockPath(parentPath, primitiveString(source.name)) } : {}),
+        fieldKey: 'type',
+      },
+      parameters: {
+        rawType: 'markdown-text-block',
+        fallbackType: 'text-block',
+      },
+    }))
+    return 'text-block'
   }
 
   const fallbackType: BlockType = 'text-block'

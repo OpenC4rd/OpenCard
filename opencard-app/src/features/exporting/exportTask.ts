@@ -83,6 +83,7 @@ export type ExportRenderRequest = {
   faceKey: CardFaceKey
   render: PreparedCardRender
   scale: number
+  dpi?: number
 }
 
 export interface ExportDocumentSource {
@@ -121,6 +122,7 @@ export function createDefaultProjectExportTask(): ProjectExportTask {
     documentPaths: [],
     selectionMode: 'blueprint-and-instances',
     scale: 1,
+    dpi: 300,
     layoutMode: 'none',
     outputDirectory: '',
     conflictMode: 'replace',
@@ -144,7 +146,8 @@ export function validateExportTask(task: ProjectExportTask): ExportTaskValidatio
     identities.add(identity)
   }
 
-  if (!Number.isFinite(task.scale) || task.scale < 0.1) issues.push({ code: 'invalid-scale' })
+  const scale = task.scale ?? (task.dpi ? task.dpi / 25.4 : 1)
+  if (!Number.isFinite(scale) || scale < 0.1) issues.push({ code: 'invalid-scale' })
   if (task.layoutMode !== 'none') issues.push({ code: 'layout-unavailable' })
   if (!task.outputDirectory.trim()) issues.push({ code: 'output-required' })
   if (!['continue', 'stop'].includes(resolveExportErrorPolicy(task))) {

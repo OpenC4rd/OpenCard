@@ -4,11 +4,15 @@ import { useRichTextFormatting } from './useRichTextFormatting'
 import { resolveRichTextStyle } from '../../rich-text/richTextResourceStyle'
 import { Extension, type ChainedCommands, type Editor, type JSONContent } from '@tiptap/core'
 import { richTextStyleExtensions, fontVariable } from './richTextStyleExtensions'
-import { richTextParseOptions, canonicalEditorHtml, visualEditorHtml, equivalentRichTextHtml } from './richTextEditorHtml'
-import { NodeSelection, Selection } from '@tiptap/pm/state'
+import {
+  cardMarkupToTiptap,
+  serializeTiptapMarkup,
+  isLegacyHtml,
+  type TiptapBridgeNode,
+} from '../../../features/card-rendering/markup'
+import { NodeSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
-import { DOMParser as ProseMirrorParser, DOMSerializer, type Node as ProseMirrorNode } from '@tiptap/pm/model'
-import { closeHistory } from '@tiptap/pm/history'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import Color from '@tiptap/extension-color'
 import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
@@ -42,8 +46,9 @@ import {
 } from './richTextFormat'
 
 export type RichTextEditorProps = {
-  /** 本次会话的初始 HTML。挂载后内容由编辑器文档持有。 */
-  initialHtml: string
+  /** 本次会话的初始内容（Card Markup 或旧 HTML）。挂载后内容由编辑器文档持有。 */
+  initialContent?: string
+  initialHtml?: string
   /** 行内表达式补全服务。 */
   bindingCompletion?: PropertyCompletionProvider
   /** 编辑区继承的基础字体与字号。 */
@@ -62,8 +67,9 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   const tr = (key: string, fallback: string, parameters?: Record<string, unknown>): string =>
     translate?.(key, parameters) ?? fallback
 
+  const initialSource = props.initialContent ?? props.initialHtml ?? ''
   let originalDocument: ProseMirrorNode | null = null
-  let appliedSource: { document: ProseMirrorNode; html: string } | null = null
+  let appliedSource: { document: ProseMirrorNode; source: string } | null = null
   const toolbarRevision = ref(0)
   const interaction = createRichTextInteraction(() => editor.value, (node, previewStyle) => {
     const attributes = node.marks.find(mark => mark.type.name === 'textStyle')?.attrs ?? {}
@@ -301,8 +307,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   })
   const nodeEditOpen = computed(() => Boolean(selectedNodeAnchor.value))
   const editor = useEditor({
-    content: visualEditorHtml(props.initialHtml),
-    parseOptions: richTextParseOptions,
+    content: cardMarkupToTiptap(initialSource) as unknown as JSONContent,
     extensions: [
       Extension.create({ name: 'formatInteraction', addProseMirrorPlugins: () => [interaction.plugin] }),
       StarterKit.configure({
@@ -344,31 +349,28 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     if (current && !current.isDestroyed) current.view.updateState(current.state)
   })
 
-  function getHtml(): string {
+  function getContent(): string {
     const current = editor.value
-    if (!current) return props.initialHtml
-    if (appliedSource?.document.eq(current.state.doc)) return appliedSource.html
-    if (originalDocument?.eq(current.state.doc)) return props.initialHtml
-    return canonicalEditorHtml(current.getHTML())
+    if (!current) return initialSource
+    if (appliedSource?.document.eq(current.state.doc)) {
+      if (!isLegacyHtml(appliedSource.source)) return appliedSource.source
+    }
+    if (originalDocument?.eq(current.state.doc)) {
+      if (!isLegacyHtml(initialSource)) return initialSource
+    }
+    return serializeTiptapMarkup(current.getJSON() as unknown as TiptapBridgeNode)
   }
-  function applyHtml(html: string): boolean {
+  function setContent(source: string): boolean {
     const current = editor.value
     if (!current) return false
-    const dom = new DOMParser().parseFromString(visualEditorHtml(html), 'text/html').body
-    const next = ProseMirrorParser.fromSchema(current.schema).parse(dom, richTextParseOptions)
-    const output = document.createElement('div')
-    output.append(DOMSerializer.fromSchema(current.schema).serializeFragment(next.content))
-    if (!equivalentRichTextHtml(html, canonicalEditorHtml(output.innerHTML))) return false
     interaction.release()
-    if (!next.eq(current.state.doc)) {
-      const transaction = closeHistory(current.state.tr).replaceWith(0, current.state.doc.content.size, next.content)
-      transaction.setSelection(Selection.atStart(transaction.doc))
-      current.view.dispatch(transaction)
-      current.view.dispatch(closeHistory(current.state.tr))
-    }
-    appliedSource = { document: current.state.doc, html }
+    const docNode = cardMarkupToTiptap(source)
+    current.commands.setContent(docNode as unknown as JSONContent, false)
+    appliedSource = { document: current.state.doc, source }
     return true
   }
+  const getHtml = getContent
+  const applyHtml = setContent
   function flushPendingInput(): boolean {
     if (editor.value?.view.composing) return false
     const detail = { ready: true }
@@ -480,7 +482,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   }
 
   return {
-    editor, focus, getHtml, applyHtml, flushPendingInput, endInteraction: interaction.release,
+    editor, focus, getHtml, applyHtml, getContent, setContent, flushPendingInput, endInteraction: interaction.release,
     fontVariables, captureInteraction, colorOpen, formatting, interaction,
     fontFieldDefinition, fontSizeFieldDefinition, activeFontFamily, activeFontSize,
     runCommand, insertTable, tableAction, handleTableAction, insertBinding,

@@ -59,10 +59,6 @@ export type TextBlock = TextContentBlock & {
     type: "text-block"
 }
 
-export type MarkdownTextBlock = TextContentBlock & {
-    type: "markdown-text-block"
-}
-
 export type ImageBlock = BlockIdentity & {
     type: "image-block"
     source: string
@@ -138,7 +134,12 @@ export type CustomBlock = BlockIdentity & {
     source: string
 }
 
-export type CardBlock = TextBlock | MarkdownTextBlock | ImageBlock | QrCodeBlock | ShapeBlock | SimpleContainerBlock | FlowContainerBlock | CustomBlock
+/**
+ * @deprecated “Markdown 文本块”（markdown-text-block）已废弃，统一使用 TextBlock
+ */
+export type MarkdownTextBlock = TextBlock & { type: 'markdown-text-block' }
+
+export type CardBlock = TextBlock | ImageBlock | QrCodeBlock | ShapeBlock | SimpleContainerBlock | FlowContainerBlock | CustomBlock
 
 export type RootChild = {
     block: CardBlock
@@ -169,6 +170,7 @@ export type CardDocument = {
     version: string
     width: string
     height: string
+    dpi?: number
     faces: Record<CardFaceKey, CardFace>
     instances: CardInstanceRecord[]
     dataTable?: CardDataTableConfiguration
@@ -352,7 +354,9 @@ type BlockInit = {
     borderColor?: string; borderWidth?: string; borderStyle?: 'solid' | 'dashed' | 'dotted'
     borderRadius?: CssValue; background?: string; translateX?: CssValue; translateY?: CssValue
     scaleX?: string; scaleY?: string; transformAnchor?: AnchorPosition; zIndex?: string
-    rotation?: string; opacity?: string; customCss?: string
+    rotation?: string; opacity?: string
+    /** @deprecated 自定义 CSS 属性已废弃并移除，不再生效 */
+    customCss?: string
     additionalFieldDefinition?: AdditionalFieldDefinitionMap
 }
 type TextBlockInit = BlockInit & {
@@ -360,7 +364,6 @@ type TextBlockInit = BlockInit & {
     color?: string; textAlign?: AlignmentPosition; verticalAlign?: VerticalAlignmentPosition
     lineHeight?: CssValue; writingMode?: TextWritingMode
 }
-type MarkdownTextBlockInit = TextBlockInit
 type ImageBlockInit = BlockInit & { source?: string; maskSource?: string; fit?: 'cover' | 'contain' | 'fill'; maskFit?: 'cover' | 'contain' | 'fill' }
 type QrCodeBlockInit = BlockInit & { content?: string; errorCorrection?: 'L' | 'M' | 'Q' | 'H'; foreground?: string; backgroundColor?: string; quietZone?: string }
 type ShapeBlockInit = BlockInit & { shape?: ShapeBlock['shape']; fill?: string; stroke?: string; strokeWidth?: string; strokeStyle?: ShapeBlock['strokeStyle']; strokeAlignment?: ShapeBlock['strokeAlignment']; strokeJoin?: ShapeBlock['strokeJoin']; strokeCap?: ShapeBlock['strokeCap']; strokeMiterLimit?: string }
@@ -398,8 +401,6 @@ function getDefaultBlockName(type: CardBlock['type']): string {
     switch (type) {
         case 'text-block':
             return 'Text Block'
-        case 'markdown-text-block':
-            return 'Markdown Text Block'
         case 'image-block':
             return 'Image Block'
         case 'qrcode-block':
@@ -421,7 +422,6 @@ function getDefaultBlockName(type: CardBlock['type']): string {
  */
 const blockSeedFieldKeys: Record<CardBlock['type'], readonly string[]> = {
     'text-block': ['width', 'height', 'fontSize', 'fontWeight', 'color', 'textAlign', 'verticalAlign', 'lineHeight'],
-    'markdown-text-block': ['width', 'height', 'fontSize', 'fontWeight', 'color', 'textAlign', 'verticalAlign', 'lineHeight'],
     'image-block': ['width', 'height'],
     'qrcode-block': ['width', 'height'],
     'shape-block': ['width', 'height'],
@@ -448,19 +448,6 @@ export function createTextBlock(init: TextBlockInit = {}): TextBlock {
         type: 'text-block',
         content: init.content ?? '',
     } as TextBlock
-}
-
-export function createMarkdownTextBlock(init: MarkdownTextBlockInit = {}): MarkdownTextBlock {
-    return {
-        ...createBlockIdentity({
-            id: init.id ?? createBlockId('markdown-text-block'),
-            name: init.name ?? getDefaultBlockName('markdown-text-block'),
-            ...createBlockSeed('markdown-text-block'),
-            ...init,
-        }),
-        type: 'markdown-text-block',
-        content: init.content ?? '',
-    } as MarkdownTextBlock
 }
 
 export function createImageBlock(init: ImageBlockInit = {}): ImageBlock {
@@ -547,7 +534,7 @@ export function createFlowContainerBlock(init: FlowContainerBlockInit = {}): Flo
         ...(init.packaged !== undefined ? { packaged: init.packaged } : {}),
         clip: init.clip ?? 'false',
         direction: init.direction ?? 'lr',
-        gap: init.gap ?? '10px',
+        gap: init.gap ?? '2mm',
         children: init.children ? [...init.children] : [],
     }
 
@@ -567,7 +554,6 @@ export function createCustomBlock(init: CustomBlockInit = {}): CustomBlock {
 }
 
 export function createBlock(type: 'text-block', init?: TextBlockInit): TextBlock
-export function createBlock(type: 'markdown-text-block', init?: MarkdownTextBlockInit): MarkdownTextBlock
 export function createBlock(type: 'image-block', init?: ImageBlockInit): ImageBlock
 export function createBlock(type: 'qrcode-block', init?: QrCodeBlockInit): QrCodeBlock
 export function createBlock(type: 'shape-block', init?: ShapeBlockInit): ShapeBlock
@@ -578,8 +564,6 @@ export function createBlock(type: CardBlock['type'], init: unknown = {}): CardBl
     switch (type) {
         case 'text-block':
             return createTextBlock(init as TextBlockInit)
-        case 'markdown-text-block':
-            return createMarkdownTextBlock(init as MarkdownTextBlockInit)
         case 'image-block':
             return createImageBlock(init as ImageBlockInit)
         case 'qrcode-block':

@@ -115,6 +115,7 @@ describe('useCdeViewportController', () => {
 
   it('projects preview geometry from the single transform', () => {
     const { controller, wrapper } = createHarness()
+    controller.handleViewportTransformChange({ x: 0, y: 0, scale: 1 })
     const host = controller.transformPreviewHostRef.value!
     resizeHost(host, 200, 100)
     controller.handleViewportSizeChange({ width: 100, height: 50 })
@@ -129,8 +130,22 @@ describe('useCdeViewportController', () => {
     wrapper.unmount()
   })
 
+  it('expands preview scale beyond unity when logical face size is smaller than host', () => {
+    const { controller, wrapper } = createHarness({ width: 50, height: 100 })
+    const host = controller.transformPreviewHostRef.value!
+    resizeHost(host, 200, 200)
+
+    expect(controller.transformPreviewScale.value).toBe(2)
+    expect(controller.transformPreviewViewportStyle.value).toEqual({
+      width: '100px',
+      height: '200px',
+    })
+    wrapper.unmount()
+  })
+
   it('maps preview wheel coordinates into viewport coordinates', () => {
     const { controller, wrapper, zoomByWheelAt } = createHarness()
+    controller.handleViewportTransformChange({ x: 0, y: 0, scale: 1 })
     resizeHost(controller.transformPreviewHostRef.value!, 200, 100)
     controller.handleViewportSizeChange({ width: 100, height: 50 })
     vi.spyOn(controller.transformPreviewViewportRef.value!, 'getBoundingClientRect')

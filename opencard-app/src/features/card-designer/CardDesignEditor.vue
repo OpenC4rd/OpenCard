@@ -55,7 +55,7 @@
                   :show-position-on-move="workspaceMode === 'design' && (settingsStore.settings.value.workspace.showSelectionPositionOnMove ?? true)"
                   :show-size-on-resize="workspaceMode === 'design' && (settingsStore.settings.value.workspace.showSelectionSizeOnResize ?? true)"
                   :alignment-snapping-enabled="workspaceMode === 'design' && alignmentSnappingEnabled"
-                  :transform-disabled-block-ids="transformDisabledBlockIds"
+                  :dot-grid-spacing-mm="settingsStore.settings.value.workspace.cdeDotGridSpacingMm ?? 5"
                   @pointerdown.capture="handleCanvasPointerDown" @block-click="handleEffectiveViewportBlockClick"
                   @blank-click="clearEffectiveBlockSelection" @resize-selection="handleSelectionResize"
                   @move-selection="handleSelectionMove" @selection-action="handleSelectionAction"
@@ -144,7 +144,8 @@
                   <div ref="transformPreviewViewportRef" class="card-design-editor__transform-preview-viewport"
                     :style="transformPreviewViewportStyle">
                     <CardFaceRenderer v-if="viewFace && renderResources" :face="viewFace" :clip-to-face="true"
-                      :resource-context="renderResources" :style="transformPreviewRendererStyle" />
+                      :resource-context="renderResources" :render-scale="transformPreviewScale"
+                      :style="transformPreviewRendererStyle" />
                     <button v-if="transformPreviewFrameStyle" type="button"
                       class="card-design-editor__transform-preview-frame"
                       :class="{ 'is-visible': isTransformPreviewFrameVisible, 'is-dragging': isPreviewViewportDragging }"
@@ -1294,24 +1295,6 @@ const layerViewShortcutHints = computed(() => [
     label: t('cardDesigner.layerView.switchExistingLayer'),
   },
 ])
-const transformDisabledBlockIds = computed(() => {
-  const block = selectedBlock.value
-  if (!block) {
-    return []
-  }
-
-  const ids: string[] = []
-  let current: CardBlock | null = block
-  while (current) {
-    ids.push(current.id)
-    const parent = parentLookup.value.get(current.id)
-    if (!parent || parent.type === 'card-face') {
-      break
-    }
-    current = parent
-  }
-  return ids
-})
 const renderTargetInstance = computed(() => (
   selectedCardId.value === BLUEPRINT_CARD_ID ? null : selectedCard.value ?? null
 ))
@@ -1359,6 +1342,7 @@ const {
   transformPreviewFrameStyle,
   transformPreviewHostRef,
   transformPreviewRendererStyle,
+  transformPreviewScale,
   transformPreviewViewportRef,
   transformPreviewViewportStyle,
   viewportScaleLabel,
@@ -2164,6 +2148,8 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  padding: var(--oc-space-xs);
+  box-sizing: border-box;
 }
 
 .card-design-editor__transform-preview-viewport {

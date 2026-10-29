@@ -1,9 +1,4 @@
 <template>
-  <div v-if="showExportRenderer" style="position: fixed; top: -9999px; left: -9999px;">
-    <CardFaceRenderer v-if="exportCardFace && exportResourceContext" :ref="setExportRendererRef"
-      :face="exportCardFace" :clip-to-face="true" :resource-context="exportResourceContext" />
-  </div>
-
   <ProjectExportDialog :open="projectExportDialogOpen" :model-value="projectExportDialogTask"
     :documents="projectExportDocumentCandidates" :busy="isExportPreparing || isProjectExportRunning"
     :preparation-issues="exportPreparationIssues" @update:model-value="emit('update:projectExportDialogTask', $event)"
@@ -26,23 +21,15 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue'
-import CardFaceRenderer from '../../card-rendering/components/CardFaceRenderer.vue'
 import ProjectExportDialog from '../../exporting/components/ProjectExportDialog.vue'
 import ResourcePackageBuilderDialog from '../../workspace/components/ResourcePackageBuilderDialog.vue'
 import UnsavedEditorsDialog from './UnsavedEditorsDialog.vue'
 import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
 import type { ExportDocumentCandidate } from '../../../components/editors/ProjectExportTaskEditor.vue'
 import type { ExportTaskValidationIssue } from '../../exporting/exportTask'
-import type { RenderReadyCardFace } from '../../card-rendering/render.types'
-import type { CardRenderResourceContext } from '../../card-rendering/cardRenderResources'
 import type { UnsavedCloseIntent, UnsavedEditorDecision } from '../composables/useUnsavedSessionGuard'
 
 defineProps<{
-  showExportRenderer: boolean
-  exportCardFace: RenderReadyCardFace | null
-  exportResourceContext: CardRenderResourceContext | null
-  setExportRendererRef: (renderer: Element | ComponentPublicInstance | null) => void
   projectExportDialogOpen: boolean
   projectExportDialogTask: ProjectExportTask
   projectExportDocumentCandidates: readonly ExportDocumentCandidate[]

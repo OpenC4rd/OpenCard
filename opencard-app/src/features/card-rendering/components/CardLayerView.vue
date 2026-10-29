@@ -5,13 +5,8 @@
     @pointerup="handlePointerUp"
     @wheel.stop.prevent="handleWheel"
   >
-    <aside
-      v-if="facePreviewHtml"
-      class="card-layer-view__card-preview"
-      :style="facePreviewStyle"
-      aria-hidden="true"
-    >
-      <div class="card-layer-view__card-preview-content" v-html="facePreviewHtml" />
+    <aside class="card-layer-view__card-preview" :style="facePreviewStyle" aria-hidden="true">
+      <canvas class="card-layer-view__preview-canvas" :width="props.face.width" :height="props.face.height" @vue:mounted="paintCanvas" />
     </aside>
 
     <div class="card-layer-view__stack">
@@ -55,9 +50,13 @@
           </span>
           <span
             class="card-layer-view__block"
-            :style="getBlockStyle(snapshot, layer)"
           >
-            <span class="card-layer-view__block-content" v-html="snapshot.html" />
+            <canvas
+              class="card-layer-view__block-content"
+              :width="props.face.width"
+              :height="props.face.height"
+              @vue:mounted="paintSnapshotCanvas"
+            />
           </span>
         </button>
       </section>
@@ -121,13 +120,16 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSPro
 import { pinyin } from 'pinyin-pro'
 import OcShortcut, { type OcShortcutPart } from '../../../components/standard/OcShortcut.vue'
 import type { RenderReadyCardFace } from '../render.types'
+import type { CardRenderResourceContext } from '../cardRenderResources'
 import { buildCardLayerGroups, type CardLayerGroup } from './cardLayerModel'
+import { computeSceneLayout } from '../geometry'
+import { createCanvasAssetStore } from '../painter/canvasAssetStore'
+import { paintCardScene } from '../painter/paintCardScene'
 import { prefersReducedMotion } from '../../../shared/ui/foundation'
 
 type Snapshot = {
   id: string
   name: string
-  html: string
   width: number
   height: number
   x: number
@@ -154,7 +156,7 @@ const RULER_STACK_GAP = 78
 
 const props = defineProps<{
   face: RenderReadyCardFace
-  sourceRoot: HTMLElement | null
+  resourceContext?: CardRenderResourceContext
   selectedBlockId?: string | null
   viewportWidth: number
   viewportHeight: number
@@ -171,9 +173,12 @@ const emit = defineEmits<{
 }>()
 
 const rootRef = ref<HTMLElement | null>(null)
+const scene = computed(() => computeSceneLayout(props.face))
 const layers = computed(() => buildCardLayerGroups(props.face, new Set(props.atomicBlockIds ?? [])))
 const snapshots = ref(new Map<string, Snapshot>())
-const facePreviewHtml = ref('')
+const assets = createCanvasAssetStore()
+let unsubscribeAssets: (() => void) | null = null
+let preloadToken = 0
 const layerPosition = ref(0)
 const targetLayerPosition = ref(0)
 const focusedPlaneIndex = ref(0)
@@ -383,71 +388,66 @@ function getLayerSnapshots(layer: CardLayerGroup): Snapshot[] {
   })
 }
 
-function getBlockStyle(snapshot: Snapshot, _layer: CardLayerGroup): CSSProperties {
-  const scale = planeScale.value
-  return {
-    left: `${snapshot.x * scale}px`,
-    top: `${snapshot.y * scale}px`,
-    width: `${snapshot.width * scale}px`,
-    height: `${snapshot.height * scale}px`,
-    '--layer-block-scale': String(scale),
-    '--layer-block-width': `${snapshot.width}px`,
-    '--layer-block-height': `${snapshot.height}px`,
+function paintCanvas(canvas: Element): void {
+  const canvasElement = ((canvas as unknown as { el?: Element }).el ?? canvas) as HTMLCanvasElement
+  let ctx: CanvasRenderingContext2D | null = null
+  try { ctx = typeof canvasElement.getContext === 'function' ? canvasElement.getContext('2d') : null } catch { return }
+  if (ctx) {
+    paintCardScene(ctx, scene.value, assets, {
+      resourceContext: props.resourceContext,
+    })
   }
 }
 
-function removeDuplicateIds(root: Element): void {
-  root.removeAttribute('id')
-  root.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'))
+function paintSnapshotCanvas(canvas: Element): void {
+  const canvasElement = ((canvas as unknown as { el?: Element }).el ?? canvas) as HTMLCanvasElement
+  const id = canvasElement.closest('[data-layer-block-id]')?.getAttribute('data-layer-block-id')
+  if (!id) return
+  let ctx: CanvasRenderingContext2D | null = null
+  try { ctx = typeof canvasElement.getContext === 'function' ? canvasElement.getContext('2d') : null } catch { return }
+  if (ctx) {
+    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height)
+    paintCardScene(ctx, scene.value, assets, {
+      onlyBlockId: id,
+      resourceContext: props.resourceContext,
+    })
+  }
 }
 
 function rebuildSnapshots(): void {
-  const sourceRoot = props.sourceRoot
+  const currentScene = scene.value
   const nextSnapshots = new Map<string, Snapshot>()
-  if (!sourceRoot) {
-    snapshots.value = nextSnapshots
-    facePreviewHtml.value = ''
-    return
+  for (const layer of layers.value) {
+    for (const item of layer.blocks) {
+      const node = currentScene.nodeMap.get(item.id)
+      const rect = node?.localRect
+      nextSnapshots.set(item.id, {
+        id: item.id,
+        name: item.block.name || item.id,
+        width: rect ? Math.max(1, Math.round(rect.width)) : Math.max(1, Number.parseFloat(item.block.width) || 1),
+        height: rect ? Math.max(1, Math.round(rect.height)) : Math.max(1, Number.parseFloat(item.block.height) || 1),
+        x: rect ? Math.round(rect.x) : (Number.parseFloat(item.block.translateX) || 0),
+        y: rect ? Math.round(rect.y) : (Number.parseFloat(item.block.translateY) || 0),
+      })
+    }
   }
-
-  const sourceBlocks = [...sourceRoot.querySelectorAll<HTMLElement>('[data-block-id]')]
-  const faceElement = sourceRoot.querySelector<HTMLElement>('.card-canvas') ?? sourceRoot
-  const faceClone = faceElement.cloneNode(true) as HTMLElement
-  removeDuplicateIds(faceClone)
-  faceClone.removeAttribute('data-block-id')
-  faceClone.querySelectorAll('[data-block-id]').forEach(element => element.removeAttribute('data-block-id'))
-  faceClone.style.width = `${props.face.width}px`
-  faceClone.style.height = `${props.face.height}px`
-  facePreviewHtml.value = faceClone.outerHTML
-  const faceRect = faceElement.getBoundingClientRect()
-  const coordinateScaleX = faceRect.width > 0 ? props.face.width / faceRect.width : 1
-  const coordinateScaleY = faceRect.height > 0 ? props.face.height / faceRect.height : 1
-  layers.value.flatMap(layer => layer.blocks).forEach(({ id, block }) => {
-    const source = sourceBlocks.find(element => element.dataset.blockId === id)
-    if (!source) return
-
-    const clone = source.cloneNode(true) as HTMLElement
-    clone.querySelectorAll('[data-block-id]').forEach(element => element.remove())
-    clone.removeAttribute('data-block-id')
-    clone.style.position = 'relative'
-    clone.style.inset = 'auto'
-    clone.style.left = '0'
-    clone.style.top = '0'
-    clone.style.width = '100%'
-    clone.style.height = '100%'
-    removeDuplicateIds(clone)
-    const rect = source.getBoundingClientRect()
-    nextSnapshots.set(id, {
-      id,
-      name: typeof block.name === 'string' && block.name ? block.name : id,
-      html: clone.outerHTML,
-      width: Math.max(1, rect.width * coordinateScaleX || source.offsetWidth),
-      height: Math.max(1, rect.height * coordinateScaleY || source.offsetHeight),
-      x: (rect.left - faceRect.left) * coordinateScaleX,
-      y: (rect.top - faceRect.top) * coordinateScaleY,
-    })
-  })
   snapshots.value = nextSnapshots
+}
+
+function repaintAllCanvases(): void {
+  if (!rootRef.value) return
+  const previewCanvas = rootRef.value.querySelector<HTMLCanvasElement>('.card-layer-view__preview-canvas')
+  if (previewCanvas) paintCanvas(previewCanvas)
+  const snapshotCanvases = rootRef.value.querySelectorAll<HTMLCanvasElement>('.card-layer-view__block-content')
+  snapshotCanvases.forEach(canvas => paintSnapshotCanvas(canvas))
+}
+
+async function loadAndRepaint(): Promise<void> {
+  const currentToken = ++preloadToken
+  await assets.preloadSceneAssets(scene.value, props.resourceContext)
+  if (currentToken !== preloadToken) return
+  await nextTick()
+  repaintAllCanvases()
 }
 
 function stopAnimation(): void {
@@ -604,9 +604,11 @@ function cycleLayerByInitial(initial: string, currentLayerOnly = false): boolean
   return false
 }
 
-watch(() => [props.face, props.sourceRoot, props.viewportWidth, props.viewportHeight], async () => {
-  await nextTick()
+watch(() => [props.face, props.resourceContext], async () => {
   rebuildSnapshots()
+  await nextTick()
+  repaintAllCanvases()
+  void loadAndRepaint()
 }, { deep: true })
 
 watch(planeEntries, () => {
@@ -619,11 +621,21 @@ watch(planeEntries, () => {
 onMounted(() => {
   selectInitialLayer()
   rebuildSnapshots()
+  unsubscribeAssets = assets.onAssetLoaded(() => {
+    repaintAllCanvases()
+  })
+  void loadAndRepaint()
 })
 
 onBeforeUnmount(() => {
+  preloadToken += 1
   stopAnimation()
   if (wheelResetTimer !== null) window.clearTimeout(wheelResetTimer)
+  if (unsubscribeAssets) {
+    unsubscribeAssets()
+    unsubscribeAssets = null
+  }
+  assets.clear()
 })
 
 defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayerByInitial })
@@ -724,11 +736,11 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
 
 .card-layer-view__block {
   position: absolute;
+  inset: 0;
   display: block;
   padding: 0;
   overflow: visible;
   border: 0;
-  border-radius: 2px;
   color: inherit;
   background: transparent;
   pointer-events: none;
@@ -773,15 +785,11 @@ defineExpose({ stepLayer, handleWheel, focusBlock, getFocusedBlockId, cycleLayer
 
 .card-layer-view__block-content {
   position: absolute;
-  left: 0;
-  top: 0;
+  inset: 0;
   display: block;
-  width: var(--layer-block-width);
-  height: var(--layer-block-height);
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  transform: scale(var(--layer-block-scale));
-  transform-origin: 0 0;
 }
 
 .card-layer-view__block-content :deep(*) {

@@ -39,6 +39,8 @@ export type CardRenderParseIssueType =
   | 'card-designer.render-parse.invalid-css-length'
   | 'card-designer.render-parse.invalid-file-path'
   | 'card-designer.render-parse.invalid-object'
+  | 'card-designer.render-parse.deprecated-block-type'
+  | 'card-designer.render-parse.deprecated-property'
 export type CardRichTextIssueType =
   | 'card-designer.rich-text.invalid-html'
   | 'card-designer.rich-text.limit-exceeded'
@@ -66,6 +68,8 @@ const cardIssueMessageKeys: Readonly<Record<CardIssueType, string>> = {
   'card-designer.render-parse.invalid-css-length': 'app.problems.renderCodes.INVALID_CSS_LENGTH',
   'card-designer.render-parse.invalid-file-path': 'app.problems.renderCodes.INVALID_FILE_PATH',
   'card-designer.render-parse.invalid-object': 'app.problems.renderCodes.INVALID_OBJECT',
+  'card-designer.render-parse.deprecated-block-type': 'app.problems.renderCodes.DEPRECATED_BLOCK_TYPE',
+  'card-designer.render-parse.deprecated-property': 'app.problems.renderCodes.DEPRECATED_PROPERTY',
   'card-designer.rich-text.invalid-html': 'app.problems.richTextCodes.INVALID_HTML',
   'card-designer.rich-text.limit-exceeded': 'app.problems.richTextCodes.LIMIT_EXCEEDED',
   'card-designer.resource.remote-blocked': 'app.problems.resourceCodes.REMOTE_BLOCKED',

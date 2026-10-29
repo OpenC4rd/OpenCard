@@ -167,4 +167,10 @@ describe('appSettingsStore', () => {
     expect(store.settings.value.appearance).toEqual(createDefaultAppSettings().appearance)
     expect(store.settings.value.exporting.openCdeWorkbookAfterExport).toBe(false)
   })
+
+  it('updates the CDE dot grid spacing setting', async () => {
+    const { store } = await createStore()
+    store.updateSetting('workspace.cdeDotGridSpacingMm', '2.5')
+    expect(store.settings.value.workspace.cdeDotGridSpacingMm).toBe(2.5)
+  })
 })

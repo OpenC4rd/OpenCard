@@ -1,135 +1,134 @@
-<!-- 卡面渲染器：只接收可直接渲染的完整卡面，并可选择裁切超出卡面尺寸的内容。 -->
 <template>
-    <div ref="cardCanvasRef" class="card-canvas" :class="{ 'card-canvas--clipped': props.clipToFace }"
-        :style="canvasStyle">
-        <NativeBlockRenderer :block="rootContainerBlock" :placement="{ kind: 'root' }" />
-    </div>
+  <canvas ref="canvasRef" class="card-canvas" :width="pixelWidth" :height="pixelHeight"
+    :style="canvasStyle" @click="handleClick" />
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref, watch, nextTick, onMounted } from 'vue'
-import NativeBlockRenderer from './NativeBlockRenderer.vue'
-import { cardEditorContextKey } from './cardEditorContext'
-import type { RenderReadyCardFace, RenderReadySimpleContainerBlock } from '../render.types'
-import {
-    createCardResourceResolver,
-    type CardRenderResourceContext,
-} from '../cardRenderResources'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { RenderReadyCardFace } from '../render.types'
+import type { CardRenderResourceContext } from '../cardRenderResources'
 import type { CardVisualReadinessRegistrar } from './cardRenderReadiness'
-
-const emit = defineEmits<{
-    /** 块点击事件：上抛被点击 blockId 与原始鼠标事件。 */
-    (e: 'block-click', blockId: string, event: MouseEvent): void
-}>()
+import { createCanvasAssetStore } from '../painter/canvasAssetStore'
+import { paintCardScene } from '../painter/paintCardScene'
+import { computeSceneLayout, hitTestScene, type CardSceneGraph } from '../geometry'
 
 const props = withDefaults(defineProps<{
-    /** 已完成解析、校验和默认值回退的卡面。 */
-    face: RenderReadyCardFace
-    /** 不允许被变换的块 ID 列表。 */
-    transformDisabledBlockIds?: string[]
-    /** 根层可见块 ID 列表（为空时显示全部）。 */
-    visibleRootBlockIds?: string[]
-    /** 是否裁切超出卡面尺寸的内容。 */
-    clipToFace?: boolean
-    /** 卡面资源唯一解析上下文。 */
+  face: RenderReadyCardFace
+  visibleRootBlockIds?: string[]
+  clipToFace?: boolean
   resourceContext: CardRenderResourceContext
   diffHighlights?: readonly { blockId: string; kind: 'added' | 'removed' | 'changed' }[]
   visualReadiness?: CardVisualReadinessRegistrar
-}>(), {
-    transformDisabledBlockIds: () => [],
-    visibleRootBlockIds: () => [],
-  clipToFace: false,
-  diffHighlights: () => [],
+  renderScale?: number
+}>(), { visibleRootBlockIds: () => [], clipToFace: false, diffHighlights: () => [], renderScale: 1 })
+
+const emit = defineEmits<{
+  (e: 'block-click', blockId: string, event: MouseEvent): void
+  (e: 'blank-click', event: MouseEvent): void
+}>()
+
+const MAX_CANVAS_PHYSICAL_PIXELS = 8192
+
+const canvasRef = ref<HTMLCanvasElement>()
+const devicePixelRatio = computed(() => typeof window === 'undefined' ? 1 : Math.max(1, window.devicePixelRatio || 1))
+const effectivePixelRatio = computed(() => {
+  const zoom = Number.isFinite(props.renderScale) && (props.renderScale ?? 0) > 0 ? (props.renderScale ?? 1) : 1
+  const idealRatio = devicePixelRatio.value * zoom
+  const maxSide = Math.max(props.face.width, props.face.height, 1)
+  const maxSafeRatio = MAX_CANVAS_PHYSICAL_PIXELS / maxSide
+  return Math.min(idealRatio, Math.max(0.1, maxSafeRatio))
 })
-
-const cardCanvasRef = ref<HTMLElement>()
-async function applyDiffHighlights(highlights: readonly { blockId: string; kind: 'added' | 'removed' | 'changed' }[]) {
-  await nextTick()
-  const root = cardCanvasRef.value
-  if (!root) return
-  root.querySelectorAll<HTMLElement>('[data-block-id]').forEach(element => {
-    const match = highlights.find(item => item.blockId === element.dataset.blockId)
-    if (match) element.dataset.diffKind = match.kind
-    else delete element.dataset.diffKind
-  })
-}
-watch(() => props.diffHighlights, applyDiffHighlights, { deep: true })
-onMounted(() => { void applyDiffHighlights(props.diffHighlights) })
-
-const normalizedTransformDisabledBlockIds = computed(() => new Set(props.transformDisabledBlockIds))
-const normalizedVisibleRootBlockIds = computed(() => new Set(props.visibleRootBlockIds))
-const resources = createCardResourceResolver(() => props.resourceContext)
-
-const canvasStyle = computed((): Record<string, string> => ({
-    position: 'relative',
-    width: `${props.face.width}px`,
-    height: `${props.face.height}px`,
-    background: props.face.background,
+const pixelWidth = computed(() => Math.max(1, Math.round(props.face.width * effectivePixelRatio.value)))
+const pixelHeight = computed(() => Math.max(1, Math.round(props.face.height * effectivePixelRatio.value)))
+const canvasStyle = computed(() => ({
+  width: `${props.face.width}px`,
+  height: `${props.face.height}px`,
+  display: 'block',
+  background: props.face.background,
 }))
 
-const visibleChildren = computed(() => {
-    if (normalizedVisibleRootBlockIds.value.size === 0) {
-        return props.face.children
-    }
+const assets = createCanvasAssetStore()
+const renderFace = computed(() => props.visibleRootBlockIds.length
+  ? { ...props.face, children: props.face.children.filter(child => props.visibleRootBlockIds.includes(child.block.id)) }
+  : props.face)
 
-    return props.face.children.filter(child =>
-        normalizedVisibleRootBlockIds.value.has(child.block.id)
-    )
-})
-const rootContainerBlock = computed<RenderReadySimpleContainerBlock>(() => {
-    return {
-        type: 'simple-container-block',
-        id: props.face.id,
-        name: props.face.faceKey,
-        notes: '',
-        visible: true,
-        width: `${props.face.width}px`,
-        height: `${props.face.height}px`,
-        clip: false,
-        children: visibleChildren.value,
-        borderColor: '#000000',
-        borderWidth: 0,
-        borderStyle: 'solid',
-        borderRadius: '',
-        background: props.face.background,
-        translateX: '0px',
-        translateY: '0px',
-        scaleX: 1,
-        scaleY: 1,
-        transformAnchor: 'cc',
-        zIndex: 0,
-        rotation: 0,
-        opacity: 1,
-        customCss: '',
-    }
+const sceneGraph = computed<CardSceneGraph>(() => computeSceneLayout(renderFace.value))
+
+function paint(): void {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const ratio = effectivePixelRatio.value
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+  paintCardScene(ctx, sceneGraph.value, assets, {
+    diffHighlights: props.diffHighlights,
+    resourceContext: props.resourceContext,
+  })
+}
+
+function handleClick(event: MouseEvent): void {
+  if (event.button !== 0) return
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const rect = canvas.getBoundingClientRect()
+  const canvasWidth = rect.width > 0 ? rect.width : props.face.width
+  const canvasHeight = rect.height > 0 ? rect.height : props.face.height
+  const canvasLeft = rect.width > 0 ? rect.left : 0
+  const canvasTop = rect.height > 0 ? rect.top : 0
+
+  const worldX = (event.clientX - canvasLeft) * props.face.width / canvasWidth
+  const worldY = (event.clientY - canvasTop) * props.face.height / canvasHeight
+
+  const hitNode = hitTestScene(sceneGraph.value, { x: worldX, y: worldY })
+  if (hitNode) {
+    emit('block-click', hitNode.id, event)
+  } else {
+    emit('blank-click', event)
+  }
+}
+
+let unbindAssets: (() => void) | null = null
+const handleFontLoaded = () => { paint() }
+
+onMounted(() => {
+  unbindAssets = assets.onAssetLoaded(() => { paint() })
+  if (typeof document !== 'undefined' && 'fonts' in document) {
+    document.fonts?.addEventListener?.('loadingdone', handleFontLoaded)
+    void document.fonts?.ready?.then(() => { paint() })
+  }
+  paint()
 })
 
-provide(cardEditorContextKey, {
-    transformDisabledBlockIds: normalizedTransformDisabledBlockIds,
-    handleBlockClick: (blockId, event) => {
-        emit('block-click', blockId, event)
-    },
-	    resources,
-		    richText: computed(() => props.resourceContext.richText ?? new Map()),
-	    visualReadiness: props.visualReadiness,
-	    documentId: props.face.id,
-    faceKey: props.face.faceKey,
-    bindingProject: computed(() => props.resourceContext.bindingProject),
-    bindingDictionary: computed(() => props.resourceContext.bindingDictionary),
-	})
+onBeforeUnmount(() => {
+  if (unbindAssets) {
+    unbindAssets()
+    unbindAssets = null
+  }
+  if (typeof document !== 'undefined' && 'fonts' in document) {
+    document.fonts?.removeEventListener?.('loadingdone', handleFontLoaded)
+  }
+  assets.clear()
+})
+
+watch(() => [props.face, props.resourceContext], () => {
+  void assets.preloadSceneAssets(sceneGraph.value, props.resourceContext)
+}, { immediate: true })
+
+watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds, effectivePixelRatio.value], async () => {
+  await nextTick()
+  paint()
+}, { deep: true })
 
 defineExpose({
-	    getCanvasElement: () => cardCanvasRef.value,
-	})
+  getCanvasElement: () => canvasRef.value,
+  getSceneGraph: () => sceneGraph.value,
+})
 </script>
 
 <style scoped>
 .card-canvas {
-    user-select: none;
-    display: inline-block;
-}
-
-.card-canvas--clipped {
-    overflow: hidden;
+  user-select: none;
+  pointer-events: auto;
 }
 </style>

@@ -362,7 +362,7 @@ const shapeStrokeAlignmentOptions = ['inside', 'center', 'outside'] as const
 const shapeStrokeJoinOptions = ['miter', 'round', 'bevel'] as const
 const shapeStrokeCapOptions = ['butt', 'round', 'square'] as const
 const blockBorderStyleOptions = ['solid', 'dashed', 'dotted'] as const
-const cssLengthAutocomplete = ['px', '%'] as const
+const cssLengthAutocomplete = ['mm', 'pt', '%'] as const
 
 function createBaseBlockPropertyEditorSchema(): Record<string, EditorPropertyDefinition> {
     return {
@@ -379,12 +379,11 @@ function createBaseBlockPropertyEditorSchema(): Record<string, EditorPropertyDef
         visible: { fieldType: 'boolean', categoryId: 'layer' },
         zIndex: { fieldType: 'number', categoryId: 'layer' },
         opacity: { fieldType: 'number', min: 0, max: 1, categoryId: 'layer' },
-        background: { fieldType: 'string', categoryId: 'surface' },
+        background: { fieldType: 'color', categoryId: 'surface' },
         borderColor: { fieldType: 'color', categoryId: 'surface' },
         borderWidth: { fieldType: 'number', min: 0, categoryId: 'surface' },
         borderStyle: { fieldType: 'string', options: blockBorderStyleOptions, categoryId: 'surface' },
         borderRadius: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'surface' },
-        customCss: { fieldType: 'string', multiline: true, categoryId: 'advanced' },
         id: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, minLength: 1, categoryId: 'advanced', acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         additionalFieldDefinition: { fieldType: 'object', objectType: 'AdditionalFieldDefinition', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
@@ -401,12 +400,10 @@ function createCustomBlockPropertyEditorSchema(): Record<string, EditorPropertyD
     }
 }
 
-function createTextContentBlockPropertyEditorSchema(richText: boolean): Record<string, EditorPropertyDefinition> {
+function createTextContentBlockPropertyEditorSchema(): Record<string, EditorPropertyDefinition> {
     return {
         ...createBaseBlockPropertyEditorSchema(),
-        content: richText
-            ? { fieldType: 'richText', categoryId: 'content' }
-            : { fieldType: 'string', multiline: true, categoryId: 'content' },
+        content: { fieldType: 'richText', categoryId: 'content' },
         fontFamily: { fieldType: 'fontFamily', categoryId: 'textStyle' },
         fontSize: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'textStyle' },
         fontWeight: {
@@ -428,8 +425,7 @@ function createTextContentBlockPropertyEditorSchema(richText: boolean): Record<s
 }
 
 const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
-    'text-block': createTextContentBlockPropertyEditorSchema(true),
-    'markdown-text-block': createTextContentBlockPropertyEditorSchema(false),
+    'text-block': createTextContentBlockPropertyEditorSchema(),
     'image-block': {
         ...createBaseBlockPropertyEditorSchema(),
         source: { ...imageSourceField, displayFieldKey: 'imageSource' },
@@ -492,6 +488,7 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
         version: { fieldType: 'string', unremovable: true, categoryId: 'general', bindingScopes: ['project'] },
         width: { fieldType: 'number', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
         height: { fieldType: 'number', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
+        dpi: { fieldType: 'number', min: 72, categoryId: 'size', bindingScopes: ['project'] },
         id: { fieldType: 'string', unremovable: true, categoryId: 'advanced', isReadonly: true, isHidden: true, acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         faces: { fieldType: 'object', objectType: 'CardFace', unremovable: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
@@ -501,7 +498,7 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
     'card-face': {
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         id: { fieldType: 'string', unremovable: true, categoryId: 'advanced', isReadonly: true, isHidden: true, acceptsBinding: false },
-        background: { fieldType: 'string', unremovable: true, categoryId: 'surface' },
+        background: { fieldType: 'color', unremovable: true, categoryId: 'surface' },
         children: { fieldType: 'object', objectType: 'RootChild', unremovable: true, isArray: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     },
     'card-instance': {
@@ -521,8 +518,8 @@ const BASE_BLOCK_DEFAULTS = {
     visible: 'true',
     width: '32%',
     height: '18%',
-    translateX: '0px',
-    translateY: '0px',
+    translateX: '0mm',
+    translateY: '0mm',
     scaleX: '1',
     scaleY: '1',
     transformAnchor: 'cc',
@@ -534,28 +531,26 @@ const BASE_BLOCK_DEFAULTS = {
     borderStyle: 'solid',
     borderRadius: '',
     background: '',
-    customCss: '',
 }
 
-function createTextContentBlockDefaultValues(type: 'text-block' | 'markdown-text-block'): Record<string, unknown> {
+function createTextContentBlockDefaultValues(): Record<string, unknown> {
     return {
         ...BASE_BLOCK_DEFAULTS,
-        type,
+        type: 'text-block',
         content: '',
-        fontSize: '16px',
+        fontSize: '3.5mm',
         fontFamily: '',
         fontWeight: 'normal',
         color: '#000000',
         textAlign: 'start',
         verticalAlign: 'top',
-        lineHeight: '1.4em',
+        lineHeight: '150%',
         writingMode: 'horizontal-tb',
     }
 }
 
 const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
-    'text-block': createTextContentBlockDefaultValues('text-block'),
-    'markdown-text-block': createTextContentBlockDefaultValues('markdown-text-block'),
+    'text-block': createTextContentBlockDefaultValues(),
     'image-block': {
         ...BASE_BLOCK_DEFAULTS,
         type: 'image-block',
@@ -599,7 +594,7 @@ const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
         packaged: 'false',
         clip: 'false',
         direction: 'lr',
-        gap: '10px',
+        gap: '2mm',
         children: [],
     },
     'custom-block': {
@@ -611,8 +606,8 @@ const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
         id: '',
         type: 'simple-container-location',
         anchor: 'lt',
-        x: '0px',
-        y: '0px',
+        x: '0mm',
+        y: '0mm',
     },
     'flow-container-location': {
         id: '',
@@ -624,8 +619,8 @@ const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
         type: 'card-document',
         id: '',
         version: '1.0.0',
-        width: '540',
-        height: '850',
+        width: '63',
+        height: '88',
         faces: {
             front: { type: 'card-face', id: '', background: '#FFFFFF', children: [] },
             back: { type: 'card-face', id: '', background: '#FFFFFF', children: [] },

@@ -64,20 +64,20 @@ export function useCdeSelectionCommands(options: UseCdeSelectionCommandsOptions)
     const heightLocked = options.isResizeAxisLocked?.(intent.blockId, 'height') === true
     let changed = false
     if (intent.width !== undefined && !widthLocked) {
-      setBlockProperty(target.block, 'width', formatCssPixels(intent.width))
+      setBlockProperty(target.block, 'width', formatLength(intent.width))
       changed = true
     }
     if (intent.height !== undefined && !heightLocked) {
-      setBlockProperty(target.block, 'height', formatCssPixels(intent.height))
+      setBlockProperty(target.block, 'height', formatLength(intent.height))
       changed = true
     }
     if (target.location.type === 'simple-container-location') {
       if (intent.x !== undefined && !widthLocked) {
-        target.location.x = formatCssPixels(intent.x)
+        target.location.x = formatLength(intent.x)
         changed = true
       }
       if (intent.y !== undefined && !heightLocked) {
-        target.location.y = formatCssPixels(intent.y)
+        target.location.y = formatLength(intent.y)
         changed = true
       }
     }
@@ -90,8 +90,8 @@ export function useCdeSelectionCommands(options: UseCdeSelectionCommandsOptions)
     const target = resolveTarget(intent.blockId)
     if (!target || target.location.type !== 'simple-container-location') return false
 
-    target.location.x = formatCssPixels(intent.x)
-    target.location.y = formatCssPixels(intent.y)
+    target.location.x = formatLength(intent.x)
+    target.location.y = formatLength(intent.y)
     commitAction()
     return true
   }
@@ -104,19 +104,19 @@ export function useCdeSelectionCommands(options: UseCdeSelectionCommandsOptions)
       if (target.location.type !== 'simple-container-location') return false
       let changed = false
       if (intent.width !== undefined && !options.isResizeAxisLocked?.(intent.blockId, 'width')) {
-        setBlockProperty(target.block, 'width', formatCssPixels(intent.width))
-        if (intent.x !== undefined) target.location.x = formatCssPixels(intent.x)
+        setBlockProperty(target.block, 'width', formatLength(intent.width))
+        if (intent.x !== undefined) target.location.x = formatLength(intent.x)
         changed = true
       } else if (intent.operation === 'center' && intent.x !== undefined) {
-        target.location.x = formatCssPixels(intent.x)
+        target.location.x = formatLength(intent.x)
         changed = true
       }
       if (intent.height !== undefined && !options.isResizeAxisLocked?.(intent.blockId, 'height')) {
-        setBlockProperty(target.block, 'height', formatCssPixels(intent.height))
-        if (intent.y !== undefined) target.location.y = formatCssPixels(intent.y)
+        setBlockProperty(target.block, 'height', formatLength(intent.height))
+        if (intent.y !== undefined) target.location.y = formatLength(intent.y)
         changed = true
       } else if (intent.operation === 'center' && intent.y !== undefined) {
-        target.location.y = formatCssPixels(intent.y)
+        target.location.y = formatLength(intent.y)
         changed = true
       }
       if (!changed) return false
@@ -129,12 +129,12 @@ export function useCdeSelectionCommands(options: UseCdeSelectionCommandsOptions)
       let changed = false
       if (intent.width && !options.isResizeAxisLocked?.(intent.blockId, 'width')) {
         setBlockProperty(target.block, 'width', '100%')
-        target.location.x = '0px'
+        target.location.x = '0mm'
         changed = true
       }
       if (intent.height && !options.isResizeAxisLocked?.(intent.blockId, 'height')) {
         setBlockProperty(target.block, 'height', '100%')
-        target.location.y = '0px'
+        target.location.y = '0mm'
         changed = true
       }
       if (!changed) return false
@@ -221,7 +221,7 @@ export function useCdeSelectionCommands(options: UseCdeSelectionCommandsOptions)
   }
 }
 
-function formatCssPixels(value: number): string {
+function formatLength(value: number): string {
   const normalized = Math.round(value * 100) / 100
-  return `${Object.is(normalized, -0) ? 0 : normalized}px`
+  return `${Object.is(normalized, -0) ? 0 : normalized}mm`
 }

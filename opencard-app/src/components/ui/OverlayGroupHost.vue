@@ -114,6 +114,8 @@ onBeforeUnmount(() => {
 .overlay-group-layer .overlay-group-content {
   overflow: hidden;
   max-height: inherit;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .overlay-group-content.is-sizing {

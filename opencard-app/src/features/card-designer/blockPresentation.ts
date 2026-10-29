@@ -8,7 +8,6 @@ export type BlockPresentation = {
 
 const blockPresentations = {
   'text-block': { icon: 'mdiTextBoxOutline', iconTone: 'block-text' },
-  'markdown-text-block': { icon: 'mdiLanguageMarkdownOutline', iconTone: 'block-markdown' },
   'image-block': { icon: 'mdiImageOutline', iconTone: 'block-image' },
   'qrcode-block': { icon: 'mdiQrcode', iconTone: 'block-qrcode' },
   'shape-block': { icon: 'mdiShapeOutline', iconTone: 'block-shape' },

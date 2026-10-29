@@ -242,7 +242,7 @@ function sanitizeCssColor(value: string | null): string | null {
 }
 function sanitizeCssLength(value: string | null): string {
   const length = value?.trim() ?? ''
-  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|%)$/.test(length) ? length : '0px'
+  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|mm|cm|in|%)$/.test(length) ? length : '0mm'
 }
 export function normalizeRichTextHtml(source: string): string {
   if (source === '') return '<p></p>'

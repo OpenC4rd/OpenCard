@@ -11,7 +11,8 @@ export type ProjectRemoteResourcePolicy =
 export type ProjectExportTask = {
   documentPaths: readonly string[]
   selectionMode: 'instances' | 'blueprint-and-instances' | 'blueprint'
-  scale: number
+  dpi?: number
+  scale?: number
   layoutMode: 'none' | 'layout'
   outputDirectory: string
   conflictMode: 'replace' | 'skip'
@@ -28,6 +29,8 @@ export type ProjectProfile = {
   cover?: string
   remoteResources?: ProjectRemoteResourcePolicy
   exportTask?: ProjectExportTask
+  /** 默认渲染与导出 DPI，未配置时默认为 300 */
+  defaultDpi?: number
 }
 
 export type ProjectInformation = {

@@ -52,7 +52,7 @@
           :previous-label="t('projectExport.previousPreset')"
           :next-label="t('projectExport.nextPreset')" @update:model-value="updateQuality" />
         <NumberPropertyField class="project-export-task-editor__scale-field"
-          :definition="scaleDefinition" :value="scaleText" @update:value="updateScale" />
+          :definition="dpiDefinition" :value="dpiText" @update:value="updateDpi" />
       </div>
       <OcText v-if="selectedDocuments.length === 0" tone="muted" size="sm">
         {{ t('projectExport.resolutionHint') }}
@@ -151,11 +151,11 @@ const layoutMode = ref<ProjectExportTask['layoutMode']>('none')
 const conflictMode = ref<ProjectExportTask['conflictMode']>('replace')
 const errorPolicy = ref<NonNullable<ProjectExportTask['errorPolicy']>>('continue')
 const quality = ref<'preview' | 'standard' | 'high' | 'ultra' | 'custom'>('standard')
-const scaleText = ref('1')
+const dpiText = ref('300')
 const autocompleteId = useId()
 const activeInput = ref<HTMLInputElement | null>(null)
 
-const qualityScales = { preview: 0.5, standard: 1, high: 2, ultra: 5 } as const
+const qualityDpi = { preview: 150, standard: 300, high: 450, ultra: 600 } as const
 const REMOVE_DOCUMENT_ACTION_KEY = 'remove-document'
 const qualityOptions = computed(() => [
   { value: 'preview', label: t('projectExport.qualityPreview') },
@@ -164,11 +164,11 @@ const qualityOptions = computed(() => [
   { value: 'ultra', label: t('projectExport.qualityUltra') },
   { value: 'custom', label: t('projectExport.qualityCustom') },
 ])
-const scaleDefinition = computed<Extract<PropertyEditorFieldDefinition, { fieldType: 'number' }>>(() => ({
+const dpiDefinition = computed<Extract<PropertyEditorFieldDefinition, { fieldType: 'number' }>>(() => ({
   title: t('projectExport.scale'),
   fieldType: 'number',
-  min: 0.1,
-  step: 0.1,
+  min: 72,
+  step: 50,
   isReadonly: busy.value,
 }))
 const selectionOptions = computed<OcSelectOption[]>(() => [
@@ -219,10 +219,10 @@ const candidatePath = computed(() => activePath.value && suggestions.value.some(
 // 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
 onBeforeUnmount(() => { layer.value?.close() })
 
-const scale = computed(() => Number(scaleText.value))
+const dpi = computed(() => Number(dpiText.value))
 const canSubmit = computed(() => selectedDocuments.value.length > 0
   && outputDirectory.value.trim().length > 0
-  && Number.isFinite(scale.value) && scale.value >= 0.1
+  && Number.isFinite(dpi.value) && dpi.value >= 72
   && layoutMode.value === 'none')
 watch(canSubmit, valid => emit('update:valid', valid), { immediate: true })
 const validationMessage = computed(() => {
@@ -232,7 +232,7 @@ const validationMessage = computed(() => {
   })
   if (selectedDocuments.value.length === 0) return t('projectExport.validation.documents-required')
   if (!outputDirectory.value.trim()) return t('projectExport.validation.output-required')
-  if (!Number.isFinite(scale.value) || scale.value < 0.1) return t('projectExport.validation.invalid-scale')
+  if (!Number.isFinite(dpi.value) || dpi.value < 72) return t('projectExport.validation.invalid-scale')
   return ''
 })
 
@@ -243,8 +243,11 @@ watch([() => props.modelValue, () => props.documents], ([task]) => {
     .map(path => props.documents.find(document => document.path === path) ?? { path })
   query.value = ''
   outputDirectory.value = task.outputDirectory
-  quality.value = resolveQuality(task.scale)
-  scaleText.value = String(task.scale)
+  const rawScale = task.scale ?? 1
+  const initialDpi = task.dpi ?? (rawScale > 10 ? Math.round(rawScale) : Math.round(rawScale * 300))
+  const resolvedDpi = initialDpi >= 72 ? initialDpi : 300
+  quality.value = resolveQuality(resolvedDpi)
+  dpiText.value = String(resolvedDpi)
   selectionMode.value = task.selectionMode
   layoutMode.value = task.layoutMode
   conflictMode.value = task.conflictMode
@@ -254,9 +257,9 @@ watch([() => props.modelValue, () => props.documents], ([task]) => {
 }, { immediate: true })
 
 watch([
-  selectedDocuments, scaleText, selectionMode, layoutMode, outputDirectory, conflictMode, errorPolicy,
+  selectedDocuments, dpiText, selectionMode, layoutMode, outputDirectory, conflictMode, errorPolicy,
 ], () => {
-  if (syncingFromProps || !Number.isFinite(scale.value) || scale.value < 0.1) return
+  if (syncingFromProps || !Number.isFinite(dpi.value) || dpi.value < 72) return
   emit('update:modelValue', buildTask())
 }, { deep: true })
 
@@ -331,14 +334,14 @@ function handleDocumentTreeMove(event: OcNodeMoveEvent): void {
 function updateQuality(value: string): void {
   if (!['preview', 'standard', 'high', 'ultra', 'custom'].includes(value)) return
   quality.value = value as typeof quality.value
-  if (quality.value !== 'custom') scaleText.value = String(qualityScales[quality.value])
+  if (quality.value !== 'custom') dpiText.value = String(qualityDpi[quality.value])
 }
-function updateScale(value: string): void {
-  scaleText.value = value
+function updateDpi(value: string): void {
+  dpiText.value = value
   quality.value = resolveQuality(Number(value))
 }
 function resolveQuality(value: number): typeof quality.value {
-  const preset = Object.entries(qualityScales).find(([, scale]) => scale === value)?.[0]
+  const preset = Object.entries(qualityDpi).find(([, val]) => val === value)?.[0]
   return preset ? preset as typeof quality.value : 'custom'
 }
 async function chooseOutputDirectory(): Promise<void> {
@@ -346,14 +349,17 @@ async function chooseOutputDirectory(): Promise<void> {
   if (typeof selected === 'string') outputDirectory.value = selected
 }
 function targetResolution(document: ExportDocumentCandidate): string {
-  if (!document.width || !document.height || !Number.isFinite(scale.value)) return t('projectExport.resolutionUnknown')
-  return `${Math.round(document.width * scale.value)} × ${Math.round(document.height * scale.value)} px`
+  if (!document.width || !document.height || !Number.isFinite(dpi.value)) return t('projectExport.resolutionUnknown')
+  const w = Math.round(document.width * (dpi.value / 25.4))
+  const h = Math.round(document.height * (dpi.value / 25.4))
+  return `${w} × ${h} px`
 }
 function buildTask(): ProjectExportTask {
   return {
     documentPaths: selectedDocuments.value.map(document => document.path),
     selectionMode: selectionMode.value,
-    scale: scale.value,
+    dpi: dpi.value,
+    scale: dpi.value / 25.4,
     layoutMode: layoutMode.value,
     outputDirectory: outputDirectory.value.trim(),
     conflictMode: conflictMode.value,

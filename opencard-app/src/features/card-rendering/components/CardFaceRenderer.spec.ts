@@ -45,4 +45,20 @@ describe('CardFaceRenderer resources', () => {
 
     expect(wrapper.find('img').exists()).toBe(false)
   })
+
+  it('scales physical canvas pixels dynamically with renderScale without artificial ratio clamp', () => {
+    const face: RenderReadyCardFace = {
+      type: 'card-face', id: 'front', faceKey: 'front', width: 100, height: 100,
+      background: '#fff',
+      children: [],
+    }
+    const resourceContext = createCardRenderResourceContext({})
+    const wrapper = mount(CardFaceRenderer, {
+      props: { face, resourceContext, renderScale: 15 },
+    })
+
+    const canvas = wrapper.find('canvas').element as HTMLCanvasElement
+    expect(canvas.width).toBeGreaterThanOrEqual(1500)
+    expect(canvas.height).toBeGreaterThanOrEqual(1500)
+  })
 })

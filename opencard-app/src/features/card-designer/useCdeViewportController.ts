@@ -40,7 +40,7 @@ type PreviewDragState = {
   startTransform: EditorViewportTransform
 }
 
-const DEFAULT_VIEWPORT_TRANSFORM: EditorViewportTransform = { x: 0, y: 0, scale: 1 }
+const DEFAULT_VIEWPORT_TRANSFORM: EditorViewportTransform = { x: 0, y: 0, scale: 96 / 25.4 }
 const VIEWPORT_ZOOM_STEP = 1.25
 const TRANSFORM_PREVIEW_MAX_SIDE = 220
 const TRANSFORM_PREVIEW_VISIBILITY_COVERAGE = 0.7
@@ -62,11 +62,10 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
 
   const transformPreviewScale = computed(() => {
     const face = options.faceSize.value
-    if (!face) return 1
+    if (!face || face.width <= 0 || face.height <= 0) return 1
     return Math.min(
       transformPreviewHostSize.value.width / face.width,
       transformPreviewHostSize.value.height / face.height,
-      1,
     )
   })
   const transformPreviewRendererStyle = computed<CSSProperties>(() => ({
@@ -126,7 +125,10 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
     transformPreviewVisibleCoverage.value < TRANSFORM_PREVIEW_VISIBILITY_COVERAGE
     || isPreviewViewportDragging.value
   ))
-  const viewportScaleLabel = computed(() => `${Math.round(viewportTransform.value.scale * 100)}%`)
+  const viewportScaleLabel = computed(() => {
+    const physicalPercent = Math.round((viewportTransform.value.scale / (96 / 25.4)) * 100)
+    return `${physicalPercent}%`
+  })
 
   function updateTransformPreviewHostSize(width: number, height: number): void {
     transformPreviewHostSize.value = {
@@ -340,6 +342,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
     transformPreviewFrameStyle,
     transformPreviewHostRef,
     transformPreviewRendererStyle,
+    transformPreviewScale,
     transformPreviewViewportRef,
     transformPreviewViewportStyle,
     viewportScaleLabel,

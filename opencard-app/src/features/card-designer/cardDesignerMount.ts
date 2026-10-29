@@ -175,8 +175,8 @@ export function createCdeDocument(overrides: Partial<CardDocument> = {}): CardDo
     description: 'Reusable hero\ncard.',
     notes: 'Review print\nmargins.',
     version: '1.0.0',
-    width: '540',
-    height: '850',
+    width: '63',
+    height: '88',
     instances: [{
       type: 'card-instance',
       id: 'instance-1',

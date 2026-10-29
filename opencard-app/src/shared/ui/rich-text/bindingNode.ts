@@ -29,7 +29,29 @@ export const BindingNode = Node.create<BindingNodeOptions>({
   },
 
   parseHTML() {
-    return [{ tag: 'span[data-oc-binding]' }]
+    return [
+      {
+        tag: 'span[data-oc-binding]',
+        getAttrs: element => ({
+          expression: (element as HTMLElement).getAttribute('data-oc-binding') ?? '',
+        }),
+      },
+      {
+        tag: 'span[data-type="binding"]',
+        getAttrs: element => ({
+          expression: (element as HTMLElement).getAttribute('data-expression')
+            ?? (element as HTMLElement).getAttribute('data-oc-binding')
+            ?? (element as HTMLElement).textContent?.replace(/^\{\{|\}\}$/g, '')
+            ?? '',
+        }),
+      },
+      {
+        tag: 'span[data-expression]',
+        getAttrs: element => ({
+          expression: (element as HTMLElement).getAttribute('data-expression') ?? '',
+        }),
+      },
+    ]
   },
 
   renderHTML({ node, HTMLAttributes }) {

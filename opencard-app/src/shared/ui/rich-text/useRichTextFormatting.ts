@@ -189,7 +189,7 @@ export function useRichTextFormatting(
 
 function normalizeLength(raw: string): string | null {
   const value = raw.trim().toLowerCase()
-  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|%)?$/.test(value)
+  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|mm|cm|in|%)?$/.test(value)
     ? /[a-z%]$/.test(value) ? value : `${value}px`
     : null
 }

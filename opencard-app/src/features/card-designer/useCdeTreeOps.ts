@@ -61,7 +61,6 @@ type BlockActionSet = {
 
 const BLOCK_ADD_ACTION_DEFINITIONS: readonly { key: string; type: CardBlock['type'] }[] = [
   { key: 'add-text-block', type: 'text-block' },
-  { key: 'add-markdown-text-block', type: 'markdown-text-block' },
   { key: 'add-image-block', type: 'image-block' },
   { key: 'add-qrcode-block', type: 'qrcode-block' },
   { key: 'add-shape-block', type: 'shape-block' },
@@ -311,9 +310,6 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
       case 'add-text-block':
         if (targetContainer) createBlockAt(targetContainer, 'text-block')
         return
-      case 'add-markdown-text-block':
-        if (targetContainer) createBlockAt(targetContainer, 'markdown-text-block')
-        return
       case 'add-image-block':
         if (targetContainer) createBlockAt(targetContainer, 'image-block')
         return
@@ -507,9 +503,6 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
     switch (type) {
       case 'text-block':
         block = createBlock('text-block', { name })
-        break
-      case 'markdown-text-block':
-        block = createBlock('markdown-text-block', { name })
         break
       case 'image-block':
         block = createBlock('image-block', { name })

@@ -4,7 +4,7 @@
  * 职责边界：
  * - 只提供端口适配和运行生命周期，不定义队列、命名、冲突或失败策略。
  */
-import { nextTick, readonly, ref, shallowRef, type Ref } from 'vue'
+import { readonly, ref, type Ref } from 'vue'
 import { parseCardDocument } from '../../../entities/card/storage'
 import { isSameOrDescendantPath, normalizePath } from '../../../shared/model/filePath'
 import { prepareExportTask } from '../../exporting/exportPlanner'
@@ -17,28 +17,22 @@ import type {
   ExportProgressEvent,
   ExportRunResult,
 } from '../../exporting/exportTask'
-import type { RenderReadyCardFace } from '../../card-rendering/render.types'
 import type { CardRenderEnvironment } from '../../card-rendering/renderPipeline'
 import type { PreparedCardRender } from '../../card-rendering/renderPipeline'
 import type { CardFaceKey } from '../../../entities/card/model'
-import type { CardRenderResourceContext } from '../../card-rendering/cardRenderResources'
 import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
-import domtoimage from 'dom-to-image-more'
+import { renderFaceToPng } from '../../card-rendering/export/renderFaceToPng'
+import { createCanvasAssetStore } from '../../card-rendering/painter/canvasAssetStore'
 import { reportAppError } from '../../logging/appErrorCatalog'
 import { notifyAppError, notifyError, notifySuccess, notifyWarning } from '../../notifications/titlebarNotices'
 import { useShellProgressTasks } from './useShellProgressTasks'
 
 const PROJECT_EXPORT_PROGRESS_KEY = 'project-export'
 
-type ExportRendererInstance = {
-  getCanvasElement?: () => HTMLElement | undefined
-}
-
 type UseProjectExportOptions = {
   sessions: Readonly<Ref<readonly EditorSession[]>>
-  exportRendererRef: Ref<ExportRendererInstance | undefined>
   renderEnvironment: Readonly<Ref<Readonly<CardRenderEnvironment>>>
   readProjectFile: (relativePath: string) => Promise<string>
   resolveProjectPath: (relativePath: string) => string
@@ -46,131 +40,7 @@ type UseProjectExportOptions = {
   translate: (key: string, params?: Record<string, unknown>) => string
 }
 
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-  const binaryData = atob(dataUrl.split(',')[1] ?? '')
-  const bytes = new Uint8Array(binaryData.length)
-  for (let index = 0; index < binaryData.length; index += 1) bytes[index] = binaryData.charCodeAt(index)
-  return bytes
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => typeof reader.result === 'string'
-      ? resolve(reader.result)
-      : reject(new Error('Could not encode the project icon image')))
-    reader.addEventListener('error', () => reject(reader.error ?? new Error('Could not read the project icon image')))
-    reader.readAsDataURL(blob)
-  })
-}
-
-/** Paint properties a project icon can carry; a mask icon has no background image and vice versa. */
-const PROJECT_ICON_PAINT_PROPERTIES = ['--oc-project-icon-background-image', '--oc-project-icon-mask-image'] as const
-const MASK_PROPERTIES = ['mask-image', '-webkit-mask-image'] as const
-
-/**
- * Collects every icon source the rendered DOM actually paints, which keeps export correct without
- * asking the registry again: an icon is exported only because something was drawn with it.
- */
-function projectIconPaintSources(root: HTMLElement): string[] {
-  const sources = new Set<string>()
-  for (const element of root.querySelectorAll<HTMLElement>('.oc-project-icon')) {
-    for (const property of PROJECT_ICON_PAINT_PROPERTIES) {
-      const source = extractCssUrl(element.style.getPropertyValue(property))
-      if (source) sources.add(source)
-    }
-  }
-  for (const element of root.querySelectorAll<HTMLElement>('*')) for (const property of MASK_PROPERTIES) {
-    const source = extractCssUrl(element.style.getPropertyValue(property)); if (source) sources.add(source)
-  }
-  return [...sources]
-}
-
-export async function inlineProjectIconSources(root: HTMLElement): Promise<() => void> {
-  const replacements = new Map<string, string>()
-  await Promise.all(projectIconPaintSources(root).map(async source => {
-    const response = await fetch(source)
-    if (!response.ok) throw new Error(`Could not load project icon source: ${source}`)
-    replacements.set(source, await blobToDataUrl(await response.blob()))
-  }))
-
-  const restorations: Array<() => void> = []
-  for (const element of root.querySelectorAll<HTMLElement>('.oc-project-icon')) {
-    for (const property of PROJECT_ICON_PAINT_PROPERTIES) {
-      const original = element.style.getPropertyValue(property)
-      const source = extractCssUrl(original)
-      const replacement = source ? replacements.get(source) : undefined
-      if (!replacement) continue
-      element.style.setProperty(property, `url(${JSON.stringify(replacement)})`)
-      restorations.push(() => element.style.setProperty(property, original))
-    }
-  }
-  for (const element of root.querySelectorAll<HTMLElement>('*')) for (const property of MASK_PROPERTIES) {
-    const original = element.style.getPropertyValue(property); const source = extractCssUrl(original); const replacement = source ? replacements.get(source) : undefined
-    if (!replacement) continue
-    element.style.setProperty(property, `url(${JSON.stringify(replacement)})`); restorations.push(() => element.style.setProperty(property, original))
-  }
-  return () => restorations.forEach(restore => restore())
-}
-
-function extractCssUrl(value: string): string | null {
-  const match = /^url\((?:"([^"]*)"|'([^']*)'|([^)]*))\)$/.exec(value.trim())
-  return match ? (match[1] ?? match[2] ?? match[3] ?? '').trim() : null
-}
-
-function waitForNextPaint(): Promise<void> {
-  return new Promise(resolve => window.requestAnimationFrame(() => resolve()))
-}
-
-async function waitForImageElement(image: HTMLImageElement): Promise<void> {
-  if (!image.complete) {
-    await new Promise<void>(resolve => {
-      const finish = () => {
-        image.removeEventListener('load', finish)
-        image.removeEventListener('error', finish)
-        resolve()
-      }
-      image.addEventListener('load', finish, { once: true })
-      image.addEventListener('error', finish, { once: true })
-    })
-  }
-  if (typeof image.decode === 'function') {
-    try { await image.decode() } catch { /* use the best available image state */ }
-  }
-}
-
-async function waitForImageSource(source: string): Promise<void> {
-  const image = new Image()
-  image.src = source
-  await waitForImageElement(image)
-}
-
-async function waitForExportAssets(root: HTMLElement): Promise<void> {
-  if (typeof document !== 'undefined' && document.fonts?.ready) {
-    try { await document.fonts.ready } catch { /* best effort */ }
-  }
-  await Promise.all([
-    ...Array.from(root.querySelectorAll('img')).map(async image => {
-      await waitForImageElement(image)
-      if (image.complete && image.naturalWidth > 0) {
-        const parentBlock = image.closest('.image-block')
-        if (parentBlock) {
-          const placeholder = parentBlock.querySelector('.image-block__placeholder')
-          if (placeholder instanceof HTMLElement) placeholder.style.display = 'none'
-          image.classList.add('is-loaded')
-          image.style.opacity = '1'
-        }
-      }
-    }),
-    ...projectIconPaintSources(root).map(waitForImageSource),
-  ])
-  await waitForNextPaint()
-}
-
 export function useProjectExport(options: UseProjectExportOptions) {
-  const showExportRenderer = ref(false)
-  const exportCardFace = shallowRef<RenderReadyCardFace | null>(null)
-  const exportResourceContext = shallowRef<CardRenderResourceContext | null>(null)
   const isRunning = ref(false)
   let settle: (() => void) | undefined
   let settled: Promise<void> = Promise.resolve()
@@ -230,34 +100,27 @@ export function useProjectExport(options: UseProjectExportOptions) {
     } finally { controller.value = null; isRunning.value = false; settle?.(); settle = undefined }
   }
 
+  const exportAssetStore = createCanvasAssetStore()
+
   const renderer: ExportFaceRenderer = {
     async render(request, signal) {
       if (signal.aborted || request.render.resources.hostEnvironment.isDisposed?.()) throw new DOMException('Export cancelled', 'AbortError')
-      showExportRenderer.value = true
-      exportCardFace.value = request.render.document.faces[request.faceKey]
-      exportResourceContext.value = request.render.resources
-      await nextTick()
-      await waitForNextPaint()
-
-      const canvas = options.exportRendererRef.value?.getCanvasElement?.()
-      if (!canvas) throw new Error('Export renderer is unavailable')
       await request.render.resources.hostEnvironment.waitForResources?.()
-      await nextTick()
-      await waitForExportAssets(canvas)
-      await waitForNextPaint()
       if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
-      const restoreProjectIcons = await inlineProjectIconSources(canvas)
-      try {
-        await waitForNextPaint()
-        return dataUrlToBytes(await domtoimage.toPng(canvas, { scale: request.scale }))
-      } finally {
-        restoreProjectIcons()
+      const bytes = await renderFaceToPng(request.render.document.faces[request.faceKey], {
+        scale: request.scale,
+        dpi: request.dpi,
+        resourceContext: request.render.resources,
+        signal,
+        assets: exportAssetStore,
+      })
+      if (!bytes || bytes.length === 0) {
+        throw new Error(`Export render produced 0 bytes for face '${request.faceKey}'`)
       }
+      return bytes
     },
     reset() {
-      showExportRenderer.value = false
-      exportCardFace.value = null
-      exportResourceContext.value = null
+      exportAssetStore.clear()
     },
   }
 
@@ -355,7 +218,10 @@ export function useProjectExport(options: UseProjectExportOptions) {
       for (const [face, path] of outputs ?? []) {
         if (controller.value!.signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
         const bytes = result.get(face)
-        if (bytes) await destination.write(path, bytes)
+        if (!bytes || bytes.length === 0) {
+          throw new Error(`Export render produced 0 bytes for face '${face}'`)
+        }
+        await destination.write(path, bytes)
       }
       return result
     } catch (error) {
@@ -375,9 +241,6 @@ export function useProjectExport(options: UseProjectExportOptions) {
   }
 
   return {
-    showExportRenderer: readonly(showExportRenderer),
-    exportCardFace,
-    exportResourceContext,
     isRunning: readonly(isRunning),
     loadDocumentSnapshot,
     prepare,

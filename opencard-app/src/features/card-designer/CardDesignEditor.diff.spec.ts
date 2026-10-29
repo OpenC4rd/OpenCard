@@ -317,8 +317,8 @@ describe('CardDesignEditor diff mode', () => {
     await settle(wrapper)
     const modelValue = editorProp<string>(wrapper, 'modelValue')
 
-    // A real click on the block the after side renders; diff mode has no other canvas selection path.
-    await wrapper.get('.card-viewport-stage--after [data-block-id="text-added"]').trigger('click')
+    // In Canvas viewport, block click emits 'block-click' with the clicked block id
+    editorViewport(wrapper).vm.$emit('block-click', 'text-added')
     await settle(wrapper)
 
     expect(editorTrees(wrapper).structureTree.props('selectedKeys')).toEqual(['text-added'])

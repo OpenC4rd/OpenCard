@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createMarkdownTextBlock,
   createImageBlock,
   createSimpleContainerBlock,
   createTextBlock,
@@ -54,7 +53,7 @@ describe('renderParser', () => {
       description: 'Reusable card.',
       notes: 'Review margins.',
     })
-    expect(result.document.faces.front.children[0]!.location).toMatchObject({ x: '10px', y: '20px' })
+    expect(result.document.faces.front.children[0]!.location).toMatchObject({ x: '10mm', y: '20px' })
     expect(block).toMatchObject({
       type: 'text-block',
       id: 'text',
@@ -206,16 +205,45 @@ describe('renderParser', () => {
     expect(document).toEqual(sourceSnapshot)
   })
 
-  it('uses the same stable default text color for markdown blocks', () => {
+  it('reads a legacy markdown block as a text block and reports a deprecation issue', () => {
     const document = createDocument()
-    document.faces.front.children[0]!.block = createMarkdownTextBlock({
-      id: 'markdown',
-      content: '# Heading',
-    })
+    document.faces.front.children[0]!.block = {
+      ...createTextBlock({ id: 'markdown', content: '# Heading' }),
+      type: 'markdown-text-block',
+    } as unknown as CardDocument['faces']['front']['children'][number]['block']
 
-    const block = parseRenderDocument(document).document.faces.front.children[0]!.block
+    const result = parseRenderDocument(document)
+    const block = result.document.faces.front.children[0]!.block
 
-    expect(block).toMatchObject({ type: 'markdown-text-block', color: '#000000' })
+    expect(block).toMatchObject({ type: 'text-block', content: '# Heading' })
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        type: 'card-designer.render-parse.deprecated-block-type',
+        location: expect.objectContaining({
+          fieldKey: 'type',
+          blockId: 'markdown',
+        }),
+      }),
+    ])
+  })
+
+  it('reports a deprecation issue when reading a block with legacy customCss', () => {
+    const document = createDocument()
+    document.faces.front.children[0]!.block = {
+      ...createTextBlock({ id: 'styled-text', content: 'Styled' }),
+      customCss: '.custom { color: red; }',
+    } as unknown as CardDocument['faces']['front']['children'][number]['block']
+
+    const result = parseRenderDocument(document)
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        type: 'card-designer.render-parse.deprecated-property',
+        location: expect.objectContaining({
+          fieldKey: 'customCss',
+          blockId: 'styled-text',
+        }),
+      }),
+    ])
   })
 
   it('records nested block paths as dot-separated block names', () => {

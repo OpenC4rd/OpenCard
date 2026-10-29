@@ -8,6 +8,8 @@ import type {
 } from '../../entities/card/model'
 import type { CardPipelineIssue } from './cardPipelineIssue'
 
+export type { AnchorPosition } from '../../entities/card/model'
+
 export type RenderReadyBaseBlock = {
   id: string
   name: string
@@ -28,11 +30,10 @@ export type RenderReadyBaseBlock = {
   zIndex: number
   rotation: number
   opacity: number
-  customCss: string
   [fieldKey: string]: unknown
 }
 
-type RenderReadyTextContentBlock = RenderReadyBaseBlock & {
+export type RenderReadyTextContentBlock = RenderReadyBaseBlock & {
   content: string
   fontSize: string
   fontFamily: string
@@ -46,10 +47,6 @@ type RenderReadyTextContentBlock = RenderReadyBaseBlock & {
 
 export type RenderReadyTextBlock = RenderReadyTextContentBlock & {
   type: 'text-block'
-}
-
-export type RenderReadyMarkdownTextBlock = RenderReadyTextContentBlock & {
-  type: 'markdown-text-block'
 }
 
 export type RenderReadyImageBlock = RenderReadyBaseBlock & {
@@ -131,7 +128,6 @@ export type RenderReadyCustomBlock = RenderReadyBaseBlock & {
 
 export type RenderReadyCardBlock =
   | RenderReadyTextBlock
-  | RenderReadyMarkdownTextBlock
   | RenderReadyImageBlock
   | RenderReadyQrCodeBlock
   | RenderReadyShapeBlock
@@ -145,6 +141,7 @@ export type RenderReadyCardFace = {
   faceKey: CardFaceKey
   width: number
   height: number
+  dpi?: number
   background: string
   children: RenderReadySimpleContainerChild[]
 }
@@ -156,6 +153,7 @@ export type RenderReadyCardDocument = {
   version: string
   description: string
   notes: string
+  dpi?: number
   faces: Record<CardFaceKey, RenderReadyCardFace>
 }
 

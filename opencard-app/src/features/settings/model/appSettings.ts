@@ -175,6 +175,7 @@ export type AppSettingKey =
   | 'workspace.historyEntryLimit'
   | 'workspace.autoSave'
   | 'workspace.autoSaveIntervalSeconds'
+  | 'workspace.cdeDotGridSpacingMm'
 
 export interface AppSettings {
   version: typeof APP_SETTINGS_VERSION
@@ -236,6 +237,7 @@ export interface AppSettings {
     showSelectionSizeOnResize: boolean
     alignmentSnappingEnabledByDefault: boolean
     historyEntryLimit: number
+    cdeDotGridSpacingMm: number
   }
 }
 
@@ -331,6 +333,7 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     showSelectionSizeOnResize: true,
     alignmentSnappingEnabledByDefault: true,
     historyEntryLimit: 100,
+    cdeDotGridSpacingMm: 5,
   }),
 })
 
@@ -357,6 +360,11 @@ function clampPercentage(value: unknown, fallback: number): number {
 function clampHistoryEntryLimit(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_APP_SETTINGS.workspace.historyEntryLimit
   return Math.min(1000, Math.max(10, Math.round(value / 10) * 10))
+}
+
+function normalizeCdeDotGridSpacingMm(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value) && [0, 2.5, 5, 10].includes(value)) return value
+  return DEFAULT_APP_SETTINGS.workspace.cdeDotGridSpacingMm
 }
 
 function clampTitleBarNoticeHistoryLimit(value: unknown): number {
@@ -722,6 +730,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
         ? workspace.alignmentSnappingEnabledByDefault
         : DEFAULT_APP_SETTINGS.workspace.alignmentSnappingEnabledByDefault,
       historyEntryLimit: clampHistoryEntryLimit(workspace.historyEntryLimit),
+      cdeDotGridSpacingMm: normalizeCdeDotGridSpacingMm(workspace.cdeDotGridSpacingMm),
     },
   }
 }

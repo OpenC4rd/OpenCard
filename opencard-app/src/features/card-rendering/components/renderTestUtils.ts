@@ -3,27 +3,21 @@ import type {
   CardDocument,
   FlowContainerBlock,
   ImageBlock,
-  MarkdownTextBlock,
   QrCodeBlock,
   ShapeBlock,
   SimpleContainerBlock,
   TextBlock,
 } from '../../../entities/card/model'
-import { computed } from 'vue'
-import { cardEditorContextKey } from './cardEditorContext'
 import { parseRenderDocument } from '../renderParser'
 import type {
   RenderReadyCardBlock,
   RenderReadyFlowContainerBlock,
   RenderReadyImageBlock,
-  RenderReadyMarkdownTextBlock,
   RenderReadyQrCodeBlock,
   RenderReadyShapeBlock,
   RenderReadySimpleContainerBlock,
   RenderReadyTextBlock,
 } from '../render.types'
-import { parseRichTextHtml } from '../../../shared/rich-text/richTextHtml'
-import type { PreparedRichTextCatalog } from '../prepareRichText'
 import { EMPTY_PROJECT_ICON_CATALOG, type ProjectIconCatalog } from '../../workspace/services/projectIconCatalog'
 import type { CardResourceResolver } from '../cardRenderResources'
 
@@ -47,39 +41,7 @@ export function createRendererTestResources(projectIconCatalog: ProjectIconCatal
   return resolver
 }
 
-export const rendererTestGlobal = {
-  provide: {
-    [cardEditorContextKey as symbol]: {
-      transformDisabledBlockIds: computed(() => new Set<string>()),
-      handleBlockClick: () => undefined,
-      resources: createRendererTestResources(),
-    },
-  },
-}
-
-export function richTextRendererTestGlobal(block: RenderReadyTextBlock, projectIconCatalog?: unknown) {
-  const parsed = parseRichTextHtml(block.content)
-  const prepared: PreparedRichTextCatalog = new Map([[block.id, {
-    document: parsed.document,
-    diagnostics: [],
-    valid: parsed.canEnterVisualMode,
-  }]])
-  return {
-    provide: {
-      [cardEditorContextKey as symbol]: {
-        transformDisabledBlockIds: computed(() => new Set<string>()),
-        handleBlockClick: () => undefined,
-        resources: createRendererTestResources(
-          (projectIconCatalog as ProjectIconCatalog | undefined) ?? EMPTY_PROJECT_ICON_CATALOG,
-        ),
-        richText: computed(() => prepared),
-      },
-    },
-  }
-}
-
 export function parseRenderReadyBlockForTest(block: TextBlock): RenderReadyTextBlock
-export function parseRenderReadyBlockForTest(block: MarkdownTextBlock): RenderReadyMarkdownTextBlock
 export function parseRenderReadyBlockForTest(block: ImageBlock): RenderReadyImageBlock
 export function parseRenderReadyBlockForTest(block: QrCodeBlock): RenderReadyQrCodeBlock
 export function parseRenderReadyBlockForTest(block: ShapeBlock): RenderReadyShapeBlock

@@ -38,7 +38,6 @@
     "@tiptap/extension-underline": "2.27.1",
     "@tiptap/starter-kit": "2.27.1",
     "@tiptap/vue-3": "2.27.1",
-    "dom-to-image-more": "^3.7.2",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
     "fontkit": "^2.0.4",

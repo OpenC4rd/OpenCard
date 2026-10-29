@@ -311,6 +311,8 @@ function clearTypeahead(): void {
   font: inherit;
   text-align: start;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .oc-select__trigger:disabled {

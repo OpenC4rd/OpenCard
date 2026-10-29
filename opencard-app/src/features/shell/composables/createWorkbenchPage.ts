@@ -1,6 +1,5 @@
 import { ref, shallowRef, computed, nextTick, onUnmounted, watch } from 'vue'
 import { taskScheduler } from '../../../utils/taskScheduler'
-import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { projectFontSources } from '../../workspace/model/projectFontRegistry'
@@ -16,7 +15,6 @@ import { fileSystemService } from '../../workspace/services/fileSystemService'
 import { notifyAppError, notifyError, notifySuccess } from '../../notifications/titlebarNotices'
 import { editorHistoryManager } from '../../editor-runtime/history/editorHistoryManager'
 import type { SessionIssueNavigationRequest } from '../../editor-runtime/model/editorIssue'
-import CardFaceRenderer from '../../card-rendering/components/CardFaceRenderer.vue'
 import { resolveFileType } from '../../workspace/model/fileTypes'
 import { resolveSessionLabel } from '../../workspace/model/sessionLabel'
 import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../../workspace/model/projectStructure'
@@ -69,10 +67,6 @@ export function createWorkbenchPage(options: {
   let packageScan: AbortController | undefined
   const projectTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
   const projectManagementTreeRef = ref<{ beginRename: (key: string) => Promise<void> } | null>(null)
-  const exportRendererRef = ref<InstanceType<typeof CardFaceRenderer>>()
-  const setExportRendererRef = (renderer: Element | ComponentPublicInstance | null): void => {
-    exportRendererRef.value = renderer && 'getCanvasElement' in renderer ? renderer as InstanceType<typeof CardFaceRenderer> : undefined
-  }
   watch(() => settingsStore.settings.value.workspace.historyEntryLimit, limit => editorHistoryManager.setEntryLimit(limit), { immediate: true })
   const projectStore = useProjectStore()
   const projectOpen = computed(() => Boolean(projectStore.projectPath.value))
@@ -184,9 +178,6 @@ export function createWorkbenchPage(options: {
     onChangesExpansionChange: handleChangesExpansionChange,
   })
   const {
-    showExportRenderer,
-    exportCardFace,
-    exportResourceContext,
     isRunning: isProjectExportRunning,
     loadDocumentSnapshot,
     prepare: prepareProjectExport,
@@ -194,7 +185,6 @@ export function createWorkbenchPage(options: {
     renderCardImages, cancelAndWait: cancelExportsAndWait,
   } = useProjectExport({
     sessions,
-    exportRendererRef,
     renderEnvironment: projectRenderEnvironment,
     readProjectFile,
     resolveProjectPath,
@@ -734,7 +724,6 @@ export function createWorkbenchPage(options: {
     handleKeydown,
     overlays: WorkbenchOverlays,
     overlayProps: computed(() => ({
-      showExportRenderer: showExportRenderer.value, exportCardFace: exportCardFace.value, exportResourceContext: exportResourceContext.value, setExportRendererRef,
       projectExportDialogOpen: projectExportDialogOpen.value, projectExportDialogTask: projectExportDialogTask.value,
       projectExportDocumentCandidates: projectExportDocumentCandidates.value, isExportPreparing: isExportPreparing.value, isProjectExportRunning: isProjectExportRunning.value,
       exportPreparationIssues: exportPreparationIssues.value, resourcePackageBuilderOpen: resourcePackageBuilderOpen.value, projectPath: projectPath.value,

@@ -14,8 +14,8 @@ import { useCdeSelectionCommands } from './useCdeSelectionCommands'
 function createDocument(): CardDocument {
   const simpleChild = createTextBlock({
     id: 'simple-child',
-    width: '20px',
-    height: '30px',
+    width: '20mm',
+    height: '30mm',
     zIndex: '1.5',
   })
   const simple = createSimpleContainerBlock({
@@ -26,8 +26,8 @@ function createDocument(): CardDocument {
         id: 'simple-location',
         type: 'simple-container-location',
         anchor: 'rb',
-        x: '1px',
-        y: '2px',
+        x: '1mm',
+        y: '2mm',
       },
     }],
   })
@@ -35,7 +35,7 @@ function createDocument(): CardDocument {
     id: 'flow',
     direction: 'lr',
     children: [{
-      block: createTextBlock({ id: 'flow-child', width: '40px', height: '50px' }),
+      block: createTextBlock({ id: 'flow-child', width: '40mm', height: '50mm' }),
       location: {
         id: 'flow-location',
         type: 'flow-container-location',
@@ -111,12 +111,12 @@ describe('useCdeSelectionCommands', () => {
     const { commands, simple } = createHarness((_blockId, axis) => axis === 'width')
     const child = simple.children[0].block
     expect(commands.resizeSelection({ blockId: child.id, width: 99 })).toBe(false)
-    expect(getBlockProperty<string>(child, 'width')).toBe('20px')
+    expect(getBlockProperty<string>(child, 'width')).toBe('20mm')
     expect(commands.resizeSelection({ blockId: child.id, width: 99, height: 44 })).toBe(true)
-    expect(getBlockProperty<string>(child, 'width')).toBe('20px')
-    expect(getBlockProperty<string>(child, 'height')).toBe('44px')
+    expect(getBlockProperty<string>(child, 'width')).toBe('20mm')
+    expect(getBlockProperty<string>(child, 'height')).toBe('44mm')
     expect(commands.resizeSelection({ blockId: child.id, x: 99 })).toBe(false)
-    expect(simple.children[0]!.location.x).toBe('1px')
+    expect(simple.children[0]!.location.x).toBe('1mm')
   })
 
   it('rejects fully locked resize intents without committing position changes', () => {
@@ -124,8 +124,8 @@ describe('useCdeSelectionCommands', () => {
     const child = simple.children[0]!
 
     expect(commands.resizeSelection({ blockId: child.block.id, width: 99, height: 44, x: 10, y: 12 })).toBe(false)
-    expect(child.block).toMatchObject({ width: '20px', height: '30px' })
-    expect(child.location).toMatchObject({ x: '1px', y: '2px' })
+    expect(child.block).toMatchObject({ width: '20mm', height: '30mm' })
+    expect(child.location).toMatchObject({ x: '1mm', y: '2mm' })
     expect(markDocumentChanged).not.toHaveBeenCalled()
   })
 
@@ -139,11 +139,11 @@ describe('useCdeSelectionCommands', () => {
       x: -0,
       y: 2.345,
     })).toBe(true)
-    expect(simple.children[0]!.block).toMatchObject({ width: '10.13px', height: '0px' })
-    expect(simple.children[0]!.location).toMatchObject({ x: '0px', y: '2.35px' })
+    expect(simple.children[0]!.block).toMatchObject({ width: '10.13mm', height: '0mm' })
+    expect(simple.children[0]!.location).toMatchObject({ x: '0mm', y: '2.35mm' })
 
     expect(commands.moveSelection({ blockId: 'simple-child', x: 8.444, y: -0 })).toBe(true)
-    expect(simple.children[0]!.location).toMatchObject({ x: '8.44px', y: '0px' })
+    expect(simple.children[0]!.location).toMatchObject({ x: '8.44mm', y: '0mm' })
     expect(refreshDocumentState).toHaveBeenCalledTimes(2)
     expect(markDocumentChanged).toHaveBeenNthCalledWith(1, 'action')
     expect(markDocumentChanged).toHaveBeenNthCalledWith(2, 'action')
@@ -159,10 +159,10 @@ describe('useCdeSelectionCommands', () => {
       x: 99,
       y: 88,
     })).toBe(true)
-    expect(flow.children[0]!.block).toMatchObject({ width: '120px', height: '60px' })
+    expect(flow.children[0]!.block).toMatchObject({ width: '120mm', height: '60mm' })
     expect(flow.children[0]!.location).not.toHaveProperty('x')
     expect(commands.resizeSelection({ blockId: 'flow-child', height: 75 })).toBe(true)
-    expect(flow.children[0]!.block).toMatchObject({ width: '120px', height: '75px' })
+    expect(flow.children[0]!.block).toMatchObject({ width: '120mm', height: '75mm' })
     expect(commands.resizeSelection({ blockId: 'flow-child' })).toBe(false)
     expect(commands.moveSelection({ blockId: 'flow-child', x: 1, y: 2 })).toBe(false)
   })
@@ -179,25 +179,25 @@ describe('useCdeSelectionCommands', () => {
       x: 10,
       y: 12,
     })).toBe(true)
-    expect(simple.children[0]!.block).toMatchObject({ width: '100.56px', height: '80.44px' })
-    expect(simple.children[0]!.location).toMatchObject({ anchor: 'rb', x: '10px', y: '12px' })
+    expect(simple.children[0]!.block).toMatchObject({ width: '100.56mm', height: '80.44mm' })
+    expect(simple.children[0]!.location).toMatchObject({ anchor: 'rb', x: '10mm', y: '12mm' })
 
     expect(commands.applySelectionLayout({
       type: 'fill-parent', blockId: 'simple-child', width: true, height: true,
     })).toBe(true)
     expect(simple.children[0]!.block).toMatchObject({ width: '100%', height: '100%' })
-    expect(simple.children[0]!.location).toMatchObject({ anchor: 'rb', x: '0px', y: '0px' })
+    expect(simple.children[0]!.location).toMatchObject({ anchor: 'rb', x: '0mm', y: '0mm' })
   })
 
   it('applies flow layouts only on the parent cross axis', () => {
     const { commands, flow } = createHarness()
 
     expect(commands.applySelectionLayout({ type: 'fill-cross-axis', blockId: 'flow-child' })).toBe(true)
-    expect(flow.children[0]!.block).toMatchObject({ width: '40px', height: '100%' })
+    expect(flow.children[0]!.block).toMatchObject({ width: '40mm', height: '100%' })
     expect(flow.children[0]!.location.align).toBe('justify')
 
     flow.direction = 'tb'
-    setBlockProperty(flow.children[0]!.block, 'width', '40px')
+    setBlockProperty(flow.children[0]!.block, 'width', '40mm')
     expect(commands.applySelectionLayout({ type: 'fill-cross-axis', blockId: 'flow-child' })).toBe(true)
     expect(getBlockProperty<string>(flow.children[0]!.block, 'width')).toBe('100%')
     expect(commands.applySelectionLayout({ type: 'center-cross-axis', blockId: 'flow-child' })).toBe(true)
@@ -212,13 +212,13 @@ describe('useCdeSelectionCommands', () => {
       type: 'geometry.apply', operation: 'inset', blockId: child.block.id,
       width: 80, height: 30, x: 5, y: 6,
     })).toBe(true)
-    expect(child.block).toMatchObject({ width: '20px', height: '30px' })
-    expect(child.location).toMatchObject({ x: '1px', y: '6px' })
+    expect(child.block).toMatchObject({ width: '20mm', height: '30mm' })
+    expect(child.location).toMatchObject({ x: '1mm', y: '6mm' })
     expect(commands.applySelectionLayout({
       type: 'fill-parent', blockId: child.block.id, width: true, height: true,
     })).toBe(true)
-    expect(child.block).toMatchObject({ width: '20px', height: '100%' })
-    expect(child.location).toMatchObject({ x: '1px', y: '0px' })
+    expect(child.block).toMatchObject({ width: '20mm', height: '100%' })
+    expect(child.location).toMatchObject({ x: '1mm', y: '0mm' })
   })
 
   it('finishes face dimension typing even when the final value is unchanged', () => {

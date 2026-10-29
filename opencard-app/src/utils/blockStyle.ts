@@ -1,16 +1,11 @@
 import type { RenderReadyBaseBlock } from '../features/card-rendering/render.types'
 
-type BlockStyleOptions = {
-    disableTransform: boolean
-}
-
 function isZeroCssValue(value: string): boolean {
     const normalized = value.trim().toLowerCase()
-    return normalized === '' || normalized === '0' || normalized === '0px' || normalized === '0%'
+    return normalized === '' || normalized === '0' || normalized === '0px' || normalized === '0mm' || normalized === '0pt' || normalized === '0%'
 }
 
-
-export function getBlockBoxStyles(comp: RenderReadyBaseBlock, options: BlockStyleOptions): string {
+export function getBlockBoxStyles(comp: RenderReadyBaseBlock): string {
     const styles: string[] = []
 
     styles.push(`width: ${comp.width}`)
@@ -24,7 +19,7 @@ export function getBlockBoxStyles(comp: RenderReadyBaseBlock, options: BlockStyl
     if (comp.opacity !== 1) styles.push(`opacity: ${comp.opacity}`)
     if (comp.zIndex !== 0) styles.push(`z-index: ${comp.zIndex}`)
 
-    if (!options.disableTransform && comp.transformAnchor !== 'cc') {
+    if (comp.transformAnchor !== 'cc') {
         const originMap: Record<string, string> = {
             'lt': '0% 0%', 'ct': '50% 0%', 'rt': '100% 0%',
             'lc': '0% 50%', 'cc': '50% 50%', 'rc': '100% 50%',
@@ -34,20 +29,19 @@ export function getBlockBoxStyles(comp: RenderReadyBaseBlock, options: BlockStyl
     }
 
     const transforms: string[] = []
-    if (!options.disableTransform && (!isZeroCssValue(comp.translateX) || !isZeroCssValue(comp.translateY))) {
+    if (!isZeroCssValue(comp.translateX) || !isZeroCssValue(comp.translateY)) {
         transforms.push(`translate(${comp.translateX}, ${comp.translateY})`)
     }
-    if (!options.disableTransform && (comp.scaleX !== 1 || comp.scaleY !== 1)) {
+    if (comp.scaleX !== 1 || comp.scaleY !== 1) {
         transforms.push(`scale(${comp.scaleX}, ${comp.scaleY})`)
     }
-    if (!options.disableTransform && comp.rotation !== 0) {
+    if (comp.rotation !== 0) {
         transforms.push(`rotate(${comp.rotation}deg)`)
     }
     if (transforms.length > 0) {
         styles.push(`transform: ${transforms.join(' ')}`)
     }
 
-    const customCss = comp.customCss.trim()
-    return styles.join('; ') + (!options.disableTransform && customCss ? '; ' + customCss : '')
+    return styles.join('; ')
 }
 

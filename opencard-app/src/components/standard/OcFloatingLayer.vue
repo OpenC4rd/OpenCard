@@ -143,6 +143,8 @@ const layerStyle = computed<CSSProperties>(() => ({
   background-clip: padding-box;
   border-radius: var(--oc-floating-layer-radius, var(--oc-radius-control));
   isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .oc-floating-layer-fade-enter-active,

@@ -169,6 +169,8 @@ defineExpose({ activate: openPopover })
   font: inherit;
   text-align: start;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .file-path-field__trigger:disabled {

@@ -3,7 +3,7 @@
     :class="{ 'is-selected': selected, 'is-missing': !entry }"
     contenteditable="false" tabindex="-1"
     :aria-label="tr('propertyEditor.richText.selectProjectIcon', '点击选中项目图标')" @mousedown.stop @click="selectIconNode">
-    <span v-if="entry" class="project-icon-node__image oc-project-icon" :style="entry.inlineStyle" role="img"
+    <span v-if="entry" class="project-icon-node__image oc-project-icon" :style="imageStyle" role="img"
       :aria-label="entry.name" :data-tooltip="entry.name" />
     <span v-else class="project-icon-node__missing">{{ tr('propertyEditor.richText.iconUnavailable', '图标不可用') }}</span>
   </NodeViewWrapper>
@@ -27,6 +27,16 @@ const options = computed(() => props.extension.options as ProjectIconNodeOptions
 const entry = computed(() => {
   const reference = String(props.node.attrs.iconPath ?? '')
   return reference ? options.value.resolve?.(reference) ?? null : null
+})
+const imageStyle = computed(() => {
+  if (!entry.value) return undefined
+  const style = { ...entry.value.inlineStyle }
+  const size = props.node.attrs.size
+  if (size) {
+    style.width = String(size)
+    style.height = String(size)
+  }
+  return style
 })
 
 function selectIconNode(): void {

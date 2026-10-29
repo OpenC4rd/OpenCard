@@ -98,7 +98,7 @@ function validateBlock(
       if (mask.kind === 'unavailable') pushPackageResourceIssue('card-designer.resource.file-missing', block.maskSource, { code: 'resource-unavailable', reference: block.maskSource, message: mask.message }, { documentId, instanceId, faceKey, blockId: block.id, blockPath, fieldKey: 'maskSource', issues })
     }
   }
-  if (block.type === 'text-block' || block.type === 'markdown-text-block') {
+  if (block.type === 'text-block') {
     for (const fontName of systemFontFamilies(block.fontFamily)) {
       issues.push(createCardPipelineIssue({
         type: 'card-designer.resource.system-font',

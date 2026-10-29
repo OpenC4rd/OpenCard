@@ -75,7 +75,8 @@ export async function runExportPlan(options: RunExportPlanOptions): Promise<Expo
           ...current,
           faceKey: entry.faceKey,
           render: entry.render,
-          scale: options.plan.task.scale,
+          scale: options.plan.task.scale ?? 1,
+          dpi: options.plan.task.dpi,
         }, options.signal)
         completedUnits += 1
       } catch (error) {

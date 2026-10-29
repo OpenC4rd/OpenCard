@@ -36,6 +36,7 @@ describe('property binding schema policy', () => {
     const documentSchema = getTypePropertyEditorSchema('card-document')
 
     expect(exposesPropertyReference(faceSchema.background)).toBe(true)
+    expect(faceSchema.background).toMatchObject({ fieldType: 'color' })
     expect(acceptsPropertyBinding(faceSchema.children)).toBe(false)
     expect(exposesPropertyReference(documentSchema.faces)).toBe(false)
     expect(documentSchema).not.toHaveProperty('schemaVersion')
@@ -44,7 +45,6 @@ describe('property binding schema policy', () => {
   it('assigns every visible native field to a registered category', () => {
     const typeNames = [
       'text-block',
-      'markdown-text-block',
       'image-block',
       'qrcode-block',
       'shape-block',
@@ -75,7 +75,5 @@ describe('property binding schema policy', () => {
     expect(getTypePropertyEditorSchema('text-block').content).toMatchObject({
       fieldType: 'richText',
     })
-    const markdown = getTypePropertyEditorSchema('markdown-text-block').content
-    expect(markdown).toMatchObject({ fieldType: 'string', multiline: true })
   })
 })

@@ -7,8 +7,8 @@ import OverlayGroupRoot from '../../../components/ui/OverlayGroupRoot.vue'
 import { disposeGroup, overlayGroups } from '../../../composables/overlayGroups'
 import type { Editor } from '@tiptap/core'
 import { undoDepth } from '@tiptap/pm/history'
+import { NodeSelection } from '@tiptap/pm/state'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
-import { fromCssFontFamily } from '../../../features/workspace/model/projectFonts'
 
 beforeEach(() => setAppLocale('zh-CN'))
 afterEach(() => {
@@ -32,20 +32,32 @@ function listbox(): HTMLElement | null {
 
 describe('OcRichTextEditor locale reactivity', () => {
   it.each([
-    '<p><span data-oc-fill-type="unexpected">A</span></p>',
-    '<table><tbody><tr><td><p>A</p></td><td><p>B</p></td></tr></tbody></table>',
-    '<table><colgroup><col style="width: 80px"><col style="width: 120px"></colgroup><thead><tr><th colspan="2"><p>AB</p></th></tr></thead><tbody><tr><td><p>C</p></td><td><p>D</p></td></tr></tbody></table>',
-    '<table><tbody><tr><td rowspan="2"><p>A</p></td><td><p>B</p></td></tr><tr><td><p>C</p></td></tr></tbody></table>',
-  ])('preserves table content and geometry through source handoff: %s', async source => {
+    '@b{Hello world}',
+    '@i{Italic} and @u{Underline}',
+    '@ul{@li{Alpha}@li{Beta}}',
+    'Level: {{player.lvl}} @icon(key=star)',
+    '@style(color=red,size="20px"){Custom text}',
+  ])('preserves Card Markup content and structure through source handoff: %s', async source => {
     const wrapper = mountEditor()
     try {
       await nextTick()
-      const vm = wrapper.vm as unknown as { editor: Editor; applyHtml: (html: string) => boolean; getHtml: () => string }
+      const vm = wrapper.vm as unknown as { editor: Editor; applyHtml: (markup: string) => boolean; getHtml: () => string }
       expect(vm.applyHtml(source)).toBe(true)
       expect(vm.getHtml()).toBe(source)
       const before = vm.editor.getJSON()
-      expect(vm.applyHtml(vm.editor.getHTML())).toBe(true)
+      expect(vm.applyHtml(vm.getHtml())).toBe(true)
       expect(vm.editor.getJSON()).toEqual(before)
+    } finally { wrapper.unmount() }
+  })
+
+  it('tolerantly converts legacy HTML into Card Markup without html tags', async () => {
+    const wrapper = mountEditor()
+    try {
+      await nextTick()
+      const vm = wrapper.vm as unknown as { editor: Editor; applyHtml: (markup: string) => boolean; getHtml: () => string }
+      expect(vm.applyHtml('<p><strong>Legacy</strong> <em>content</em></p>')).toBe(true)
+      expect(vm.getHtml()).toBe('@b{Legacy} @i{content}')
+      expect(vm.getHtml()).not.toMatch(/<p>|<strong|<span|<em/)
     } finally { wrapper.unmount() }
   })
 
@@ -60,7 +72,6 @@ describe('OcRichTextEditor locale reactivity', () => {
       expect(vm.flushPendingInput()).toBe(true)
     } finally { wrapper.unmount() }
   })
-
 
   it('saves stable resource references instead of resolved preview sources', async () => {
     const wrapper = mount(OcRichTextEditor, {
@@ -83,10 +94,10 @@ describe('OcRichTextEditor locale reactivity', () => {
     vm.editor.commands.setTextSelection({ from: 1, to: 3 })
     vm.editor.commands.setColor('#ff0000')
     const saved = vm.getHtml()
-    const document = new DOMParser().parseFromString(saved, 'text/html')
-    expect(fromCssFontFamily(document.querySelector('span')!.style.fontFamily)).toBe('font:brand')
+    expect(saved).toContain('font:brand')
     expect(saved).toContain('素材/a.png')
     expect(saved).not.toMatch(/ScopedBrand|resolved\.png|--oc-rich-font|data-oc-font/)
+    expect(saved).not.toMatch(/<p|<span/)
     wrapper.unmount()
   })
 
@@ -210,5 +221,90 @@ describe('OcRichTextEditor locale reactivity', () => {
     update('shadowBlur', '-2px')
     expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textShadowOffsetX: '-3px', textShadowBlur: '0.5em' })
     wrapper.unmount()
+  })
+
+  it('supports selecting and deleting atom nodes (@icon and {{expr}})', async () => {
+    const wrapper = mountEditor()
+    try {
+      await nextTick()
+      const vm = wrapper.vm as unknown as { editor: Editor; applyHtml: (markup: string) => boolean; getHtml: () => string }
+      vm.applyHtml('Hello {{user.name}} world')
+      expect(vm.getHtml()).toBe('Hello {{user.name}} world')
+
+      // NodeSelection on binding atom node (pos 7)
+      const bindingPos = 7
+      const trBinding = vm.editor.state.tr.setSelection(NodeSelection.create(vm.editor.state.doc, bindingPos))
+      vm.editor.view.dispatch(trBinding)
+      expect(vm.editor.state.selection instanceof NodeSelection).toBe(true)
+      expect((vm.editor.state.selection as NodeSelection).node.type.name).toBe('binding')
+
+      // Delete the selected atom node
+      vm.editor.view.dispatch(vm.editor.state.tr.deleteSelection())
+      expect(vm.getHtml()).toBe('Hello  world')
+
+      // Now test with projectIcon
+      vm.applyHtml('Star: @icon(key=star) done')
+      expect(vm.getHtml()).toBe('Star: @icon(key=star) done')
+      const iconPos = 7
+      const trIcon = vm.editor.state.tr.setSelection(NodeSelection.create(vm.editor.state.doc, iconPos))
+      vm.editor.view.dispatch(trIcon)
+      expect(vm.editor.state.selection instanceof NodeSelection).toBe(true)
+      expect((vm.editor.state.selection as NodeSelection).node.type.name).toBe('projectIcon')
+
+      vm.editor.view.dispatch(vm.editor.state.tr.deleteSelection())
+      expect(vm.getHtml()).toBe('Star:  done')
+    } finally { wrapper.unmount() }
+  })
+
+  it('activates binding input when typing {{ via input rules', async () => {
+    const wrapper = mountEditor()
+    try {
+      await nextTick()
+      const vm = wrapper.vm as unknown as { editor: Editor; getHtml: () => string }
+      vm.editor.commands.clearContent()
+      vm.editor.commands.focus()
+
+      const view = vm.editor.view
+      // User types first '{' (inserted into doc)
+      view.dispatch(view.state.tr.insertText('{'))
+      // User types second '{', intercepted by input rule
+      const handled = view.someProp('handleTextInput', f => f(view, 2, 2, '{', () => view.state.tr.insertText('{', 2, 2)))
+      expect(handled).toBe(true)
+      await nextTick()
+
+      // Binding atom node was inserted by the input rule
+      const json = vm.editor.getJSON()
+      const paragraph = json.content?.[0]
+      const hasBinding = paragraph?.content?.some(child => child.type === 'binding')
+      expect(hasBinding).toBe(true)
+    } finally { wrapper.unmount() }
+  })
+
+  it('preserves package coordinate, version and size when pasting @icon(...) markup', async () => {
+    const wrapper = mountEditor()
+    try {
+      await nextTick()
+      const vm = wrapper.vm as unknown as { editor: Editor; getHtml: () => string }
+      vm.editor.commands.clearContent()
+      vm.editor.commands.focus()
+
+      // Paste @icon with package, version, and size
+      if (typeof ClipboardEvent === 'undefined') {
+        (globalThis as any).ClipboardEvent = class ClipboardEvent extends Event {}
+      }
+      const markup = '@icon(key=blade,pkg=@scoped/pack,version=1.0.0,size=24px)'
+      const view = vm.editor.view
+      view.pasteHTML(markup)
+      await nextTick()
+
+      const json = vm.editor.getJSON()
+      const iconNode = json.content?.[0]?.content?.find(child => child.type === 'projectIcon')
+      expect(iconNode).toBeDefined()
+      expect(iconNode?.attrs?.iconPath).toBe('@scoped/pack@1.0.0#icon:blade')
+      expect(iconNode?.attrs?.size).toBe('24px')
+      expect(vm.getHtml()).toContain('blade')
+      expect(vm.getHtml()).toContain('@scoped/pack')
+      expect(vm.getHtml()).toContain('24px')
+    } finally { wrapper.unmount() }
   })
 })

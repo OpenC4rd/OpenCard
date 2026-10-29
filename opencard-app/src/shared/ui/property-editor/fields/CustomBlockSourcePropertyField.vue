@@ -264,7 +264,7 @@ defineExpose({ activate: openPopover })
 
 <style scoped>
 .custom-block-source-field { flex: 1 1 auto; width: 100%; min-width: 0; }
-.custom-block-source-field__trigger { display: flex; width: 100%; min-width: 0; height: 100%; align-items: center; gap: var(--oc-space-xs); padding: var(--oc-field-content-padding, 0 var(--oc-space-xs)); border: 0; outline: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.custom-block-source-field__trigger { display: flex; width: 100%; min-width: 0; height: 100%; align-items: center; gap: var(--oc-space-xs); padding: var(--oc-field-content-padding, 0 var(--oc-space-xs)); border: 0; outline: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; user-select: none; -webkit-user-select: none; }
 .custom-block-source-field__trigger:disabled { cursor: not-allowed; }
 .custom-block-source-field__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .custom-block-source-field__value.is-placeholder { color: var(--oc-fg-muted); }

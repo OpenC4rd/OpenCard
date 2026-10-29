@@ -169,4 +169,11 @@ describe('appSettings', () => {
     expect(localeOf('fr/FR.json')).toBe('system')
     expect(localeOf(12)).toBe('system')
   })
+
+  it('normalizes the CDE dot grid spacing to allowed increments', () => {
+    expect(normalizeAppSettings({ workspace: { cdeDotGridSpacingMm: 2.5 } }).workspace.cdeDotGridSpacingMm).toBe(2.5)
+    expect(normalizeAppSettings({ workspace: { cdeDotGridSpacingMm: 0 } }).workspace.cdeDotGridSpacingMm).toBe(0)
+    expect(normalizeAppSettings({ workspace: { cdeDotGridSpacingMm: 10 } }).workspace.cdeDotGridSpacingMm).toBe(10)
+    expect(normalizeAppSettings({ workspace: { cdeDotGridSpacingMm: 99 } }).workspace.cdeDotGridSpacingMm).toBe(5)
+  })
 })

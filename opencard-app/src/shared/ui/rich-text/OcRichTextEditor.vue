@@ -37,10 +37,6 @@
             :active="editor.isActive('bulletList')" @mousedown.prevent @click="runCommand('bulletList')" />
           <OcButton size="md" icon-only icon="mdiFormatListNumbered" :data-tooltip="tr('propertyEditor.richText.orderedList', '有序列表')" :aria-label="tr('propertyEditor.richText.orderedList', '有序列表')"
             :active="editor.isActive('orderedList')" @mousedown.prevent @click="runCommand('orderedList')" />
-          <OcButton v-if="!editor.isActive('table')" size="md" icon-only icon="mdiTableLarge" :data-tooltip="tr('propertyEditor.richText.insertTable', '插入表格')" :aria-label="tr('propertyEditor.richText.insertTable', '插入表格')"
-            @mousedown.prevent @click="insertTable" />
-          <OcActionButton v-if="editor.isActive('table')" :action="tableAction" size="md" variant="ghost"
-            @select="handleTableAction" />
         </div>
         <div v-if="bindingCompletion" class="oc-rich-text-editor__tool-group" role="group" :aria-label="tr('propertyEditor.richText.groupDataReference', '数据引用')">
           <OcButton size="md" icon-only icon="mdiCodeBraces" :data-tooltip="tr('propertyEditor.richText.insertBinding', '插入 binding')"
@@ -120,10 +116,10 @@ import { useRichTextEditor, type RichTextEditorProps } from './useRichTextEditor
 const props = defineProps<RichTextEditorProps>()
 const emit = defineEmits<{ change: [] }>()
 const {
-  editor, focus, getHtml, applyHtml, flushPendingInput, endInteraction,
+  editor, focus, getHtml, applyHtml, getContent, setContent, flushPendingInput, endInteraction,
   fontVariables, captureInteraction, colorOpen, formatting, interaction,
   fontFieldDefinition, fontSizeFieldDefinition, activeFontFamily, activeFontSize,
-  runCommand, insertTable, tableAction, handleTableAction, insertBinding,
+  runCommand, insertBinding,
   hasProjectIconSources, projectIconAction, handleProjectIconAction,
   recentProjectIconEntries, projectIconSelectionKey, insertRecentProjectIcon,
   foregroundColor, backgroundColor, alignments, tr,
@@ -148,7 +144,7 @@ watch(
 watch(nodeEditAnchor, () => {
   if (nodeEditLayerOpen.value) nodeEditLayer.value?.open()
 }, { flush: 'post' })
-defineExpose({ editor, focus, getHtml, applyHtml, flushPendingInput, endInteraction, properties })
+defineExpose({ editor, focus, getHtml, applyHtml, getContent, setContent, flushPendingInput, endInteraction, properties })
 </script>
 
 <style scoped>

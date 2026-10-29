@@ -58,12 +58,12 @@
           resize="none"
           autocomplete="off"
           spellcheck="false"
-          :aria-label="tr('propertyEditor.richText.htmlSource', 'HTML 源码')"
+          :aria-label="tr('propertyEditor.richText.sourceMode', '源码')"
           @input="handleSourceInput"
         />
       </div>
       <p v-if="sourceDiagnostics.length" class="rich-text-popover__diagnostics" role="alert">
-        {{ sourceDiagnostics[0]?.path }}: {{ sourceDiagnostics[0]?.message }}
+        {{ sourceDiagnostics[0]?.path ? `${sourceDiagnostics[0].path}: ` : '' }}{{ sourceDiagnostics[0]?.message }}
       </p>
       <template #footer-start>
         <OcOptionGroup
@@ -129,7 +129,6 @@ import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 import OcDialog from '../../../../components/standard/OcDialog.vue'
 import OcOptionGroup, { type OcOption } from '../../../../components/standard/OcOptionGroup.vue'
-import { parseRichTextHtml } from '../../../rich-text/richTextHtml'
 import OcRichTextEditor from '../../rich-text/OcRichTextEditor.vue'
 import RichTextPreview from '../../rich-text/RichTextPreview.vue'
 import { useRichTextSession } from '../../rich-text/useRichTextSession'
@@ -142,7 +141,7 @@ import type {
 const props = defineProps<{
   /** 字段 schema 定义。决定对话框标题、只读态、行内表达式补全与基础排版样式。 */
   definition: Extract<PropertyEditorFieldDefinition, { fieldType: 'richText' }>
-  /** 当前持久化的 HTML 字符串值。 */
+  /** 当前持久化的 Card Markup 或旧 HTML 字符串值。 */
   value: unknown
   /** 环境资源能力（项目与资源包字体、图标、图片文件与预览解析器）。 */
   capabilities?: PropertyFieldCapabilities
@@ -163,18 +162,12 @@ const anchor = ref<HTMLElement | null>(null)
 const richTextEditor = ref<InstanceType<typeof OcRichTextEditor> | null>(null)
 const sourceEditor = ref<{ focus: () => void } | null>(null)
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)))
-const session = useRichTextSession(
-  richTextEditor,
-  sourceEditor,
-  () => tr('propertyEditor.richText.sourcePreserved', '内容无法无损转为可视化编辑，请继续编辑源码。'),
-)
+const session = useRichTextSession(richTextEditor, sourceEditor)
 const { open, mode: editorMode, initialHtml, source: sourceValue, diagnostics: sourceDiagnostics } = session
-const saveBlocked = computed(
-  () => editorMode.value === 'source' && parseRichTextHtml(sourceValue.value).diagnostics.length > 0,
-)
+const saveBlocked = computed(() => false)
 const editorModeOptions = computed<readonly OcOption[]>(() => [
   { value: 'rich', label: tr('propertyEditor.richText.richTextMode', '富文本'), icon: 'mdiFormatTextVariantOutline' },
-  { value: 'source', label: tr('propertyEditor.richText.htmlSource', 'HTML 源码'), icon: 'mdiXml' },
+  { value: 'source', label: tr('propertyEditor.richText.sourceMode', '源码'), icon: 'mdiXml' },
 ])
 
 function openEditor() {
@@ -228,8 +221,14 @@ defineExpose({ activate: openEditor })
   font: inherit;
   text-align: start;
   white-space: nowrap;
-  cursor: text;
+  cursor: pointer;
   outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rich-text-field__preview--readonly {
+  cursor: default;
 }
 
 .rich-text-field__content {

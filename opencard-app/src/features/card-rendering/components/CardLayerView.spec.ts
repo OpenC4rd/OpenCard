@@ -26,7 +26,6 @@ function block(id: string, zIndex: number): RenderReadyCardBlock {
     zIndex,
     rotation: 0,
     opacity: 1,
-    customCss: '',
     content: id,
     fontSize: '16px',
     fontFamily: '',
@@ -54,44 +53,6 @@ function createFace(): RenderReadyCardFace {
   }
 }
 
-function createSourceRoot(): HTMLElement {
-  const root = document.createElement('div')
-  const canvas = document.createElement('div')
-  canvas.className = 'card-canvas'
-  Object.defineProperty(canvas, 'getBoundingClientRect', {
-    value: () => ({ left: 10, top: 20, width: 630, height: 880, right: 640, bottom: 900 }),
-  })
-  const positions = new Map([
-    ['high-a', { left: 70, top: 100 }],
-    ['high-b', { left: 270, top: 340 }],
-    ['low', { left: 110, top: 520 }],
-  ])
-  for (const id of positions.keys()) {
-    const element = document.createElement('div')
-    element.dataset.blockId = id
-    element.textContent = id
-    const position = positions.get(id)!
-    Object.defineProperties(element, {
-      offsetWidth: { configurable: true, value: 100 },
-      offsetHeight: { configurable: true, value: 40 },
-      getBoundingClientRect: {
-        configurable: true,
-        value: () => ({
-          left: position.left,
-          top: position.top,
-          width: 100,
-          height: 40,
-          right: position.left + 100,
-          bottom: position.top + 40,
-        }),
-      },
-    })
-    canvas.appendChild(element)
-  }
-  root.appendChild(canvas)
-  return root
-}
-
 function dispatchPointer(
   element: Element,
   type: 'pointerdown' | 'pointermove' | 'pointerup',
@@ -106,7 +67,6 @@ function mountView(face: RenderReadyCardFace, selectedBlockId: string | null, ex
   return mount(CardLayerView, {
     props: {
       face,
-      sourceRoot: createSourceRoot(),
       selectedBlockId,
       viewportWidth: 1000,
       viewportHeight: 800,
@@ -205,5 +165,61 @@ describe('CardLayerView', () => {
     dispatchPointer(planes[2]!.element, 'pointerdown', { button: 0, pointerId: 4, clientX: 420, clientY: 360 })
     dispatchPointer(planes[2]!.element, 'pointerup', { button: 0, pointerId: 4, clientX: 420, clientY: 360 })
     expect(wrapper.emitted('block-click')?.[0]?.[0]).toBe('low')
+  })
+
+  it('renders snapshot canvases at full card dimensions with block-specific slice', async () => {
+    const wrapper = mountView(createFace(), 'high-a')
+    await nextTick()
+
+    const canvases = wrapper.findAll('canvas.card-layer-view__block-content')
+    expect(canvases.length).toBeGreaterThan(0)
+    for (const canvas of canvases) {
+      expect(canvas.attributes('width')).toBe('630')
+      expect(canvas.attributes('height')).toBe('880')
+    }
+  })
+
+  it('preloads scene assets without throwing when card face contains image blocks', async () => {
+    const faceWithImage = createFace()
+    faceWithImage.children.push({
+      block: {
+        type: 'image-block',
+        id: 'img-1',
+        name: 'Logo',
+        notes: '',
+        visible: true,
+        width: '100px',
+        height: '100px',
+        borderColor: '#000000',
+        borderWidth: 0,
+        borderStyle: 'solid',
+        borderRadius: '',
+        background: '#ffffff',
+        translateX: '0px',
+        translateY: '0px',
+        scaleX: 1,
+        scaleY: 1,
+        transformAnchor: 'cc',
+        zIndex: 2,
+        rotation: 0,
+        opacity: 1,
+        source: 'test-logo.png',
+        maskSource: '',
+        maskFit: 'cover',
+        fit: 'contain',
+        tint: 'none',
+      },
+      location: { id: 'img-1-loc', type: 'simple-container-location', anchor: 'lt', x: '0px', y: '0px' },
+    })
+
+    const wrapper = mountView(faceWithImage, 'img-1')
+    await nextTick()
+    expect(wrapper.exists()).toBe(true)
+
+    await wrapper.setProps({ face: createFace() })
+    await nextTick()
+    expect(wrapper.exists()).toBe(true)
+
+    wrapper.unmount()
   })
 })

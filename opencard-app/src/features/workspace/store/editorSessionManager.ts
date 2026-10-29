@@ -13,7 +13,7 @@ export function createDefaultOpenCardContent(displayName: string) {
   return JSON.stringify({
     type: 'card-document', id: `card-document-${crypto.randomUUID()}`,
     name: (dot > 0 ? displayName.slice(0, dot) : displayName) || 'UNTITLED',
-    version: '1.0.0', width: '540', height: '850',
+    version: '1.0.0', width: '63', height: '88',
     faces: Object.fromEntries(['front', 'back'].map(face => [face, {
       type: 'card-face', id: `card-face-${crypto.randomUUID()}`, background: '#FFFFFF', children: [],
     }])), instances: [],

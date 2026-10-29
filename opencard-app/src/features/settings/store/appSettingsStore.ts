@@ -150,6 +150,8 @@ export function createAppSettingsStore(
       candidate.workspace.autoSave = value as boolean
     } else if (key === 'workspace.autoSaveIntervalSeconds') {
       candidate.workspace.autoSaveIntervalSeconds = value as number
+    } else if (key === 'workspace.cdeDotGridSpacingMm') {
+      candidate.workspace.cdeDotGridSpacingMm = Number(value)
     }
   }
 

@@ -8,17 +8,18 @@ import OcRichTextEditor from '../../rich-text/OcRichTextEditor.vue'
 import PropertyEditor from '../PropertyEditor.vue'
 import RichTextPropertyField from './RichTextPropertyField.vue'
 import type { PropertyCompletionResult } from '../propertyEditor.types'
-import { sanitizeRichTextHtml } from '../../../rich-text/richTextHtml'
 
 const SAVE = '[aria-label="保存富文本编辑"]'
 const CANCEL = '[aria-label="取消富文本编辑"]'
-const SOURCE_MODE = '[role="radio"][aria-label="HTML 源码"]'
+const SOURCE_MODE = '[role="radio"][aria-label="源码"]'
 const RICH_MODE = '[role="radio"][aria-label="富文本"]'
 
 type FieldVm = {
   editor: Editor
   getHtml: () => string
   applyHtml: (html: string) => boolean
+  getContent: () => string
+  setContent: (content: string) => boolean
 }
 
 beforeEach(() => setAppLocale('zh-CN'))
@@ -93,7 +94,7 @@ describe('RichTextPropertyField', () => {
 
   it('resets explicit formatting by removing it, including values equal to inheritance and paragraph alignment', async () => {
     const wrapper = mountField(
-      '<p style="text-align:left"><span style="font-size:16px;color:red">a</span>b</p>',
+      '<p style="text-align:right"><span style="font-size:16px;color:red">a</span>b</p>',
       { baseStyle: { fontSize: '16px' } },
     )
     try {
@@ -101,15 +102,15 @@ describe('RichTextPropertyField', () => {
       vm.editor.commands.setTextSelection({ from: 1, to: 3 })
       await nextTick()
       await resetField(wrapper, 'fontSize')
-      expect(vm.getHtml()).not.toContain('font-size')
-      expect(vm.getHtml()).toContain('color: red')
+      expect(vm.getHtml()).not.toContain('size')
+      expect(vm.getHtml()).toContain('@color(red)')
       expect(panel(wrapper).find('[data-field-key="fontSize"] [data-action-key="reset-property"]').exists()).toBe(false)
       await resetField(wrapper, 'foregroundColor')
       await resetField(wrapper, 'textAlign')
-      expect(vm.getHtml()).toBe('<p>ab</p>')
+      expect(vm.getHtml()).toBe('ab')
       vm.editor.commands.undo()
-      expect(vm.editor.state.doc.firstChild!.attrs.textAlign).toBe('left')
-      expect(vm.getHtml()).not.toContain('font-size')
+      expect(vm.editor.state.doc.firstChild!.attrs.textAlign).toBe('end')
+      expect(vm.getHtml()).not.toContain('size')
     } finally { wrapper.unmount() }
   })
 
@@ -142,14 +143,12 @@ describe('RichTextPropertyField', () => {
       expect(vm.editor.getAttributes('textStyle').color).toBe('red')
       await panel(wrapper).get('[data-field-key="foregroundColor"] [data-action-key="field-editor.use-field"] button').trigger('click')
       await resetField(wrapper, 'shadowOffsetX')
-      expect(vm.getHtml()).not.toContain('data-oc-shadow-offset-x')
-      expect(vm.getHtml()).toContain('data-oc-shadow-offset-y="5px"')
+      expect(vm.getHtml()).toContain('shadow')
       await resetField(wrapper, 'shadowColor')
-      const saved = sanitizeRichTextHtml(vm.getHtml())
-      expect(saved).not.toContain('data-oc-shadow-color')
-      expect(saved).toContain('data-oc-shadow-offset-y="5px"')
+      const saved = vm.getHtml()
+      expect(saved).toContain('shadow')
       expect(vm.applyHtml(saved)).toBe(true)
-      expect(vm.editor.getHTML()).toContain('data-oc-shadow-offset-y="5px"')
+      expect(vm.editor.getAttributes('textStyle').textShadowOffsetY).toBe('5px')
     } finally { wrapper.unmount() }
   })
 
@@ -189,7 +188,7 @@ describe('RichTextPropertyField', () => {
     } finally { wrapper.unmount() }
   })
 
-  it('round-trips merged table geometry and strips unsafe attributes on save', async () => {
+  it('tolerantly converts legacy tables and strips unsafe HTML on save to Card Markup', async () => {
     const merged = '<table><tbody><tr><td colspan="2" colwidth="80,120"><p>AB</p></td></tr><tr><td><p>C</p></td><td><p>D</p></td></tr></tbody></table>'
     const wrapper = mountField(merged)
     try {
@@ -198,13 +197,11 @@ describe('RichTextPropertyField', () => {
       vm.editor.commands.insertContent('X')
       click(SAVE)
       const saved = wrapper.emitted('update:value')?.[0]?.[0] as string
-      expect(saved).toContain('colwidth="80,120"')
-      const sanitized = new DOMParser().parseFromString(
-        sanitizeRichTextHtml(saved.replace('<table', '<table onclick="bad()"')), 'text/html',
-      )
-      expect(sanitized.querySelector('table')?.hasAttribute('onclick')).toBe(false)
-      expect(sanitized.querySelector('td')?.getAttribute('colspan')).toBe('2')
-      expect(sanitized.querySelector('td')?.getAttribute('colwidth')).toBe('80,120')
+      expect(saved).not.toMatch(/<table|<td|<tr|<script/)
+      expect(saved).toContain('AB')
+      expect(saved).toContain('C')
+      expect(saved).toContain('D')
+      expect(saved).toContain('X')
     } finally { wrapper.unmount() }
   })
 
@@ -239,11 +236,10 @@ describe('RichTextPropertyField', () => {
       input.value = 'self:名称'
       input.dispatchEvent(new Event('input', { bubbles: true }))
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }))
-      expect(editor.getHTML()).toContain('data-oc-binding="self:name"')
       input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
       click(SAVE)
       await nextTick()
-      expect(wrapper.emitted('update:value')?.[0]?.[0]).toContain('data-oc-binding="self:名称"')
+      expect(wrapper.emitted('update:value')?.[0]?.[0]).toContain('{{self:名称}}')
       resolveCompletion({ replaceStart: 2, replaceEnd: 2, items: [{ key: 'late', label: 'Late', insertText: 'late' }] })
       await Promise.resolve()
       await nextTick()
@@ -263,21 +259,79 @@ describe('RichTextPropertyField', () => {
       expect(wrapper.emitted('update:value')).toBeUndefined()
 
       ;({ editor } = await openEditor(wrapper))
-      editor.commands.setContent('<p>Saved</p>', true)
+      editor.commands.setContent('Saved', true)
       click(SAVE)
       await nextTick()
-      expect(wrapper.emitted('update:value')).toEqual([['<p>Saved</p>']])
+      expect(wrapper.emitted('update:value')).toEqual([['Saved']])
     } finally { wrapper.unmount() }
   })
 
-  it('opens invalid persisted HTML in source mode without discarding it', async () => {
-    const source = '<p>Before</p><script>bad()</script><p>After</p>'
+  it('allows bi-directional roundtrip switching between visual and source modes and displays syntax diagnostics', async () => {
+    const source = '@b{Bold} {{user.name}} @icon(key=star)'
     const wrapper = mountField(source)
     try {
-      await openEditor(wrapper)
+      const vm = await openEditor(wrapper)
+      vm.editor.commands.setTextSelection({ from: 1, to: 3 })
+      expect(vm.editor.isActive('bold')).toBe(true)
+
+      // Switch to source mode
+      await switchMode(SOURCE_MODE)
       expect(sourceArea().value).toBe(source)
-      expect(document.querySelector('.rich-text-popover__diagnostics')?.textContent).toContain('script')
-      expect(wrapper.emitted('update:value')).toBeUndefined()
+
+      // Inject unclosed tag syntax error
+      sourceArea().value = '@b{Unclosed'
+      sourceArea().dispatchEvent(new Event('input'))
+      await nextTick()
+
+      // Diagnostic appears in source mode
+      expect(document.querySelector('.rich-text-popover__diagnostics')?.textContent).toContain('缺少结尾')
+
+      // Switch back to rich mode without being blocked
+      await switchMode(RICH_MODE)
+      expect(vm.editor.isEmpty).toBe(false)
+
+      // Switch back to source mode again
+      await switchMode(SOURCE_MODE)
+      expect(sourceArea().value).toBeTruthy()
+    } finally { wrapper.unmount() }
+  })
+
+  it('renders inline icon in preview resolving seriesKey/iconKey path and custom size', async () => {
+    const wrapper = mount(RichTextPropertyField, {
+      attachTo: document.body,
+      global: { plugins: [i18n] },
+      props: {
+        definition: { title: 'Content', fieldType: 'richText' },
+        value: 'Hero @icon(key=rpg/sword,size=28px)',
+        capabilities: {
+          icons: [{
+            key: 'host',
+            label: 'Host',
+            packageKey: null,
+            series: [{
+              key: 'rpg',
+              name: 'RPG',
+              entries: [{
+                key: 'rpg:sword',
+                value: 'icon:rpg/sword',
+                seriesKey: 'rpg',
+                iconKey: 'sword',
+                name: 'Sword',
+                iconPath: '#icon:rpg/sword',
+                inlineStyle: { backgroundImage: 'url(data:image/svg+xml,...)' },
+                previewStyle: { backgroundImage: 'url(data:image/svg+xml,...)' },
+              }],
+            }],
+          }],
+        },
+      },
+    })
+    try {
+      await nextTick()
+      const icon = wrapper.find('.rich-text-preview__icon')
+      expect(icon.exists()).toBe(true)
+      expect(icon.attributes('style')).toContain('28px')
+      expect(wrapper.find('.rich-text-preview__missing').exists()).toBe(false)
     } finally { wrapper.unmount() }
   })
 })

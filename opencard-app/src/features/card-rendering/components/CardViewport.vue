@@ -4,6 +4,7 @@
     'card-viewport--layer-view': effectiveLayerViewActive,
     'card-viewport--readonly': props.readonly,
   }"
+  :style="viewportDotGridStyle"
     @pointerdown.self="handleViewportPointerDown" @mousedown="handleMouseDown" @mousemove="handleMouseMove"
     @mouseup="handleMouseUp" @mouseleave="handleMouseLeave" @mouseover="handleComparisonMouseOver"
     @wheel.prevent="handleWheel">
@@ -14,10 +15,13 @@
           :style="comparisonBeforeStageStyle" @transitionend="finishComparisonTransition">
           <div v-if="props.comparison.before.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.before.face)" />
           <CardFaceRenderer v-else :face="props.comparison.before.face"
-            :transform-disabled-block-ids="transformDisabledBlockIds" :clip-to-face="clipToFace"
+            :clip-to-face="clipToFace"
+            :render-scale="scale"
             :resource-context="props.comparison.before.resourceContext"
             :visual-readiness="visualReadiness"
-            :diff-highlights="props.comparison.before.diffHighlights ?? []" @block-click="handleBlockClick" />
+            :diff-highlights="props.comparison.before.diffHighlights ?? []"
+            @block-click="handleBlockClick"
+            @blank-click="handleCanvasBlankClick" />
         </div>
       </div>
       <div ref="comparisonAfterLayerRef" class="card-viewport-comparison-layer" :class="{ 'is-transitioning': comparisonTransitioning }"
@@ -26,45 +30,23 @@
           :style="comparisonAfterStageStyle">
           <div v-if="props.comparison.after.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.after.face)" />
           <CardFaceRenderer v-else :face="props.comparison.after.face"
-            :transform-disabled-block-ids="transformDisabledBlockIds" :clip-to-face="clipToFace"
+            :clip-to-face="clipToFace"
+            :render-scale="scale"
             :resource-context="props.comparison.after.resourceContext"
             :visual-readiness="visualReadiness"
-            :diff-highlights="props.comparison.after.diffHighlights ?? []" @block-click="handleBlockClick" />
+            :diff-highlights="props.comparison.after.diffHighlights ?? []"
+            @block-click="handleBlockClick"
+            @blank-click="handleCanvasBlankClick" />
         </div>
       </div>
     </template>
     <div v-else ref="stageRef" data-oc-layout-anchor="center" class="card-viewport-stage" :style="stageStyle">
-      <CardFaceRenderer :face="face" :transform-disabled-block-ids="transformDisabledBlockIds"
-        :clip-to-face="clipToFace" :resource-context="resourceContext"
+      <CardFaceRenderer :face="face"
+        :clip-to-face="clipToFace" :render-scale="scale" :resource-context="resourceContext"
         :visual-readiness="visualReadiness"
-        :diff-highlights="diffHighlights" @block-click="handleBlockClick" />
-      <Transition name="card-info-fade">
-        <aside v-if="$slots.info && showInfo" class="card-viewport-info" :style="viewportInfoStyle">
-          <slot name="info" />
-        </aside>
-      </Transition>
-      <Transition name="card-info-fade">
-        <aside v-if="$slots['left-info'] && showInfo" class="card-viewport-left-info" :style="viewportLeftInfoStyle"
-          @pointerdown.stop.prevent="startFaceDimensionDrag('height', $event)">
-          <span
-            class="card-viewport-dimension-line card-viewport-dimension-line--vertical"
-            :style="viewportLeftInfoLineStyle"
-          >
-            <span class="card-viewport-dimension-label"><slot name="left-info" /></span>
-          </span>
-        </aside>
-      </Transition>
-      <Transition name="card-info-fade">
-        <aside v-if="$slots['bottom-info'] && showInfo" class="card-viewport-bottom-info" :style="viewportBottomInfoStyle"
-          @pointerdown.stop.prevent="startFaceDimensionDrag('width', $event)">
-          <span
-            class="card-viewport-dimension-line card-viewport-dimension-line--horizontal"
-            :style="viewportBottomInfoLineStyle"
-          >
-            <span class="card-viewport-dimension-label"><slot name="bottom-info" /></span>
-          </span>
-        </aside>
-      </Transition>
+        :diff-highlights="diffHighlights"
+        @block-click="handleBlockClick"
+        @blank-click="handleCanvasBlankClick" />
     </div>
     <button v-if="props.comparison" type="button" class="card-viewport-comparison-divider"
       :class="{
@@ -84,7 +66,7 @@
       v-if="effectiveLayerViewActive"
       ref="layerViewRef"
       :face="face"
-      :source-root="stageRef"
+      :resource-context="props.resourceContext"
       :selected-block-id="selectedBlockId"
       :space-modifier-active="spaceModifierActive"
       :base-plane-label="layerViewBasePlaneLabel"
@@ -107,15 +89,44 @@
       <OcIcon :name="statusFlash.icon" size="display" />
       <span>{{ statusFlash.message }}</span>
     </div>
+    <div v-if="hasHudContent" class="card-viewport-hud">
+      <Transition name="card-info-fade">
+        <aside v-if="$slots.info && isHudVisible" class="card-viewport-info" :style="viewportInfoStyle">
+          <slot name="info" />
+        </aside>
+      </Transition>
+      <Transition name="card-info-fade">
+        <aside v-if="$slots['left-info'] && isHudVisible" class="card-viewport-left-info" :style="viewportLeftInfoStyle"
+          @pointerdown.stop.prevent="startFaceDimensionDrag('height', $event)">
+          <span
+            class="card-viewport-dimension-line card-viewport-dimension-line--vertical"
+            :style="viewportLeftInfoLineStyle"
+          >
+            <span class="card-viewport-dimension-label"><slot name="left-info" /></span>
+          </span>
+        </aside>
+      </Transition>
+      <Transition name="card-info-fade">
+        <aside v-if="$slots['bottom-info'] && isHudVisible" class="card-viewport-bottom-info" :style="viewportBottomInfoStyle"
+          @pointerdown.stop.prevent="startFaceDimensionDrag('width', $event)">
+          <span
+            class="card-viewport-dimension-line card-viewport-dimension-line--horizontal"
+            :style="viewportBottomInfoLineStyle"
+          >
+            <span class="card-viewport-dimension-label"><slot name="bottom-info" /></span>
+          </span>
+        </aside>
+      </Transition>
+    </div>
     <div v-if="!effectiveLayerViewActive" class="card-selection-layer">
       <div v-if="props.comparison" class="card-diff-overlay-layer card-diff-overlay-layer--before" :class="{ 'is-hidden': !diffOverlayVisible }" :style="comparisonBeforeLayerStyle" aria-hidden="true">
-        <div v-for="highlight in diffOverlayBeforeHighlights" :key="highlight.key" class="card-diff-overlay"
+        <div v-for="highlight in diffOverlayBeforeHighlights" :key="highlight.key" :data-block-id="highlight.key.split(':')[1]" class="card-diff-overlay"
           :class="[`card-diff-overlay--${highlight.kind}`, `card-diff-overlay--${highlight.side}`]" :style="highlight.style">
           <span class="card-diff-overlay__label"><OcIcon :name="highlight.icon" size="sm" /></span>
         </div>
       </div>
       <div v-if="props.comparison" class="card-diff-overlay-layer card-diff-overlay-layer--after" :class="{ 'is-hidden': !diffOverlayVisible }" :style="comparisonAfterLayerStyle" aria-hidden="true">
-        <div v-for="highlight in diffOverlayAfterHighlights" :key="highlight.key" class="card-diff-overlay"
+        <div v-for="highlight in diffOverlayAfterHighlights" :key="highlight.key" :data-block-id="highlight.key.split(':')[1]" class="card-diff-overlay"
           :class="[`card-diff-overlay--${highlight.kind}`, `card-diff-overlay--${highlight.side}`]" :style="highlight.style">
           <span class="card-diff-overlay__label"><OcIcon :name="highlight.icon" size="sm" /></span>
         </div>
@@ -287,7 +298,7 @@ export interface CardViewportComparison {
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useSlots, watch, type CSSProperties } from 'vue'
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
 import { clamp } from '../../../shared/model/number'
 import { taskScheduler } from '../../../utils/taskScheduler'
@@ -302,8 +313,16 @@ import CardFaceRenderer from './CardFaceRenderer.vue'
 import { createCardVisualReadiness, type CardVisualReadinessState } from './cardRenderReadiness'
 import CardLayerView from './CardLayerView.vue'
 import { buildCardLayerGroups } from './cardLayerModel'
-import type { RenderReadyCardBlock, RenderReadyCardFace } from '../render.types'
+import type { RenderReadyCardFace } from '../render.types'
 import type { CardRenderResourceContext } from '../cardRenderResources'
+import {
+  computeSceneLayout,
+  projectWorldDeltaToParentLocation,
+  transformPoint,
+  type CardSceneGraph,
+  type SceneNodeLayout,
+} from '../geometry'
+import { getParentSize } from '../geometry/sceneLayout'
 import {
   snapMoveRect,
   snapResizeRect,
@@ -312,6 +331,7 @@ import {
   type ResizeSnapTarget,
 } from './resizeSnapping'
 import {
+  SCREEN_PIXELS_PER_MM,
   VIEWPORT_FIT_PADDING,
   VIEWPORT_MAX_SCALE,
   VIEWPORT_MIN_SCALE,
@@ -345,6 +365,7 @@ type SelectionMeasurement = {
   worldRect: SelectionFrame
   parentWorldWidth: number
   parentWorldHeight: number
+  node: SceneNodeLayout
 }
 type AlignmentSnapGuide = {
   axis: 'x' | 'y'
@@ -376,7 +397,7 @@ type ViewportTransform = {
 }
 const TRANSFORM_EPSILON = 0.0001
 const SELECTION_INSET_STEP = 10
-const MIN_SELECTION_SIZE = 24
+const MIN_SELECTION_SIZE = 2
 
 const emit = defineEmits<{
   (e: 'block-click', blockId: string, event: MouseEvent): void
@@ -419,7 +440,6 @@ const props = withDefaults(defineProps<{
     label: string
   }>
   transform?: ViewportTransform
-  transformDisabledBlockIds?: string[]
   layerViewAtomicBlockIds?: string[]
   widthLocked?: boolean
   heightLocked?: boolean
@@ -429,6 +449,7 @@ const props = withDefaults(defineProps<{
   diffHighlights?: readonly CardDiffHighlight[]
   comparison?: CardViewportComparison
   comparisonDividerLabel?: string
+  dotGridSpacingMm?: number
 }>(), {
   restoreKey: undefined,
   selectedBlockId: null,
@@ -443,8 +464,8 @@ const props = withDefaults(defineProps<{
     label: 'Selection layout actions',
     fillParent: 'Fill parent',
     centerInParent: 'Center in parent',
-    inset: 'Inset 10 px',
-    outset: 'Outset 10 px',
+    inset: 'Inset 10 mm',
+    outset: 'Outset 10 mm',
     fillCrossAxis: 'Fill cross axis',
     centerCrossAxis: 'Center on cross axis',
   }),
@@ -458,7 +479,6 @@ const props = withDefaults(defineProps<{
   layerViewBasePlaneLabel: '',
   layerViewShortcutHints: () => [],
   transform: undefined,
-  transformDisabledBlockIds: () => [],
   layerViewAtomicBlockIds: () => [],
   widthLocked: false,
   heightLocked: false,
@@ -468,7 +488,10 @@ const props = withDefaults(defineProps<{
   diffHighlights: () => [],
   comparison: undefined,
   comparisonDividerLabel: 'Comparison divider',
+  dotGridSpacingMm: 5,
 })
+
+const slots = useSlots()
 
 const visualReadiness = createCardVisualReadiness(state => emit('render-readiness-change', state))
 visualReadiness.reset()
@@ -485,12 +508,12 @@ const layerViewRef = ref<{
 } | null>(null)
 const viewportWidth = ref(0)
 const viewportHeight = ref(0)
-const panX = ref(0)
-const panY = ref(0)
-const scale = ref(1)
-const targetPanX = ref(0)
-const targetPanY = ref(0)
-const targetScale = ref(1)
+const panX = ref(props.transform?.x ?? 0)
+const panY = ref(props.transform?.y ?? 0)
+const scale = ref(props.transform ? clamp(props.transform.scale, VIEWPORT_MIN_SCALE, VIEWPORT_MAX_SCALE) : (96 / 25.4))
+const targetPanX = ref(panX.value)
+const targetPanY = ref(panY.value)
+const targetScale = ref(scale.value)
 const isPanning = ref(false)
 const lastPointerX = ref(0)
 const lastPointerY = ref(0)
@@ -529,7 +552,8 @@ const alignmentSnapDistances = ref<AlignmentSnapDistances | null>(null)
 const transformBlockId = ref<string | null>(null)
 const faceDimensionDrag = ref<{
   dimension: FaceDimension
-  startClientPosition: number
+  startClientX: number
+  startClientY: number
   startValue: number
   lastValue: number
 } | null>(null)
@@ -537,8 +561,7 @@ const statusFlash = ref<(CardViewportStatusFlash & { sequence: number }) | null>
 let statusFlashSequence = 0
 
 let resizeObserver: ResizeObserver | null = null
-const selectionResizeTargets = new Set<Element>()
-let diffOverlayMutationObserver: MutationObserver | null = null
+const sceneGraph = computed<CardSceneGraph>(() => computeSceneLayout(props.face))
 let zoomAnimationFrame: number | null = null
 const panInput = taskScheduler.frame(applyPan)
 const transformInput = taskScheduler.frame(applyTransformMove)
@@ -579,6 +602,17 @@ const baseOffsetY = computed(() => {
 
 const translateX = computed(() => baseOffsetX.value + panX.value)
 const translateY = computed(() => baseOffsetY.value + panY.value)
+
+const viewportDotGridStyle = computed<CSSProperties>(() => {
+  const mm = props.dotGridSpacingMm ?? 5
+  if (mm <= 0) return { backgroundImage: 'none' }
+  const sizePx = mm * (96 / 25.4)
+  const halfPx = sizePx / 2
+  return {
+    backgroundSize: `${sizePx}px ${sizePx}px`,
+    backgroundPosition: `${halfPx}px ${halfPx}px`,
+  }
+})
 
 // DOM measurement belongs to content/layout changes. Navigation only projects cached geometry.
 const selectionFrame = computed<SelectionFrame | null>({
@@ -713,34 +747,72 @@ function startComparisonDividerDrag(event: PointerEvent): void {
   target.addEventListener('pointercancel', finish)
   update(event.clientX)
 }
-const viewportInfoStyle = computed(() => {
-  const safeScale = scale.value || 1
+const fitScale = computed(() => {
+  if (viewportWidth.value <= 0 || viewportHeight.value <= 0 || !props.face?.width || !props.face?.height) return SCREEN_PIXELS_PER_MM
+  const safeRegion = resolveViewportSafeRegion(viewportWidth.value, viewportHeight.value, props.viewportInsets)
+  const availableWidth = Math.max(1, safeRegion.width - VIEWPORT_FIT_PADDING * 2)
+  const availableHeight = Math.max(1, safeRegion.height - VIEWPORT_FIT_PADDING * 2)
+  return clamp(
+    Math.min(availableWidth / props.face.width, availableHeight / props.face.height),
+    VIEWPORT_MIN_SCALE,
+    VIEWPORT_MAX_SCALE,
+  )
+})
+
+const maxHudScale = computed(() => fitScale.value * 1.25)
+
+const isHudVisible = computed(() => {
+  if (faceDimensionDrag.value !== null) return true
+  return Boolean(props.showInfo)
+    && !props.comparison
+    && !effectiveLayerViewActive.value
+    && !props.readonly
+    && scale.value <= maxHudScale.value
+})
+
+const hasHudContent = computed(() => !props.comparison && Boolean(slots.info || slots['left-info'] || slots['bottom-info']))
+
+const cardScreenBounds = computed(() => {
+  const currentScale = scale.value || 1
+  const left = Math.round(translateX.value)
+  const top = Math.round(translateY.value)
+  const width = Math.round(props.face.width * currentScale)
+  const height = Math.round(props.face.height * currentScale)
   return {
-    left: `${props.face.width + 16 / safeScale}px`,
-    transform: `scale(${1 / safeScale})`,
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    centerX: Math.round(left + width / 2),
+    centerY: Math.round(top + height / 2),
   }
 })
-const viewportLeftInfoStyle = computed(() => {
-  const safeScale = scale.value || 1
-  return {
-    left: `${-12 / safeScale}px`,
-    top: `${props.face.height / 2}px`,
-    transform: `translate(-50%, -50%) scale(${1 / safeScale})`,
-  }
-})
-const viewportBottomInfoStyle = computed(() => {
-  const safeScale = scale.value || 1
-  return {
-    left: `${props.face.width / 2}px`,
-    top: `${props.face.height + 12 / safeScale}px`,
-    transform: `translateX(-50%) scale(${1 / safeScale})`,
-  }
-})
-const viewportLeftInfoLineStyle = computed(() => ({
-  height: `${props.face.height * scale.value}px`,
+
+const viewportInfoStyle = computed(() => ({
+  left: `${cardScreenBounds.value.right + 16}px`,
+  top: `${cardScreenBounds.value.top}px`,
 }))
+
+const viewportLeftInfoStyle = computed(() => ({
+  left: `${cardScreenBounds.value.left - 12}px`,
+  top: `${cardScreenBounds.value.centerY}px`,
+  transform: 'translate(-50%, -50%)',
+}))
+
+const viewportBottomInfoStyle = computed(() => ({
+  left: `${cardScreenBounds.value.centerX}px`,
+  top: `${cardScreenBounds.value.bottom + 12}px`,
+  transform: 'translateX(-50%)',
+}))
+
+const viewportLeftInfoLineStyle = computed(() => ({
+  height: `${cardScreenBounds.value.height}px`,
+}))
+
 const viewportBottomInfoLineStyle = computed(() => ({
-  width: `${props.face.width * scale.value}px`,
+  width: `${cardScreenBounds.value.width}px`,
 }))
 const resizeMode = computed<ResizeMode>(() => {
   if (!props.selectedBlockId) {
@@ -1000,7 +1072,7 @@ const moveGuide = computed(() => {
 
 function formatGeometryValue(value: number): string {
   const rounded = Math.round(value * 10) / 10
-  return `${Object.is(rounded, -0) ? 0 : rounded}px`
+  return `${Object.is(rounded, -0) ? 0 : rounded} mm`
 }
 
 function getAnchorPoint(frame: SelectionFrame, anchor: AnchorPosition): { x: number; y: number } {
@@ -1238,10 +1310,10 @@ function resetView(): void {
   stopZoomAnimation()
   panX.value = 0
   panY.value = 0
-  scale.value = 1
+  scale.value = 96 / 25.4
   targetPanX.value = 0
   targetPanY.value = 0
-  targetScale.value = 1
+  targetScale.value = 96 / 25.4
 }
 
 function fitView(targetRect?: { left: number; top: number; width: number; height: number }): void {
@@ -1373,6 +1445,10 @@ function cycleLayerByInitial(initial: string, currentLayerOnly = false): boolean
   return layerViewRef.value?.cycleLayerByInitial(initial, currentLayerOnly) ?? false
 }
 
+function handleCanvasBlankClick(event: MouseEvent): void {
+  emit('blank-click', event)
+}
+
 function handleViewportPointerDown(event: PointerEvent) {
   if (event.button !== 0) {
     return
@@ -1383,7 +1459,7 @@ function handleViewportPointerDown(event: PointerEvent) {
     return
   }
 
-  if (target.closest('[data-block-id]') || target.closest('.selection-frame') || target.closest('.selection-handle')) {
+  if (target.closest('.selection-frame') || target.closest('.selection-handle')) {
     return
   }
 
@@ -1395,7 +1471,8 @@ function startFaceDimensionDrag(dimension: FaceDimension, event: PointerEvent): 
   const startValue = dimension === 'width' ? props.face.width : props.face.height
   faceDimensionDrag.value = {
     dimension,
-    startClientPosition: dimension === 'width' ? event.clientX : event.clientY,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
     startValue,
     lastValue: startValue,
   }
@@ -1413,14 +1490,16 @@ function handleFaceDimensionDrag(event: PointerEvent): void {
 function applyFaceDimensionDrag(event: PointerEvent): void {
   const drag = faceDimensionDrag.value
   if (!drag) return
-  const clientPosition = drag.dimension === 'width' ? event.clientX : event.clientY
   const directionalDelta = drag.dimension === 'width'
-    ? clientPosition - drag.startClientPosition
-    : drag.startClientPosition - clientPosition
+    ? (Math.abs(event.clientX - drag.startClientX) >= Math.abs(event.clientY - drag.startClientY)
+        ? event.clientX - drag.startClientX
+        : event.clientY - drag.startClientY)
+    : (Math.abs(drag.startClientY - event.clientY) >= Math.abs(drag.startClientX - event.clientX)
+        ? drag.startClientY - event.clientY
+        : drag.startClientX - event.clientX)
   const rawValue = drag.startValue + directionalDelta / (scale.value || 1)
-  const nextValue = Math.max(16, event.shiftKey
-    ? Math.round(rawValue / 10) * 10
-    : Math.round(rawValue))
+  const snapStep = event.shiftKey ? 0.5 : 1
+  const nextValue = Math.max(10, Math.round(rawValue / snapStep) * snapStep)
   if (nextValue === drag.lastValue) return
   drag.lastValue = nextValue
   emit('face-dimension-change', { dimension: drag.dimension, value: nextValue, final: false })
@@ -1440,59 +1519,53 @@ function stopFaceDimensionDrag(): void {
   emit('face-dimension-change', { dimension: drag.dimension, value: drag.lastValue, final: true })
 }
 
-function getElementFrame(element: Element, viewportRect: DOMRect): SelectionFrame {
-  const rect = element.getBoundingClientRect()
-  return {
-    left: rect.left - viewportRect.left,
-    top: rect.top - viewportRect.top,
-    width: rect.width,
-    height: rect.height,
-  }
-}
-
 async function refreshDiffOverlay(): Promise<void> {
   await nextTick()
-  await nextTick()
   syncDiffOverlayHighlights()
-  await nextTick()
-  syncDiffOverlayHighlights()
-}
-
-function observeDiffOverlayStages(): void {
-  diffOverlayMutationObserver?.disconnect()
-  diffOverlayMutationObserver = null
-  if (!props.comparison || typeof MutationObserver === 'undefined') return
-  diffOverlayMutationObserver = new MutationObserver(() => {
-    syncDiffOverlayHighlights()
-  })
-  for (const root of [stageRef.value, comparisonAfterStageRef.value]) {
-    if (root) diffOverlayMutationObserver.observe(root, { childList: true, subtree: true, attributes: true })
-  }
-}
-
-function escapeAttributeSelectorValue(value: string): string {
-  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value)
-  return value.replace(/["\\]/g, character => `\\${character}`)
 }
 
 function syncDiffOverlayHighlights(): void {
-  const viewport = viewportRef.value
   const comparison = props.comparison
-  if (!viewport || !comparison) {
+  if (!comparison) {
     if (diffOverlayHighlights.value.length > 0) diffOverlayHighlights.value = []
     return
   }
-  const viewportRect = viewport.getBoundingClientRect()
+  const safeScale = scale.value || 1
+  const beforeScene = computeSceneLayout(comparison.before.face)
+  const afterScene = computeSceneLayout(comparison.after.face)
+
+  const beforeOrigin = comparison.viewMode === 'side-by-side'
+    ? resolveZoomOrigin(comparison.before, safeScale)
+    : { x: baseOffsetX.value, y: baseOffsetY.value }
+  const afterOrigin = comparison.viewMode === 'side-by-side'
+    ? resolveZoomOrigin(comparison.after, safeScale)
+    : { x: baseOffsetX.value, y: baseOffsetY.value }
+
   const layers = [
-    { side: 'before', root: stageRef.value, highlights: comparison.before.diffHighlights ?? [] },
-    { side: 'after', root: comparisonAfterStageRef.value, highlights: comparison.after.diffHighlights ?? [] },
-  ] as const
-  const nextHighlights: DiffOverlayHighlight[] = layers.flatMap(({ side, root, highlights }) => {
-    if (!root) return []
+    {
+      side: 'before' as const,
+      scene: beforeScene,
+      highlights: comparison.before.diffHighlights ?? [],
+      origin: { x: beforeOrigin.x + panX.value, y: beforeOrigin.y + panY.value },
+    },
+    {
+      side: 'after' as const,
+      scene: afterScene,
+      highlights: comparison.after.diffHighlights ?? [],
+      origin: { x: afterOrigin.x + panX.value, y: afterOrigin.y + panY.value },
+    },
+  ]
+
+  const nextHighlights: DiffOverlayHighlight[] = layers.flatMap(({ side, scene, highlights, origin }) => {
     return highlights.flatMap(highlight => {
-      const element = root.querySelector(`[data-block-id="${escapeAttributeSelectorValue(highlight.blockId)}"]`)
-      if (!element) return []
-      const frame = getElementFrame(element, viewportRect)
+      const node = scene.nodeMap.get(highlight.blockId)
+      if (!node) return []
+      const frame: SelectionFrame = {
+        left: origin.x + node.worldAabb.x * safeScale,
+        top: origin.y + node.worldAabb.y * safeScale,
+        width: node.worldAabb.width * safeScale,
+        height: node.worldAabb.height * safeScale,
+      }
       return [{
         ...frame,
         key: `${side}:${highlight.blockId}`,
@@ -1500,11 +1573,15 @@ function syncDiffOverlayHighlights(): void {
         icon: highlight.kind === 'added' ? 'mdiPlus' : highlight.kind === 'removed' ? 'mdiMinus' : 'mdiCircleMedium',
         side,
         style: {
-          left: `${frame.left}px`, top: `${frame.top}px`, width: `${frame.width}px`, height: `${frame.height}px`,
+          left: `${frame.left}px`,
+          top: `${frame.top}px`,
+          width: `${frame.width}px`,
+          height: `${frame.height}px`,
         },
       }]
     })
   })
+
   if (!sameDiffOverlayHighlights(diffOverlayHighlights.value, nextHighlights)) {
     diffOverlayHighlights.value = nextHighlights
   }
@@ -1528,56 +1605,47 @@ function sameDiffOverlayHighlights(
   })
 }
 
-function observeSelectionGeometry(targets: readonly Element[]): void {
-  for (const previous of selectionResizeTargets) {
-    if (!targets.includes(previous)) { resizeObserver?.unobserve(previous); selectionResizeTargets.delete(previous) }
-  }
-  for (const target of targets) {
-    if (!selectionResizeTargets.has(target)) { selectionResizeTargets.add(target); resizeObserver?.observe(target) }
-  }
-}
-
 function measureSelection(): SelectionMeasurement | null {
-  const viewport = viewportRef.value
-  const stage = stageRef.value
   const selectedBlockId = props.selectedBlockId
-  if (!viewport || !stage || !selectedBlockId) {
-    observeSelectionGeometry([])
-    return null
-  }
+  if (!selectedBlockId) return null
+  const scene = sceneGraph.value
+  const node = scene.nodeMap.get(selectedBlockId)
+  if (!node) return null
 
-  const selectedElement = stage.querySelector(`[data-block-id="${selectedBlockId}"]`)
-  if (!selectedElement) {
-    observeSelectionGeometry([])
-    return null
-  }
-
-  const viewportRect = viewport.getBoundingClientRect()
-  const selectedFrame = getElementFrame(selectedElement, viewportRect)
-
-  const parentElement = props.selectedParentBlockId
-    ? stage.querySelector(`[data-block-id="${props.selectedParentBlockId}"]`)
-    : stage.querySelector('.card-canvas')
-
-  if (!parentElement) {
-    observeSelectionGeometry([])
-    return null
-  }
-
-  observeSelectionGeometry([selectedElement, parentElement])
-  const parentFrame = getElementFrame(parentElement, viewportRect)
   const safeScale = scale.value || 1
+  const parentSize = getParentSize(node)
+  const parentWorldWidth = node.parentId ? parentSize.width : props.face.width
+  const parentWorldHeight = node.parentId ? parentSize.height : props.face.height
+
+  const parentOrigin = transformPoint(node.parentWorldMatrix, { x: 0, y: 0 })
+  const parentFrame: SelectionFrame = {
+    left: parentOrigin.x * safeScale + translateX.value,
+    top: parentOrigin.y * safeScale + translateY.value,
+    width: parentWorldWidth * safeScale,
+    height: parentWorldHeight * safeScale,
+  }
+
+  const worldRect: SelectionFrame = {
+    left: node.localRect.x,
+    top: node.localRect.y,
+    width: node.localRect.width,
+    height: node.localRect.height,
+  }
+
+  const frame: SelectionFrame = {
+    left: parentFrame.left + worldRect.left * safeScale,
+    top: parentFrame.top + worldRect.top * safeScale,
+    width: worldRect.width * safeScale,
+    height: worldRect.height * safeScale,
+  }
+
   return {
-    frame: selectedFrame,
+    frame,
     parentFrame,
-    worldRect: {
-      left: (selectedFrame.left - parentFrame.left) / safeScale,
-      top: (selectedFrame.top - parentFrame.top) / safeScale,
-      width: selectedFrame.width / safeScale,
-      height: selectedFrame.height / safeScale,
-    },
-    parentWorldWidth: parentFrame.width / safeScale,
-    parentWorldHeight: parentFrame.height / safeScale,
+    worldRect,
+    parentWorldWidth,
+    parentWorldHeight,
+    node,
   }
 }
 
@@ -1596,9 +1664,8 @@ function readAlignmentSnapDistances(): AlignmentSnapDistances | null {
 
 function measureAlignmentSnapTargets(measurement: SelectionMeasurement): ResizeSnapTarget[] {
   if (!props.alignmentSnappingEnabled || resizeMode.value !== 'absolute') return []
-  const stage = stageRef.value
   const selectedBlockId = props.selectedBlockId
-  if (!stage || !selectedBlockId) return []
+  if (!selectedBlockId) return []
 
   const targets: ResizeSnapTarget[] = [{
     id: props.selectedParentBlockId ?? props.face.id,
@@ -1610,43 +1677,29 @@ function measureAlignmentSnapTargets(measurement: SelectionMeasurement): ResizeS
       height: measurement.parentWorldHeight,
     },
   }]
-  const safeScale = scale.value || 1
-  for (const block of directSiblingBlocks()) {
-    if (!block.visible || block.id === selectedBlockId) continue
-    const element = [...stage.querySelectorAll<HTMLElement>('[data-block-id]')]
-      .find(candidate => candidate.dataset.blockId === block.id)
-    if (!element) continue
-    const frame = getElementFrame(element, viewportRef.value!.getBoundingClientRect())
+
+  const scene = sceneGraph.value
+  const node = scene.nodeMap.get(selectedBlockId)
+  if (!node) return targets
+
+  const siblings = node.parentId === null
+    ? scene.rootNodes
+    : (scene.nodeMap.get(node.parentId)?.children ?? [])
+
+  for (const sibling of siblings) {
+    if (!sibling.visible || sibling.id === selectedBlockId) continue
     targets.push({
-      id: block.id,
+      id: sibling.id,
       kind: 'sibling',
       rect: {
-        left: (frame.left - measurement.parentFrame.left) / safeScale,
-        top: (frame.top - measurement.parentFrame.top) / safeScale,
-        width: frame.width / safeScale,
-        height: frame.height / safeScale,
+        left: sibling.localRect.x,
+        top: sibling.localRect.y,
+        width: sibling.localRect.width,
+        height: sibling.localRect.height,
       },
     })
   }
   return targets
-}
-
-function directSiblingBlocks(): readonly RenderReadyCardBlock[] {
-  const parentId = props.selectedParentBlockId
-  if (!parentId) return props.face.children.map(child => child.block)
-  const parent = findRenderBlock(props.face.children.map(child => child.block), parentId)
-  return parent && (parent.type === 'simple-container-block' || parent.type === 'flow-container-block')
-    ? parent.children.map(child => child.block) : []
-}
-
-function findRenderBlock(blocks: readonly RenderReadyCardBlock[], blockId: string): RenderReadyCardBlock | null {
-  for (const block of blocks) {
-    if (block.id === blockId) return block
-    if (block.type !== 'simple-container-block' && block.type !== 'flow-container-block') continue
-    const match = findRenderBlock(block.children.map(child => child.block), blockId)
-    if (match) return match
-  }
-  return null
 }
 
 function requestSelectionFrameSync() {
@@ -1674,10 +1727,6 @@ function requestSelectionFrameSync() {
 async function syncSelectionFrame() {
   await nextTick()
   if (activeHandle.value || isMovingSelection.value) return
-  if (props.comparison) {
-    observeDiffOverlayStages()
-    await nextTick()
-  }
   syncDiffOverlayHighlights()
   const measurement = measureSelection()
   const nextFrame = measurement?.frame ?? null
@@ -1932,10 +1981,16 @@ function buildAbsoluteResizePayload(preview: SelectionFrame, measurement: Select
 }
 
 function buildMovePayload(preview: SelectionFrame, measurement: SelectionMeasurement): MovePayload {
-  const absolutePayload = buildAbsoluteResizePayload(preview, measurement)
+  const worldDelta = {
+    x: preview.left - measurement.worldRect.left,
+    y: preview.top - measurement.worldRect.top,
+  }
+  const anchor = props.selectedAnchor ?? 'lt'
+  const projected = projectWorldDeltaToParentLocation(measurement.node, worldDelta, anchor)
+  const basePayload = buildAbsoluteResizePayload(measurement.worldRect, measurement)
   return {
-    x: absolutePayload.x ?? 0,
-    y: absolutePayload.y ?? 0,
+    x: (basePayload.x ?? 0) + projected.dx,
+    y: (basePayload.y ?? 0) + projected.dy,
   }
 }
 
@@ -2242,7 +2297,6 @@ onMounted(() => {
 
   document.fonts?.addEventListener('loadingdone', requestSelectionFrameSync)
   requestSelectionFrameSync()
-  void nextTick().then(observeDiffOverlayStages)
 })
 
 onBeforeUnmount(() => {
@@ -2255,10 +2309,7 @@ onBeforeUnmount(() => {
   stopZoomAnimation()
   resizeObserver?.disconnect()
   resizeObserver = null
-  selectionResizeTargets.clear()
   document.fonts?.removeEventListener('loadingdone', requestSelectionFrameSync)
-  diffOverlayMutationObserver?.disconnect()
-  diffOverlayMutationObserver = null
   statusFlash.value = null
 })
 
@@ -2294,7 +2345,6 @@ watch(
     props.selectedParentBlockId,
     props.selectedLocationType,
     props.selectedAnchor,
-    props.transformDisabledBlockIds.join('|'),
   ],
   () => {
     if (activeHandle.value || isMovingSelection.value) {
@@ -2315,8 +2365,6 @@ watch(
 
     diffOverlayVisible.value = false
     await nextTick()
-    await nextTick()
-    observeDiffOverlayStages()
     syncDiffOverlayHighlights()
     await nextTick()
     diffOverlayVisible.value = true
@@ -2573,19 +2621,25 @@ watch(
   pointer-events: none;
 }
 
-.card-viewport-stage :deep([data-block-id]) {
+.card-viewport-stage :deep(.card-canvas) {
   pointer-events: auto;
 }
 
-.card-viewport--layer-view .card-viewport-stage :deep([data-block-id]) {
+.card-viewport--readonly .card-viewport-stage :deep(.card-canvas),
+.card-viewport--layer-view .card-viewport-stage :deep(.card-canvas) {
   pointer-events: none;
+}
+
+.card-viewport-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .card-viewport-info {
   position: absolute;
-  top: 0;
   width: 228px;
-  transform-origin: top left;
   pointer-events: auto;
 }
 
@@ -2616,10 +2670,10 @@ watch(
 .card-viewport-left-info,
 .card-viewport-bottom-info {
   position: absolute;
-  transform-origin: center;
   pointer-events: auto;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 .card-viewport-left-info {
@@ -2646,42 +2700,48 @@ watch(
   width: 16px;
 }
 
-.card-viewport-dimension-line::before,
-.card-viewport-dimension-line::after {
+.card-viewport-dimension-line--horizontal::before {
   content: '';
   position: absolute;
   inset-inline: 0;
-  top: 50%;
+  top: 8px;
   height: 1px;
   background: currentColor;
   opacity: 0.34;
-  transform: translateY(-50%);
   transition: opacity 140ms ease-out;
 }
 
-.card-viewport-dimension-line::after {
+.card-viewport-dimension-line--horizontal::after {
+  content: '';
+  position: absolute;
   inset: 3px 0;
   width: 100%;
-  height: auto;
   border-inline: 1px solid currentColor;
   background: transparent;
-  transform: none;
+  opacity: 0.34;
+  transition: opacity 140ms ease-out;
 }
 
 .card-viewport-dimension-line--vertical::before {
-  inset: 0 auto;
-  left: 50%;
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 8px;
   width: 1px;
-  height: auto;
-  transform: translateX(-50%);
+  background: currentColor;
+  opacity: 0.34;
+  transition: opacity 140ms ease-out;
 }
 
 .card-viewport-dimension-line--vertical::after {
+  content: '';
+  position: absolute;
   inset: 0 3px;
-  width: auto;
   height: 100%;
   border-block: 1px solid currentColor;
   border-inline: 0;
+  opacity: 0.34;
+  transition: opacity 140ms ease-out;
 }
 
 .card-viewport-left-info:hover .card-viewport-dimension-line::before,
@@ -2700,6 +2760,7 @@ watch(
   padding: 0 5px;
   background: var(--oc-bg-raised);
   opacity: 0.34;
+  border-radius: var(--oc-radius-xs);
   transition: opacity 140ms ease-out;
 }
 

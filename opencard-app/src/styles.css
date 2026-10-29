@@ -203,6 +203,17 @@ body {
   background: var(--oc-bg-window, var(--oc-bg-base));
   color: var(--oc-fg-default);
   font-family: var(--oc-font-sans);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+.monaco-editor,
+.monaco-editor * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .oc-markdown {
