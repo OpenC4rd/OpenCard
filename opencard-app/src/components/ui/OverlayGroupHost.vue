@@ -47,17 +47,15 @@ function measure(): void {
   const element = contentEl.value
   if (!element) return
   const pinnedWidth = element.style.width
-  const pinnedHeight = element.style.height
-  // 先松开上一次的固定值再量，否则 scrollWidth/Height 被旧值托底，内容变小永远缩不回去。
+  // 只有宽度松绑：宽度被钉住时 scrollWidth 量不出内容想要的宽度。
   element.style.width = 'auto'
-  element.style.height = 'auto'
   const width = element.scrollWidth
-  const height = element.scrollHeight
+  element.style.width = pinnedWidth || 'auto'
+  const height = naturalHeight(element)
   const settled = hasSize.value && width === sizedWidth && height === sizedHeight
   // 内容还没挂进来时写 0 会让宿主从 0 撑开，等它来了再量。
   if (width === 0 || height === 0 || settled) {
     element.style.width = pinnedWidth
-    element.style.height = pinnedHeight
     return
   }
   element.style.width = `${width}px`
@@ -65,6 +63,26 @@ function measure(): void {
   sizedWidth = width
   sizedHeight = height
   hasSize.value = true
+}
+
+/**
+ * 内容自然高度：量内容范围，不去动宿主自己的 height。
+ * 宿主高度被钉住时它只会返回钉住值，所以把 height 归零再量是行不通的；而归零会强制布局，
+ * 把正在跑的 height 过渡按在 auto 上——内容一变高矮，弹层就整块瞬跳。
+ * 只有绝对定位内容量不到高度时才退回老办法。
+ */
+function naturalHeight(element: HTMLElement): number {
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  // jsdom 的 Range 没有 getBoundingClientRect：量不到就走下面的退路。
+  const rect = typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect() : null
+  const height = rect ? Math.ceil(rect.height) : 0
+  if (height > 0) return height
+  const pinnedHeight = element.style.height
+  element.style.height = 'auto'
+  const fallback = element.scrollHeight
+  element.style.height = pinnedHeight
+  return fallback
 }
 
 /**
