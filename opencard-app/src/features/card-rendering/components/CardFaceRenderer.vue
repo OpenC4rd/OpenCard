@@ -1,10 +1,9 @@
 <template>
-  <canvas ref="canvasRef" class="card-canvas" :width="pixelWidth" :height="pixelHeight"
-    :style="canvasStyle" @click="handleClick" />
+  <canvas ref="canvasRef" class="card-canvas" :style="canvasStyle" @click="handleClick" />
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { RenderReadyCardFace } from '../render.types'
 import type { CardRenderResourceContext } from '../cardRenderResources'
 import type { CardVisualReadinessRegistrar } from './cardRenderReadiness'
@@ -57,6 +56,12 @@ const sceneGraph = computed<CardSceneGraph>(() => computeSceneLayout(renderFace.
 function paint(): void {
   const canvas = canvasRef.value
   if (!canvas) return
+  if (canvas.width !== pixelWidth.value) {
+    canvas.width = pixelWidth.value
+  }
+  if (canvas.height !== pixelHeight.value) {
+    canvas.height = pixelHeight.value
+  }
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const ratio = effectivePixelRatio.value
@@ -115,10 +120,9 @@ watch(() => [props.face, props.resourceContext], () => {
   void assets.preloadSceneAssets(sceneGraph.value, props.resourceContext)
 }, { immediate: true })
 
-watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds, effectivePixelRatio.value], async () => {
-  await nextTick()
+watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds, effectivePixelRatio.value], () => {
   paint()
-}, { deep: true })
+}, { deep: true, flush: 'post' })
 
 defineExpose({
   getCanvasElement: () => canvasRef.value,

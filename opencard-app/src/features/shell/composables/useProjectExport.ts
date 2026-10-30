@@ -107,9 +107,12 @@ export function useProjectExport(options: UseProjectExportOptions) {
       if (signal.aborted || request.render.resources.hostEnvironment.isDisposed?.()) throw new DOMException('Export cancelled', 'AbortError')
       await request.render.resources.hostEnvironment.waitForResources?.()
       if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+      const resolvedDpi = (typeof request.dpi === 'number' && Number.isFinite(request.dpi) && request.dpi > 0)
+        ? request.dpi
+        : (request.render.document.dpi ?? 300)
       const bytes = await renderFaceToPng(request.render.document.faces[request.faceKey], {
         scale: request.scale,
-        dpi: request.dpi,
+        dpi: resolvedDpi,
         resourceContext: request.render.resources,
         signal,
         assets: exportAssetStore,
@@ -198,6 +201,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
     faceKeys: readonly CardFaceKey[],
     scale: number,
     outputs?: ReadonlyMap<CardFaceKey, string>,
+    dpi?: number,
   ): Promise<ReadonlyMap<CardFaceKey, Uint8Array> | null> {
     if (isRunning.value || render.resources.hostEnvironment.isDisposed?.()) return null
     isRunning.value = true
@@ -206,6 +210,9 @@ export function useProjectExport(options: UseProjectExportOptions) {
     try {
       await options.renderEnvironment.value.projectResourceEnvironment?.waitForResources?.()
       await render.resources.hostEnvironment.waitForResources?.()
+      const resolvedDpi = (typeof dpi === 'number' && Number.isFinite(dpi) && dpi > 0)
+        ? dpi
+        : (render.document.dpi ?? 300)
       for (const faceKey of faceKeys) {
         result.set(faceKey, await renderer.render({
           sourcePath: '',
@@ -213,6 +220,7 @@ export function useProjectExport(options: UseProjectExportOptions) {
           faceKey,
           render,
           scale,
+          dpi: resolvedDpi,
         }, controller.value!.signal))
       }
       for (const [face, path] of outputs ?? []) {

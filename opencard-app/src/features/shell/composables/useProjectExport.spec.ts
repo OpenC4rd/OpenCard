@@ -247,3 +247,43 @@ it('clears the shared CanvasAssetStore on export completion, cancellation, and e
     renderSpy.mockRestore()
   }
 })
+
+it('resolves export DPI from options, document or default 300', async () => {
+  const renderFaceToPngModule = await import('../../card-rendering/export/renderFaceToPng')
+  const renderSpy = vi.spyOn(renderFaceToPngModule, 'renderFaceToPng').mockImplementation(async () => {
+    return new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  })
+  const { prepareCardRender } = await import('../../card-rendering/renderPipeline')
+  const { parseCardDocument } = await import('../../../entities/card/storage')
+
+  const renderDefault = prepareCardRender({
+    document: parseCardDocument(JSON.parse(content('100'))),
+    instance: null,
+    resourceRootPath: null,
+    sourceFilePath: null,
+    environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG },
+  })
+
+  const { adapter } = createAdapter([])
+  try {
+    await adapter.renderCardImages(renderDefault, ['front'], 1)
+    expect(renderSpy.mock.calls[0]?.[1]?.dpi).toBe(300)
+
+    const docWithDpi = { ...JSON.parse(content('100')), dpi: 450 }
+    const renderWithDpi = prepareCardRender({
+      document: parseCardDocument(docWithDpi),
+      instance: null,
+      resourceRootPath: null,
+      sourceFilePath: null,
+      environment: { projectIconCatalog: EMPTY_PROJECT_ICON_CATALOG },
+    })
+
+    await adapter.renderCardImages(renderWithDpi, ['front'], 1)
+    expect(renderSpy.mock.calls[1]?.[1]?.dpi).toBe(450)
+
+    await adapter.renderCardImages(renderDefault, ['front'], 1, undefined, 600)
+    expect(renderSpy.mock.calls[2]?.[1]?.dpi).toBe(600)
+  } finally {
+    renderSpy.mockRestore()
+  }
+})

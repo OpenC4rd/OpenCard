@@ -130,6 +130,8 @@ function inspectCssClasses(path, css) {
 }
 
 function inspectAsset(path, name) {
+  const normalizedPath = toProjectPath(path)
+  if (normalizedPath.startsWith('../docs/media/')) return
   const extension = extname(name)
   const stem = name.slice(0, -extension.length)
   if (!kebab.test(stem)) {

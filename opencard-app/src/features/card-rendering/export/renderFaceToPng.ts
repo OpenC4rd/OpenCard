@@ -36,6 +36,9 @@ export async function renderFaceToPng(
   } else if ('dpi' in sceneOrFace && typeof sceneOrFace.dpi === 'number' && sceneOrFace.dpi > 0) {
     const multiplier = typeof options.scale === 'number' && Number.isFinite(options.scale) && options.scale > 0 ? options.scale : 1
     scale = (sceneOrFace.dpi / 25.4) * multiplier
+  } else if ('face' in sceneOrFace && typeof sceneOrFace.face.dpi === 'number' && sceneOrFace.face.dpi > 0) {
+    const multiplier = typeof options.scale === 'number' && Number.isFinite(options.scale) && options.scale > 0 ? options.scale : 1
+    scale = (sceneOrFace.face.dpi / 25.4) * multiplier
   } else {
     const rawScale = options.scale ?? 1
     scale = typeof rawScale === 'number' && Number.isFinite(rawScale) ? rawScale : 1

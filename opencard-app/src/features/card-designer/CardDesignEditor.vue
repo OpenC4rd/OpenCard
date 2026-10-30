@@ -1880,13 +1880,16 @@ async function onHeaderAction(key: string): Promise<void> {
   const faces: readonly CardFaceKey[] = match[1] === 'current' ? [activeFaceKey.value] : ['front', 'back']
   const stem = (editorState.value.name ?? 'card').replace(/\.ocdocument$/i, '')
   const scale = Number(match[2])
+  const instanceSuffix = renderTargetInstance.value ? `_${(renderTargetInstance.value.name || renderTargetInstance.value.id).trim()}` : ''
+  const baseName = `${stem}${instanceSuffix}`
   imageExporting.value = true
   try {
     const destination = match[1] === 'current'
-      ? await fileSystemService.pickSavePath({ defaultPath: `${stem}_${faces[0]}.png`, fileTypeName: t('cardDesigner.renderImage.pngFile'), extensions: ['png'], title: t('cardDesigner.renderImage.saveCurrent') })
+      ? await fileSystemService.pickSavePath({ defaultPath: `${baseName}_${faces[0]}.png`, fileTypeName: t('cardDesigner.renderImage.pngFile'), extensions: ['png'], title: t('cardDesigner.renderImage.saveCurrent') })
       : await fileSystemService.pickDirectory(t('cardDesigner.renderImage.saveBoth'))
     if (!destination || disposed) return
-    const outputs = new Map(faces.map(face => [face, match[1] === 'current' ? destination : `${destination.replace(/[\\/]+$/, '')}/${stem}_${face}.png`]))
+    const separator = destination.includes('\\') ? '\\' : '/'
+    const outputs = new Map(faces.map(face => [face, match[1] === 'current' ? destination : `${destination.replace(/[\\/]+$/, '')}${separator}${baseName}_${face}.png`]))
     await renderImages(render, faces, scale, outputs)
   } catch (error) { notifyError(error instanceof Error ? error.message : String(error)) }
   finally { imageExporting.value = false }

@@ -359,7 +359,7 @@ function buildTask(): ProjectExportTask {
     documentPaths: selectedDocuments.value.map(document => document.path),
     selectionMode: selectionMode.value,
     dpi: dpi.value,
-    scale: dpi.value / 25.4,
+    scale: 1,
     layoutMode: layoutMode.value,
     outputDirectory: outputDirectory.value.trim(),
     conflictMode: conflictMode.value,
