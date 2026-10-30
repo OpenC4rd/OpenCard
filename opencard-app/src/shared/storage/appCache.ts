@@ -1,6 +1,6 @@
 /**
  * 模块说明：
- * - `cache/` 的度量与清理：派生数据，删掉不丢东西（见 docs/存储布局.md）
+ * - `cache/` 的度量与清理：派生数据，删掉不丢东西（见 docs/实现指南.md#软件存储）
  * 职责边界：
  * - 只走 appStoragePaths 给的路径，不认识缓存里的格式，也不碰 `cache/` 之外的任何位置
  */
@@ -56,7 +56,7 @@ export async function clearAppCache(fs: CacheFileSystem): Promise<void> {
 }
 
 /** 给人看的体积：字节 → `1.5GB`。单位不翻译，两种语言里都这么认。 */
-export function formatCacheBytes(bytes: number): string {
+function formatCacheBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB']
   let value = Math.max(0, bytes)
   let unit = 0

@@ -3,7 +3,7 @@ import type { CardRenderEnvironment, PreparedCardRender } from '../card-renderin
 import type { CardPipelineIssue } from '../card-rendering/cardPipelineIssue'
 import type { ProjectExportTask } from '../workspace/model/projectMetadata'
 
-export type ExportTaskValidationCode =
+type ExportTaskValidationCode =
   | 'documents-required'
   | 'duplicate-document'
   | 'invalid-document-path'
@@ -77,7 +77,7 @@ export type ExportRunResult = {
   failures: readonly ExportFailure[]
 }
 
-export type ExportRenderRequest = {
+type ExportRenderRequest = {
   sourcePath: string
   outputPath: string
   faceKey: CardFaceKey
@@ -86,7 +86,7 @@ export type ExportRenderRequest = {
   dpi?: number
 }
 
-export interface ExportDocumentSource {
+interface ExportDocumentSource {
   load(relativePath: string): Promise<ExportDocumentSnapshot>
 }
 

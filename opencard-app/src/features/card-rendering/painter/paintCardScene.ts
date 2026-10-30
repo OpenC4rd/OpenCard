@@ -546,12 +546,12 @@ function paintTextBlock(
       boxWidth: w,
       boxHeight: h,
       baseFontFamily,
-      baseFontSizePx: baseSize,
+      baseFontSize: baseSize,
       baseFontWeight: block.fontWeight ?? 'normal',
       baseColor: block.color || '#000000',
       textAlign: block.textAlign ?? 'start',
       verticalAlign: block.verticalAlign ?? 'top',
-      lineHeightPx: evaluateRenderLength(block.lineHeight, baseSize, baseSize * 1.2),
+      lineHeight: evaluateRenderLength(block.lineHeight, baseSize, baseSize * 1.2),
       writingMode: block.writingMode ?? 'horizontal-tb',
     },
     measurer,
@@ -590,7 +590,7 @@ function paintTextBlock(
     if (run.kind === 'glyph' && (run.style.underline || run.style.strikethrough)) {
       ctx.save()
       ctx.strokeStyle = run.style.color || '#000'
-      ctx.lineWidth = Math.max(1, run.style.fontSizePx * 0.07)
+      ctx.lineWidth = Math.max(0.1, run.style.fontSize * 0.07)
       if (run.style.underline) {
         const lineY = run.baselineY + ctx.lineWidth * 1.5
         ctx.beginPath()
@@ -666,7 +666,7 @@ function paintGlyphPass(
   const resolvedFont = style.fontFamily === baseFontFamily
     ? baseFontFamily
     : resolveBlockFontFamily(style.fontFamily, blockId, 'content', resourceContext)
-  ctx.font = `${italic}${weight} ${style.fontSizePx}px ${resolvedFont}`
+  ctx.font = `${italic}${weight} ${style.fontSize}px ${resolvedFont}`
   ctx.textBaseline = 'alphabetic'
 
   if (run.angleRad !== 0) {

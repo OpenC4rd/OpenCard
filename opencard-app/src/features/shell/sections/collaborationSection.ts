@@ -4,7 +4,7 @@ import type { ShellListGroup } from '../shell.types'
 
 type Translate = (key: string, paramsOrFallback?: Record<string, unknown> | string) => string
 
-export interface CollaborationSectionOptions {
+interface CollaborationSectionOptions {
   translate: Translate
   projectOpen: Readonly<Ref<boolean>>
   onAction: (key: string) => void | Promise<void>

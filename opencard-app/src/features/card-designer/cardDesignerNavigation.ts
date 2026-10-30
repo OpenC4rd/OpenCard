@@ -2,7 +2,7 @@ import type { EditorNavigationResult } from '../editor-runtime/model/editorIssue
 import type { CardFaceKey } from '../../entities/card/model'
 import { isRecord } from '../../shared/model/record'
 
-export type CardDesignerNavigationOwner = 'document' | 'face' | 'instance' | 'block' | 'location'
+type CardDesignerNavigationOwner = 'document' | 'face' | 'instance' | 'block' | 'location'
 
 export type CardDesignerNavigationToken = {
   protocol: 'card-designer'

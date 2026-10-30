@@ -2,8 +2,8 @@
 import { toRaw, type DeepReadonly } from 'vue'
 import type { AppState, ProjectWorkspaceState } from './appState'
 
-export type ProjectWorkspaceStates = AppState['projects']['workspaces']
-export type ProjectWorkspaceStatesSource = DeepReadonly<ProjectWorkspaceStates>
+type ProjectWorkspaceStates = AppState['projects']['workspaces']
+type ProjectWorkspaceStatesSource = DeepReadonly<ProjectWorkspaceStates>
 /** The store exposes state as a deep-readonly projection; updates return the mutable record. */
 export type ProjectWorkspaceStateRead = DeepReadonly<ProjectWorkspaceState>
 

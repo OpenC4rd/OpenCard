@@ -1,6 +1,6 @@
 import type { CardFaceKey } from '../../entities/card/model'
 
-export type CardIssueSeverity = 'error' | 'warning' | 'info'
+type CardIssueSeverity = 'error' | 'warning' | 'info'
 
 export type CardIssueOwner =
   | { kind: 'document', id: string }
@@ -9,7 +9,7 @@ export type CardIssueOwner =
   | { kind: 'block', id: string }
   | { kind: 'location', id: string }
 
-export type CardIssueLocation = {
+type CardIssueLocation = {
   documentId: string
   instanceId: string | null
   faceKey: CardFaceKey | null
@@ -41,16 +41,16 @@ export type CardRenderParseIssueType =
   | 'card-designer.render-parse.invalid-object'
   | 'card-designer.render-parse.deprecated-block-type'
   | 'card-designer.render-parse.deprecated-property'
-export type CardRichTextIssueType =
-  | 'card-designer.rich-text.invalid-html'
+type CardRichTextIssueType =
+  | 'card-designer.rich-text.invalid-markup'
   | 'card-designer.rich-text.limit-exceeded'
-export type CardResourceIssueType =
+type CardResourceIssueType =
   | 'card-designer.resource.remote-blocked'
   | 'card-designer.resource.system-font'
   | 'card-designer.resource.package-missing'
   | 'card-designer.resource.file-missing'
 
-export type CardIssueType = CardBindingIssueType | CardRenderParseIssueType | CardRichTextIssueType | CardResourceIssueType
+type CardIssueType = CardBindingIssueType | CardRenderParseIssueType | CardRichTextIssueType | CardResourceIssueType
 
 const cardIssueMessageKeys: Readonly<Record<CardIssueType, string>> = {
   'card-designer.binding.invalid-token': 'app.problems.bindingCodes.INVALID_TOKEN',
@@ -70,7 +70,7 @@ const cardIssueMessageKeys: Readonly<Record<CardIssueType, string>> = {
   'card-designer.render-parse.invalid-object': 'app.problems.renderCodes.INVALID_OBJECT',
   'card-designer.render-parse.deprecated-block-type': 'app.problems.renderCodes.DEPRECATED_BLOCK_TYPE',
   'card-designer.render-parse.deprecated-property': 'app.problems.renderCodes.DEPRECATED_PROPERTY',
-  'card-designer.rich-text.invalid-html': 'app.problems.richTextCodes.INVALID_HTML',
+  'card-designer.rich-text.invalid-markup': 'app.problems.richTextCodes.INVALID_MARKUP',
   'card-designer.rich-text.limit-exceeded': 'app.problems.richTextCodes.LIMIT_EXCEEDED',
   'card-designer.resource.remote-blocked': 'app.problems.resourceCodes.REMOTE_BLOCKED',
   'card-designer.resource.system-font': 'app.problems.resourceCodes.SYSTEM_FONT',
@@ -93,7 +93,7 @@ export type CardPipelineIssue = {
   children?: readonly CardPipelineIssue[]
 }
 
-export type CreateCardPipelineIssueInput = Omit<CardPipelineIssue, 'id' | 'severity'>
+type CreateCardPipelineIssueInput = Omit<CardPipelineIssue, 'id' | 'severity'>
 
 export function createCardPipelineIssue(
   input: CreateCardPipelineIssueInput,

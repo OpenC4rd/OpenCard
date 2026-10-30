@@ -2,7 +2,7 @@ import { getReadableForegroundColor, getReadableForegroundTone } from '../../sha
 
 export { getReadableForegroundColor, getReadableForegroundTone }
 
-export interface HsvColor {
+interface HsvColor {
   hue: number
   saturation: number
   value: number
@@ -12,7 +12,7 @@ export interface HsvaColor extends HsvColor {
   alpha: number
 }
 
-export interface RgbaColor {
+interface RgbaColor {
   red: number
   green: number
   blue: number

@@ -34,13 +34,13 @@ export type {
 } from './schema'
 
 // Block and document data models.
-export type BlockIdentity = {
+type BlockIdentity = {
     id: string
     additionalFieldDefinition?: AdditionalFieldDefinitionMap
 }
 
-export type CssValue = string
-export type TextFontWeight = 'light' | 'normal' | 'bold'
+type CssValue = string
+type TextFontWeight = 'light' | 'normal' | 'bold'
 
 export type AnchorPosition =
     | 'lt' | 'ct' | 'rt'
@@ -96,7 +96,7 @@ export type SimpleContainerLocationInfo = {
     y?: CssValue
 }
 
-export type ContainerPackaging = {
+type ContainerPackaging = {
     packaged?: string
 }
 
@@ -134,11 +134,6 @@ export type CustomBlock = BlockIdentity & {
     source: string
 }
 
-/**
- * @deprecated “Markdown 文本块”（markdown-text-block）已废弃，统一使用 TextBlock
- */
-export type MarkdownTextBlock = TextBlock & { type: 'markdown-text-block' }
-
 export type CardBlock = TextBlock | ImageBlock | QrCodeBlock | ShapeBlock | SimpleContainerBlock | FlowContainerBlock | CustomBlock
 
 export type RootChild = {
@@ -146,7 +141,7 @@ export type RootChild = {
     location: SimpleContainerLocationInfo
 }
 
-export const cardFaceKeys = ['front', 'back'] as const
+const cardFaceKeys = ['front', 'back'] as const
 export type CardFaceKey = typeof cardFaceKeys[number]
 
 export type CardFace = {
@@ -468,7 +463,7 @@ export function createImageBlock(init: ImageBlockInit = {}): ImageBlock {
     return block as ImageBlock
 }
 
-export function createQrCodeBlock(init: QrCodeBlockInit = {}): QrCodeBlock {
+function createQrCodeBlock(init: QrCodeBlockInit = {}): QrCodeBlock {
     return {
         ...createBlockIdentity({
             id: init.id ?? createBlockId('qrcode-block'),

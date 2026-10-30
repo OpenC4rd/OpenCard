@@ -21,7 +21,7 @@ export const TEMPLATE_ENTRY_REMOVE_ACTION_KEY = 'template.entry.remove'
 export const TEMPLATE_ENTRY_TREE_PREFIX = 'template-entry:'
 export const TEMPLATE_COVER_TREE_PREFIX = 'template-cover:'
 
-export type ShellCatalogLabels = (key: string, params?: Record<string, unknown>) => string
+type ShellCatalogLabels = (key: string, params?: Record<string, unknown>) => string
 
 function unusableCatalogItem(warning: { path: string; reason: string }, remove?: OcNodeAction): OcNode {
   return {

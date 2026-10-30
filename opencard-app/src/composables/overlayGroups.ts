@@ -5,14 +5,14 @@ import type { Placement } from '@floating-ui/vue'
 export type OverlayAnchor = HTMLElement | DOMRect | (() => DOMRect | null) | null
 
 /** 描述「这一层长什么样、锚在哪」；同一个组的宿主换 marker 时只换这些。 */
-export interface OverlayMarkerLayout {
+interface OverlayMarkerLayout {
   anchor: OverlayAnchor
   owner?: HTMLElement | null
   placement?: Placement
   maxHeight?: number
 }
 
-export interface OverlayGroupState {
+interface OverlayGroupState {
   anchor: OverlayAnchor
   owner: HTMLElement | null
   placement: Placement

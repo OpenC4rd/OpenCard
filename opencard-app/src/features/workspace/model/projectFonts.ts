@@ -2,7 +2,6 @@ import { parseResourceReferenceList } from '../services/resourceReference'
 import type {
   ProjectFontComposition,
   ProjectFont,
-  ProjectFontRegistry,
   UnicodeRange,
 } from './projectFontRegistry'
 import { projectFontSources } from './projectFontRegistry'
@@ -19,24 +18,24 @@ export type FontCatalogEntry = {
   cssFamily?: string
 }
 
-export type ProjectFontResolutionIssue = {
+type ProjectFontResolutionIssue = {
   kind: 'missing'
   key: string
   path: readonly string[]
 }
 
-export type ProjectFontResolution = {
+type ProjectFontResolution = {
   familyKeys: readonly string[]
   cssFontFamily: string
   issues: readonly ProjectFontResolutionIssue[]
 }
 
-export type ProjectFontResolutionContext = {
+type ProjectFontResolutionContext = {
   families: readonly ProjectFont[]
   compositions: readonly ProjectFontComposition[]
 }
 
-export type ProjectFontRegistryIssue =
+type ProjectFontRegistryIssue =
   | { kind: 'empty-font', fontKey: string }
   | { kind: 'empty-composition', compositionKey: string }
   | { kind: 'missing-font', compositionKey: string, fontKey: string }
@@ -58,7 +57,7 @@ export function findProjectFontRegistryIssues(context: ProjectFontResolutionCont
   return issues
 }
 
-export function createProjectFontReference(key: string): string {
+function createProjectFontReference(key: string): string {
   return `font:${key}`
 }
 
@@ -151,18 +150,6 @@ export function fromCssFontFamily(value: string): string {
     } else if (family) references.push(family)
   }
   return references.join('; ')
-}
-
-export function buildFontCatalog(fonts: ProjectFontRegistry | null | undefined): readonly FontCatalogEntry[] {
-  const projectEntries = Object.entries(fonts ?? {}).map(([key, definition]) => ({
-    value: createProjectFontReference(key),
-    label: definition.name,
-    source: 'project' as const,
-    detail: definition.kind === 'family'
-      ? projectFontSources(definition.family).join('; ')
-      : definition.composition.members.map(member => member.fontKey).join(' → '),
-  }))
-  return projectEntries
 }
 
 export function unicodeRangeContains(ranges: readonly UnicodeRange[] | undefined, codePoint: number): boolean {

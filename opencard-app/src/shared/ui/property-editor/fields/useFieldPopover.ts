@@ -3,7 +3,7 @@ import { useOverlayDismiss } from '../../useOverlayDismiss'
 import type { OcNode, OcNodeCollection, OcNodeKey } from '../../node/node.types'
 import type { IconToken } from '../../icon/iconRegistry'
 
-export interface UseFieldPopoverOptions {
+interface UseFieldPopoverOptions {
   isReadonly?: () => boolean | undefined
   onOpen?: () => void
 }

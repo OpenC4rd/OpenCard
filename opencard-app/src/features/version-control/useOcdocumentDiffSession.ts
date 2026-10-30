@@ -5,7 +5,7 @@ import { materializeRevision, readFileAtRevision, releaseRevisionSnapshot } from
 import type { DiffRevisionOption, DiffSession, DiffSnapshot } from './diff.types'
 import { compareOcdocuments, type OcdocumentDiffModel } from './ocdocumentDiff'
 
-export interface OcdocumentDiffSessionOptions {
+interface OcdocumentDiffSessionOptions {
   translate: (key: string) => string
   projectRoot: Readonly<Ref<string | null | undefined>>
   environment: Readonly<Ref<ResourceEnvironment | null>>
@@ -14,7 +14,7 @@ export interface OcdocumentDiffSessionOptions {
   revisions: Readonly<Ref<readonly DiffRevisionOption[]>>
 }
 const DIFF_RESOURCE_SNAPSHOT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
-export function isResourceSnapshotDiffPath(path: string): boolean {
+function isResourceSnapshotDiffPath(path: string): boolean {
   const extension = path.split('.').pop()?.toLocaleLowerCase()
   return Boolean(extension && DIFF_RESOURCE_SNAPSHOT_EXTENSIONS.has(extension))
 }

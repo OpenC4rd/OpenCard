@@ -11,7 +11,7 @@ import { fileSystemService, type FileSystemService } from '../../workspace/servi
 
 export const WELCOME_COVER_SOURCE_LIMIT = 8
 
-export type RecentProjectSnapshot = {
+type RecentProjectSnapshot = {
   readonly available: boolean
   readonly cover: ProjectCover | null
 }

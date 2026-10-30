@@ -38,7 +38,7 @@ type IssueContext = {
   typeName: string
 }
 
-export type ParseRenderDocumentOptions = {
+type ParseRenderDocumentOptions = {
   instanceId?: string | null
   customBlocks?: ReadonlyMap<string, CustomBlockRuntimeDescriptor>
 }

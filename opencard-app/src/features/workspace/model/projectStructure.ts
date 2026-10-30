@@ -20,13 +20,6 @@ export const PROJECT_INTERNAL_FILE_DEFAULTS = Object.freeze({
   [PROJECT_DICTIONARY_FILE_NAME]: '{}\n',
 })
 
-export const PROJECT_INTERNAL_DIRECTORIES = Object.freeze([
-  `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_FONT_DIRECTORY}`,
-  `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_ICON_DIRECTORY}`,
-  `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_CUSTOM_BLOCK_DIRECTORY}`,
-  `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`,
-])
-
 export function resolveProjectInternalRelativePath(path = ''): string {
   const normalized = path.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
   return normalized ? `${PROJECT_INTERNAL_DIRECTORY_NAME}/${normalized}` : PROJECT_INTERNAL_DIRECTORY_NAME

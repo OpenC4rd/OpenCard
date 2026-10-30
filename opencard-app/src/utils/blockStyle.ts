@@ -2,7 +2,7 @@ import type { RenderReadyBaseBlock } from '../features/card-rendering/render.typ
 
 function isZeroCssValue(value: string): boolean {
     const normalized = value.trim().toLowerCase()
-    return normalized === '' || normalized === '0' || normalized === '0px' || normalized === '0mm' || normalized === '0pt' || normalized === '0%'
+    return normalized === '' || normalized === '0' || normalized === '0mm' || normalized === '0pt' || normalized === '0%'
 }
 
 export function getBlockBoxStyles(comp: RenderReadyBaseBlock): string {
@@ -12,7 +12,7 @@ export function getBlockBoxStyles(comp: RenderReadyBaseBlock): string {
     styles.push(`height: ${comp.height}`)
     if (!comp.visible) styles.push('visibility: hidden')
     if (comp.borderWidth > 0) {
-        styles.push(`outline: ${comp.borderWidth}px ${comp.borderStyle} ${comp.borderColor}`)
+        styles.push(`outline: ${comp.borderWidth}mm ${comp.borderStyle} ${comp.borderColor}`)
     }
     if (comp.borderRadius) styles.push(`border-radius: ${comp.borderRadius}`)
     if (comp.background) styles.push(`background: ${comp.background}`)

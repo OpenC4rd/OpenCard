@@ -3,7 +3,7 @@
  */
 import { isIconToken, type IconToken } from '../icon/iconRegistry'
 
-export type InlineMarkupNode =
+type InlineMarkupNode =
   | { type: 'text'; value: string }
   | { type: 'strong'; value: string }
   | { type: 'emphasis'; value: string }

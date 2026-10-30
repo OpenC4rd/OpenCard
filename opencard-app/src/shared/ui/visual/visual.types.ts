@@ -5,14 +5,14 @@
 import type { IconToken, IconTone } from '../icon/iconRegistry'
 
 /** 语义图标；图标对读屏是装饰性的，名称由相邻文字承担。 */
-export type OcIconVisual = {
+type OcIconVisual = {
   type: 'icon'
   icon: IconToken
   iconTone?: IconTone
 }
 
 /** 调用方给定的呈现，例如项目图标的精灵图裁剪样式。 */
-export type OcStyledVisual = {
+type OcStyledVisual = {
   type: 'style'
   style: Readonly<Record<string, string>>
   /** 无障碍名称；缺省时由宿主元素回退到条目自身名称。 */
@@ -20,7 +20,7 @@ export type OcStyledVisual = {
 }
 
 /** 已解析的图片源。 */
-export type OcImageVisual = {
+type OcImageVisual = {
   type: 'image'
   src: string
   /** 无障碍名称；缺省时由宿主元素回退到条目自身名称。 */

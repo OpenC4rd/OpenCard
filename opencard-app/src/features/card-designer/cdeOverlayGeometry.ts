@@ -12,7 +12,7 @@ export type CdeOverlayGeometryConfig = Readonly<{
 
 export type CdeOverlaySide = 'left' | 'right'
 
-export type CdeOverlayDockGeometry = Readonly<{
+type CdeOverlayDockGeometry = Readonly<{
   side: CdeOverlaySide
   extent: number
   contentWidth: number

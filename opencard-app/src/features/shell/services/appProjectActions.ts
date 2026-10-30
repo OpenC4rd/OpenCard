@@ -4,7 +4,7 @@ import type { ApplicationCloseAction } from '../composables/useUnsavedSessionGua
 import type { CloseOutcome } from '../composables/useWorkbenchCloseCoordinator'
 
 /** Application entry points shared by pages, menus and external-open requests. */
-export interface AppProjectActions {
+interface AppProjectActions {
   openProject: () => Promise<boolean>
   openRecentProject: (path: string) => Promise<boolean>
   relocateRecentProject: (path: string) => Promise<string | null>

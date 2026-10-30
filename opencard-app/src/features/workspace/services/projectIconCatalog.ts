@@ -198,39 +198,6 @@ export function createProjectIconPreviewStyle(
   }
 }
 
-export type ProjectIconBlockFit = 'contain' | 'cover' | 'fill'
-
-function projectIconBlockDimensions(
-  dimensions: { width: number, height: number },
-  fit: ProjectIconBlockFit,
-): { width: string, height: string } {
-  if (fit === 'fill') return { width: '100cqw', height: '100cqh' }
-  const operation = fit === 'cover' ? 'max' : 'min'
-  return {
-    width: `${operation}(100cqw, ${100 * dimensions.width / dimensions.height}cqh)`,
-    height: `${operation}(${100 * dimensions.height / dimensions.width}cqw, 100cqh)`,
-  }
-}
-
-export function createProjectIconBlockStyle(
-  entry: ProjectIconCatalogEntry,
-  fit: ProjectIconBlockFit,
-  readDimensions?: ProjectIconDimensionReader,
-): Record<string, string> {
-  const dimensions = projectIconBlockDimensions(displayDimensions(entry, readDimensions), fit)
-  return {
-    backgroundImage: 'none',
-    imageRendering: entry.pixelated === true ? 'pixelated' : 'auto',
-    '--oc-project-icon-renderer': rendererOf(entry),
-    '--oc-project-icon-display-width': dimensions.width,
-    '--oc-project-icon-display-height': dimensions.height,
-    '--oc-project-icon-source-width': 'var(--oc-project-icon-display-width)',
-    '--oc-project-icon-source-height': 'var(--oc-project-icon-display-height)',
-    '--oc-project-icon-image-rendering': entry.pixelated === true ? 'pixelated' : 'auto',
-    ...createProjectIconPaint(entry),
-  }
-}
-
 export function createProjectIconCssProperties(
   entry: ProjectIconCatalogEntry,
   readDimensions?: ProjectIconDimensionReader,

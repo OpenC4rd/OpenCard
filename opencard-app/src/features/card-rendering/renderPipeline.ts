@@ -20,7 +20,7 @@ export type RenderPipelineResult = {
   resourceScopes?: ProjectResourceScopeMap
 }
 
-export type RenderPipelineContext = {
+type RenderPipelineContext = {
   project?: Readonly<ProjectInformation> | null
   dictionary?: Readonly<Record<string, string>> | null
   projectResourceEnvironment?: ProjectResourceEnvironment

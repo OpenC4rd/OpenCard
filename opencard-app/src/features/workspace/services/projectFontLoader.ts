@@ -21,12 +21,12 @@ export type ProjectFontLoadError = {
   message: string
 }
 
-export type ProjectFontLoadResult = {
+type ProjectFontLoadResult = {
   current: boolean
   errors: readonly ProjectFontLoadError[]
 }
 
-export type ProjectFontCharacterSetLoader = (source: string) => Promise<ReadonlySet<number>>
+type ProjectFontCharacterSetLoader = (source: string) => Promise<ReadonlySet<number>>
 
 function cssUnicodeRanges(ranges: readonly UnicodeRange[]): string {
   return ranges.map(range => range.start === range.end

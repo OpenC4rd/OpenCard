@@ -13,7 +13,7 @@
 
 import { formatPackageCoordinate, parsePackageCoordinate } from '../../features/workspace/model/packageCoordinate'
 
-export type ProjectIconReference = {
+type ProjectIconReference = {
   /**
    * Reference qualifier: `null` for the current scope, `''` for the host project, otherwise the
    * package's full coordinate（`作者/包名@版本`）.

@@ -27,7 +27,7 @@ import {
 type Translate = (key: string, paramsOrFallback?: Record<string, unknown> | string) => string
 type RenameTree = (instance: unknown) => void
 
-export interface WorkbenchSectionOptions {
+interface WorkbenchSectionOptions {
   translate: Translate
   project: {
     open: Readonly<Ref<boolean>>

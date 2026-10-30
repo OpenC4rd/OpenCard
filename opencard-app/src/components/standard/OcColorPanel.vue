@@ -121,7 +121,7 @@ export interface ColorDragStart {
 }
 
 /** 面板渲染所需的全部状态都由父层提供。 */
-export interface ColorPanelProps {
+interface ColorPanelProps {
   label?: string
   hsva: HsvaColor
   inputMode: ColorInputMode
@@ -132,18 +132,6 @@ export interface ColorPanelProps {
   sliderChannels: readonly ColorSliderField[]
   channelFields: readonly ColorChannelField[]
   alphaSliderStyle: CSSProperties
-}
-
-/** 交互一律回到父层；父层仍持有颜色与拖拽状态。 */
-export interface ColorPanelHandlers {
-  onDragStart?: (payload: ColorDragStart) => void
-  onCommit?: (value?: string) => void
-  onPreviewChannel?: (key: ColorSliderKey, value: number) => void
-  /** 冒号事件名的监听键必须带冒号：Vue 按 `onUpdate:inputMode` 查找。 */
-  'onUpdate:inputMode'?: (mode: ColorInputMode) => void
-  onChannelInput?: (key: ColorChannelKey, event: Event) => void
-  onSaturationKeydown?: (event: KeyboardEvent) => void
-  onEscape?: () => void
 }
 </script>
 

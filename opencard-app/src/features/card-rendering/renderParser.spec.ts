@@ -28,7 +28,7 @@ function createDocument(): CardDocument {
             id: 'text', name: 'Title', content: 'Hello', opacity: '0.5',
           }),
           location: {
-            id: 'location', type: 'simple-container-location', anchor: 'lt', x: '10', y: '20px',
+            id: 'location', type: 'simple-container-location', anchor: 'lt', x: '10', y: '20mm',
           },
         }],
       },
@@ -53,7 +53,7 @@ describe('renderParser', () => {
       description: 'Reusable card.',
       notes: 'Review margins.',
     })
-    expect(result.document.faces.front.children[0]!.location).toMatchObject({ x: '10mm', y: '20px' })
+    expect(result.document.faces.front.children[0]!.location).toMatchObject({ x: '10mm', y: '20mm' })
     expect(block).toMatchObject({
       type: 'text-block',
       id: 'text',
@@ -313,5 +313,21 @@ describe('renderParser', () => {
     ]))
     expect(document).toEqual(sourceSnapshot)
     expect(block).toMatchObject({ color: 'not a color!', width: 'wide-ish', content: '' })
+  })
+
+  it('rejects px lengths and reports invalid-css-length', () => {
+    const document = createDocument()
+    ;(document.faces.front.children[0]!.block as unknown as Record<string, unknown>).width = '120px'
+
+    const result = parseRenderDocument(document)
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        type: 'card-designer.render-parse.invalid-css-length',
+        location: expect.objectContaining({
+          blockId: 'text',
+          fieldKey: 'width',
+        }),
+      }),
+    )
   })
 })

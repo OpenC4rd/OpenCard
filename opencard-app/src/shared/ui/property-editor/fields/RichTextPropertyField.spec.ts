@@ -94,8 +94,8 @@ describe('RichTextPropertyField', () => {
 
   it('resets explicit formatting by removing it, including values equal to inheritance and paragraph alignment', async () => {
     const wrapper = mountField(
-      '<p style="text-align:right"><span style="font-size:16px;color:red">a</span>b</p>',
-      { baseStyle: { fontSize: '16px' } },
+      '@align(end){@style(size="4mm",color=red){a}b}',
+      { baseStyle: { fontSize: '4mm' } },
     )
     try {
       const vm = await openEditor(wrapper)
@@ -115,7 +115,7 @@ describe('RichTextPropertyField', () => {
   })
 
   it('clears only pending caret formatting without changing existing text or leaving empty style marks', async () => {
-    const wrapper = mountField('<p><span style="font-size:24px">A</span></p>')
+    const wrapper = mountField('@size(6mm){A}')
     try {
       const { editor } = await openEditor(wrapper)
       editor.commands.setTextSelection(2)
@@ -123,7 +123,7 @@ describe('RichTextPropertyField', () => {
       panel.vm.$emit('update-property', { key: 'rich-text-selection', fieldKey: 'fontSize', value: '12' })
       await nextTick()
       await panel.get('[data-field-key="fontSize"] [data-action-key="reset-property"] button').trigger('click')
-      expect(editor.state.doc.firstChild!.firstChild!.marks[0]!.attrs.fontSize).toBe('24px')
+      expect(editor.state.doc.firstChild!.firstChild!.marks[0]!.attrs.fontSize).toBe('6mm')
       editor.view.dispatch(editor.state.tr.insertText('X'))
       expect(editor.state.doc.firstChild!.lastChild!.text).toBe('X')
       expect(editor.state.doc.firstChild!.lastChild!.marks).toHaveLength(0)
@@ -131,7 +131,7 @@ describe('RichTextPropertyField', () => {
   })
 
   it('preserves independent shadow settings through reset and the sanitized handoff', async () => {
-    const wrapper = mountField('<p><span data-oc-shadow-color="red" data-oc-shadow-offset-x="4px" data-oc-shadow-offset-y="5px">A</span></p>')
+    const wrapper = mountField('@style(shadow="red 1mm 2mm 0mm"){A}')
     try {
       const vm = await openEditor(wrapper)
       vm.editor.commands.setTextSelection({ from: 1, to: 2 })
@@ -148,14 +148,14 @@ describe('RichTextPropertyField', () => {
       const saved = vm.getHtml()
       expect(saved).toContain('shadow')
       expect(vm.applyHtml(saved)).toBe(true)
-      expect(vm.editor.getAttributes('textStyle').textShadowOffsetY).toBe('5px')
+      expect(vm.editor.getAttributes('textStyle').textShadowOffsetY).toBe('2mm')
     } finally { wrapper.unmount() }
   })
 
   it('recognizes inherited size and equivalent CSS colors as common selection values without rewriting them', async () => {
     const wrapper = mountField(
-      '<p><strong><span style="color:red">A</span><span style="font-size:20px;color:#ff0000">B</span></strong></p>',
-      { baseStyle: { fontSize: '20px' } },
+      '@b{@color(red){A}@style(size="5mm",color="#ff0000"){B}}',
+      { baseStyle: { fontSize: '5mm' } },
     )
     try {
       const { editor } = await openEditor(wrapper)
@@ -168,7 +168,7 @@ describe('RichTextPropertyField', () => {
   })
 
   it('changes only the requested selection property and types over it using its first character format', async () => {
-    const wrapper = mountField('<p><span style="font-size:10px">O</span><strong><span style="font-size:12px;color:red">A</span><span style="font-size:24px;color:blue">B</span></strong></p>')
+    const wrapper = mountField('@size(2.5mm){O}@b{@style(size="3mm",color=red){A}@style(size="6mm",color=blue){B}}')
     try {
       const { editor } = await openEditor(wrapper)
       editor.commands.setTextSelection({ from: 2, to: 4 })
@@ -177,56 +177,40 @@ describe('RichTextPropertyField', () => {
       await color.trigger('pointerdown')
       await color.setValue('#00FF00')
       await color.trigger('keydown', { key: 'Enter' })
-      expect(editor.state.doc.nodeAt(2)!.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('12px')
-      expect(editor.state.doc.nodeAt(3)!.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('24px')
+      expect(editor.state.doc.nodeAt(2)!.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('3mm')
+      expect(editor.state.doc.nodeAt(3)!.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('6mm')
       editor.view.dispatch(editor.state.tr.insertText('X'))
       expect(editor.state.doc.textContent).toBe('OX')
       const inserted = editor.state.doc.nodeAt(2)!
       expect(inserted.marks.some(mark => mark.type.name === 'bold')).toBe(true)
-      expect(inserted.marks.find(mark => mark.type.name === 'textStyle')?.attrs).toMatchObject({ fontSize: '12px', color: '#00FF00' })
-      expect(editor.state.doc.nodeAt(1)!.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('10px')
-    } finally { wrapper.unmount() }
-  })
-
-  it('tolerantly converts legacy tables and strips unsafe HTML on save to Card Markup', async () => {
-    const merged = '<table><tbody><tr><td colspan="2" colwidth="80,120"><p>AB</p></td></tr><tr><td><p>C</p></td><td><p>D</p></td></tr></tbody></table>'
-    const wrapper = mountField(merged)
-    try {
-      const vm = await openEditor(wrapper)
-      vm.editor.commands.setTextSelection(vm.editor.state.doc.content.size - 1)
-      vm.editor.commands.insertContent('X')
-      click(SAVE)
-      const saved = wrapper.emitted('update:value')?.[0]?.[0] as string
-      expect(saved).not.toMatch(/<table|<td|<tr|<script/)
-      expect(saved).toContain('AB')
-      expect(saved).toContain('C')
-      expect(saved).toContain('D')
-      expect(saved).toContain('X')
+      expect(inserted.marks.find(mark => mark.type.name === 'textStyle')?.attrs).toMatchObject({ fontSize: '3mm', color: '#00FF00' })
+      expect(editor.state.doc.nodeAt(1)!.marks.find(mark => mark.type.name === 'textStyle')?.attrs.fontSize).toBe('2.5mm')
     } finally { wrapper.unmount() }
   })
 
   it('keeps mixed formatting intact when the real sidebar updates an unrelated attribute', async () => {
-    const wrapper = mountField('<p>Hello</p>')
+    const wrapper = mountField('Hello')
     try {
-      const { editor } = await openEditor(wrapper)
-      editor.commands.setContent('<p><span style="font-size: 12px; color: red;">A</span><span style="font-size: 24px; color: blue;">B</span></p>', false)
+      const vm = await openEditor(wrapper)
+      const editor = vm.editor
+      vm.applyHtml('@style(size="3mm",color=red){A}@style(size="6mm",color=blue){B}')
       editor.commands.setTextSelection({ from: 1, to: 3 })
       await nextTick()
       const input = panel(wrapper).get('[data-field-key="strokeWidth"] input')
       await input.trigger('pointerdown')
-      await input.setValue('2px')
+      await input.setValue('0.5mm')
       await input.trigger('keydown', { key: 'Enter' })
       const marks = editor.state.doc.firstChild!.content.content.map(node => node.marks.find(mark => mark.type.name === 'textStyle')!.attrs)
-      expect(marks.map(attrs => attrs.fontSize)).toEqual(['12px', '24px'])
+      expect(marks.map(attrs => attrs.fontSize)).toEqual(['3mm', '6mm'])
       expect(marks.map(attrs => attrs.color)).toEqual(['red', 'blue'])
-      expect(marks.map(attrs => attrs.textStrokeWidth)).toEqual(['2px', '2px'])
+      expect(marks.map(attrs => attrs.textStrokeWidth)).toEqual(['0.5mm', '0.5mm'])
     } finally { wrapper.unmount() }
   })
 
   it('flushes composed binding input on save and ignores completion after the dialog closes', async () => {
     let resolveCompletion!: (result: PropertyCompletionResult) => void
     const provider = vi.fn(() => new Promise<PropertyCompletionResult>(resolve => { resolveCompletion = resolve }))
-    const wrapper = mountField('<p><span data-oc-binding="self:name">{{self:name}}</span></p>', { binding: { provider } })
+    const wrapper = mountField('{{self:name}}', { binding: { provider } })
     try {
       const { editor } = await openEditor(wrapper)
       editor.view.dom.querySelector('.binding-node__label')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
@@ -249,10 +233,10 @@ describe('RichTextPropertyField', () => {
   })
 
   it('writes a local draft only when the user saves', async () => {
-    const wrapper = mountField('<p>Original</p>')
+    const wrapper = mountField('Original')
     try {
       let { editor } = await openEditor(wrapper)
-      editor.commands.setContent('<p>Cancelled</p>', true)
+      editor.commands.setContent('Cancelled', true)
       expect(wrapper.emitted('update:value')).toBeUndefined()
       click(CANCEL)
       await nextTick()
@@ -302,7 +286,7 @@ describe('RichTextPropertyField', () => {
       global: { plugins: [i18n] },
       props: {
         definition: { title: 'Content', fieldType: 'richText' },
-        value: 'Hero @icon(key=rpg/sword,size=28px)',
+        value: 'Hero @icon(key=rpg/sword,size=7mm)',
         capabilities: {
           icons: [{
             key: 'host',
@@ -330,7 +314,7 @@ describe('RichTextPropertyField', () => {
       await nextTick()
       const icon = wrapper.find('.rich-text-preview__icon')
       expect(icon.exists()).toBe(true)
-      expect(icon.attributes('style')).toContain('28px')
+      expect(icon.attributes('style')).toContain('7mm')
       expect(wrapper.find('.rich-text-preview__missing').exists()).toBe(false)
     } finally { wrapper.unmount() }
   })

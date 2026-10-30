@@ -7,8 +7,8 @@ import {
   type ProjectIconCatalogEntry,
   type ProjectIconCatalog,
   type ProjectIconDimensionReader,
-} from '../../workspace/services/projectIconCatalog'
-import { formatProjectIconPath, parseProjectIconPath } from '../../../shared/rich-text/projectIconReference'
+} from '../../../features/workspace/services/projectIconCatalog'
+import { formatProjectIconPath, parseProjectIconPath } from '../../rich-text/projectIconReference'
 
 const IMAGE_ATTRIBUTE_NAMES = new Set(['width', 'height', 'fit', 'align'])
 const CSS_LENGTH_PATTERN = /^(?:auto|0|(?:\d+(?:\.\d+)?|\.\d+)(?:px|%|em|rem|vw|vh|vmin|vmax|ch|ex|cm|mm|in|pt|pc))$/i
@@ -58,7 +58,7 @@ markdown.core.ruler.after('curly_attributes', 'opencard_image_attributes', (stat
   removeImageAttributesFromNonImageTokens(state.tokens)
 })
 
-export type MarkdownRenderOptions = {
+type MarkdownRenderOptions = {
   resolveImageSrc?: (path: string) => string
   projectIconCatalog?: ProjectIconCatalog
   resolveIconReference?: (source: string) => ProjectIconCatalogEntry | null

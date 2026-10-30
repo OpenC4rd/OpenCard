@@ -530,7 +530,7 @@ describe('CardDesignEditor issue navigation', () => {
       id: 'flow-1',
       direction: 'lr',
       children: [{
-        block: createTextBlock({ id: 'flow-text', width: '120px', height: '40px' }),
+        block: createTextBlock({ id: 'flow-text', width: '120mm', height: '40mm' }),
         location: { id: 'flow-location', type: 'flow-container-location', index: '0', align: 'start' },
       }],
     })
@@ -555,7 +555,7 @@ describe('CardDesignEditor issue navigation', () => {
     let document = emittedDocument(wrapper)
     let flow = document.faces.front.children[0]!.block
     if (flow.type !== 'flow-container-block') throw new Error('Expected flow container')
-    expect(flow.children[0]!.block).toMatchObject({ width: '120px', height: '100%' })
+    expect(flow.children[0]!.block).toMatchObject({ width: '120mm', height: '100%' })
     expect(flow.children[0]!.location.align).toBe('justify')
 
     viewport.vm.$emit('selection-action', { type: 'center-cross-axis', blockId: 'flow-text' })

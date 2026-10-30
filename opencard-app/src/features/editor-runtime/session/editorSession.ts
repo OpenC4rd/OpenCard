@@ -11,9 +11,9 @@ import type { ContentHistoryOperationMeta } from '../history/contentHistory'
 import type { EditorCapabilities, EditorInstance } from '../editorProtocol'
 import type { EditorDiffUiState } from '../model/editorUiState'
 
-export type SessionResourceKind = 'workspace' | 'external' | 'draft'
+type SessionResourceKind = 'workspace' | 'external' | 'draft'
 export type SessionSaveResult = 'saved' | 'cancelled' | 'skipped'
-export type EditorSessionDiffState = {
+type EditorSessionDiffState = {
   beforeRevisionId: string | null
   afterRevisionId: string | null
   uiState?: EditorDiffUiState

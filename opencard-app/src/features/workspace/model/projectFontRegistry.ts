@@ -2,9 +2,9 @@ export { PROJECT_FONT_REGISTRY_FILE_NAME } from './projectStructure'
 import { isRecord } from '../../../shared/model/record'
 import { referenceSyntaxIsValid } from './scopedResourcePath'
 
-export const projectFontKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
+const projectFontKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
 export const projectFontIdPattern = projectFontKeyPattern
-export const projectFontSourcePattern = /\.(?:woff2?|ttf|otf)$/i
+const projectFontSourcePattern = /\.(?:woff2?|ttf|otf)$/i
 
 export const projectFontWeights = ['light', 'normal', 'bold'] as const
 export const projectFontStyles = ['upright', 'italic'] as const
@@ -12,20 +12,18 @@ export const projectFontWeightValues = { light: 300, normal: 400, bold: 700 } as
 export type ProjectFontWeight = typeof projectFontWeights[number]
 export type ProjectFontStyle = typeof projectFontStyles[number]
 
-export type ProjectFontWeightFiles = {
+type ProjectFontWeightFiles = {
   upright?: string
   italic?: string
 }
 
-export type ProjectFontFiles = Partial<Record<ProjectFontWeight, ProjectFontWeightFiles>>
+type ProjectFontFiles = Partial<Record<ProjectFontWeight, ProjectFontWeightFiles>>
 
 export type ProjectFont = {
   key: string
   name: string
   files: ProjectFontFiles
 }
-export type ProjectFontFamily = ProjectFont
-
 export type UnicodeRange = {
   start: number
   end: number

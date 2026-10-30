@@ -17,7 +17,7 @@ export type AppOutputEntry = {
   code?: AppErrorCode
 }
 
-export type AppOutputInput = Omit<AppOutputEntry, 'id' | 'timestamp'>
+type AppOutputInput = Omit<AppOutputEntry, 'id' | 'timestamp'>
 
 const MAX_ENTRY_COUNT = 1_000
 const GLOBAL_STATE_KEY = '__OPENCARD_APP_OUTPUT_STATE__'

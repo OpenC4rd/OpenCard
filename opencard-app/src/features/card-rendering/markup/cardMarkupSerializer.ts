@@ -7,12 +7,12 @@ import type {
 } from './cardMarkup.types'
 
 /** 文本里会被词法器当作语法的字符一律转义。`\n` 无法转义，交给 `@br()`（带括号，避免后续字母被并进标签名）。 */
-export function escapeMarkupText(text: string): string {
+function escapeMarkupText(text: string): string {
   return text.replace(/[\\@{}]/g, '\\$&')
 }
 
 /** 参数值含分隔符、括号、引号或首尾空白时加引号；否则原样输出。 */
-export function quoteMarkupArg(value: string): string {
+function quoteMarkupArg(value: string): string {
   if (value !== '' && !/[,"'()\\]|^\s|\s$/.test(value)) return value
   return `"${value.replace(/["\\]/g, '\\$&')}"`
 }

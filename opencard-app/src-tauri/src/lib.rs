@@ -45,12 +45,6 @@ struct WatcherState {
     watchers: Mutex<HashMap<String, notify::RecommendedWatcher>>,
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[tauri::command]
 async fn list_system_font_families() -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(|| {
@@ -410,7 +404,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             list_system_font_families,
             list_system_fonts,
             watch_directory,

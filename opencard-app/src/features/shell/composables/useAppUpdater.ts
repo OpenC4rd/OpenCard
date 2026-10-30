@@ -23,7 +23,7 @@ type AppUpdaterOptions = {
   now?: () => string
 }
 
-export type AppUpdateCheckResult = 'available' | 'up-to-date' | 'failed' | 'skipped'
+type AppUpdateCheckResult = 'available' | 'up-to-date' | 'failed' | 'skipped'
 
 export function useAppUpdater(options: AppUpdaterOptions = {}) {
   const persistence = options.persistence ?? createUpdateStatePersistence()

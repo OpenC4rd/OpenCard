@@ -35,7 +35,7 @@ type FeedbackReceiptsDocument = {
   records: FeedbackReceiptRecord[]
 }
 
-export interface FeedbackReceiptPersistence {
+interface FeedbackReceiptPersistence {
   load(): Promise<unknown>
   save(document: FeedbackReceiptsDocument): Promise<void>
 }

@@ -5,12 +5,12 @@ import type { OcActionDefinition } from '../action/action.types'
 
 export type PropertyEditorSortMode = 'category' | 'alphabetical'
 
-export type PropertyInputPair = {
+type PropertyInputPair = {
   open: string
   close: string
 }
 
-export type PropertyCompletionRequest = {
+type PropertyCompletionRequest = {
   value: string
   cursor: number
 }
@@ -45,7 +45,7 @@ export type PropertyCompletionProvider = (
   request: PropertyCompletionRequest,
 ) => PropertyCompletionResult | null | Promise<PropertyCompletionResult | null>
 
-export type PropertyCompletion = {
+type PropertyCompletion = {
   static?: {
     values: readonly string[]
     presentation?: 'ghost' | 'menu'
@@ -84,7 +84,7 @@ export type PropertyIconEntry = {
   previewStyle: Readonly<Record<string, string>>
 }
 
-export type PropertyIconSeriesGroup = {
+type PropertyIconSeriesGroup = {
   key: string
   name: string
   entries: readonly PropertyIconEntry[]
@@ -128,7 +128,7 @@ export type PropertyFieldCapabilities = {
   resolveImagePreview?: (reference: string) => string | null
 }
 
-export type PropertyFieldConstraintMap = {
+type PropertyFieldConstraintMap = {
   string: {
     minLength?: number
     maxLength?: number
@@ -198,7 +198,7 @@ export type PropertyFieldConstraintMap = {
 }
 
 export type BasePropertyFieldType = keyof PropertyFieldConstraintMap
-export type PropertyArrayElementType = Extract<
+type PropertyArrayElementType = Extract<
   BasePropertyFieldType,
   | 'string'
   | 'richText'
@@ -210,7 +210,7 @@ export type PropertyArrayElementType = Extract<
   | 'boolean'
   | 'color'
 >
-export type PropertyArrayFieldType = `${PropertyArrayElementType}[]`
+type PropertyArrayFieldType = `${PropertyArrayElementType}[]`
 export type PropertyFieldType = BasePropertyFieldType | PropertyArrayFieldType
 
 type PropertyEditorFieldBase = {
@@ -266,7 +266,7 @@ export type PropertyEditorBindingInterpreter = {
   isExpression(value: unknown): boolean
 }
 
-export type PropertyEditorRecord = Readonly<Record<string, unknown>>
+type PropertyEditorRecord = Readonly<Record<string, unknown>>
 
 export type PropertyEditorInput = {
   key: string
@@ -300,7 +300,7 @@ export type EditorItemEditorPart = {
   value: unknown
 }
 
-export type EditorItemActionPart = OcActionDefinition & {
+type EditorItemActionPart = OcActionDefinition & {
   type: 'action'
   iconOnly: boolean
   variant: 'solid' | 'soft' | 'ghost' | 'outline'

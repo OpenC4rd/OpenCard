@@ -29,7 +29,7 @@ type BlockFieldCreateTarget = BlockFieldTarget & {
   definition: AdditionalFieldDefinition
 }
 
-export type CdeDataTableFieldCreatePayload = {
+type CdeDataTableFieldCreatePayload = {
   blockId: string
   fieldKey: string
   definition: AdditionalFieldDefinition

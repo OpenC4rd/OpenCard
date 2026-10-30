@@ -14,7 +14,7 @@ import {
 } from '../../../shared/ui/foundation'
 
 export const APP_SETTINGS_VERSION = 1 as const
-export const DEFAULT_ACCENT_NEIGHBOR_ANGLE = -50
+const DEFAULT_ACCENT_NEIGHBOR_ANGLE = -50
 export const MIN_PHASE_IMAGE_SPEED = 25
 export const MAX_PHASE_IMAGE_SPEED = 400
 export const MIN_TITLE_BAR_NOTICE_HISTORY_LIMIT = 1
@@ -33,8 +33,8 @@ export const MAX_CUSTOM_BLOCK_NODES = 100_000
 
 /** `system`、内置语言 id，或用户语言文件名（`<名字>.json`）；规则见 `i18n/appLocale.ts`。 */
 export type { AppLocale }
-export type AppThemePreference = OcThemeId | 'system'
-export type StructureTreeSelectionBehavior = 'none' | 'expand' | 'expand-exclusive'
+type AppThemePreference = OcThemeId | 'system'
+type StructureTreeSelectionBehavior = 'none' | 'expand' | 'expand-exclusive'
 export type SettingsCategoryKey = 'general' | 'appearance' | 'workspace' | 'versionControl'
 /** 设置页分类的唯一清单：侧栏树、分类投影与跳转都从这里取，避免各处各抄一份。 */
 export const SETTINGS_CATEGORY_KEYS: readonly SettingsCategoryKey[] = [
@@ -47,8 +47,8 @@ export function isSettingsCategoryKey(value: unknown): value is SettingsCategory
   return typeof value === 'string' && (SETTINGS_CATEGORY_KEYS as readonly string[]).includes(value)
 }
 /** 提交者邮箱留空时使用的域名：`<归一化后的提交者名称>@noreply.example`。 */
-export const COMMITTER_EMAIL_DOMAIN = 'noreply.example'
-export const MAX_COMMITTER_FIELD_LENGTH = 128
+const COMMITTER_EMAIL_DOMAIN = 'noreply.example'
+const MAX_COMMITTER_FIELD_LENGTH = 128
 export type AppThemePresetId =
   | 'default'
   | 'graphite'
@@ -69,7 +69,7 @@ export type AppUserThemePreset = {
   name: string
   definition: AppThemeDefinition
 }
-export type AppThemeSettings = AppThemeDefinition & {
+type AppThemeSettings = AppThemeDefinition & {
   /** 空串表示自定义；同色预设通过 id 区分。 */
   presetId: string
   presets: AppUserThemePreset[]

@@ -14,7 +14,7 @@ export type ViewportInsets = {
   left?: number
 }
 
-export type ViewportSafeRegion = {
+type ViewportSafeRegion = {
   left: number
   top: number
   width: number

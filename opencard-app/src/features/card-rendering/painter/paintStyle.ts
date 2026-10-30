@@ -1,6 +1,6 @@
 export type PaintStyle = string | CanvasGradient | CanvasPattern
 
-export type RectArea = {
+type RectArea = {
   x: number
   y: number
   width: number

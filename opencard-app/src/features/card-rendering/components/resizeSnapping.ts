@@ -1,4 +1,4 @@
-export type ResizeSnapRect = {
+type ResizeSnapRect = {
   left: number
   top: number
   width: number
@@ -24,7 +24,7 @@ export type ResizeSnapLocks = {
   y?: ResizeSnapLock
 }
 
-export type ResizeSnapResult = {
+type ResizeSnapResult = {
   rect: ResizeSnapRect
   locks: ResizeSnapLocks
 }

@@ -1,4 +1,4 @@
-export interface TutorialRect { left: number; top: number; right: number; bottom: number }
+interface TutorialRect { left: number; top: number; right: number; bottom: number }
 
 /** 从所有目标之间找可用矩形，而不是把目标包成一个大锚点。 */
 export function findTutorialSpace(targets: readonly TutorialRect[], width: number, height: number, preferredHeight = 520): TutorialRect {

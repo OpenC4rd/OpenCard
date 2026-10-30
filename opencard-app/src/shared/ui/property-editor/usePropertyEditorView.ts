@@ -17,7 +17,7 @@ export type PropertyEditorEntry = {
   tail?: PropertyEditorFieldDefinition['tail']
 }
 
-export type PropertyEditorAddableField = {
+type PropertyEditorAddableField = {
   key: string
   label: string
   definition: PropertyEditorFieldDefinition
@@ -32,7 +32,7 @@ export type PropertyEditorCategoryView = {
   addableFields: PropertyEditorAddableField[]
 }
 
-export type PropertyEditorSourceView = {
+type PropertyEditorSourceView = {
   key: string
   title: string
   categories: PropertyEditorCategoryView[]

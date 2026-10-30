@@ -43,7 +43,7 @@ import {
 } from '../model/appSettings'
 
 /** 某个设置项在设置页里的位置：分类 + 卡片 + 行 key。 */
-export interface SettingsAnchor {
+interface SettingsAnchor {
   category: SettingsCategoryKey
   cardKey: string
   itemKey: AppSettingKey

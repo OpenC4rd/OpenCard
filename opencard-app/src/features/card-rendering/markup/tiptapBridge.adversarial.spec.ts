@@ -37,7 +37,7 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
       '@color(#123456){hex}',
       '@color(rgb(10, 20, 30)){rgb}',
       '@color(rgba(255, 0, 0, 0.5)){rgba}',
-      '@size(14px){pixel size}',
+      '@size(14mm){millimeter size}',
       '@size(1.5rem){rem size}',
       '@size(120%){percent size}',
       '@font(Roboto){unquoted font}',
@@ -108,14 +108,14 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
 
   it('round-trips @img inline images with all attributes and quote normalization', () => {
     // Unquoted path without spaces
-    const unquotedMarkup = '@img(src=avatar.png,w=48px,h=48px,fit=cover,align=center)'
+    const unquotedMarkup = '@img(src=avatar.png,w=48mm,h=48mm,fit=cover,align=center)'
     const tiptap1 = cardMarkupToTiptap(unquotedMarkup)
     expect(tiptap1.content![0]!.content![0]).toEqual({
       type: 'image',
       attrs: {
         src: 'avatar.png',
-        width: '48px',
-        height: '48px',
+        width: '48mm',
+        height: '48mm',
         fit: 'cover',
         align: 'center',
       },
@@ -206,18 +206,18 @@ describe('tiptapBridge Adversarial: Atom Nodes (@bind, @icon)', () => {
         expectedPkg: '@scoped/pack',
       },
       {
-        markup: '@icon(key=clock,size=24px)',
-        expectedAttrs: { iconPath: 'clock', size: '24px' },
+        markup: '@icon(key=clock,size=24mm)',
+        expectedAttrs: { iconPath: 'clock', size: '24mm' },
         expectedKey: 'clock',
-        expectedSize: '24px',
+        expectedSize: '24mm',
       },
       {
-        markup: '@icon(key=gem,pkg=rpg-pack,version=2.0.0,size=32px)',
-        expectedAttrs: { iconPath: 'rpg-pack@2.0.0#icon:gem', size: '32px' },
+        markup: '@icon(key=gem,pkg=rpg-pack,version=2.0.0,size=32mm)',
+        expectedAttrs: { iconPath: 'rpg-pack@2.0.0#icon:gem', size: '32mm' },
         expectedKey: 'gem',
         expectedPkg: 'rpg-pack',
         expectedVersion: '2.0.0',
-        expectedSize: '32px',
+        expectedSize: '32mm',
       },
     ]
 
@@ -270,7 +270,7 @@ describe('tiptapBridge Adversarial: Deep Nesting & Conflicting Styles', () => {
     // 10 nested levels of styles
     let markup = 'Deep text'
     markup = `@color(red){${markup}}`
-    markup = `@size(18px){${markup}}`
+    markup = `@size(18mm){${markup}}`
     markup = `@font(Arial){${markup}}`
     markup = `@b{${markup}}`
     markup = `@i{${markup}}`
@@ -297,14 +297,14 @@ describe('tiptapBridge Adversarial: Deep Nesting & Conflicting Styles', () => {
     const textStyleAttrs = textNode.marks!.find(m => m.type === 'textStyle')!.attrs
     expect(textStyleAttrs).toMatchObject({
       color: 'red',
-      fontSize: '18px',
+      fontSize: '18mm',
       fontFamily: 'Arial',
       textStrokeColor: '#000',
-      textStrokeWidth: '2px',
+      textStrokeWidth: '2mm',
       textShadowColor: '#111',
-      textShadowOffsetX: '1px',
-      textShadowOffsetY: '1px',
-      textShadowBlur: '2px',
+      textShadowOffsetX: '1mm',
+      textShadowOffsetY: '1mm',
+      textShadowBlur: '2mm',
     })
 
     // Bi-directional roundtrip preserves all attributes regardless of mark array order
@@ -643,16 +643,16 @@ describe('tiptapBridge Adversarial: Malformed Inputs & Edge Cases', () => {
   })
 
   it('handles numeric font sizes from ProseMirror JSON', () => {
-    // If TipTap passes attrs.fontSize as a string like "24px"
+    // If TipTap passes attrs.fontSize as a string like "24mm"
     const docWithString: TiptapBridgeNode = {
       type: 'doc',
       content: [{
         type: 'paragraph',
-        content: [{ type: 'text', text: 'big', marks: [{ type: 'textStyle', attrs: { fontSize: '24px' } }] }],
+        content: [{ type: 'text', text: 'big', marks: [{ type: 'textStyle', attrs: { fontSize: '24mm' } }] }],
       }],
     }
     const markupWithString = tiptapToCardMarkup(docWithString)
-    expect(markupWithString.source).toBe('@size(24px){big}')
+    expect(markupWithString.source).toBe('@size(24mm){big}')
   })
 })
 

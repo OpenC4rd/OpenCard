@@ -10,7 +10,7 @@ export type TextMetricsSample = {
 export type TextMeasurePort = {
   measureText(text: string, fontSpec: {
     fontFamily: string
-    fontSizePx: number
+    fontSize: number
     fontWeight: 'light' | 'normal' | 'bold'
     italic: boolean
   }): TextMetricsSample
@@ -19,7 +19,7 @@ export type TextMeasurePort = {
 
 export type ResolvedRunStyle = {
   fontFamily: string
-  fontSizePx: number
+  fontSize: number
   fontWeight: 'light' | 'normal' | 'bold'
   italic: boolean
   underline: boolean
@@ -94,12 +94,12 @@ export type TextLayoutInput = {
   boxWidth: number
   boxHeight: number
   baseFontFamily: string
-  baseFontSizePx: number
+  baseFontSize: number
   baseFontWeight: 'light' | 'normal' | 'bold'
   baseColor: string
   textAlign: AlignmentPosition
   verticalAlign: VerticalAlignmentPosition
-  lineHeightPx: number
+  lineHeight: number
   writingMode: TextWritingMode
 }
 

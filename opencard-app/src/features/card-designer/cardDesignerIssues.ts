@@ -17,13 +17,13 @@ const valueKindMessageKeys: Readonly<Record<string, string>> = {
   'interpolated-string': 'app.problems.valueKinds.interpolatedString',
 }
 
-export const CARD_DESIGNER_BLUEPRINT_SCOPE_KEY = 'card:blueprint'
+const CARD_DESIGNER_BLUEPRINT_SCOPE_KEY = 'card:blueprint'
 
-export function createCardInstanceScopeKey(instanceId: string): string {
+function createCardInstanceScopeKey(instanceId: string): string {
   return `card:instance:${instanceId}`
 }
 
-export function createCardIssueScopeOrder(document: CardDocument): readonly string[] {
+function createCardIssueScopeOrder(document: CardDocument): readonly string[] {
   return [
     CARD_DESIGNER_BLUEPRINT_SCOPE_KEY,
     ...(document.instances ?? []).map((instance) => createCardInstanceScopeKey(instance.id)),

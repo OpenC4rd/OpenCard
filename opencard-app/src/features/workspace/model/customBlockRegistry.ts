@@ -3,7 +3,7 @@ import { normalizeKeySlug } from '../../../shared/model/keySlug'
 import { referenceSyntaxIsValid } from './scopedResourcePath'
 
 export const customBlockKeyPattern = /^[a-z0-9][a-z0-9._-]*$/
-export const customBlockSourcePattern = /\.ocblock$/i
+const customBlockSourcePattern = /\.ocblock$/i
 
 export type CustomBlockRegistryEntry = { key: string; source: string }
 export type CustomBlockCollection = { key: string; name: string; blocks: readonly CustomBlockRegistryEntry[] }
@@ -72,21 +72,9 @@ export function serializeCustomBlockRegistry(document: CustomBlockRegistryDocume
   return JSON.stringify(normalized, null, 2)
 }
 
-export function customBlockIdentity(collectionKey: string, blockKey: string): string {
-  return `${collectionKey}/${blockKey}`
-}
-
 export function buildCustomBlockRegistry(document: CustomBlockRegistryDocument): CustomBlockRegistry {
   return Object.fromEntries((document.collections ?? []).map(collection => [
     collection.key,
     Object.fromEntries(collection.blocks.map(entry => [entry.key, entry])),
   ]))
-}
-
-export function flattenCustomBlockRegistry(document: CustomBlockRegistryDocument): Array<CustomBlockRegistryEntry & { collectionKey: string; collectionName: string }> {
-  return (document.collections ?? []).flatMap(collection => collection.blocks.map(entry => ({
-    ...entry,
-    collectionKey: collection.key,
-    collectionName: collection.name,
-  })))
 }

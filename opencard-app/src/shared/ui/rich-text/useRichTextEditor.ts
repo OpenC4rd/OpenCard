@@ -7,20 +7,14 @@ import { richTextStyleExtensions, fontVariable } from './richTextStyleExtensions
 import {
   cardMarkupToTiptap,
   serializeTiptapMarkup,
-  isLegacyHtml,
   type TiptapBridgeNode,
 } from '../../../features/card-rendering/markup'
 import { NodeSelection } from '@tiptap/pm/state'
-import { CellSelection } from '@tiptap/pm/tables'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import Color from '@tiptap/extension-color'
 import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableHeader from '@tiptap/extension-table-header'
-import TableCell from '@tiptap/extension-table-cell'
 import { useEditor } from '@tiptap/vue-3'
 import type { OcActionDefinition, OcActionSelectPayload } from '../action/action.types'
 import type {
@@ -92,7 +86,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   function colorOpen(open: boolean) { if (open) interaction.capture(); else interaction.clearPreview() }
 
   const strokeWidthCompletionProvider = createToolbarCompletion(
-    [0, 0.5, 1, 1.5, 2, 3].map(size => ({ key: `${size}px`, label: `${size}px` })),
+    [0, 0.1, 0.2, 0.3, 0.5, 0.8, 1, 1.5, 2].map(size => ({ key: `${size}mm`, label: `${size}mm` })),
   )
   const fontVariables = computed(() => {
     const vars: Record<string, string> = {}
@@ -120,14 +114,14 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   const activeFontSize = computed(() => formatting.value('fontSize'))
   const fontSizeOptions = computed(() => {
     const current = activeFontSize.value
-    const sizes = [...new Set([...formatting.sizeSteps, ...(current.endsWith('px') ? [Number.parseFloat(current)] : [])])].sort((a, b) => a - b)
-    const options = sizes.map(size => ({ key: `${size}px`, label: `${size}px` }))
-    return current && !current.endsWith('px') ? [{ key: current, label: current }, ...options] : options
+    const sizes = [...new Set([...formatting.sizeSteps, ...(current.endsWith('mm') ? [Number.parseFloat(current)] : [])])].sort((a, b) => a - b)
+    const options = sizes.map(size => ({ key: `${size}mm`, label: `${size}mm` }))
+    return current && !current.endsWith('mm') ? [{ key: current, label: current }, ...options] : options
   })
   function createToolbarCompletion(items: readonly { key: string; label: string; labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
     return ({ value }) => {
       const raw = value.trim().toLocaleLowerCase()
-      const query = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw) ? `${raw}px` : raw
+      const query = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw) ? `${raw}mm` : raw
       const filterQuery = items.some(item => item.key.toLocaleLowerCase() === query) ? '' : query
       const suggestions: PropertyCompletionItem[] = items
         .filter(item => !filterQuery || `${item.label} ${item.key}`.toLocaleLowerCase().includes(filterQuery))
@@ -157,7 +151,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     completion: { provider: strokeWidthCompletionProvider },
   }))
   const lengthCompletionProvider = createToolbarCompletion(
-    [0, 1, 2, 4, 8, 12].map(size => ({ key: `${size}px`, label: `${size}px` })),
+    [0, 0.2, 0.5, 1, 2, 3, 5].map(size => ({ key: `${size}mm`, label: `${size}mm` })),
   )
   const propertyCategories = computed(() => richTextFormatCategories(tr))
   const propertyInputs = computed(() => {
@@ -165,8 +159,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     const selection = editor.value?.state.selection
     return [createRichTextFormatInput({
       labels: tr,
-      title: selection instanceof CellSelection ? tr('propertyEditor.richText.selectedCells', '选中单元格')
-        : selection instanceof NodeSelection ? tr('propertyEditor.richText.selectedNode', '选中节点')
+      title: selection instanceof NodeSelection ? tr('propertyEditor.richText.selectedNode', '选中节点')
         : selection && !selection.empty ? tr('propertyEditor.richText.selectionProperties', '选中文本')
         : tr('propertyEditor.richText.inputProperties', '输入文字'),
       state: formatting.state.value,
@@ -257,29 +250,6 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     }
   })
 
-  const tableAction = computed<OcActionDefinition>(() => {
-    toolbarRevision.value
-    return {
-      key: 'table-actions',
-      icon: 'mdiTableLarge',
-      title: tr('propertyEditor.richText.tableActions', '表格操作'),
-      children: [
-        { key: 'table.add-row-before', icon: 'mdiArrowUp', title: tr('propertyEditor.richText.addRowBefore', '在上方插入行') },
-        { key: 'table.add-row-after', icon: 'mdiArrowDown', title: tr('propertyEditor.richText.addRowAfter', '在下方插入行') },
-        { key: 'table.add-column-before', icon: 'mdiArrowLeft', title: tr('propertyEditor.richText.addColumnBefore', '在左侧插入列') },
-        { key: 'table.add-column-after', icon: 'mdiArrowRight', title: tr('propertyEditor.richText.addColumnAfter', '在右侧插入列') },
-        { key: 'table.toggle-header', icon: 'mdiLandRowsHorizontal', title: tr('propertyEditor.richText.toggleHeader', '切换表头行') },
-        { key: 'table.toggle-header-column', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.toggleHeaderColumn', '切换表头列') },
-        { key: 'table.toggle-header-cell', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.toggleHeaderCell', '切换表头单元格') },
-        { key: 'table.merge-cells', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.mergeCells', '合并单元格'), disabled: !editor.value?.can().mergeCells() },
-        { key: 'table.split-cell', icon: 'mdiTableLarge', title: tr('propertyEditor.richText.splitCell', '拆分单元格'), disabled: !editor.value?.can().splitCell() },
-        { key: 'table.delete-row', icon: 'mdiTrashCanOutline', iconTone: 'danger', title: tr('propertyEditor.richText.deleteRow', '删除当前行') },
-        { key: 'table.delete-column', icon: 'mdiTrashCanOutline', iconTone: 'danger', title: tr('propertyEditor.richText.deleteColumn', '删除当前列') },
-        { key: 'table.delete', icon: 'mdiUndoVariant', iconTone: 'danger', title: tr('propertyEditor.richText.deleteTable', '删除整个表格') },
-      ],
-    }
-  })
-
   const selectedNodeKind = computed<'binding' | 'projectIcon' | null>(() => {
     toolbarRevision.value
     const node = editor.value?.state.selection instanceof NodeSelection
@@ -316,10 +286,6 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
         heading: false,
         horizontalRule: false,
       }),
-      Table.configure({ resizable: true, allowTableNodeSelection: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
       Underline,
       Color,
       ...richTextStyleExtensions,
@@ -353,10 +319,10 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     const current = editor.value
     if (!current) return initialSource
     if (appliedSource?.document.eq(current.state.doc)) {
-      if (!isLegacyHtml(appliedSource.source)) return appliedSource.source
+      return appliedSource.source
     }
     if (originalDocument?.eq(current.state.doc)) {
-      if (!isLegacyHtml(initialSource)) return initialSource
+      return initialSource
     }
     return serializeTiptapMarkup(current.getJSON() as unknown as TiptapBridgeNode)
   }
@@ -393,28 +359,6 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
       if (commands[command]) commands[command](chain).run()
       else chain.setTextAlign(command).run()
     }, command !== 'undo' && command !== 'redo')
-  }
-
-  function insertTable(): void {
-    interaction.run(current => current.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(), true)
-  }
-
-  function handleTableAction(payload: OcActionSelectPayload): void {
-    interaction.run(current => {
-      const chain = current.chain().focus()
-      if (payload.key === 'table.add-row-before') chain.addRowBefore().run()
-      else if (payload.key === 'table.add-row-after') chain.addRowAfter().run()
-      else if (payload.key === 'table.add-column-before') chain.addColumnBefore().run()
-      else if (payload.key === 'table.add-column-after') chain.addColumnAfter().run()
-      else if (payload.key === 'table.toggle-header') chain.toggleHeaderRow().run()
-      else if (payload.key === 'table.toggle-header-column') chain.toggleHeaderColumn().run()
-      else if (payload.key === 'table.toggle-header-cell') chain.toggleHeaderCell().run()
-      else if (payload.key === 'table.merge-cells') chain.mergeCells().run()
-      else if (payload.key === 'table.split-cell') chain.splitCell().run()
-      else if (payload.key === 'table.delete-row') chain.deleteRow().run()
-      else if (payload.key === 'table.delete-column') chain.deleteColumn().run()
-      else if (payload.key === 'table.delete') chain.deleteTable().run()
-    }, true)
   }
 
   function insertBinding(): void {
@@ -485,7 +429,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     editor, focus, getHtml, applyHtml, getContent, setContent, flushPendingInput, endInteraction: interaction.release,
     fontVariables, captureInteraction, colorOpen, formatting, interaction,
     fontFieldDefinition, fontSizeFieldDefinition, activeFontFamily, activeFontSize,
-    runCommand, insertTable, tableAction, handleTableAction, insertBinding,
+    runCommand, insertBinding,
     hasProjectIconSources, projectIconAction, handleProjectIconAction,
     recentProjectIconEntries, projectIconSelectionKey, insertRecentProjectIcon,
     foregroundColor, backgroundColor, alignments, tr,

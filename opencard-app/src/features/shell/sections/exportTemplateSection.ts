@@ -9,7 +9,7 @@ import {
 
 type Translate = (key: string, fallback?: string) => string
 
-export interface ExportTemplateSectionOptions {
+interface ExportTemplateSectionOptions {
   translate: Translate
   busy: Readonly<Ref<boolean>>
   projectFolderName: Readonly<Ref<string>>

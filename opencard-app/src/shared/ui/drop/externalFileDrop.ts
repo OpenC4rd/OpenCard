@@ -12,7 +12,7 @@ import type { Event as TauriEvent, UnlistenFn } from '@tauri-apps/api/event'
 import { filterSupportedExternalOpenPaths } from '../../../features/shell/services/externalOpenService'
 
 /** 拖放期间指针的视口坐标（CSS 像素）。 */
-export interface ExternalDropPoint {
+interface ExternalDropPoint {
   x: number
   y: number
 }
@@ -28,7 +28,7 @@ export interface ExternalDropZone {
   onDrop: (paths: readonly string[], point: ExternalDropPoint) => boolean
 }
 
-export interface ExternalFileDrop {
+interface ExternalFileDrop {
   registerZone: (zone: ExternalDropZone) => () => void
   /** 窗口内是否正有一次外部拖拽；区域命中不区分文件类型。 */
   isDragActive: Readonly<Ref<boolean>>

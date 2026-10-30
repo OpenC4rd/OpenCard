@@ -7,7 +7,7 @@ const SFNT_VERSION_TRUE_TYPE = 0x00010000
 const SFNT_VERSION_CFF = 0x4f54544f
 const TTC_SIGNATURE = 0x74746366
 
-export type ExtractedFontCollectionFace = {
+type ExtractedFontCollectionFace = {
   bytes: Uint8Array
   extension: 'ttf' | 'otf'
 }

@@ -1,6 +1,6 @@
 import { publishAppOutput } from './appOutput'
 
-export type AppErrorDefinition = {
+type AppErrorDefinition = {
   area: string
   meaning: Readonly<{
     'zh-CN': string
@@ -199,7 +199,7 @@ export const APP_ERROR_CATALOG = {
 
 export type AppErrorCode = keyof typeof APP_ERROR_CATALOG
 
-export type AppErrorReport = Error & {
+type AppErrorReport = Error & {
   readonly code: AppErrorCode
   readonly details?: unknown
 }
@@ -208,7 +208,7 @@ export function getAppErrorMeaning(code: AppErrorCode, locale: string): string {
   return APP_ERROR_CATALOG[code].meaning[locale.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US']
 }
 
-export function createAppErrorReport(code: AppErrorCode, details?: unknown): AppErrorReport {
+function createAppErrorReport(code: AppErrorCode, details?: unknown): AppErrorReport {
   return Object.assign(new Error(`[${code}] ${APP_ERROR_CATALOG[code].meaning['zh-CN']}`), {
     name: 'OpenCardError',
     code,

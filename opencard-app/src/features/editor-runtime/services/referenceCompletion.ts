@@ -6,7 +6,7 @@ import {
   type BindingScopeDescriptor,
 } from '../model/bindingExpression'
 
-export type ReferenceCompletionField = {
+type ReferenceCompletionField = {
   key: string
   label?: string
   valueKind: BindingValueKind
@@ -30,7 +30,7 @@ export type ReferenceCompletionContext = {
   getAncestor: (depth: number) => ReferenceCompletionScope | undefined
 }
 
-export type ReferenceCompletionSuggestion = {
+type ReferenceCompletionSuggestion = {
   key: string
   label: string
   detail: string
@@ -39,7 +39,7 @@ export type ReferenceCompletionSuggestion = {
   valueKind?: BindingValueKind
 }
 
-export type ReferenceCompletionState = {
+type ReferenceCompletionState = {
   replaceStart: number
   replaceEnd: number
   suggestions: ReferenceCompletionSuggestion[]

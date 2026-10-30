@@ -6,7 +6,7 @@ import { useProjectStore } from './projectStore'
 import { editorRegistry } from '../../editor-runtime/registry/editorRegistry'
 import { createEditorSession, type EditorSession } from '../../editor-runtime/session/editorSession'
 
-export type OpenSessionOptions = { preview?: boolean }
+type OpenSessionOptions = { preview?: boolean }
 
 export function createDefaultOpenCardContent(displayName: string) {
   const dot = displayName.lastIndexOf('.')

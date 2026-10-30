@@ -183,7 +183,7 @@ type IconGlyph = {
   viewBox?: string
 }
 
-export const iconGlyphs = {
+const iconGlyphs = {
   mdiAccountGroup,
   mdiAccountGroupOutline,
   mdiAlertCircleOutline,
@@ -367,8 +367,8 @@ type IconColorCssToken = Exclude<
 
 export type IconTone = IconColorCssToken extends `--oc-icon-${infer Tone}` ? Tone : never
 
-export const DEFAULT_ICON_TOKEN: IconToken = 'mdiFileOutline'
-export const UNKNOWN_ICON_TOKEN: IconToken = 'mdiHelpCircleOutline'
+const DEFAULT_ICON_TOKEN: IconToken = 'mdiFileOutline'
+const UNKNOWN_ICON_TOKEN: IconToken = 'mdiHelpCircleOutline'
 
 /** MDI 的少数图形画到了 24 网格之外，只有这些图标需要放宽 viewBox。 */
 const iconViewBoxes: Partial<Record<IconToken, string>> = {

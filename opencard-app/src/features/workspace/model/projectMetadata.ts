@@ -39,7 +39,7 @@ export type ProjectInformation = {
   version: string
 }
 
-export const projectPropertySchema = {
+const projectPropertySchema = {
   name: { fieldType: 'string', categoryId: 'general', acceptsBinding: false },
   description: { fieldType: 'string', multiline: true, categoryId: 'general', acceptsBinding: false },
   version: { fieldType: 'string', categoryId: 'general', acceptsBinding: false },
@@ -144,7 +144,7 @@ export function toProjectInformation(profile: ProjectProfile): ProjectInformatio
 }
 
 
-export function getProjectFieldDefinition(fieldKey: string): EditorPropertyDefinition | undefined {
+function getProjectFieldDefinition(fieldKey: string): EditorPropertyDefinition | undefined {
   return projectPropertySchema[fieldKey as keyof typeof projectPropertySchema]
 }
 

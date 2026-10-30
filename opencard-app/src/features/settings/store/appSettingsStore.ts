@@ -19,7 +19,7 @@ import { APP_SETTINGS_FILE_NAME, resolveAppStoragePath } from '../../../shared/s
 
 type SettingsSection = keyof Pick<AppSettings, 'appearance' | 'shell' | 'exporting' | 'workspace' | 'rendering'>
 
-export interface AppSettingsStore {
+interface AppSettingsStore {
   settings: Readonly<Ref<DeepReadonly<AppSettings>>>
   isReady: Readonly<Ref<boolean>>
   error: Readonly<Ref<string | null>>

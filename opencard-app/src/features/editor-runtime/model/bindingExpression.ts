@@ -22,7 +22,7 @@ export type FieldReferenceDescriptor = BindingScopeDescriptor & {
   fieldKey: string
 }
 
-export type ActiveBindingToken = {
+type ActiveBindingToken = {
   body: string
   bodyStart: number
   cursor: number

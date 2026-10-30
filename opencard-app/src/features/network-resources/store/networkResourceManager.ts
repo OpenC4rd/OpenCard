@@ -7,7 +7,7 @@ import {
   type NetworkResourceCacheService,
 } from '../services/networkResourceCacheService'
 
-export interface ProjectNetworkResources {
+interface ProjectNetworkResources {
   /** 读这个 URL 的缓存；没有就顺手在后台取一次，命中前先返回 null。 */
   get(url: string): CachedNetworkResource | null
   status(url: string): 'pending' | 'ready' | 'failed' | 'blocked'

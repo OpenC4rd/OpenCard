@@ -63,6 +63,18 @@ describe('property field editor modes', () => {
       .toBeNull()
   })
 
+  it('keeps rich-text as the default while offering the same raw-string switch as other scalar fields', () => {
+    const modes = usePropertyFieldEditorModes()
+    const definition = { title: 'Content', fieldType: 'richText' as const }
+
+    expect(modes.resolve({
+      identity: 'content',
+      definition,
+      value: '{{self:content}}',
+      bindingInterpreter: { isExpression: () => true },
+    })).toEqual({ editorId: 'field', switchTarget: 'raw-string' })
+  })
+
   it('lets the PropertyEditor default be overridden per field', () => {
     const modes = usePropertyFieldEditorModes()
     const field = { title: 'Value', fieldType: 'string' as const }

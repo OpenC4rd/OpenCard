@@ -309,7 +309,7 @@ describe('Adversarial Stress Test: Extreme and Negative Borders and Radii', () =
     expect(ctx.rect).toHaveBeenCalledWith(5, 5, 50, 50)
   })
 
-  it('handles fractional border widths (e.g. 0.25px) and dotted styles', () => {
+  it('handles fractional border widths (e.g. 0.25mm) and dotted styles', () => {
     const ctx = createSpyCanvasContext()
     const fractional = block('frac', {
       width: '100',

@@ -10,11 +10,10 @@ import {
   type ProjectIconCatalogEntry,
 } from './projectIconCatalog'
 import { type ProjectFontRegistryEntry } from '../model/projectFontRegistry'
-import { resolveProjectEnvironmentFontFamily, resolveProjectResourcePackage, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
-import { type FontCatalogEntry } from '../model/projectFonts'
+import { resolveProjectResourcePackage, type ProjectResourceEnvironment, type ProjectResourcePackage } from './projectResourceEnvironment'
 import type { CustomBlockRegistryEntry } from '../model/customBlockRegistry'
 
-export type ResourceReferenceScope = 'current' | 'host' | 'package'
+type ResourceReferenceScope = 'current' | 'host' | 'package'
 export type ResourceReferenceKind = 'font' | 'icon' | 'block'
 
 export type ResourceReference = {
@@ -25,7 +24,7 @@ export type ResourceReference = {
   key: string
 }
 
-export type ResourceReferenceDiagnosticCode =
+type ResourceReferenceDiagnosticCode =
   | 'syntax-error'
   | 'scope-unavailable'
   | 'package-unavailable'
@@ -37,7 +36,7 @@ export type ResourceReferenceDiagnostic = {
   message: string
 }
 
-export type ParsedResourceReference = {
+type ParsedResourceReference = {
   reference: ResourceReference | null
   diagnostics: readonly ResourceReferenceDiagnostic[]
 }
@@ -269,7 +268,7 @@ export function resolveResourceReferenceText<T extends string | ProjectFontRegis
     : { ...result, diagnostics: [...parsed.diagnostics, ...result.diagnostics] }
 }
 
-export type ParsedResourceReferenceToken = {
+type ParsedResourceReferenceToken = {
   source: string
   reference: ResourceReference | null
   diagnostics: readonly ResourceReferenceDiagnostic[]
@@ -289,32 +288,4 @@ export function parseResourceReferenceList(
     const parsed = parseResourceReference(candidate)
     return { source: candidate, reference: parsed.reference, diagnostics: parsed.diagnostics }
   }).filter(token => token.source.length > 0)
-}
-
-export function buildResourceFontCatalog(
-  environment: ProjectResourceEnvironment,
-): readonly FontCatalogEntry[] {
-  const entries: FontCatalogEntry[] = []
-  for (const [key, entry] of Object.entries(environment.fonts)) {
-    entries.push({ value: `font:${key}`, label: entry.name, source: 'project', detail: `font:${key}`,
-      cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, environment) })
-  }
-  // 环境按坐标索引，引用值就写完整坐标：`作者/包名@版本#font:key`。
-  // 挑中的东西写死版本 —— 用户挑的就是这个长相。坐标里的 `@` 与引用分段符 `#` 不同，
-  // 所以坐标可以完整写出来。
-  for (const [coordinate, packageEnvironment] of environment.packageEnvironments ?? []) {
-    const pkg = [...environment.packages?.values() ?? []].find(candidate => formatPackageCoordinate(candidate.coordinate) === coordinate)
-    if (!pkg) continue
-    const qualifier = formatPackageCoordinate(pkg.coordinate)
-    for (const [key, entry] of Object.entries(packageEnvironment.fonts)) {
-      entries.push({
-        value: `${qualifier}#font:${key}`,
-        label: entry.name,
-        source: 'project',
-        detail: `${qualifier}#font:${key}`,
-        cssFamily: resolveProjectEnvironmentFontFamily(`font:${key}`, packageEnvironment),
-      })
-    }
-  }
-  return entries
 }

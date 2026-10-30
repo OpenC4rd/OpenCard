@@ -204,7 +204,7 @@ export default {
         DEPRECATED_PROPERTY: '属性“{propertyName}”已废弃，不再生效',
       },
       richTextCodes: {
-        INVALID_HTML: '富文本 HTML 未通过安全检查，已保留原始内容',
+        INVALID_MARKUP: '富文本标记语法未通过检查，已保留原始内容',
         LIMIT_EXCEEDED: '富文本内嵌块超过安全限制，超出部分未渲染',
       },
       resourceCodes: {

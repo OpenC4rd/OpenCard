@@ -12,7 +12,7 @@ import { readResourcePackageArchive, scanResourcePackageDirectory } from './reso
 /** 内置包所在的资源目录，对应 src-tauri/resources/packages。 */
 const BUILTIN_RESOURCE_PACKAGE_DIRECTORY = 'packages'
 
-export type BuiltinResourcePackageSnapshot = {
+type BuiltinResourcePackageSnapshot = {
   packs: readonly StoredResourcePackage[]
   warnings: readonly StoredResourcePackageWarning[]
 }

@@ -5,7 +5,7 @@
  * - 只测量与打印 不改变打开流程的任何行为与结果
  */
 
-export type ProjectOpenTimer = {
+type ProjectOpenTimer = {
   /** 记录上一段到现在的耗时。 */
   step: (label: string) => void
   /** 记录已经量好的耗时（用于并行分支内部）。 */

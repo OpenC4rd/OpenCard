@@ -71,7 +71,7 @@ import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcTree from './OcTree.vue'
 
-export interface OcFilePickerProps {
+interface OcFilePickerProps {
   /** 当前选中的路径值（含可选包前缀）。决定树中哪一项处于选中高亮态。 */
   modelValue?: string
   /** 可浏览的文件作用域列表（如当前项目与各资源包）。决定顶层作用域节点及目录读取来源。 */
@@ -92,7 +92,7 @@ export interface OcFilePickerProps {
   disabled?: boolean
 }
 
-export interface OcFilePickerEmits {
+interface OcFilePickerEmits {
   /** 选中文件或目录时触发，输出完整引用路径。 */
   'update:modelValue': [value: string]
 }

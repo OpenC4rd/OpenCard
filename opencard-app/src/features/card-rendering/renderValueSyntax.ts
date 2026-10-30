@@ -3,11 +3,11 @@ const cssNamedColor = /^[a-z]+$/i
 const cssHexColor = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
 
 /**
- * 卡片渲染只认能被自己算出来的长度：纯数字（默认 mm）、mm、pt、cm、in、px、%，以及由它们和
+ * 卡片渲染只认能被自己算出来的长度：纯数字（默认 mm）、mm、pt、cm、in、%，以及由它们和
  * `+ - * / ( )` 组成的四则运算（可包在 `calc(...)` 里）。
- * `em`、`vw`、`auto` 之类需要浏览器布局上下文，画布上无从求值，一律拒绝。
+ * `px`、`em`、`vw`、`auto` 之类不具备卡片物理意义或需要浏览器布局上下文，一律拒绝。
  */
-const lengthTerm = String.raw`-?(?:\d+\.?\d*|\.\d+)(?:mm|pt|cm|in|px|%)?`
+const lengthTerm = String.raw`-?(?:\d+\.?\d*|\.\d+)(?:mm|pt|cm|in|%)?`
 const singleLength = new RegExp(`^${lengthTerm}$`)
 const lengthToken = new RegExp(`${lengthTerm}|[+*/()-]`, 'g')
 const bareNumber = /^-?(?:\d+\.?\d*|\.\d+)$/

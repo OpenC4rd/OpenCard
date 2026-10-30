@@ -22,20 +22,20 @@ const TOOLTIP_GROUP_GAP_MS = 80;
 const TOOLTIP_INIT_FLAG = '__oc_tooltip_initialized__';
 
 /** Attribute declaring the preferred side of the anchor; nearest declaring element wins. */
-export const TOOLTIP_PLACEMENT_ATTRIBUTE = 'data-tooltip-placement';
+const TOOLTIP_PLACEMENT_ATTRIBUTE = 'data-tooltip-placement';
 
 /** Follow the pointer (default) or anchor to the target; nearest declaration wins. */
-export const TOOLTIP_ANCHOR_ATTRIBUTE = 'data-tooltip-anchor';
+const TOOLTIP_ANCHOR_ATTRIBUTE = 'data-tooltip-anchor';
 
 /**
  * Attribute marking one interaction region. Controls sharing a declaring element share the warm
  * window, so moving between them (toolbar buttons, node tail actions) swaps instantly. Without a
  * declaration each control is its own group, which keeps the plain per-control delay.
  */
-export const TOOLTIP_GROUP_ATTRIBUTE = 'data-tooltip-group';
+const TOOLTIP_GROUP_ATTRIBUTE = 'data-tooltip-group';
 
 /** Side of the anchor the tooltip is drawn on. */
-export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
+type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
 const TOOLTIP_PLACEMENTS: readonly TooltipPlacement[] = ['top', 'bottom', 'left', 'right'];
 

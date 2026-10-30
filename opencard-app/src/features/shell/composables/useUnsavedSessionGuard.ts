@@ -49,7 +49,7 @@ function appendFileNameIndex(name: string, index: number): string {
   return `${name.slice(0, extensionIndex)}-${index}${name.slice(extensionIndex)}`
 }
 
-export function sessionNeedsCloseProtection(session: EditorSession): boolean {
+function sessionNeedsCloseProtection(session: EditorSession): boolean {
   return session.state.resourceKind === 'draft' || session.state.isDirty
 }
 

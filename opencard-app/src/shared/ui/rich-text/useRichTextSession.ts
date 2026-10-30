@@ -1,7 +1,7 @@
 import { computed, nextTick, ref, type Ref } from 'vue'
 import { parseCardMarkup, type CardMarkupDiagnostic } from '../../../features/card-rendering/markup'
 
-export type RichTextSessionDiagnostic = {
+type RichTextSessionDiagnostic = {
   code: string
   offset?: number
   message: string

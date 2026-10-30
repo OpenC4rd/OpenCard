@@ -48,7 +48,7 @@ function toCharacterOffset(value: string, codeUnitOffset: number): number {
   return Array.from(value.slice(0, Math.max(0, codeUnitOffset))).length
 }
 
-export function resolveParentFieldReferenceKey(
+function resolveParentFieldReferenceKey(
   blockId: string,
   reference: string,
   parentLookup: ParentLookup,
@@ -84,12 +84,12 @@ export function resolveParentFieldReferenceKey(
   return { ownerId: currentBlockId, fieldKey: descriptor.fieldKey }
 }
 
-export type ResolveReferencesResult = {
+type ResolveReferencesResult = {
   document: CardDocument
   issues: CardPipelineIssue[]
 }
 
-export type ResolveReferencesOptions = {
+type ResolveReferencesOptions = {
   currentCard?: CardInstanceRecord | null
   project?: Readonly<ProjectInformation> | null
   dictionary?: Readonly<Record<string, string>> | null
@@ -97,13 +97,13 @@ export type ResolveReferencesOptions = {
   shouldResolveOwner?: (owner: ResolveReferenceOwner) => boolean
 }
 
-export type ResolveReferenceOwner = {
+type ResolveReferenceOwner = {
   kind: ReferenceOwnerKind
   id: string
   anchorBlockId: string | null
 }
 
-export type PreserveReferenceContext = {
+type PreserveReferenceContext = {
   owner: ResolveReferenceOwner
   fieldKey: string
   reference: FieldReferenceDescriptor

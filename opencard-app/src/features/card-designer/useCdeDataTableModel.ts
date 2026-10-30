@@ -28,7 +28,7 @@ export type CdeDataTableCell = {
   overridden: boolean
 }
 
-export type CdeDataTableFieldCatalogEntry = {
+type CdeDataTableFieldCatalogEntry = {
   key: string
   title: string
   definition: CardPropertyFieldDefinition
@@ -48,7 +48,7 @@ export type CdeDataTableBlockCatalogEntry = {
   fields: CdeDataTableFieldCatalogEntry[]
 }
 
-export type CdeDataTableBlockRow = Omit<CdeDataTableBlockCatalogEntry, 'fields'> & {
+type CdeDataTableBlockRow = Omit<CdeDataTableBlockCatalogEntry, 'fields'> & {
   fields: CdeDataTableFieldRow[]
 }
 
@@ -64,7 +64,7 @@ export type CdeDataTableFaceCatalog = {
   blocks: CdeDataTableBlockCatalogEntry[]
 }
 
-export type CdeDataTableFieldSelection = Readonly<Record<string, readonly string[]>>
+type CdeDataTableFieldSelection = Readonly<Record<string, readonly string[]>>
 
 type UseCdeDataTableModelOptions = {
   cardDoc: Readonly<Ref<CardDocument | null>>

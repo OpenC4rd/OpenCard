@@ -20,7 +20,7 @@ import { formatPackageCoordinate, parsePackageQualifier, type PackageQualifier }
 import { resolveResourcePath } from '../workspace/model/scopedResourcePath'
 
 export const CUSTOM_BLOCK_MAX_DEPTH = 32
-export const CUSTOM_BLOCK_MAX_NODES = 10_000
+const CUSTOM_BLOCK_MAX_NODES = 10_000
 
 export type OcBlockDocument = {
   type: 'ocblock'
@@ -106,7 +106,7 @@ export function createProjectCustomBlockCatalog(
   }
 }
 
-export type CustomBlockRuntimeState = 'ready' | 'source-unavailable' | 'limited'
+type CustomBlockRuntimeState = 'ready' | 'source-unavailable' | 'limited'
 
 export type CustomBlockRuntimeDescriptor = {
   id: string
@@ -114,13 +114,13 @@ export type CustomBlockRuntimeDescriptor = {
   state: CustomBlockRuntimeState
 }
 
-export type MaterializeCustomBlocksOptions = {
+type MaterializeCustomBlocksOptions = {
   catalog: CustomBlockSourceCatalog
   maxDepth?: number
   maxNodes?: number
 }
 
-export type MaterializeCustomBlocksResult = {
+type MaterializeCustomBlocksResult = {
   resourceScopes: ReadonlyMap<string, ProjectResourceEnvironment>
   document: CardDocument
   descriptors: ReadonlyMap<string, CustomBlockRuntimeDescriptor>

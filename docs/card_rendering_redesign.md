@@ -12,7 +12,7 @@
 | 决策维度 | 最终共识方案 | 废弃的旧设计 |
 | :--- | :--- | :--- |
 | **前后端分工** | **前端纯 TS 确定性几何布局 + Canvas 2D 统一绘制**；Rust 专注字体/图片底层探测与导出并发写盘 | 废弃 Vue DOM 组件树渲染卡片（`TextBlockRenderer.vue` 等 8 个 DOM 块组件） |
-| **几何与盒模型** | 尺寸与坐标收紧为纯数学可解的 **`px`、`%`（相对父容器）及四则运算**；**彻底移除 `customCss`** | 废弃任意 CSS 单位（`auto`/`vw`/`em` 等）与自由注入 `customCss` |
+| **几何与盒模型** | 尺寸与坐标收紧为纯数学可解的 **物理单位（`mm`、`pt`、`cm`、`in`）、`%`（相对父容器）及四则运算**；**彻底移除 `customCss` 与像素 `px`** | 废弃任意未受控单位（`auto`/`vw`/`em` 等）、自由注入 `customCss` 与屏幕像素 `px` |
 | **块变换与选区** | 保留 `translateX/Y`、`scaleX/Y`、`rotation`、`transformAnchor`；通过 2D 仿射矩阵直接计算有向包围盒（OBB）；**彻底废除 `transformDisabledBlockIds`** | 废弃选中块时临时关闭块及祖先容器变换的 `transformDisabledBlockIds` 与 `getBoundingClientRect` 测量 |
 | **文本块收敛** | **移除独立的 `markdown-text-block`**，统一收敛为单一 `text-block`（不含 HTML `<table>`） | 废弃 `markdown-text-block`、`markdown-it` 卡片渲染链路及 HTML `<table>` 富文本 |
 | **富文本未来扩展** | 底层采用「**字元/切片排版（Positioned Glyphs/Runs）+ 多通道绘制（Multi-pass Painter）**」，未来新增「艺术字 / 沿路径文字块」直接复用同一底层管线 | 告别 CSS `-webkit-text-stroke` 无法圆角外描边、无法沿曲线排布的限制 |
@@ -59,7 +59,7 @@ flowchart LR
 
 | 模块路径 | 单一职责 | 严禁越界行为（边界铁律） |
 | :--- | :--- | :--- |
-| **`geometry/`**<br>`lengthMath.ts`<br>`matrix2d.ts`<br>`sceneLayout.ts`<br>`hitTest.ts` | 1. 解析 `px`/`%`/四则运算长度；<br>2. 计算 2D 仿射变换矩阵 `Matrix2D` 与逆矩阵；<br>3. 计算 `simple-container` 锚点定位与 `flow-container` 流式排布；<br>4. 输出含 `localRect`、`worldMatrix`、`obbCorners`、`aabb` 的 `CardSceneGraph`；<br>5. 提供点选/框选射线检测与父坐标系逆投影。 | **严禁访问任何 DOM API（`window`/`HTMLElement`）或 Vue 响应式状态**；必须是可在 Node 环境直接单测的纯数学函数。 |
+| **`geometry/`**<br>`lengthMath.ts`<br>`matrix2d.ts`<br>`sceneLayout.ts`<br>`hitTest.ts` | 1. 解析物理长度（`mm`/`pt`/`cm`/`in`）、`%`/四则运算长度；<br>2. 计算 2D 仿射变换矩阵 `Matrix2D` 与逆矩阵；<br>3. 计算 `simple-container` 锚点定位与 `flow-container` 流式排布；<br>4. 输出含 `localRect`、`worldMatrix`、`obbCorners`、`aabb` 的 `CardSceneGraph`；<br>5. 提供点选/框选射线检测与父坐标系逆投影。 | **严禁访问任何 DOM API（`window`/`HTMLElement`）或 Vue 响应式状态**；必须是可在 Node 环境直接单测的纯数学函数。 |
 | **`markup/`**<br>`cardMarkupLexer.ts`<br>`cardMarkupParser.ts`<br>`cardMarkupSerializer.ts`<br>`tiptapBridge.ts` | 1. 解析 `@tag(k=v){content}` 与 `{{binding}}` 生成 `CardMarkupDocument` AST；<br>2. 将 AST 序列化回规范的 `@tag` 字符串；<br>3. 提供与可视化编辑器（TipTap `OcRichTextEditor`）JSON 文档的双向无损转换。 | **严禁依赖浏览器 `DOMParser` 或拼接 HTML 字符串**；解析器必须 100% 容错（未闭合或未知标签降级为普通文本并产出诊断，绝不抛异常崩溃）。 |
 | **`text-layout/`**<br>`glyphMeasurer.ts`<br>`inlineRunBreaker.ts`<br>`textBlockLayout.ts` | 1. 将 `CardMarkupDocument` 展开为扁平样式切片（`StyledTextRun` / `InlineIconRun` / `InlineImageRun`）；<br>2. 支持横排（`horizontal-tb`）与竖排（`vertical-rl`/`lr`）折行、对齐（`start/center/end/justify`）与垂直对齐；<br>3. 输出每个字元/图标的精确坐标与角度（为未来路径文字预留变换钩子）。 | 通过注入的 `TextMeasurePort` 测量字宽（浏览器环境用离屏 Canvas `ctx.measureText`，Node 单测环境用确定性等宽/字表替身），**不直接操作视图 Canvas**。 |
 | **`painter/`**<br>`paintStyle.ts`<br>`canvasAssetStore.ts`<br>`paintCardScene.ts`<br>`painters/*.ts` | 1. `paintStyle.ts`：统一将颜色（及未来的渐变/纹理）转换为 `CanvasFillStrokeStyles`；<br>2. `canvasAssetStore.ts`：管理已解码的 `ImageBitmap`/`HTMLImageElement` 与字体就绪状态；<br>3. `paintCardScene.ts`：按 `CardSceneGraph` 绘制卡面背景、容器裁剪、内描边、图形、二维码、带遮罩图片、多通道富文本。 | **只读取 `CardSceneGraph` 与 `CanvasAssetStore` 向传入的 `CanvasRenderingContext2D` 绘图**；不修改数据模型，不自行发起业务层文件读取。 |
@@ -89,7 +89,7 @@ flowchart LR
 ### 3.1 确定性长度解析与 2D 仿射矩阵（`geometry/`）
 
 1. **长度表达式语法（`resolveLength(expr: string, parentSpan: number): number`）**：
-   - 支持纯数字/`px`（如 `120`、`120px` $\to 120$）、百分比 `%`（如 `50%` $\to 0.5 \times \text{parentSpan}$），以及包含 `+`、`-`、`*`、`/`、括号或可选 `calc(...)` 外壳的线性组合（如 `50% - 12px`、`calc(100% - 24px)`）。
+   - 支持纯数字/默认单位 `mm`（如 `63`、`63mm` $\to 63$）、物理单位 `pt`、`cm`、`in`、百分比 `%`（如 `50%` $\to 0.5 \times \text{parentSpan}$），以及包含 `+`、`-`、`*`、`/`、括号或可选 `calc(...)` 外壳的线性组合（如 `50% - 4mm`、`calc(100% - 10mm)`）。彻底移除像素 `px` 单位。
    - 解析失败时由 `renderParser` 记录诊断并回退到字段默认值，进入 `geometry/` 时保证 100% 可求值为有限浮点数 `number`。
 2. **容器布局求值**：
    - **`simple-container-block`**：根据子块 `width`/`height`（相对容器宽高）和 `location.anchor`（`lt/ct/rt/lc/cc/rc/lb/cb/rb`）+ `location.x/y`，直接算出子块在父容器局部坐标系下的未变换矩形 `localRect = { x, y, width, height }`：
@@ -112,14 +112,14 @@ flowchart LR
 2. **标准指令集**：
    - **行内布尔修饰（带 `{content}`）**：`@b{...}`、`@i{...}`、`@u{...}`、`@s{...}`
    - **行内样式修饰（带 `(args){content}`）**：
-     - `@style(color=#ff4d4f, bg=#ffff00, size=20px, font=font:title, stroke=#000000 2px, shadow=#000000 1px 1px 2px, fill=assets/gold.png){...}`
-     - 常用语法糖简写：`@color(#ff4d4f){...}`、`@size(20px){...}`、`@font(font:title){...}`、`@mark(color=#ffff00){...}`
+     - `@style(color=#ff4d4f, bg=#ffff00, size=5mm, font=font:title, stroke=#000000 0.5mm, shadow=#000000 0.5mm 0.5mm 1mm, fill=assets/gold.png){...}`
+     - 常用语法糖简写：`@color(#ff4d4f){...}`、`@size(5mm){...}`、`@font(font:title){...}`、`@mark(color=#ffff00){...}`
    - **块级/段落指令（带 `{content}`）**：
      - `@align(center|start|end|justify){...}`
      - `@ul{@li{...} @li{...}}`、`@ol{@li{...} @li{...}}`
    - **自闭合内联叶子指令（只带 `(args)`，无 `{content}`）**：
      - 图标：`@icon(mana/fire)` 或 `@icon(key=mana/fire, pkg=author/name, version=1.0.0, size=1.2em)`（`scope=host` 表示宿主项目）
-     - 图片：`@img(src=assets/coin.png, w=24px, h=24px, fit=contain, align=center)`
+     - 图片：`@img(src=assets/coin.png, w=10mm, h=10mm, fit=contain, align=center)`
      - 段内强制换行：`@br`
 
 ### 3.3 Canvas 2D 统一绘制细节（`painter/`）

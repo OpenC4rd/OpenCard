@@ -43,7 +43,7 @@ function failure(code: ScopedResourcePathIssueCode, message: string): ScopedReso
  * 可以靠路径前缀猜出来。现在包解开在软件存储的缓存里，与项目根毫无关系，只有环境知道
  * 每个坐标落在哪。把根直接传进来，"反推"这一整套就不需要了。
  */
-export type ResolveResourcePathOptions = {
+type ResolveResourcePathOptions = {
   /** 当前作用域的根：项目根，或某个包解开后的目录。 */
   scopeRootPath: string
   /** `#` 锚点指向哪 —— 永远是宿主项目的根。 */
@@ -53,7 +53,7 @@ export type ResolveResourcePathOptions = {
   packageRoots?: PackageScopeRoots
 }
 
-export type RelativizeResourcePathOptions = {
+type RelativizeResourcePathOptions = {
   scopeRootPath: string
   projectRootPath: string
   targetPath: string

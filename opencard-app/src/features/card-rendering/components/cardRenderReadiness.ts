@@ -1,10 +1,10 @@
 import { nextTick } from 'vue'
 
-export interface CardVisualReadinessTicket {
+interface CardVisualReadinessTicket {
   settle(): void
 }
 
-export interface CardVisualReadinessSlot {
+interface CardVisualReadinessSlot {
   begin(): CardVisualReadinessTicket
   dispose(): void
 }

@@ -21,7 +21,7 @@ export type FeedbackStatusResult = {
   }
 }
 
-export type FeedbackReceiptCredential = {
+type FeedbackReceiptCredential = {
   reportId: string
   receiptToken: string
 }
@@ -50,7 +50,7 @@ type GetFeedbackStatusOptions = SubmitFeedbackOptions
 
 const DEFAULT_TIMEOUT_MS = 12_000
 
-export function getFeedbackEndpoint(): string | undefined {
+function getFeedbackEndpoint(): string | undefined {
   const endpoint = import.meta.env.VITE_OPENCARD_FEEDBACK_ENDPOINT?.trim()
   return endpoint || undefined
 }

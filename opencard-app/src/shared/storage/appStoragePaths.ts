@@ -4,12 +4,12 @@
  * 职责边界：
  * - 只给路径；不读写任何文件，不知道某个目录里装的是什么格式。
  *
- * 顶层是闭合集合（见 docs/存储布局.md）：除 cache/ 之外都装着用户挣来的东西，
+ * 顶层是闭合集合（见 docs/实现指南.md#软件存储）：除 cache/ 之外都装着用户挣来的东西，
  * cache/ 在软件没运行时可以整个删掉。
  */
 import { homeDir, join } from '@tauri-apps/api/path'
 
-export const APP_STORAGE_DIRECTORY_NAME = '.opencard'
+const APP_STORAGE_DIRECTORY_NAME = '.opencard'
 
 export const APP_SETTINGS_FILE_NAME = 'settings.json'
 export const APP_STATE_FILE_NAME = 'app-state.json'
@@ -23,7 +23,7 @@ export const APP_TEMPLATE_DIRECTORY_NAME = 'templates'
 export const APP_LOCALE_DIRECTORY_NAME = 'locales'
 
 /** 一切可以随手删的派生数据与暂存数据。删掉不会丢东西：派生数据下次用到会重新做一遍。 */
-export const APP_CACHE_DIRECTORY_NAME = 'cache'
+const APP_CACHE_DIRECTORY_NAME = 'cache'
 /** 按内容指纹存放的包快照（.ocpack 解开后的内容），所有项目共用。 */
 export const APP_CACHE_SNAPSHOTS_DIRECTORY_NAME = 'snapshots'
 /** 网上下载过的图片资源，目录名由项目路径推导。 */
@@ -31,7 +31,7 @@ export const APP_CACHE_NETWORK_DIRECTORY_NAME = 'network'
 /** 被移出项目、等待撤销的资产字节，随进程生死。 */
 export const APP_CACHE_STAGED_DIRECTORY_NAME = 'staged'
 
-/** 顶层条目的闭合集合见 docs/存储布局.md。 */
+/** 顶层条目的闭合集合见 docs/实现指南.md#软件存储。 */
 export async function resolveAppStorageRoot(): Promise<string> {
   return await join(await homeDir(), APP_STORAGE_DIRECTORY_NAME)
 }

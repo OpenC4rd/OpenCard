@@ -23,7 +23,7 @@ describe('card property field enrichment', () => {
     }
     const definition = enrichCardPropertyFieldDefinition({
       definition: { title: 'Content', fieldType: 'richText' },
-      record: { fontFamily: 'font:body', fontSize: '20px' },
+      record: { fontFamily: 'font:body', fontSize: '4mm' },
       resourceEnvironment,
     })
 
@@ -31,7 +31,7 @@ describe('card property field enrichment', () => {
       fieldType: 'richText',
       richTextBaseStyle: {
         fontFamily: '"OpenCardResource-project-body"',
-        fontSize: '20px',
+        fontSize: '4mm',
       },
     })
   })

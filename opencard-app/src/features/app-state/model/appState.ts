@@ -3,7 +3,7 @@ import { isRecord } from '../../../shared/model/record'
 
 export const MIN_SIDEBAR_WIDTH = 220
 export const MAX_SIDEBAR_WIDTH = 420
-export const MAX_RECENT_PROJECTS = 8
+const MAX_RECENT_PROJECTS = 8
 
 export type ProjectWorkspaceSidebarState = {
   collapsedLists: string[]

@@ -11,7 +11,7 @@ export interface CardDesignerLayoutState {
   leftExpandedDockExtent: number
   rightExpandedDockExtent: number
 }
-export type CardDesignerMode = 'design' | 'data-table'
+type CardDesignerMode = 'design' | 'data-table'
 export interface CardDesignerViewState {
   activeFace: CardFaceKey
   clipToFace: boolean

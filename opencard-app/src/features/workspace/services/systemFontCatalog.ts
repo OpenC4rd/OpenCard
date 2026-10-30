@@ -47,7 +47,7 @@ export function readSystemFontCatalog(options: { refresh?: boolean } = {}): Prom
 }
 
 /** 按字系名称归组，并按名称、字重、斜体排序，让选择列表稳定展示。 */
-export function groupSystemFontFamilies(faces: readonly SystemFontFace[]): SystemFontFamily[] {
+function groupSystemFontFamilies(faces: readonly SystemFontFace[]): SystemFontFamily[] {
   const grouped = new Map<string, SystemFontFace[]>()
   for (const face of faces) {
     const name = face.family.trim()
@@ -62,7 +62,7 @@ export function groupSystemFontFamilies(faces: readonly SystemFontFace[]): Syste
 }
 
 /** 一个字面在项目字体里的槽位归属。 */
-export type SystemFontSlot = {
+type SystemFontSlot = {
   /** 语义字重槽位。 */
   weight: ProjectFontWeight
   /** 是否归入斜体槽位。 */

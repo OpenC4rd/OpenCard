@@ -10,7 +10,7 @@ import type { OcNode, OcNodeCollection } from '../../shared/ui/node/node.types'
 /** 点目录分组节点 key 里固定出现的一段，便于调用方识别分组。 */
 export const CHANGED_FOLDER_KEY_MARK = 'folder:'
 
-export type ChangedPathEntry = {
+type ChangedPathEntry = {
   /** 项目相对路径，例如 `.opencard/icons/logo.svg`。 */
   path: string
   /** 该文件在树里显示的内容（图标、徽章等）；标题由这里统一改写。 */
@@ -49,7 +49,7 @@ function relativeToFolder(path: string, folder: string): string {
  * 同一层的标题：默认就是文件名，只有重名的那几个才补上级目录，
  * 直到能区分开为止（例如 `icons/logo.svg` 与 `photos/logo.svg`）。
  */
-export function uniqueChangedLabels(relativePaths: readonly string[]): string[] {
+function uniqueChangedLabels(relativePaths: readonly string[]): string[] {
   const names = relativePaths.map(fileName)
   const occurrences = new Map<string, number>()
   for (const name of names) occurrences.set(name, (occurrences.get(name) ?? 0) + 1)

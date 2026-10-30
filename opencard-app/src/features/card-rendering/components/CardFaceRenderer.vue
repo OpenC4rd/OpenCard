@@ -40,6 +40,8 @@ const effectivePixelRatio = computed(() => {
 const pixelWidth = computed(() => Math.max(1, Math.round(props.face.width * effectivePixelRatio.value)))
 const pixelHeight = computed(() => Math.max(1, Math.round(props.face.height * effectivePixelRatio.value)))
 const canvasStyle = computed(() => ({
+  // The viewport stage owns the visual scale. Keeping the canvas at logical
+  // face size avoids applying the preview scale twice and preserves pixels.
   width: `${props.face.width}px`,
   height: `${props.face.height}px`,
   display: 'block',

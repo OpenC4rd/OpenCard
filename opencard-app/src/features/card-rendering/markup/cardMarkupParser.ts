@@ -1,4 +1,5 @@
 import type { AlignmentPosition } from '../../../entities/card/model'
+import { isRenderCssLength } from '../renderValueSyntax'
 import type {
   CardMarkupBlockNode,
   CardMarkupDiagnostic,
@@ -10,7 +11,6 @@ import type {
   InlineStyleSpec,
 } from './cardMarkup.types'
 import { lexCardMarkup, type CardMarkupToken } from './cardMarkupLexer'
-import { escapeMarkupText, quoteMarkupArg } from './cardMarkupSerializer'
 
 type Arg = { key: string; value: string }
 type TagToken = Extract<CardMarkupToken, { kind: 'tag' }>
@@ -31,11 +31,16 @@ const ALIGNMENTS: Record<string, AlignmentPosition> = {
 }
 
 export function parseCardMarkup(source: string): CardMarkupParseResult {
-  const markup = isLegacyHtml(source) ? htmlToMarkup(source) : source
-  const { tokens, diagnostics } = lexCardMarkup(markup)
+  const { tokens, diagnostics } = lexCardMarkup(source)
   const parser = new MarkupParser(tokens, diagnostics)
   const blocks = parser.parseBlocks(0)
-  return { document: { source: markup, blocks }, diagnostics, valid: diagnostics.length === 0 }
+  return { document: { source, blocks }, diagnostics, valid: diagnostics.length === 0 }
+}
+
+function isValidFontSize(value: string): boolean {
+  const candidate = value.trim()
+  if (!candidate) return true
+  return /^-?(?:\d+\.?\d*|\.\d+)(?:em|rem|%|pt|mm|cm|in)?$/i.test(candidate) || isRenderCssLength(candidate)
 }
 
 class MarkupParser {
@@ -244,7 +249,11 @@ class MarkupParser {
     if (name in FLAG_SPANS) style[FLAG_SPANS[name]! as 'bold'] = true
     else if (name === 'mark') style.markColor = this.required(tag, args, 'color', first)
     else if (name === 'color') style.color = this.required(tag, args, 'color', first)
-    else if (name === 'size') style.fontSize = this.required(tag, args, 'size', first)
+    else if (name === 'size') {
+      const val = this.required(tag, args, 'size', first)
+      if (val && !isValidFontSize(val)) this.report('invalid-argument', tag.offset, `@size 含有无效长度：${val}`)
+      else if (val) style.fontSize = val
+    }
     else if (name === 'font') style.fontFamily = this.required(tag, args, 'family', first)
     else if (name === 'style') for (const arg of args) this.applyStyleArg(tag, style, arg)
     return style
@@ -267,7 +276,7 @@ class MarkupParser {
   private applyStyleArg(tag: TagToken, style: InlineStyleSpec, { key, value }: Arg) {
     const number = (text: string | undefined, fallback = 0) => {
       if (text === undefined) return fallback
-      const parsed = Number(text)
+      const parsed = Number.parseFloat(text)
       if (Number.isFinite(parsed)) return parsed
       this.report('invalid-argument', tag.offset, `@style 的 ${key} 含有无效数字：${text}`)
       return fallback
@@ -282,7 +291,10 @@ class MarkupParser {
       case 'mark': style.markColor = value; return
       case 'color': style.color = value; return
       case 'bg': case 'background': style.backgroundColor = value; return
-      case 'size': style.fontSize = value; return
+      case 'size':
+        if (!isValidFontSize(value)) this.report('invalid-argument', tag.offset, `@style 的 size 含有无效长度：${value}`)
+        else style.fontSize = value
+        return
       case 'font': style.fontFamily = value; return
       case 'stroke': {
         const [color, width] = splitTopLevel(value, /\s/)
@@ -392,274 +404,4 @@ function parseArgs(raw: string | null): Arg[] {
     if (eq > 0 && /^[A-Za-z][\w-]*$/.test(key)) return { key, value: unquote(part.slice(eq + 1)) }
     return { key: '', value: unquote(part) }
   })
-}
-
-/* ───────────── 旧 HTML 容错：转成 @tag 源码后复用同一条解析路径 ───────────── */
-
-const LEGACY_HTML_START = /^\s*<(?:\!|p|div|span|strong|b|i|em|u|s|del|strike|mark|ul|ol|li|br|h[1-6]|table|tbody|thead|tr|td|th|img)\b/i
-const LEGACY_HTML_CLOSE = /<\/(?:p|div|span|strong|b|i|em|u|s|del|strike|mark|ul|ol|li|h[1-6]|table|tbody|thead|tr|td|th)>/i
-const LEGACY_HTML_ATTR = /<(?:p|div|span|strong|b|i|em|u|s|del|strike|mark|ul|ol|li|h[1-6]|table|tbody|thead|tr|td|th|img)\s+[^>]+>/i
-const LEGACY_HTML_VOID = /<br\s*\/?>/i
-
-export function isLegacyHtml(source: string): boolean {
-  return LEGACY_HTML_START.test(source)
-    || LEGACY_HTML_CLOSE.test(source)
-    || LEGACY_HTML_ATTR.test(source)
-    || LEGACY_HTML_VOID.test(source)
-}
-
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
-
-function decodeEntities(text: string): string {
-  return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (whole, dec, hex, named) => {
-    if (dec) return String.fromCodePoint(Number(dec))
-    if (hex) return String.fromCodePoint(parseInt(hex, 16))
-    return ENTITIES[String(named).toLowerCase()] ?? whole
-  })
-}
-
-function parseIconPathToNode(iconPath: string): CardMarkupIconNode {
-  const hashIdx = iconPath.indexOf('#')
-  if (hashIdx >= 0) {
-    const qualifier = iconPath.slice(0, hashIdx).trim()
-    const rawKey = iconPath.slice(hashIdx + 1).trim()
-    const key = rawKey.startsWith('icon:') ? rawKey.slice('icon:'.length) : rawKey
-    if (!qualifier) {
-      return { type: 'icon', key, scope: 'host' }
-    }
-    const atIdx = qualifier.lastIndexOf('@')
-    if (atIdx > 0) {
-      return {
-        type: 'icon',
-        key,
-        pkg: qualifier.slice(0, atIdx),
-        version: qualifier.slice(atIdx + 1),
-      }
-    }
-    return { type: 'icon', key, pkg: qualifier }
-  }
-  const key = iconPath.startsWith('icon:') ? iconPath.slice('icon:'.length) : iconPath
-  return { type: 'icon', key }
-}
-
-function serializeIconTag(node: CardMarkupIconNode): string {
-  const args: string[] = []
-  if (node.key) args.push(`key=${quoteMarkupArg(node.key)}`)
-  if (node.pkg) args.push(`pkg=${quoteMarkupArg(node.pkg)}`)
-  if (node.version) args.push(`version=${quoteMarkupArg(node.version)}`)
-  if (node.scope) args.push(`scope=${quoteMarkupArg(node.scope)}`)
-  if (node.size) args.push(`size=${quoteMarkupArg(node.size)}`)
-  return `@icon(${args.join(',')})`
-}
-
-function readCss(attrs: string): Record<string, string> {
-  const style = /style\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attrs)
-  const css: Record<string, string> = {}
-  const rawStyle = decodeEntities(style?.[1] ?? style?.[2] ?? '')
-  for (const declaration of rawStyle.split(';')) {
-    const colon = declaration.indexOf(':')
-    if (colon > 0) {
-      const prop = declaration.slice(0, colon).trim().toLowerCase()
-      const val = declaration.slice(colon + 1).trim().replace(/^["']|["']$/g, '').trim()
-      css[prop] = val
-    }
-  }
-  const align = /\salign\s*=\s*"([^"]*)"/i.exec(attrs)
-  if (align && !css['text-align']) css['text-align'] = align[1]!
-
-  const font = /data-oc-font="([^"]*)"/i.exec(attrs)?.[1]
-  if (font && !css['font-family']) css['font-family'] = font
-
-  const fillType = /data-oc-fill-type="([^"]*)"/i.exec(attrs)?.[1]
-  const fillSource = /data-oc-fill-source="([^"]*)"/i.exec(attrs)?.[1]
-  if (fillType === 'image' && fillSource) {
-    css['fill'] = `image:${fillSource}`
-  } else if (fillType && fillSource) {
-    css['fill'] = fillSource
-  }
-
-  const strokeColor = css['-webkit-text-stroke-color'] ?? css['text-stroke-color']
-  const strokeWidth = css['-webkit-text-stroke-width'] ?? css['text-stroke-width']
-  if (strokeColor || strokeWidth) {
-    const w = strokeWidth ? String(parseFloat(strokeWidth) || 1) : '1'
-    css['stroke'] = `${strokeColor ?? 'currentColor'} ${w}`
-  }
-
-  const shadowColor = /data-oc-shadow-color="([^"]*)"/i.exec(attrs)?.[1]
-  const shadowX = /data-oc-shadow-offset-x="([^"]*)"/i.exec(attrs)?.[1]
-  const shadowY = /data-oc-shadow-offset-y="([^"]*)"/i.exec(attrs)?.[1]
-  const shadowBlur = /data-oc-shadow-blur="([^"]*)"/i.exec(attrs)?.[1]
-  if (shadowColor || shadowX || shadowY || shadowBlur) {
-    const x = shadowX ? String(parseFloat(shadowX) || 0) : '0'
-    const y = shadowY ? String(parseFloat(shadowY) || 0) : '0'
-    const b = shadowBlur ? String(parseFloat(shadowBlur) || 0) : '0'
-    css['shadow'] = `${shadowColor ?? 'currentColor'} ${x} ${y} ${b}`
-  }
-
-  return css
-}
-
-function styleArgs(css: Record<string, string>): string[] {
-  const args: string[] = []
-  const add = (key: string, value: string | undefined) => value && args.push(`${key}=${quoteMarkupArg(value)}`)
-  if (/^(bold|[6-9]00)$/.test(css['font-weight'] ?? '')) args.push('b=true')
-  if (css['font-style'] === 'italic') args.push('i=true')
-  const decoration = css['text-decoration'] ?? css['text-decoration-line'] ?? ''
-  if (decoration.includes('underline')) args.push('u=true')
-  if (decoration.includes('line-through')) args.push('s=true')
-  add('color', css['color'])
-  add('bg', css['background-color'])
-  add('size', css['font-size'])
-  add('font', css['font-family'])
-  if (css['stroke']) add('stroke', css['stroke'])
-  if (css['shadow']) add('shadow', css['shadow'])
-  if (css['fill']) add('fill', css['fill'])
-  return args
-}
-
-function escapeMarkupTextPreservingBindings(text: string): string {
-  const parts = text.split(/(\{\{[^}]+\}\})/g)
-  return parts.map((part, index) => {
-    if (index % 2 === 1) return part
-    return escapeMarkupText(part)
-  }).join('')
-}
-
-const HTML_TOKEN = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*?)(\/?)>|([^<]+)|</g
-
-function htmlToMarkup(html: string): string {
-  const out: string[] = []
-  const stack: { name: string; close: string }[] = []
-  const trimNewline = () => {
-    const last = out[out.length - 1]
-    if (last?.endsWith('\n')) out[out.length - 1] = last.slice(0, -1)
-  }
-  const popTo = (index: number) => {
-    while (stack.length > index) {
-      const { name, close } = stack.pop()!
-      if (name === 'li') trimNewline()
-      out.push(close)
-    }
-  }
-  const atBoundary = () => out.length === 0 || out[out.length - 1]!.endsWith('\n')
-
-  let skipDepth = 0
-
-  for (const match of html.matchAll(HTML_TOKEN)) {
-    const [, slash, rawName, attrs = '', , text] = match
-    if (text !== undefined) {
-      if (skipDepth > 0) continue
-      const decoded = decodeEntities(text).replace(/\s+/g, ' ')
-      const top = stack[stack.length - 1]?.name
-      if (!decoded.trim() && (top === 'ul' || top === 'ol' || top === 'table' || top === 'tbody' || top === 'thead' || top === 'tr' || atBoundary())) continue
-      out.push(escapeMarkupTextPreservingBindings(decoded))
-      continue
-    }
-    if (!rawName) continue
-    const name = rawName.toLowerCase()
-    if (slash) {
-      if (skipDepth > 0) {
-        skipDepth -= 1
-        continue
-      }
-      const index = stack.map((entry) => entry.name).lastIndexOf(name)
-      if (index >= 0) popTo(index)
-      continue
-    }
-    if (skipDepth > 0) {
-      skipDepth += 1
-      continue
-    }
-    if (name === 'script' || name === 'style') {
-      skipDepth = 1
-      continue
-    }
-    if (name === 'br') {
-      out.push('@br()')
-      continue
-    }
-    if (name === 'img') {
-      const src = /src="([^"]*)"/i.exec(attrs)?.[1] ?? ''
-      const w = /width="([^"]*)"/i.exec(attrs)?.[1]
-      const h = /height="([^"]*)"/i.exec(attrs)?.[1]
-      const imgArgs: string[] = [`src=${quoteMarkupArg(src)}`]
-      if (w) imgArgs.push(`w=${quoteMarkupArg(w)}`)
-      if (h) imgArgs.push(`h=${quoteMarkupArg(h)}`)
-      out.push(`@img(${imgArgs.join(',')})`)
-      continue
-    }
-    if (name === 'span') {
-      const bindingMatch = /data-oc-binding="([^"]*)"|data-expression="([^"]*)"/i.exec(attrs)
-      if (bindingMatch || /data-type="binding"/i.test(attrs)) {
-        const expr = bindingMatch?.[1] ?? bindingMatch?.[2] ?? ''
-        if (expr) {
-          out.push(`{{${expr}}}`)
-          skipDepth = 1
-          continue
-        }
-      }
-      const iconMatch = /data-oc-icon-path="([^"]*)"|data-icon-path="([^"]*)"/i.exec(attrs)
-      if (iconMatch || /data-type="projectIcon"/i.test(attrs)) {
-        const iconPath = iconMatch?.[1] ?? iconMatch?.[2] ?? ''
-        const sizeMatch = /data-oc-size="([^"]*)"|data-size="([^"]*)"/i.exec(attrs)
-        const size = sizeMatch?.[1] ?? sizeMatch?.[2]
-        const keyMatch = /data-key="([^"]*)"/i.exec(attrs)?.[1]
-        const pkgMatch = /data-pkg="([^"]*)"/i.exec(attrs)?.[1]
-        const versionMatch = /data-version="([^"]*)"/i.exec(attrs)?.[1]
-        const scopeMatch = /data-scope="([^"]*)"/i.exec(attrs)?.[1]
-        const iconNode: CardMarkupIconNode = iconPath
-          ? parseIconPathToNode(iconPath)
-          : { type: 'icon', key: keyMatch ?? '' }
-        if (keyMatch && !iconNode.key) iconNode.key = keyMatch
-        if (pkgMatch && !iconNode.pkg) iconNode.pkg = pkgMatch
-        if (versionMatch && !iconNode.version) iconNode.version = versionMatch
-        if (scopeMatch === 'current' || scopeMatch === 'host' || scopeMatch === 'package') iconNode.scope = scopeMatch
-        if (size) iconNode.size = size
-        out.push(serializeIconTag(iconNode))
-        skipDepth = 1
-        continue
-      }
-    }
-    const css = readCss(attrs)
-    let open = ''
-    let close = '}'
-    if (name === 'p' || name === 'div' || /^h[1-6]$/.test(name)) {
-      const align = css['text-align']
-      open = align && ALIGNMENTS[align.toLowerCase()] ? `@align(${ALIGNMENTS[align.toLowerCase()]}){` : ''
-      close = open ? '}\n' : '\n'
-      if (name.startsWith('h')) {
-        open += '@b{'
-        close = `}${close}`
-      }
-      const sArgs = styleArgs(css)
-      if (sArgs.length > 0) {
-        open += `@style(${sArgs.join(',')}){`
-        close = `}${close}`
-      }
-    } else if (name === 'strong' || name === 'b') open = '@b{'
-    else if (name === 'em' || name === 'i') open = '@i{'
-    else if (name === 'u') open = '@u{'
-    else if (name === 's' || name === 'del' || name === 'strike') open = '@s{'
-    else if (name === 'mark') open = `@mark(color=${quoteMarkupArg(css['background-color'] ?? '#FFFF00')}){`
-    else if (name === 'ul' || name === 'ol' || name === 'li') open = `@${name}{`
-    else if (name === 'table' || name === 'tbody' || name === 'thead') {
-      open = ''
-      close = ''
-    } else if (name === 'tr') {
-      open = ''
-      close = '\n'
-    } else if (name === 'td' || name === 'th') {
-      open = ''
-      close = ' '
-    } else if (name === 'span') {
-      const args = styleArgs(css)
-      open = args.length ? `@style(${args.join(',')}){` : ''
-      if (!open) close = ''
-    } else continue
-    out.push(open)
-    stack.push({ name, close: open || close === '\n' || close === ' ' ? close : '' })
-  }
-  popTo(0)
-  trimNewline()
-  return out.join('')
 }

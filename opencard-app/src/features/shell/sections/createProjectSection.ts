@@ -20,7 +20,7 @@ import {
 
 type Translate = (key: string, paramsOrFallback?: Record<string, unknown> | string) => string
 
-export interface CreateProjectSectionOptions {
+interface CreateProjectSectionOptions {
   translate: Translate
   busy: Readonly<Ref<boolean>>
   templateTreeData: Readonly<Ref<OcNodeCollection>>

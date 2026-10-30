@@ -14,10 +14,10 @@ import {
   PROJECT_PACKAGE_DIRECTORY,
 } from './projectStructure'
 
-export const CARD_DOCUMENT_EXTENSION = 'ocdocument'
+const CARD_DOCUMENT_EXTENSION = 'ocdocument'
 export const CARD_DOCUMENT_SUFFIX = `.${CARD_DOCUMENT_EXTENSION}`
 
-export interface FileTypeDefinition {
+interface FileTypeDefinition {
   id: string
   labelKey: string
   extensions?: string[]
@@ -349,7 +349,7 @@ export function resolveFileTypeById(fileTypeId: string | null | undefined): File
   return fileType ?? defaultFileType
 }
 
-export function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryIconPresentation {
+function resolveDirectoryIcon(_path: string, isExpanded: boolean): EntryIconPresentation {
   return {
     icon: isExpanded ? 'mdiFolderOpen' : 'mdiFolder',
     tone: 'folder',

@@ -28,7 +28,7 @@ import { taskScheduler } from '../../../utils/taskScheduler'
  * per directory and the recursion itself runs here rather than in Rust, so "how many reads and how
  * long" is the difference between a slow disk and a slow walk.
  */
-export type DirectoryWalkMetrics = { reads: number, entries: number, totalMs: number, worstMs: number, worstPath: string }
+type DirectoryWalkMetrics = { reads: number, entries: number, totalMs: number, worstMs: number, worstPath: string }
 
 const directoryWalkMetrics: DirectoryWalkMetrics = { reads: 0, entries: 0, totalMs: 0, worstMs: 0, worstPath: '' }
 
@@ -48,7 +48,7 @@ export function takeDirectoryWalkMetrics(): DirectoryWalkMetrics {
  * `skipDirectory` is still listed, but its own children are not read. That lets a caller keep a
  * directory visible while refusing to walk a subtree it has no use for.
  */
-export interface ReadDirectoryEntriesOptions {
+interface ReadDirectoryEntriesOptions {
   skipDirectory?: (relativePath: string) => boolean
   signal?: AbortSignal
 }

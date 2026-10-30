@@ -403,8 +403,8 @@ describe('Invariant 3: Vertical text layout baseline positioning', () => {
         type: 'text-block', width: '120', height: '200',
         content: 'OpenCard',
         writingMode: 'vertical-rl',
-        fontSize: '20px',
-        lineHeight: '30px',
+        fontSize: '20mm',
+        lineHeight: '30mm',
         fontFamily: 'sans-serif',
       }),
     } as RenderReadyTextBlock
@@ -440,8 +440,8 @@ describe('Invariant 3: Vertical text layout baseline positioning', () => {
         type: 'text-block', width: '100', height: '250',
         content: '卡 ABC',
         writingMode: 'vertical-rl',
-        fontSize: '20px',
-        lineHeight: '40px',
+        fontSize: '20mm',
+        lineHeight: '40mm',
       }),
     } as RenderReadyTextBlock
 

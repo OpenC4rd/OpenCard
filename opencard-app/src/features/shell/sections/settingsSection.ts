@@ -6,7 +6,7 @@ import { SETTINGS_CATEGORIES_LIST_KEY } from '../shellSidebarConfig'
 
 type Translate = (key: string, fallback?: string) => string
 
-export interface SettingsSectionOptions {
+interface SettingsSectionOptions {
   translate: Translate
   categoryKey: Readonly<Ref<SettingsCategoryKey>>
   categoryTreeData: Readonly<Ref<OcNodeCollection>>

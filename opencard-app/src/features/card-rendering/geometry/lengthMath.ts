@@ -1,5 +1,5 @@
 /**
- * 求值卡片长度表达式：纯数字（px）、`px`、`%`（相对 parentSpan），
+ * 求值卡片长度表达式：纯数字（默认 mm）、`mm`、`cm`、`in`、`pt`、`%`（相对 parentSpan），
  * 以及由它们和 `+ - * / ( )` 组成的四则运算（可包在 `calc(...)` 内）。
  * 任何语法错误、未知单位或除零都返回 fallback。
  */
@@ -103,10 +103,6 @@ class LengthParser {
     if (/^pt(?![a-z])/i.test(rest)) {
       this.pos += 2
       return (value * 25.4) / 72
-    }
-    if (/^px(?![a-z])/i.test(rest)) {
-      this.pos += 2
-      return value
     }
     if (/^[a-z]/i.test(rest)) this.failed = true
     return value

@@ -23,7 +23,7 @@ export const CHANGE_DISCARD_ACTION_KEY = 'changes.discard'
 export const CHANGE_IGNORE_FILE_ACTION_KEY = 'changes.ignore-file'
 export const CHANGE_IGNORE_EXTENSION_ACTION_KEY = 'changes.ignore-extension'
 /** 忽略文件夹这一项本身（它只展开子菜单，被点击的是下面带路径的那些）。 */
-export const CHANGE_IGNORE_FOLDER_ACTION_KEY = 'changes.ignore-folder'
+const CHANGE_IGNORE_FOLDER_ACTION_KEY = 'changes.ignore-folder'
 /** 忽略某一层目录：key 的后面接着那一层的相对路径。 */
 export const CHANGE_IGNORE_FOLDER_PREFIX = 'changes.ignore-folder:'
 
@@ -40,7 +40,7 @@ export function changedPathsUnder(collection: OcNodeCollection, key: OcNodeKey):
 }
 
 /** HEAD 里没有版本的内容：未跟踪的文件、未跟踪的整条目录，以及刚加进索引的新文件。 */
-export function isNewChangePath(entry: GitStatusEntry | undefined): boolean {
+function isNewChangePath(entry: GitStatusEntry | undefined): boolean {
   return Boolean(entry?.worktreeNew || entry?.indexNew)
 }
 

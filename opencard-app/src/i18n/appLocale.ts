@@ -17,7 +17,7 @@ export type BuiltinAppLocaleId = (typeof BUILTIN_APP_LOCALES)[number]['id']
  * 用户语言文件的 id 就是它的文件名（含扩展名）。内置 id 不带 `.json`，
  * 所以 `zh-CN` 与 `zh-CN.json` 是两个不同的语言，用户文件永远不会顶掉内置目录。
  */
-export type UserLocaleFileId = `${string}.json`
+type UserLocaleFileId = `${string}.json`
 export type AppLocale = 'system' | BuiltinAppLocaleId | UserLocaleFileId
 
 export interface AppLocaleOption {
@@ -25,7 +25,7 @@ export interface AppLocaleOption {
   label: string
 }
 
-export const USER_LOCALE_FILE_EXTENSION = '.json'
+const USER_LOCALE_FILE_EXTENSION = '.json'
 
 const MAX_USER_LOCALE_STEM_LENGTH = 64
 /** id 只当字典键和提示文本用，从不拼进路径；仍挡掉路径分隔符与控制字符。 */

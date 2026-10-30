@@ -63,7 +63,7 @@ const TextStyleAttributes = Extension.create({
           renderHTML: attributes => attributes.textShadowColor
             ? {
                 'data-oc-shadow-color': attributes.textShadowColor,
-                style: `text-shadow: ${attributes.textShadowOffsetX || '0px'} ${attributes.textShadowOffsetY || '0px'} ${attributes.textShadowBlur || '0px'} ${attributes.textShadowColor}`,
+                style: `text-shadow: ${attributes.textShadowOffsetX || '0mm'} ${attributes.textShadowOffsetY || '0mm'} ${attributes.textShadowBlur || '0mm'} ${attributes.textShadowColor}`,
               }
             : {},
         },

@@ -36,7 +36,7 @@ describe('OcRichTextEditor locale reactivity', () => {
     '@i{Italic} and @u{Underline}',
     '@ul{@li{Alpha}@li{Beta}}',
     'Level: {{player.lvl}} @icon(key=star)',
-    '@style(color=red,size="20px"){Custom text}',
+    '@style(color=red,size="5mm"){Custom text}',
   ])('preserves Card Markup content and structure through source handoff: %s', async source => {
     const wrapper = mountEditor()
     try {
@@ -47,17 +47,6 @@ describe('OcRichTextEditor locale reactivity', () => {
       const before = vm.editor.getJSON()
       expect(vm.applyHtml(vm.getHtml())).toBe(true)
       expect(vm.editor.getJSON()).toEqual(before)
-    } finally { wrapper.unmount() }
-  })
-
-  it('tolerantly converts legacy HTML into Card Markup without html tags', async () => {
-    const wrapper = mountEditor()
-    try {
-      await nextTick()
-      const vm = wrapper.vm as unknown as { editor: Editor; applyHtml: (markup: string) => boolean; getHtml: () => string }
-      expect(vm.applyHtml('<p><strong>Legacy</strong> <em>content</em></p>')).toBe(true)
-      expect(vm.getHtml()).toBe('@b{Legacy} @i{content}')
-      expect(vm.getHtml()).not.toMatch(/<p>|<strong|<span|<em/)
     } finally { wrapper.unmount() }
   })
 
@@ -76,7 +65,7 @@ describe('OcRichTextEditor locale reactivity', () => {
   it('saves stable resource references instead of resolved preview sources', async () => {
     const wrapper = mount(OcRichTextEditor, {
       props: {
-        initialHtml: '<p><span data-oc-fill-type="image" data-oc-fill-source="素材/a.png" style="font-family: &quot;font:brand&quot;;">AB</span></p>',
+        initialHtml: '@style(font="font:brand",fill="image:素材/a.png"){AB}',
         capabilities: {
           fonts: [{
             key: 'project',
@@ -104,7 +93,7 @@ describe('OcRichTextEditor locale reactivity', () => {
   it('composes image fill, background and outline through previews, undo and source handoff', async () => {
     const wrapper = mount(OcRichTextEditor, {
       props: {
-        initialHtml: '<p><mark style="background-color:yellow;color:inherit"><span data-oc-fill-type="image" data-oc-fill-source="assets/a.png" style="color:red;-webkit-text-stroke-width:1px;-webkit-text-stroke-color:blue">ABC</span></mark></p>',
+        initialHtml: '@mark(color=yellow){@style(color=red,stroke="blue 1",fill="image:assets/a.png"){ABC}}',
         capabilities: {
           resolveImagePreview: reference => `https://example.test/${reference}`,
         },
@@ -128,12 +117,12 @@ describe('OcRichTextEditor locale reactivity', () => {
       expect(undoDepth(editor.state)).toBe(depth)
       picker.vm.$emit('cancel')
       vm.properties.update({ key: 'rich-text-selection', fieldKey: 'backgroundColor', value: '#ff0000' })
-      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: 'image', textFillSource: 'assets/a.png', textStrokeWidth: '1px' })
+      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: 'image', textFillSource: 'assets/a.png', textStrokeWidth: '1mm' })
       expect(editor.getAttributes('highlight').color).toBe('#ff0000')
       editor.commands.undo()
       expect(editor.getJSON()).toEqual(before)
       picker.vm.$emit('commit', '#00ff00')
-      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: null, textFillSource: null, color: '#00ff00', textStrokeWidth: '1px' })
+      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: null, textFillSource: null, color: '#00ff00', textStrokeWidth: '1mm' })
       expect(editor.getAttributes('highlight').color).toBe('yellow')
       const saved = vm.getHtml()
       expect(saved).not.toContain('example.test')
@@ -183,21 +172,21 @@ describe('OcRichTextEditor locale reactivity', () => {
       expect(options.length).toBeGreaterThan(1)
       await input.setValue('13')
       await input.trigger('keydown', { key: 'Enter' })
-      expect((wrapper.vm as unknown as { editor: { getAttributes: (name: string) => Record<string, unknown> } }).editor.getAttributes('textStyle').fontSize).toBe('13px')
+      expect((wrapper.vm as unknown as { editor: { getAttributes: (name: string) => Record<string, unknown> } }).editor.getAttributes('textStyle').fontSize).toBe('13mm')
       await input.setValue('24')
       await nextTick()
       await nextTick()
       await input.trigger('keydown', { key: 'Enter' })
-      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('24px')
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('24mm')
       await nextTick()
       expect(listbox()).toBeNull()
-      expect((input.element as HTMLInputElement).value).toBe('24px')
+      expect((input.element as HTMLInputElement).value).toBe('24mm')
       await input.setValue('24')
       await input.trigger('blur')
       await nextTick()
-      expect((input.element as HTMLInputElement).value).toBe('24px')
+      expect((input.element as HTMLInputElement).value).toBe('24mm')
       await wrapper.get('button[aria-label="增大字号"]').trigger('click')
-      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('28px')
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('28mm')
       await input.setValue('1.5em')
       await input.trigger('keydown', { key: 'Enter' })
       expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('1.5em')
@@ -216,10 +205,10 @@ describe('OcRichTextEditor locale reactivity', () => {
     update('strokeWidth', '2')
     update('shadowOffsetX', '-3')
     update('shadowBlur', '0.5em')
-    expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textStrokeWidth: '2px', textShadowOffsetX: '-3px', textShadowBlur: '0.5em' })
+    expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textStrokeWidth: '2mm', textShadowOffsetX: '-3mm', textShadowBlur: '0.5em' })
     update('shadowOffsetX', '-')
-    update('shadowBlur', '-2px')
-    expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textShadowOffsetX: '-3px', textShadowBlur: '0.5em' })
+    update('shadowBlur', '-2mm')
+    expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textShadowOffsetX: '-3mm', textShadowBlur: '0.5em' })
     wrapper.unmount()
   })
 
@@ -292,7 +281,7 @@ describe('OcRichTextEditor locale reactivity', () => {
       if (typeof ClipboardEvent === 'undefined') {
         (globalThis as any).ClipboardEvent = class ClipboardEvent extends Event {}
       }
-      const markup = '@icon(key=blade,pkg=@scoped/pack,version=1.0.0,size=24px)'
+      const markup = '@icon(key=blade,pkg=@scoped/pack,version=1.0.0,size=6mm)'
       const view = vm.editor.view
       view.pasteHTML(markup)
       await nextTick()
@@ -301,10 +290,10 @@ describe('OcRichTextEditor locale reactivity', () => {
       const iconNode = json.content?.[0]?.content?.find(child => child.type === 'projectIcon')
       expect(iconNode).toBeDefined()
       expect(iconNode?.attrs?.iconPath).toBe('@scoped/pack@1.0.0#icon:blade')
-      expect(iconNode?.attrs?.size).toBe('24px')
+      expect(iconNode?.attrs?.size).toBe('6mm')
       expect(vm.getHtml()).toContain('blade')
       expect(vm.getHtml()).toContain('@scoped/pack')
-      expect(vm.getHtml()).toContain('24px')
+      expect(vm.getHtml()).toContain('6mm')
     } finally { wrapper.unmount() }
   })
 })

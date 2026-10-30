@@ -4,7 +4,7 @@
  */
 import { pickTipKey, type TipKey } from './tips'
 
-export interface TipSchedulerOptions {
+interface TipSchedulerOptions {
   /** 把一条小贴士发出去（壳层接的是标题栏即时消息）。 */
   notify: (message: string) => void
   /** 按 key 取当前语言的文案；取不到就跳过这一条。 */
@@ -13,7 +13,7 @@ export interface TipSchedulerOptions {
   random?: () => number
 }
 
-export interface TipScheduler {
+interface TipScheduler {
   /** 应用当前设置：关掉就停，改了间隔就重新计时。 */
   configure(enabled: boolean, intervalMinutes: number): void
   stop(): void

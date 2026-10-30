@@ -28,7 +28,7 @@ export async function runStorageMaintenance(cacheLimits: CacheLimits): Promise<v
   await pruneNetworkCache(cacheLimits.networkCacheBytes)
 }
 
-export type CacheLimits = {
+type CacheLimits = {
   packageCacheBytes: number
   networkCacheBytes: number
 }

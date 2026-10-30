@@ -18,29 +18,6 @@ import type {
   RenderReadySimpleContainerBlock,
   RenderReadyTextBlock,
 } from '../render.types'
-import { EMPTY_PROJECT_ICON_CATALOG, type ProjectIconCatalog } from '../../workspace/services/projectIconCatalog'
-import type { CardResourceResolver } from '../cardRenderResources'
-
-export function createRendererTestResources(projectIconCatalog: ProjectIconCatalog = EMPTY_PROJECT_ICON_CATALOG): CardResourceResolver {
-  const resolver: CardResourceResolver = {
-    resolve: request => {
-      if (!request.value.trim()) return { kind: 'empty' }
-      if (request.expect === 'font') return { kind: 'font', cssFamily: request.value }
-      if (!request.value.includes('icon:')) return { kind: 'url', src: `asset://${request.value}` }
-      const [, path] = request.value.split(':', 2)
-      const [seriesKey, iconKey] = path?.split('/') ?? []
-      const entry = projectIconCatalog.entries.find(candidate => (
-        candidate.seriesKey.toLowerCase() === seriesKey?.toLowerCase()
-        && candidate.iconKey.toLowerCase() === iconKey?.toLowerCase()
-      ))
-      return entry ? { kind: 'icon', entry } : { kind: 'unavailable', code: 'resource-unavailable', message: 'Referenced icon is unavailable' }
-    },
-    resolveIconDimensions: () => undefined,
-    withScopes: () => resolver,
-  }
-  return resolver
-}
-
 export function parseRenderReadyBlockForTest(block: TextBlock): RenderReadyTextBlock
 export function parseRenderReadyBlockForTest(block: ImageBlock): RenderReadyImageBlock
 export function parseRenderReadyBlockForTest(block: QrCodeBlock): RenderReadyQrCodeBlock

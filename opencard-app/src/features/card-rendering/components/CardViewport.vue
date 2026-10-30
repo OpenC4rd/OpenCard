@@ -233,7 +233,7 @@ import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
 import type { RenderReadyCardFace as ComparisonCardFace } from '../render.types'
 import type { CardRenderResourceContext as ComparisonResourceContext } from '../cardRenderResources'
 
-export type CardViewportSelectionAction =
+type CardViewportSelectionAction =
   | { type: 'fill-parent'; blockId: string; width: boolean; height: boolean }
   | { type: 'fill-cross-axis'; blockId: string }
   | { type: 'center-cross-axis'; blockId: string }
@@ -279,7 +279,7 @@ export type CardDiffHighlight = {
   kind: 'added' | 'removed' | 'changed'
 }
 
-export interface CardViewportComparisonLayer {
+interface CardViewportComparisonLayer {
   face: ComparisonCardFace
   resourceContext: ComparisonResourceContext
   diffHighlights?: readonly CardDiffHighlight[]
@@ -398,6 +398,8 @@ type ViewportTransform = {
 const TRANSFORM_EPSILON = 0.0001
 const SELECTION_INSET_STEP = 10
 const MIN_SELECTION_SIZE = 2
+const DIMENSION_LINE_GAP = 12
+/** 缩放尺寸网格：默认 0.1mm，按住 Shift 落到整毫米。 */
 
 const emit = defineEmits<{
   (e: 'block-click', blockId: string, event: MouseEvent): void
@@ -794,10 +796,10 @@ const hasHudContent = computed(() => !props.comparison && Boolean(slots.info || 
 
 const cardScreenBounds = computed(() => {
   const currentScale = scale.value || 1
-  const left = Math.round(translateX.value)
-  const top = Math.round(translateY.value)
-  const width = Math.round(props.face.width * currentScale)
-  const height = Math.round(props.face.height * currentScale)
+  const left = translateX.value
+  const top = translateY.value
+  const width = props.face.width * currentScale
+  const height = props.face.height * currentScale
   return {
     left,
     top,
@@ -805,8 +807,8 @@ const cardScreenBounds = computed(() => {
     height,
     right: left + width,
     bottom: top + height,
-    centerX: Math.round(left + width / 2),
-    centerY: Math.round(top + height / 2),
+    centerX: left + width / 2,
+    centerY: top + height / 2,
   }
 })
 
@@ -816,23 +818,25 @@ const viewportInfoStyle = computed(() => ({
 }))
 
 const viewportLeftInfoStyle = computed(() => ({
-  left: `${cardScreenBounds.value.left - 12}px`,
-  top: `${cardScreenBounds.value.centerY}px`,
-  transform: 'translate(-50%, -50%)',
-}))
-
-const viewportBottomInfoStyle = computed(() => ({
-  left: `${cardScreenBounds.value.centerX}px`,
-  top: `${cardScreenBounds.value.bottom + 12}px`,
-  transform: 'translateX(-50%)',
-}))
-
-const viewportLeftInfoLineStyle = computed(() => ({
+  left: `${cardScreenBounds.value.left - DIMENSION_LINE_GAP - 8}px`,
+  top: `${cardScreenBounds.value.top}px`,
+  width: '16px',
   height: `${cardScreenBounds.value.height}px`,
 }))
 
-const viewportBottomInfoLineStyle = computed(() => ({
+const viewportBottomInfoStyle = computed(() => ({
+  left: `${cardScreenBounds.value.left}px`,
+  top: `${cardScreenBounds.value.bottom + DIMENSION_LINE_GAP - 8}px`,
   width: `${cardScreenBounds.value.width}px`,
+  height: '16px',
+}))
+
+const viewportLeftInfoLineStyle = computed(() => ({
+  height: '100%',
+}))
+
+const viewportBottomInfoLineStyle = computed(() => ({
+  width: '100%',
 }))
 const resizeMode = computed<ResizeMode>(() => {
   if (!props.selectedBlockId) {
@@ -1531,15 +1535,11 @@ function applyFaceDimensionDrag(event: PointerEvent): void {
   const drag = faceDimensionDrag.value
   if (!drag) return
   const directionalDelta = drag.dimension === 'width'
-    ? (Math.abs(event.clientX - drag.startClientX) >= Math.abs(event.clientY - drag.startClientY)
-        ? event.clientX - drag.startClientX
-        : event.clientY - drag.startClientY)
-    : (Math.abs(drag.startClientY - event.clientY) >= Math.abs(drag.startClientX - event.clientX)
-        ? drag.startClientY - event.clientY
-        : drag.startClientX - event.clientX)
+    ? event.clientX - drag.startClientX
+    : drag.startClientY - event.clientY
   const rawValue = drag.startValue + directionalDelta / (scale.value || 1)
-  const snapStep = event.shiftKey ? 0.5 : 1
-  const nextValue = Math.max(10, Math.round(rawValue / snapStep) * snapStep)
+  const snapStep = event.shiftKey ? 1 : 0.1
+  const nextValue = Math.max(10, Number((Math.round(rawValue / snapStep) * snapStep).toFixed(1)))
   if (nextValue === drag.lastValue) return
   drag.lastValue = nextValue
   emit('face-dimension-change', { dimension: drag.dimension, value: nextValue, final: false })

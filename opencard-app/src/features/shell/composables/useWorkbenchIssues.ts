@@ -17,7 +17,7 @@ import { COPY_ISSUE_ACTION_KEY } from '../spacePage'
 
 type SessionIssueScopes = ReadonlyMap<string, readonly EditorIssue[]>
 
-export type WorkspaceIssueProjection = {
+type WorkspaceIssueProjection = {
   treeData: OcNodeCollection
   navigationTargets: ReadonlyMap<string, SessionIssueNavigationRequest>
   issueDetails: ReadonlyMap<string, EditorIssue>

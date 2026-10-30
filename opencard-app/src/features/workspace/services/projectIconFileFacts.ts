@@ -10,7 +10,7 @@ const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
 const PIXEL_ART_SHORT_SIDE = 32
 
 /** Everything an imported icon file itself decides, as opposed to what the user chooses. */
-export type ProjectIconFileFacts = {
+type ProjectIconFileFacts = {
   tint: ProjectIconTint
   pixelated?: boolean
 }

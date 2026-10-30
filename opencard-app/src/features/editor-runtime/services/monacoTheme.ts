@@ -8,7 +8,7 @@ import {
 type MonacoApi = typeof import('monaco-editor')
 type MonacoThemeData = import('monaco-editor').editor.IStandaloneThemeData
 
-export interface OcMonacoAppearance {
+interface OcMonacoAppearance {
   themeName: string
   fontFamily: string
 }
@@ -29,7 +29,7 @@ function toMonacoColor(value: string): string {
   return `#${channels.join('')}${alpha}`
 }
 
-export function createOcMonacoTheme(
+function createOcMonacoTheme(
   themeId: OcThemeId,
   overrides: OcThemeColorOverrides = {},
 ): MonacoThemeData {

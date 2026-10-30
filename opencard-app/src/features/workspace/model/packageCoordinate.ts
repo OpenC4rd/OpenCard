@@ -10,10 +10,10 @@
 
 import { normalizeKeySlug } from '../../../shared/model/keySlug'
 
-export const PACKAGE_IDENTITY_SEPARATOR = '/'
-export const PACKAGE_COORDINATE_SEPARATOR = '@'
+const PACKAGE_IDENTITY_SEPARATOR = '/'
+const PACKAGE_COORDINATE_SEPARATOR = '@'
 
-export type PackageIdentity = {
+type PackageIdentity = {
   readonly author: string
   readonly name: string
 }
@@ -139,7 +139,7 @@ export function comparePackageVersions(left: string, right: string): number {
 }
 
 /** 从完整坐标里取回版本。坐标已经过校验，所以这里只切最后一段 `@`。 */
-export function packageVersionOf(coordinate: string): string {
+function packageVersionOf(coordinate: string): string {
   return coordinate.slice(coordinate.lastIndexOf(PACKAGE_COORDINATE_SEPARATOR) + 1)
 }
 

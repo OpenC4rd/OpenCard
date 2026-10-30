@@ -6,7 +6,7 @@ import type { OcActionDefinition, OcActionDivider } from '../action/action.types
 export type OcNodeKey = string
 
 /** Locale-independent tone applied to the node label. */
-export type OcNodeTone = 'default' | 'muted' | 'subtle' | 'accent' | 'success' | 'warning' | 'danger'
+type OcNodeTone = 'default' | 'muted' | 'subtle' | 'accent' | 'success' | 'warning' | 'danger'
 
 export type OcNodeDropPosition = 'before' | 'inside' | 'after'
 

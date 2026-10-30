@@ -76,7 +76,7 @@ import OcRow from '../../../components/standard/OcRow.vue'
 import OcText from '../../../components/base/OcText.vue'
 import { useFeedbackInbox } from '../composables/useFeedbackInbox'
 import { requestConfirmation } from '../../shell/services/appConfirmation'
-import { renderMarkdown } from '../../card-rendering/markdown/renderMarkdown'
+import { renderMarkdown } from '../../../shared/ui/markdown/renderMarkdown'
 
 const props = withDefaults(defineProps<{
   active: boolean

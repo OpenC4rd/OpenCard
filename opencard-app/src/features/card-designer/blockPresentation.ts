@@ -1,7 +1,7 @@
 import type { CardBlock } from '../../entities/card/model'
 import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
 
-export type BlockPresentation = {
+type BlockPresentation = {
   icon: IconToken
   iconTone: IconTone
 }

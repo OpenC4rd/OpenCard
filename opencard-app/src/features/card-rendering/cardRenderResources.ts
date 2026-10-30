@@ -48,8 +48,8 @@ export type CardRenderResourceContext = {
   readonly bindingDictionary?: Readonly<Record<string, string>> | null
 }
 
-export type CardRenderResourceContextSource = CardRenderResourceContext | (() => CardRenderResourceContext)
-export type CardRenderResourceScopeSource = ProjectResourceScopeMap | (() => ProjectResourceScopeMap)
+type CardRenderResourceContextSource = CardRenderResourceContext | (() => CardRenderResourceContext)
+type CardRenderResourceScopeSource = ProjectResourceScopeMap | (() => ProjectResourceScopeMap)
 
 /** Why a render-side resource could not be produced. */
 export type ResourceIssueCode =
@@ -66,9 +66,9 @@ export type ResourceIssueCode =
   | 'decode-failed'
 
 /** What the field is asking for: one asset reference — a path or an icon — or a font list. */
-export type ResourceExpectation = 'asset' | 'font'
+type ResourceExpectation = 'asset' | 'font'
 
-export type ResourceRequest = {
+type ResourceRequest = {
   /** The field's raw text: `xx.png` / `作者/包名@版本#xx.png` / `icon:a/b` / `作者/包名@版本#icon:a/b` / `font:x; Arial`. */
   readonly value: string
   readonly expect: ResourceExpectation

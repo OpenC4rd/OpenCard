@@ -15,8 +15,8 @@ export function createMockTextMeasurer(): TextMeasurePort {
   return {
     measureText(text, font): TextMetricsSample {
       let width = 0
-      for (const char of text) width += (isCjkChar(char) ? 1 : char === ' ' ? 0.3 : 0.5) * font.fontSizePx
-      return { width, ascent: font.fontSizePx * 0.8, descent: font.fontSizePx * 0.2 }
+      for (const char of text) width += (isCjkChar(char) ? 1 : char === ' ' ? 0.3 : 0.5) * font.fontSize
+      return { width, ascent: font.fontSize * 0.8, descent: font.fontSize * 0.2 }
     },
     resolveIconAspectRatio: () => 1,
   }
@@ -46,15 +46,15 @@ export function createCanvasTextMeasurer(ctx?: CanvasRenderingContext2D): TextMe
   const cache = new Map<string, TextMetricsSample>()
   return {
     measureText(text, font: FontSpec) {
-      const key = `${font.fontFamily}|${font.fontSizePx}|${font.fontWeight}|${font.italic}|${text}`
+      const key = `${font.fontFamily}|${font.fontSize}|${font.fontWeight}|${font.italic}|${text}`
       const hit = cache.get(key)
       if (hit) return hit
-      context.font = `${font.italic ? 'italic ' : ''}${WEIGHTS[font.fontWeight]} ${font.fontSizePx}px ${font.fontFamily}`
+      context.font = `${font.italic ? 'italic ' : ''}${WEIGHTS[font.fontWeight]} ${font.fontSize}px ${font.fontFamily}`
       const metrics = context.measureText(text)
       const sample = {
         width: metrics.width,
-        ascent: metrics.fontBoundingBoxAscent ?? metrics.actualBoundingBoxAscent ?? font.fontSizePx * 0.8,
-        descent: metrics.fontBoundingBoxDescent ?? metrics.actualBoundingBoxDescent ?? font.fontSizePx * 0.2,
+        ascent: metrics.fontBoundingBoxAscent ?? metrics.actualBoundingBoxAscent ?? font.fontSize * 0.8,
+        descent: metrics.fontBoundingBoxDescent ?? metrics.actualBoundingBoxDescent ?? font.fontSize * 0.2,
       }
       cache.set(key, sample)
       return sample

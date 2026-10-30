@@ -10,17 +10,9 @@ import type { HistoryOperationMeta } from './history.types'
 
 export type EditorHistoryKind = 'structured' | 'monaco' | 'none'
 
-export type EditorHistoryState = {
+type EditorHistoryState = {
   canUndo: boolean
   canRedo: boolean
-}
-
-export type EditorHistoryPort = {
-  canUndo: ComputedRef<boolean>
-  canRedo: ComputedRef<boolean>
-  undo: () => Promise<void>
-  redo: () => Promise<void>
-  flush: () => Promise<void>
 }
 
 type SessionHistory = {

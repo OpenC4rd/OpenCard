@@ -33,7 +33,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
-import { renderMarkdown } from '../../card-rendering/markdown/renderMarkdown'
+import { renderMarkdown } from '../../../shared/ui/markdown/renderMarkdown'
 import type { ReleaseNotesSnapshot } from '../composables/updateStatePersistence'
 
 const props = defineProps<{

@@ -27,7 +27,7 @@ const MIN_TYPING_COLUMN_WIDTH = 24
 
 type ExcelJsModule = typeof import('exceljs')
 
-export type CardDataWorkbookExportInput = {
+type CardDataWorkbookExportInput = {
   document: CardDocument
   columns: readonly CdeDataTableColumn[]
   faceGroups: readonly CdeDataTableFaceGroup[]
@@ -50,7 +50,7 @@ export type CardDataWorkbookImportResult = {
   warnings: string[]
 }
 
-export class CardDataWorkbookError extends Error {
+class CardDataWorkbookError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'CardDataWorkbookError'

@@ -7,7 +7,7 @@
 import { publishAppOutput } from './appOutput'
 import { notifyWarning } from '../notifications/titlebarNotices'
 
-export type CatalogWarning = {
+type CatalogWarning = {
   path: string
   reason: string
 }

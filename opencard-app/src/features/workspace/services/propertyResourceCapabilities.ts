@@ -24,7 +24,7 @@ import {
 } from './projectResourceEnvironment'
 import { createResourceFilePathScopes, createScopeDirectoryProvider } from './resourceDirectoryProvider'
 
-export type CreateResourcePropertyCapabilitiesOptions = {
+type CreateResourcePropertyCapabilitiesOptions = {
   projectLabel: string
   rootPath?: string | null
   fs?: Pick<FileSystemService, 'readDirectoryEntries' | 'fileExists'>

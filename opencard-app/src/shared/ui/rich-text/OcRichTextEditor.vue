@@ -264,45 +264,4 @@ defineExpose({ editor, focus, getHtml, applyHtml, getContent, setContent, flushP
   margin-block: var(--oc-space-xs);
   padding-inline-start: var(--oc-space-lg);
 }
-
-.oc-rich-text-editor__surface :deep(table) {
-  width: 100%;
-  margin-block: var(--oc-space-xs);
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.oc-rich-text-editor__surface :deep(th),
-.oc-rich-text-editor__surface :deep(td) {
-  position: relative;
-  min-width: var(--oc-size-lg);
-  padding: var(--oc-space-2xs) var(--oc-space-xs);
-  border: var(--oc-border-width) solid var(--oc-border-strong);
-  vertical-align: top;
-}
-
-.oc-rich-text-editor__surface :deep([class~="tableWrapper"]) {
-  overflow-x: auto;
-}
-
-.oc-rich-text-editor__surface :deep(th) {
-  background: var(--oc-bg-raised);
-}
-
-.oc-rich-text-editor__surface :deep(.column-resize-handle) {
-  position: absolute;
-  inset-block: 0;
-  right: 0;
-  width: var(--oc-space-2xs);
-  background: var(--oc-border-strong);
-  pointer-events: none;
-}
-
-.oc-rich-text-editor__surface :deep(.resize-cursor) {
-  cursor: col-resize;
-}
-
-.oc-rich-text-editor__surface :deep([class~="selectedCell"]) {
-  background-color: var(--oc-bg-selected);
-}
 </style>

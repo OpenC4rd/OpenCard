@@ -13,7 +13,7 @@ export type DictionaryGridColumn = {
   active: boolean
 }
 
-export type DictionaryGridCell = {
+type DictionaryGridCell = {
   columnKey: string
   recordKey: string
   value: string
@@ -21,12 +21,12 @@ export type DictionaryGridCell = {
   overridden: boolean
 }
 
-export type DictionaryGridRow = {
+type DictionaryGridRow = {
   key: string
   cells: DictionaryGridCell[]
 }
 
-export type DictionaryGridProjection = {
+type DictionaryGridProjection = {
   columns: DictionaryGridColumn[]
   rows: DictionaryGridRow[]
 }

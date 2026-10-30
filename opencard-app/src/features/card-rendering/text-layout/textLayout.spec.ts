@@ -8,8 +8,8 @@ function layout(source: string, overrides: Partial<TextLayoutInput> = {}) {
   return layoutTextBlock(
     {
       document: parseCardMarkup(source).document,
-      boxWidth: 100, boxHeight: 100, baseFontFamily: 'Test', baseFontSizePx: 10, baseFontWeight: 'normal',
-      baseColor: '#000', textAlign: 'start', verticalAlign: 'top', lineHeightPx: 20, writingMode: 'horizontal-tb',
+      boxWidth: 100, boxHeight: 100, baseFontFamily: 'Test', baseFontSize: 10, baseFontWeight: 'normal',
+      baseColor: '#000', textAlign: 'start', verticalAlign: 'top', lineHeight: 20, writingMode: 'horizontal-tb',
       ...overrides,
     },
     createMockTextMeasurer(),
@@ -76,14 +76,14 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('resolves nested span styles and relative font sizes against the enclosing span', () => {
-    const [run] = layout('@size(20px){@size(0.5em){x}}').runs
-    expect(run).toMatchObject({ style: { fontSizePx: 10 } })
+    const [run] = layout('@size(20mm){@size(0.5em){x}}').runs
+    expect(run).toMatchObject({ style: { fontSize: 10 } })
     const [colored] = layout('@style(b=true,color=red,stroke=#000 2){x}').runs
     expect(colored).toMatchObject({ style: { fontWeight: 'bold', color: 'red', strokeColor: '#000', strokeWidth: 2 } })
   })
 
   it('grows the line for a tall inline icon and sits it on the baseline', () => {
-    const result = layout('a@icon(key=k,size=40px)')
+    const result = layout('a@icon(key=k,size=40mm)')
     const icon = result.runs.find((run) => run.kind === 'icon')!
     expect(icon).toMatchObject({ width: 40, height: 40, x: 5 })
     expect(result.lines[0]!.height).toBe(40)
@@ -91,7 +91,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('grows line height for larger font spans and prevents successive lines from overlapping', () => {
-    const result = layout('Line 1\n@size(40px){BIG}\nLine 3')
+    const result = layout('Line 1\n@size(40mm){BIG}\nLine 3')
     expect(result.lines.map((l) => [l.y, l.height])).toEqual([
       [0, 20],
       [20, 80],
@@ -104,7 +104,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('keeps enlarged line height across wrapped lines when a large text wraps', () => {
-    const result = layout('@size(40px){Line 2}') // 112px wide, wraps in 100px box
+    const result = layout('@size(40mm){Line 2}') // 112 wide, wraps in 100 box
     expect(result.lines.map((l) => [l.y, l.height])).toEqual([
       [0, 80],
       [80, 80],
@@ -113,7 +113,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('aligns mixed font sizes on the same line to a common baseline without clipping', () => {
-    const result = layout('small@size(40px){BIG}')
+    const result = layout('small@size(40mm){BIG}')
     const line = result.lines[0]!
     expect(line.height).toBe(80)
     const [smallRun, bigRun] = line.runs

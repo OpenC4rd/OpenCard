@@ -14,12 +14,10 @@ export type {
   CardMarkupTextNode,
   InlineStyleSpec,
 } from './cardMarkup.types'
-export { parseCardMarkup, isLegacyHtml } from './cardMarkupParser'
+export { parseCardMarkup } from './cardMarkupParser'
 export { serializeCardMarkup } from './cardMarkupSerializer'
 export {
-  cardMarkupToHtml,
   cardMarkupToTiptap,
-  htmlToCardMarkup,
   serializeTiptapMarkup,
   tiptapToCardMarkup,
   type TiptapBridgeMark,

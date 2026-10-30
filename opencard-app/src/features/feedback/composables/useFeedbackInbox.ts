@@ -15,7 +15,7 @@ import type { FeedbackSubmission } from '../model/feedback'
 
 const MAX_TIMER_DELAY_MS = 2_147_000_000
 
-export type FeedbackInboxRefreshResult = { errorCode?: FeedbackServiceErrorCode | 'network' }
+type FeedbackInboxRefreshResult = { errorCode?: FeedbackServiceErrorCode | 'network' }
 
 type FeedbackInboxDependencies = {
   store: FeedbackReceiptStore
@@ -25,7 +25,7 @@ type FeedbackInboxDependencies = {
   clearTimer: (timer: ReturnType<typeof setTimeout>) => void
 }
 
-export type FeedbackInbox = {
+type FeedbackInbox = {
   records: Readonly<Ref<readonly FeedbackReceiptRecord[]>>
   unreadReplyCount: ComputedRef<number>
   refreshing: Readonly<Ref<boolean>>

@@ -1,6 +1,6 @@
 import type { RenderReadyCardBlock, RenderReadyCardFace } from '../render.types'
 
-export type CardLayerBlock = {
+type CardLayerBlock = {
   id: string
   zIndex: number
   block: RenderReadyCardBlock

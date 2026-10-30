@@ -136,6 +136,8 @@ OpenCard/
 - 版本变化：[`opencard-app/RELEASE_NOTES.md`](opencard-app/RELEASE_NOTES.md)
 - 最新发布：[Releases](https://github.com/OpenC4rd/OpenCard/releases)
 - 工程约定：[`docs/工程规则.md`](docs/工程规则.md)
+- 实现指南（存储、资源包、教程、性能）：[`docs/实现指南.md`](docs/实现指南.md)
+- 命名规范：[`docs/命名规范.md`](docs/命名规范.md)
 - UI 组件规范：[`docs/UI_RULES.md`](docs/UI_RULES.md)
 - 问题反馈：[GitHub Issues](https://github.com/OpenC4rd/OpenCard/issues)
 - 社群交流（QQ）：[OpenCard 桌游交流群（约 1200+ 人）](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=MJD18YzJxqft6Q6rKX-sSNiLrtmqVQmJ&authKey=TM3En%2BxxzFeqimSCUhG%2F5VLmfRDeXtnfm1h6P7cwfoGR6bVXkXk2cYm%2BOG0MHuJ8&noverify=0&group_code=567915181)

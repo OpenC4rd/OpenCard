@@ -21,7 +21,7 @@ type ContentHistoryEntry = {
 
 type PendingEntry = ContentHistoryEntry & { merge: HistoryMergeIdentity }
 
-export type ContentHistoryOptions = {
+type ContentHistoryOptions = {
   content: string
   entryLimit: number
   byteLimit?: number

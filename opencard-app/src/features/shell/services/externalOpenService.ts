@@ -10,7 +10,7 @@ import { PROJECT_TEMPLATE_PACKAGE_SUFFIX } from '../../project-templates/model/p
 const EXTERNAL_OPEN_EVENT = 'external-open-requested'
 const TAKE_EXTERNAL_OPEN_REQUESTS_COMMAND = 'take_external_open_requests'
 
-export type ExternalOpenPathKind = 'card' | 'project-resource' | 'template' | 'resource-package'
+type ExternalOpenPathKind = 'card' | 'project-resource' | 'template' | 'resource-package'
 
 export function classifyExternalOpenPath(path: string): ExternalOpenPathKind | null {
   const normalizedPath = path.replace(/\\/g, '/')

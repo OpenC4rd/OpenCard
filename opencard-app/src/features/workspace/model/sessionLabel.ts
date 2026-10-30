@@ -6,7 +6,7 @@
  */
 
 /** 判定显示名需要的最小会话形状；结构化传入，便于任何投影复用。 */
-export type SessionLabelSource = {
+type SessionLabelSource = {
   name: string
   presentation?: { title: string } | null
   isDirty: boolean
@@ -14,7 +14,7 @@ export type SessionLabelSource = {
 }
 
 /** 作用域前缀由调用方提供，因为它属于界面文案。 */
-export type SessionScopeTexts = {
+type SessionScopeTexts = {
   external: (name: string) => string
   draft: (name: string) => string
 }

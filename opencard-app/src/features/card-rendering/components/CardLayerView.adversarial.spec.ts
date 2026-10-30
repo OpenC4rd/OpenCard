@@ -177,15 +177,15 @@ function textBlock(id: string, zIndex: number, text: string, options: Partial<Re
     name: id,
     notes: '',
     visible: true,
-    width: '120px',
-    height: '40px',
+    width: '120mm',
+    height: '40mm',
     borderColor: '#000000',
     borderWidth: 0,
     borderStyle: 'solid',
     borderRadius: '',
     background: '#ffffff',
-    translateX: '0px',
-    translateY: '0px',
+    translateX: '0mm',
+    translateY: '0mm',
     scaleX: 1,
     scaleY: 1,
     transformAnchor: 'cc',
@@ -193,7 +193,7 @@ function textBlock(id: string, zIndex: number, text: string, options: Partial<Re
     rotation: 0,
     opacity: 1,
     content: text,
-    fontSize: '16px',
+    fontSize: '16mm',
     fontFamily: '',
     fontWeight: 'normal',
     color: '#000000',
@@ -217,15 +217,15 @@ function imageBlock(
     name: id,
     notes: '',
     visible: true,
-    width: '100px',
-    height: '100px',
+    width: '100mm',
+    height: '100mm',
     borderColor: '#000000',
     borderWidth: 0,
     borderStyle: 'solid',
     borderRadius: '',
     background: '#ffffff',
-    translateX: '0px',
-    translateY: '0px',
+    translateX: '0mm',
+    translateY: '0mm',
     scaleX: 1,
     scaleY: 1,
     transformAnchor: 'cc',
@@ -249,15 +249,15 @@ function shapeBlock(id: string, zIndex: number, options: Partial<RenderReadyShap
     name: id,
     notes: '',
     visible: true,
-    width: '80px',
-    height: '80px',
+    width: '80mm',
+    height: '80mm',
     borderColor: '#333333',
     borderWidth: 2,
     borderStyle: 'solid',
-    borderRadius: '4px',
+    borderRadius: '4mm',
     background: '#ff0000',
-    translateX: '0px',
-    translateY: '0px',
+    translateX: '0mm',
+    translateY: '0mm',
     scaleX: 1,
     scaleY: 1,
     transformAnchor: 'cc',
@@ -288,15 +288,15 @@ function containerBlock(
     name: id,
     notes: '',
     visible: true,
-    width: '300px',
-    height: '200px',
+    width: '300mm',
+    height: '200mm',
     borderColor: '#000000',
     borderWidth: 0,
     borderStyle: 'solid',
     borderRadius: '',
     background: '#eeeeee',
-    translateX: '0px',
-    translateY: '0px',
+    translateX: '0mm',
+    translateY: '0mm',
     scaleX: 1,
     scaleY: 1,
     transformAnchor: 'cc',
@@ -306,7 +306,7 @@ function containerBlock(
     clip: false,
     children: children.map(child => ({
       block: child,
-      location: { id: `${child.id}-loc`, type: 'simple-container-location', anchor: 'lt', x: '10px', y: '10px' },
+      location: { id: `${child.id}-loc`, type: 'simple-container-location', anchor: 'lt', x: '10mm', y: '10mm' },
     })),
     ...options,
   }
@@ -322,7 +322,7 @@ function createFace(children: RenderReadyCardBlock[], width = 600, height = 800)
     background: '#f8f9fa',
     children: children.map(child => ({
       block: child,
-      location: { id: `${child.id}-loc`, type: 'simple-container-location', anchor: 'lt', x: '20px', y: '30px' },
+      location: { id: `${child.id}-loc`, type: 'simple-container-location', anchor: 'lt', x: '20mm', y: '30mm' },
     })),
   }
 }
@@ -406,8 +406,8 @@ describe('CardLayerView 3D Invariants & Shell Decoupling Adversarial Suite', () 
       rotation: 45,
       scaleX: 1.5,
       scaleY: 0.8,
-      translateX: '50px',
-      translateY: '25px',
+      translateX: '50mm',
+      translateY: '25mm',
     })
     const plainText = textBlock('plain-text', 2, 'Target Text')
 
@@ -455,8 +455,8 @@ describe('CardLayerView 3D Invariants & Shell Decoupling Adversarial Suite', () 
     const container = containerBlock('clipped-container', 1, [clippedChild], {
       clip: true,
       rotation: 30,
-      width: '200px',
-      height: '150px',
+      width: '200mm',
+      height: '150mm',
     })
 
     const card = createFace([container], 600, 800)
@@ -530,18 +530,18 @@ describe('CardLayerView 3D Invariants & Shell Decoupling Adversarial Suite', () 
     const innerContainer = containerBlock('inner-container', 2, [leafChild], {
       clip: true,
       rotation: -20,
-      translateX: '30px',
-      translateY: '20px',
-      width: '180px',
-      height: '120px',
+      translateX: '30mm',
+      translateY: '20mm',
+      width: '180mm',
+      height: '120mm',
     })
     const outerContainer = containerBlock('outer-container', 1, [innerContainer], {
       clip: true,
       rotation: 15,
-      translateX: '40px',
-      translateY: '50px',
-      width: '350px',
-      height: '250px',
+      translateX: '40mm',
+      translateY: '50mm',
+      width: '350mm',
+      height: '250mm',
     })
 
     const card = createFace([outerContainer], 800, 1000)
@@ -775,12 +775,12 @@ describe('CardLayerView 3D Invariants & Shell Decoupling Adversarial Suite', () 
               {
                 block: {
                   type: 'shape-block', id: 's1', name: 'Shape', shape: 'rectangle',
-                  visible: true, width: '100px', height: '100px', background: '#00ff00',
+                  visible: true, width: '100mm', height: '100mm', background: '#00ff00',
                   borderColor: '#000', borderWidth: 0, borderStyle: 'solid', borderRadius: '',
-                  translateX: '10px', translateY: '10px', scaleX: 1, scaleY: 1, transformAnchor: 'cc',
+                  translateX: '10mm', translateY: '10mm', scaleX: 1, scaleY: 1, transformAnchor: 'cc',
                   zIndex: 1, rotation: 0, opacity: 1,
                 },
-                location: { id: 's1-loc', type: 'simple-container-location', anchor: 'lt', x: '10px', y: '10px' },
+                location: { id: 's1-loc', type: 'simple-container-location', anchor: 'lt', x: '10mm', y: '10mm' },
               },
             ],
           },
@@ -988,7 +988,7 @@ describe('CardLayerView 3D Invariants & Shell Decoupling Adversarial Suite', () 
     })
 
     try {
-      const faceInitial = createFace([textBlock('t1', 1, 'Initial Face', { width: '500px' })], 600, 800)
+      const faceInitial = createFace([textBlock('t1', 1, 'Initial Face', { width: '500mm' })], 600, 800)
       const wrapper = mountView(faceInitial)
       await nextTick()
 
@@ -1001,14 +1001,14 @@ describe('CardLayerView 3D Invariants & Shell Decoupling Adversarial Suite', () 
       const ctx = contextsByCanvas.get(canvas.element)!
 
       // Rapid Update 1 (slow network request, token 2)
-      const faceSlow = createFace([textBlock('t1', 1, 'Slow Face Text', { width: '500px' })], 600, 800)
+      const faceSlow = createFace([textBlock('t1', 1, 'Slow Face Text', { width: '500mm' })], 600, 800)
       await wrapper.setProps({ face: faceSlow })
       await nextTick()
       expect(deferredQueue.length).toBe(2)
       const slowDeferred = deferredQueue[1]!
 
       // Rapid Update 2 (fast network request, token 3)
-      const faceFast = createFace([textBlock('t1', 1, 'Fast Face Final Text', { width: '500px' })], 600, 800)
+      const faceFast = createFace([textBlock('t1', 1, 'Fast Face Final Text', { width: '500mm' })], 600, 800)
       await wrapper.setProps({ face: faceFast })
       await nextTick()
       expect(deferredQueue.length).toBe(3)

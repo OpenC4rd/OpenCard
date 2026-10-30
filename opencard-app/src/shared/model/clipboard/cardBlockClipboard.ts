@@ -21,7 +21,7 @@ export type CardBlockPayload = {
   location: CardBlockLocation
 }
 
-export type CardBlocksPayload = {
+type CardBlocksPayload = {
   blocks: CardBlockPayload[]
 }
 

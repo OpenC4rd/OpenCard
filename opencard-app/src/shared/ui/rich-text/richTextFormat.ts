@@ -6,9 +6,9 @@ import type {
   PropertyEditorInput,
 } from '../property-editor/propertyEditor.types'
 
-export type RichTextFormatLabels = (key: string, fallback: string) => string
+type RichTextFormatLabels = (key: string, fallback: string) => string
 
-export type RichTextFormatOptions = {
+type RichTextFormatOptions = {
   fontField: PropertyEditorFieldDefinition
   fontSizeField: PropertyEditorFieldDefinition
   strokeWidthField: PropertyEditorFieldDefinition

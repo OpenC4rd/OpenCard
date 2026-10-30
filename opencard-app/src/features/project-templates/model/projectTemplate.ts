@@ -2,17 +2,17 @@ import { isProjectCoverPath } from '../../workspace/model/projectCover'
 import { isRecord } from '../../../shared/model/record'
 
 export const PROJECT_TEMPLATE_SCHEMA_VERSION = 1 as const
-export const PROJECT_TEMPLATE_NAME_MAX_LENGTH = 80
-export const PROJECT_TEMPLATE_DESCRIPTION_MAX_LENGTH = 200
+const PROJECT_TEMPLATE_NAME_MAX_LENGTH = 80
+const PROJECT_TEMPLATE_DESCRIPTION_MAX_LENGTH = 200
 export const PROJECT_TEMPLATE_PACKAGE_EXTENSION = 'octemplate'
 export const PROJECT_TEMPLATE_PACKAGE_SUFFIX = `.${PROJECT_TEMPLATE_PACKAGE_EXTENSION}`
 
 export type ProjectTemplateSource = 'builtin' | 'user'
 export type ProjectTemplateKey = `${ProjectTemplateSource}:${string}`
 
-export type ProjectTemplateLocalizedText = Readonly<Record<string, string>>
+type ProjectTemplateLocalizedText = Readonly<Record<string, string>>
 
-export interface ProjectTemplateLocalization {
+interface ProjectTemplateLocalization {
   name?: ProjectTemplateLocalizedText
   description?: ProjectTemplateLocalizedText
 }
@@ -76,19 +76,12 @@ export interface CreateProjectFromTemplateRequest {
   entry?: string
 }
 
-export interface TemplateExportSelection {
-  excludedPaths: string[]
-  entries: string[]
-  entryNames: Record<string, string>
-  covers: string[]
-}
-
 export interface CreatedProject {
   path: string
   entry?: string
 }
 
-export type TemplateServiceErrorCode =
+type TemplateServiceErrorCode =
   | 'invalid-catalog'
   | 'invalid-manifest'
   | 'invalid-project-name'
@@ -200,7 +193,7 @@ export function resolveTemplateEntries(template: Pick<ProjectTemplateManifest, '
   return [...new Set([template.entry, ...(template.entries ?? [])].filter((entry): entry is string => Boolean(entry)))]
 }
 
-export function resolveProjectTemplateText(
+function resolveProjectTemplateText(
   localized: ProjectTemplateLocalizedText | undefined,
   fallback: string,
   locale: string,
@@ -225,7 +218,7 @@ export function resolveProjectTemplateDescription(template: ProjectTemplate, loc
   return resolveProjectTemplateText(template.i18n?.description, template.description, locale)
 }
 
-export function isSafeProjectTemplateId(value: string): boolean {
+function isSafeProjectTemplateId(value: string): boolean {
   return SAFE_TEMPLATE_ID.test(value)
 }
 

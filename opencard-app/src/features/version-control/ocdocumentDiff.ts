@@ -1,9 +1,9 @@
 import { getBlockProperty, type CardBlock, type CardDocument, type CardFaceKey, type CardInstanceRecord } from '../../entities/card/model'
 import { parseCardDocument } from '../../entities/card/storage'
 
-export type OcdocumentChangeKind = 'added' | 'removed' | 'changed' | 'moved'
+type OcdocumentChangeKind = 'added' | 'removed' | 'changed' | 'moved'
 
-export interface OcdocumentChange {
+interface OcdocumentChange {
   path: string
   kind: OcdocumentChangeKind
   label: string
@@ -14,7 +14,7 @@ export interface OcdocumentChange {
   instanceId?: string
 }
 
-export interface OcdocumentDiffError {
+interface OcdocumentDiffError {
   side: 'before' | 'after'
   message: string
 }

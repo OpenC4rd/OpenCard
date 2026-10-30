@@ -13,7 +13,7 @@ import {
   type SpaceKey,
 } from '../shellLocation'
 
-export interface ShellNavigationModel {
+interface ShellNavigationModel {
   location: Ref<ShellLocation>
   activeSpace: ComputedRef<SpaceKey>
   page: ComputedRef<ShellPage>

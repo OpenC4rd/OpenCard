@@ -62,7 +62,7 @@ type CdeDiffSideProjection = {
 }
 
 /** A compared block addressed by id, without exposing the whole side projection. */
-export type CdeDiffBlockRef = {
+type CdeDiffBlockRef = {
   blockId: string
   faceKey: CardFaceKey
 }

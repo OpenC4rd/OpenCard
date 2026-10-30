@@ -47,7 +47,7 @@ function parseLength(val: unknown): number | undefined {
   return match ? Number(match[1]) : undefined
 }
 
-export function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
+function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   const marks: TiptapBridgeMark[] = []
   if (style.bold) marks.push({ type: 'bold' })
   if (style.italic) marks.push({ type: 'italic' })
@@ -64,11 +64,11 @@ export function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   if (style.fontSize !== undefined) textStyleAttrs.fontSize = style.fontSize
   if (style.fontFamily !== undefined) textStyleAttrs.fontFamily = style.fontFamily
   if (style.strokeColor !== undefined) textStyleAttrs.textStrokeColor = style.strokeColor
-  if (style.strokeWidth !== undefined) textStyleAttrs.textStrokeWidth = `${style.strokeWidth}px`
+  if (style.strokeWidth !== undefined) textStyleAttrs.textStrokeWidth = `${style.strokeWidth}mm`
   if (style.shadowColor !== undefined) textStyleAttrs.textShadowColor = style.shadowColor
-  if (style.shadowOffsetX !== undefined) textStyleAttrs.textShadowOffsetX = `${style.shadowOffsetX}px`
-  if (style.shadowOffsetY !== undefined) textStyleAttrs.textShadowOffsetY = `${style.shadowOffsetY}px`
-  if (style.shadowBlur !== undefined) textStyleAttrs.textShadowBlur = `${style.shadowBlur}px`
+  if (style.shadowOffsetX !== undefined) textStyleAttrs.textShadowOffsetX = `${style.shadowOffsetX}mm`
+  if (style.shadowOffsetY !== undefined) textStyleAttrs.textShadowOffsetY = `${style.shadowOffsetY}mm`
+  if (style.shadowBlur !== undefined) textStyleAttrs.textShadowBlur = `${style.shadowBlur}mm`
   if (style.fillType !== undefined) {
     textStyleAttrs.textFillType = style.fillType
     if (style.fillSource !== undefined) textStyleAttrs.textFillSource = style.fillSource
@@ -81,7 +81,7 @@ export function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   return marks
 }
 
-export function marksToStyle(marks?: readonly TiptapBridgeMark[]): InlineStyleSpec {
+function marksToStyle(marks?: readonly TiptapBridgeMark[]): InlineStyleSpec {
   const style: InlineStyleSpec = {}
   if (!marks || marks.length === 0) return style
 
@@ -548,80 +548,3 @@ export function serializeTiptapMarkup(source: TiptapBridgeNode | string): string
   return serializeCardMarkup(tiptapToCardMarkup(source))
 }
 
-export function cardMarkupToHtml(source: string | CardMarkupDocument): string {
-  const doc: CardMarkupDocument = typeof source === 'string'
-    ? parseCardMarkup(source).document
-    : source
-  const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
-  function inlineToHtml(node: CardMarkupInlineNode): string {
-    switch (node.type) {
-      case 'text':
-        return escapeHtml(node.value)
-      case 'binding':
-        return `<span class="binding-node" data-type="binding" data-expression="${escapeHtml(node.expression)}">{{${escapeHtml(node.expression)}}}</span>`
-      case 'br':
-        return '<br>'
-      case 'icon': {
-        const path = formatIconPath(node)
-        const sizeAttr = node.size ? ` data-oc-size="${escapeHtml(node.size)}"` : ''
-        return `<span class="project-icon-node" data-type="projectIcon" data-icon-path="${escapeHtml(path)}"${sizeAttr}></span>`
-      }
-      case 'img': {
-        const attrs = [`src="${escapeHtml(node.src)}"`]
-        if (node.width) attrs.push(`width="${escapeHtml(node.width)}"`)
-        if (node.height) attrs.push(`height="${escapeHtml(node.height)}"`)
-        return `<img ${attrs.join(' ')} />`
-      }
-      case 'span': {
-        let content = node.children.map(inlineToHtml).join('')
-        const style = node.style
-        if (style.bold) content = `<strong>${content}</strong>`
-        if (style.italic) content = `<em>${content}</em>`
-        if (style.underline) content = `<u>${content}</u>`
-        if (style.strikethrough) content = `<s>${content}</s>`
-        if (style.markColor || style.backgroundColor) {
-          const color = style.markColor ?? style.backgroundColor!
-          content = `<mark data-color="${color}" style="background-color: ${color}">${content}</mark>`
-        }
-        const styleAttrs: string[] = []
-        if (style.color) styleAttrs.push(`color: ${style.color}`)
-        if (style.fontSize) styleAttrs.push(`font-size: ${style.fontSize}`)
-        if (style.fontFamily) styleAttrs.push(`font-family: ${style.fontFamily}`)
-        if (style.strokeColor) styleAttrs.push(`-webkit-text-stroke-color: ${style.strokeColor}`)
-        if (style.strokeWidth !== undefined) styleAttrs.push(`-webkit-text-stroke-width: ${style.strokeWidth}px`)
-        if (style.shadowColor) styleAttrs.push(`text-shadow: ${style.shadowColor} ${style.shadowOffsetX ?? 0}px ${style.shadowOffsetY ?? 0}px ${style.shadowBlur ?? 0}px`)
-        const dataAttrs: string[] = []
-        if (style.fillType) dataAttrs.push(`data-oc-fill-type="${style.fillType}"`)
-        if (style.fillSource) dataAttrs.push(`data-oc-fill-source="${escapeHtml(style.fillSource)}"`)
-        if (styleAttrs.length > 0 || dataAttrs.length > 0) {
-          const styleStr = styleAttrs.length > 0 ? ` style="${styleAttrs.join('; ')}"` : ''
-          const dataStr = dataAttrs.length > 0 ? ` ${dataAttrs.join(' ')}` : ''
-          content = `<span${dataStr}${styleStr}>${content}</span>`
-        }
-        return content
-      }
-    }
-  }
-
-  function blockToHtml(block: CardMarkupBlockNode): string {
-    if (block.type === 'paragraph') {
-      const align = block.align ? ` style="text-align: ${block.align}"` : ''
-      return `<p${align}>${block.children.map(inlineToHtml).join('')}</p>`
-    }
-    if (block.type === 'list') {
-      const tag = block.ordered ? 'ol' : 'ul'
-      const items = block.items.map(item => `<li>${item.map(p => blockToHtml(p)).join('')}</li>`).join('')
-      return `<${tag}>${items}</${tag}>`
-    }
-    return ''
-  }
-
-  const html = doc.blocks.map(blockToHtml).join('')
-  return html || '<p></p>'
-}
-
-export function htmlToCardMarkup(html: string): string {
-  const result = parseCardMarkup(html)
-  return serializeCardMarkup(result.document)
-}

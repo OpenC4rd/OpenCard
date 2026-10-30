@@ -14,7 +14,7 @@ export type GitErrorKind =
   | 'git'
   | 'io'
 
-export interface GitServiceError {
+interface GitServiceError {
   kind: GitErrorKind
   message: string
   retryable: boolean
@@ -63,7 +63,7 @@ export interface GitStatusResult {
 
 export interface PathRequest { paths: string[] }
 export interface CommitRequest { message: string }
-export type CommitChangedFileStatus = 'added' | 'modified' | 'deleted'
+type CommitChangedFileStatus = 'added' | 'modified' | 'deleted'
 export interface CommitChangedFile { path: string; status: CommitChangedFileStatus }
 
 export interface CommitSummary {

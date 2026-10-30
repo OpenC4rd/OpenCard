@@ -76,8 +76,8 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
     const face = options.faceSize.value
     if (!face) return {}
     return {
-      width: `${Math.round(face.width * transformPreviewScale.value)}px`,
-      height: `${Math.round(face.height * transformPreviewScale.value)}px`,
+      width: `${face.width * transformPreviewScale.value}px`,
+      height: `${face.height * transformPreviewScale.value}px`,
     }
   })
   const transformPreviewWorldRect = computed(() => {

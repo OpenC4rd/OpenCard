@@ -5,7 +5,7 @@ import { RECENT_PROJECTS_LIST_KEY } from '../shellSidebarConfig'
 
 type Translate = (key: string) => string
 
-export interface WelcomeSectionOptions {
+interface WelcomeSectionOptions {
   translate: Translate
   recentProjectTreeData: Readonly<Ref<OcNodeCollection>>
   selectedRecentProjectKeys: Readonly<Ref<string[]>>

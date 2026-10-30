@@ -6,7 +6,7 @@ import type { Ref } from 'vue'
 import { getBlockProperty, setBlockProperty, type CardDocument } from '../../entities/card/model'
 import type { ParentLookup } from '../../entities/card/tree'
 
-export type CdeSelectionResizeIntent = {
+type CdeSelectionResizeIntent = {
   blockId: string
   width?: number
   height?: number
@@ -14,13 +14,13 @@ export type CdeSelectionResizeIntent = {
   y?: number
 }
 
-export type CdeSelectionMoveIntent = {
+type CdeSelectionMoveIntent = {
   blockId: string
   x: number
   y: number
 }
 
-export type CdeSelectionLayoutIntent =
+type CdeSelectionLayoutIntent =
   | { type: 'fill-parent'; blockId: string; width: boolean; height: boolean }
   | { type: 'fill-cross-axis'; blockId: string }
   | { type: 'center-cross-axis'; blockId: string }
@@ -34,13 +34,13 @@ export type CdeSelectionLayoutIntent =
       y?: number
     }
 
-export type CdeFaceDimensionIntent = {
+type CdeFaceDimensionIntent = {
   dimension: 'width' | 'height'
   value: number
   final: boolean
 }
 
-export type CdeSelectionZIndexIntent = {
+type CdeSelectionZIndexIntent = {
   blockId: string
   delta: -1 | 1
   existingLayersOnly: boolean

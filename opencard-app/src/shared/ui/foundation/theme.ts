@@ -10,7 +10,7 @@ import {
   type OcThemeTokens,
 } from './themeTokens'
 
-export type OcThemeTypography = {
+type OcThemeTypography = {
   fontFamily?: string
   baseFontSize?: number
 }

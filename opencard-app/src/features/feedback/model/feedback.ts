@@ -7,7 +7,7 @@ export type FeedbackEnvironment = {
   platform: string
 }
 
-export type FeedbackDraft = {
+type FeedbackDraft = {
   kind: FeedbackKind
   message: string
   reproduction?: string
@@ -24,7 +24,7 @@ export type FeedbackDiagnosticInput = {
   logs?: readonly string[]
 }
 
-export type FeedbackDiagnostics = {
+type FeedbackDiagnostics = {
   errorName?: string
   errorMessage?: string
   stack?: string

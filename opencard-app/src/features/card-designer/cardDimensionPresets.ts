@@ -1,4 +1,4 @@
-export type CardDimensionPreset = {
+type CardDimensionPreset = {
   id: string
   name: string
   width: number

@@ -7,9 +7,9 @@ export type ProjectDictionary = {
   languages?: Record<string, Record<string, string>>
 }
 
-export type ResolvedProjectDictionary = Record<string, string>
+type ResolvedProjectDictionary = Record<string, string>
 
-export type DictionaryResolution = {
+type DictionaryResolution = {
   values: ResolvedProjectDictionary
   warning: 'active-language-missing' | null
 }

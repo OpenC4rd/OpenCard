@@ -9,15 +9,15 @@ function createBlock(overrides: Partial<RenderReadyBaseBlock> = {}): RenderReady
         name: 'Block',
         notes: '',
         visible: true,
-        width: '120px',
-        height: '80px',
+        width: '120mm',
+        height: '80mm',
         borderColor: '#000000',
         borderWidth: 0,
         borderStyle: 'solid',
         borderRadius: '',
         background: '',
-        translateX: '0px',
-        translateY: '0px',
+        translateX: '0mm',
+        translateY: '0mm',
         scaleX: 1,
         scaleY: 1,
         transformAnchor: 'cc',
@@ -36,9 +36,9 @@ describe('getBlockBoxStyles', () => {
             borderStyle: 'dashed',
         }))
 
-        expect(styles).toContain('width: 120px')
-        expect(styles).toContain('height: 80px')
-        expect(styles).toContain('outline: 3px dashed #ff0000')
+        expect(styles).toContain('width: 120mm')
+        expect(styles).toContain('height: 80mm')
+        expect(styles).toContain('outline: 3mm dashed #ff0000')
         expect(styles).not.toMatch(/(^|;)\s*border:/)
     })
 
@@ -56,7 +56,7 @@ describe('getBlockBoxStyles', () => {
         const styles = getBlockBoxStyles(createBlock({ visible: false }))
 
         expect(styles).toContain('visibility: hidden')
-        expect(styles).toContain('width: 120px')
-        expect(styles).toContain('height: 80px')
+        expect(styles).toContain('width: 120mm')
+        expect(styles).toContain('height: 80mm')
     })
 })

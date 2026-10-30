@@ -213,7 +213,7 @@ import type {
 } from './useCdeDataTableModel'
 import type { CdeBlockFieldTarget } from './useCdeBlockFieldCommands'
 
-export type CdeDataTableCellSelection = CdeBlockFieldTarget & {
+type CdeDataTableCellSelection = CdeBlockFieldTarget & {
   faceKey: CdeDataTableFaceGroup['key']
 }
 

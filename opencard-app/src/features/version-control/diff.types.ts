@@ -24,8 +24,3 @@ export interface DiffSession {
   before: DiffSnapshot
   after: DiffSnapshot
 }
-
-export interface DiffComparisonSelection {
-  beforeCommitId: string | null
-  afterCommitId: string | null
-}

@@ -20,12 +20,12 @@ import {
 /** 单份语言文件的字节上限：界面文案不该有这么大的量。 */
 export const MAX_USER_LOCALE_FILE_BYTES = 2 * 1024 * 1024
 /** 一次最多认多少种用户语言。 */
-export const MAX_USER_LOCALE_FILES = 64
+const MAX_USER_LOCALE_FILES = 64
 
 export type LocaleMessageObject = Record<string, unknown>
 export type UserLocaleBase = BuiltinAppLocaleId | 'keys'
 
-export interface UserLocaleFile {
+interface UserLocaleFile {
   id: string
   base: UserLocaleBase
   messages: LocaleMessageObject
@@ -36,12 +36,12 @@ export interface UserLocaleProblem {
   reason: string
 }
 
-export interface UserLocaleScan {
+interface UserLocaleScan {
   locales: UserLocaleFile[]
   problems: UserLocaleProblem[]
 }
 
-export type UserLocaleParseResult =
+type UserLocaleParseResult =
   | { ok: true, locale: UserLocaleFile }
   | { ok: false, reason: string }
 

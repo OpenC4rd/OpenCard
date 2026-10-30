@@ -10,7 +10,7 @@ import {
 } from './exportTask'
 import { ExportRenderDiagnosticsError } from './exportRenderingError'
 
-export type RunExportPlanOptions = {
+type RunExportPlanOptions = {
   plan: ExportPlan
   renderer: ExportFaceRenderer
   destination: ExportDestination

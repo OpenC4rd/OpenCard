@@ -1,7 +1,7 @@
 import type { UnicodeRange } from '../model/projectFontRegistry'
 import { unicodeRangeContains } from '../model/projectFonts'
 
-export type ProjectFontPreviewRun = {
+type ProjectFontPreviewRun = {
   text: string
   familyKey: string | null
   faceKey: string | null

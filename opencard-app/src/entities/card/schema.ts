@@ -4,7 +4,6 @@
  * 职责边界：
  * - 只维护字段协议与默认值 不承载 UI 写回逻辑
  */
-import type { CardBlock } from './model'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import type { BindingValueKind } from '../../features/editor-runtime/model/binding'
 import type { BindingScopeKind } from '../../features/editor-runtime/model/bindingExpression'
@@ -28,7 +27,7 @@ type EditorPropertyBase = {
 }
 
 // 这里可以定义对于某一特定 fieldType 的数据编辑器需求的辅助约束条件
-export type PropertyConstraintMap = {
+type PropertyConstraintMap = {
     string: {
         minLength?: number
         maxLength?: number
@@ -97,7 +96,7 @@ export const additionalFieldTypes = [
     'boolean',
     'color',
 ] as const satisfies readonly PropertyFieldType[]
-export const additionalFieldKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/
+const additionalFieldKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 const additionalFieldTypeSet = new Set<PropertyFieldType>(additionalFieldTypes)
 
@@ -307,10 +306,8 @@ export function getPropertyAllowedValues(
     return getPropertyFieldTypeOptions(definition.fieldType)
 }
 
-export type TypePropertyDefinitions = Record<string, Record<string, EditorPropertyDefinition>>
-export type PropertyEditorSchemaByType = Record<CardBlock['type'], Record<string, EditorPropertyDefinition>>
-
-export type PropertyEditorCategoryId =
+type TypePropertyDefinitions = Record<string, Record<string, EditorPropertyDefinition>>
+type PropertyEditorCategoryId =
     | 'general'
     | 'size'
     | 'container'
@@ -685,7 +682,7 @@ function markNonOverridableFields(schemaByType: TypePropertyDefinitions): TypePr
     ]))
 }
 
-export const propertyEditorSchemaByType: TypePropertyDefinitions = markNonOverridableFields(
+const propertyEditorSchemaByType: TypePropertyDefinitions = markNonOverridableFields(
     applyDefaultsToSchema(rawPropertyEditorSchemaByType),
 )
 
@@ -696,7 +693,7 @@ export function getTypePropertyEditorSchema(typeName: string | undefined): Recor
     return propertyEditorSchemaByType[typeName] ?? {}
 }
 
-export type ResolvedPropertyEditorSchema = {
+type ResolvedPropertyEditorSchema = {
     fields: Readonly<Record<string, EditorPropertyDefinition>>
     labels: Readonly<Record<string, string>>
     customKeys: ReadonlySet<string>

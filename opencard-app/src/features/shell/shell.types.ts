@@ -14,7 +14,7 @@ import type {
 import type { IconToken, IconTone } from '../../shared/ui/icon/iconRegistry'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
-export interface ShellAction {
+interface ShellAction {
   type?: 'action' | 'selection';
   key?: string;
   value?: string;
@@ -40,7 +40,7 @@ export interface ShellButton {
 
 export type PageHeaderAction = OcActionDefinition | string
 
-export interface ShellTreeContent {
+interface ShellTreeContent {
   type: 'tree';
   data: OcNodeCollection;
   selectedKeys?: readonly OcNodeKey[];

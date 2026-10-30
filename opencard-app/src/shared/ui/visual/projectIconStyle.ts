@@ -6,7 +6,7 @@
  */
 
 /** `.oc-project-icon` 理解的 `--oc-project-icon-renderer` 取值。 */
-export const projectIconRenderers = ['mask', 'image'] as const
+const projectIconRenderers = ['mask', 'image'] as const
 
 export type ProjectIconRenderer = typeof projectIconRenderers[number]
 

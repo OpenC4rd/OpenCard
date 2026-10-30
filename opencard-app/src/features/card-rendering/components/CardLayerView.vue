@@ -239,8 +239,8 @@ const facePreviewStyle = computed<CSSProperties>(() => ({
   width: `${props.face.width * facePreviewScale.value}px`,
   height: `${props.face.height * facePreviewScale.value}px`,
   '--card-layer-preview-scale': String(facePreviewScale.value),
-  '--card-layer-preview-width': `${props.face.width}px`,
-  '--card-layer-preview-height': `${props.face.height}px`,
+  '--card-layer-preview-width': `${props.face.width}mm`,
+  '--card-layer-preview-height': `${props.face.height}mm`,
 }))
 const layerPitch = computed(() => Math.min(400, Math.max(220, props.viewportHeight * 0.36)))
 const sameLayerPitch = computed(() => Math.min(180, Math.max(110, props.viewportHeight * 0.16)))

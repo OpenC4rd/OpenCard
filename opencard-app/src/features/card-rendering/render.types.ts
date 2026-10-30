@@ -33,7 +33,7 @@ export type RenderReadyBaseBlock = {
   [fieldKey: string]: unknown
 }
 
-export type RenderReadyTextContentBlock = RenderReadyBaseBlock & {
+type RenderReadyTextContentBlock = RenderReadyBaseBlock & {
   content: string
   fontSize: string
   fontFamily: string
@@ -94,12 +94,12 @@ export type RenderReadyFlowContainerLocation = {
   align: AlignmentPosition
 }
 
-export type RenderReadySimpleContainerChild = {
+type RenderReadySimpleContainerChild = {
   block: RenderReadyCardBlock
   location: RenderReadySimpleContainerLocation
 }
 
-export type RenderReadyFlowContainerChild = {
+type RenderReadyFlowContainerChild = {
   block: RenderReadyCardBlock
   location: RenderReadyFlowContainerLocation
 }

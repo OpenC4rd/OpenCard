@@ -24,7 +24,7 @@ export type CdeBlockFieldTarget = {
   fieldKey: string
 }
 
-export type CdeBlockFieldCreateTarget = CdeBlockFieldTarget & {
+type CdeBlockFieldCreateTarget = CdeBlockFieldTarget & {
   definition: AdditionalFieldDefinition
 }
 

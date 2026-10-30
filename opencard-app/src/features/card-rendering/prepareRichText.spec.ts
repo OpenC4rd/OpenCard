@@ -51,7 +51,6 @@ describe('prepareRichText', () => {
     expect(prepared!.valid).toBe(true)
     expect(prepared!.document.blocks).toHaveLength(2)
     expect(prepared!.document.blocks![0]!.type).toBe('paragraph')
-    expect(prepared!.document.children).toBeDefined()
   })
 
   it('reports pipeline issues with diagnostic offset and details for invalid markup', () => {
@@ -75,7 +74,7 @@ describe('prepareRichText', () => {
 
     const { catalog, issues } = prepareRichText({ document })
     expect(issues.length).toBeGreaterThan(0)
-    expect(issues[0]!.type).toBe('card-designer.rich-text.invalid-html')
+    expect(issues[0]!.type).toBe('card-designer.rich-text.invalid-markup')
     expect(issues[0]!.location.blockId).toBe('broken-block')
     expect(issues[0]!.location.characterOffset).toBeDefined()
 

@@ -12,7 +12,7 @@ export const USE_RAW_STRING_EDITOR_ACTION_KEY = 'field-editor.use-raw-string'
 
 export type PropertyFieldEditorId = 'field' | 'raw-string'
 
-export type PropertyFieldEditorState = {
+type PropertyFieldEditorState = {
   editorId: PropertyFieldEditorId
   switchTarget: PropertyFieldEditorId | null
 }
@@ -50,7 +50,7 @@ export function usePropertyFieldEditorModes() {
     }
 
     const isBindingValue = options.bindingInterpreter?.isExpression(options.value) ?? false
-    if (isBindingValue) {
+    if (isBindingValue && options.definition.fieldType !== 'richText') {
       return { editorId: 'raw-string', switchTarget: null }
     }
 

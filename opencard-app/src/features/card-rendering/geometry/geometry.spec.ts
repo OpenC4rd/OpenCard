@@ -34,7 +34,7 @@ function face(...children: ReturnType<typeof at>[]): RenderReadyCardFace {
 describe('evaluateRenderLength', () => {
   it('resolves percent and arithmetic against the parent span', () => {
     expect(evaluateRenderLength('50%', 200)).toBe(100)
-    expect(evaluateRenderLength('calc(100% - 2 * (5px + 5))', 200)).toBe(180)
+    expect(evaluateRenderLength('calc(100% - 2 * (5mm + 5))', 200)).toBe(180)
     expect(evaluateRenderLength('12', 200)).toBe(12)
   })
 
@@ -47,7 +47,7 @@ describe('evaluateRenderLength', () => {
   })
 
   it('falls back on unknown units, division by zero and malformed input', () => {
-    for (const bad of ['auto', '10vw', '1em', '1/0', '(1+', '', '1 2']) {
+    for (const bad of ['auto', '10vw', '1em', '10px', '1/0', '(1+', '', '1 2']) {
       expect(evaluateRenderLength(bad, 100, -7)).toBe(-7)
     }
   })

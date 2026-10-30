@@ -44,7 +44,7 @@ import { buildCustomBlockRegistry, parseCustomBlockRegistryText, type CustomBloc
 import type { OcBlockDocument } from '../../card-rendering/customBlockRuntime'
 import { parseOcBlock } from '../../card-rendering/customBlockRuntime'
 
-export type ProjectResourceScopeKind = 'project' | 'package'
+type ProjectResourceScopeKind = 'project' | 'package'
 
 export type ProjectResourcePackage = {
   /** 包在清单里自述的坐标。文件名与目录名都不参与身份。 */
@@ -72,7 +72,7 @@ export type ProjectResourcePackage = {
  *
  * 于是"同一个坐标该用哪一份"只在**解析引用**的时候才需要答案，见 `resolveProjectResourcePackage`。
  */
-export type ProjectResourcePackageCatalog = ReadonlyMap<string, ProjectResourcePackage>
+type ProjectResourcePackageCatalog = ReadonlyMap<string, ProjectResourcePackage>
 
 /**
  * 一个读不出来的归档：它在项目里，但我们说不出它是谁。
@@ -80,7 +80,7 @@ export type ProjectResourcePackageCatalog = ReadonlyMap<string, ProjectResourceP
  * 发现阶段本来就要读每个归档才知道它是谁，所以这一条不是额外校验，只是不再把结果丢掉：
  * 包管理器整页要能让人看到"这个文件我读不出来"，否则它在那里就是一个谁也解释不了的空缺。
  */
-export type UnreadableProjectPackage = {
+type UnreadableProjectPackage = {
   readonly archivePath: string
   readonly reason: string
 }
@@ -116,7 +116,7 @@ export type ProjectResourceEnvironment = {
   readonly customBlockSources?: ReadonlyMap<string, OcBlockDocument>
 }
 
-export type ProjectResourcePackageFile = {
+type ProjectResourcePackageFile = {
   archivePath: string
   fingerprint: string
 }

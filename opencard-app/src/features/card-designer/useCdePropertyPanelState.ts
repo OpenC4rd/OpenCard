@@ -44,33 +44,33 @@ type CardLocationInfo = SimpleContainerLocationInfo | FlowContainerLocationInfo
 
 export type CdePropertySortMode = PropertyEditorSortMode
 
-export type CdePropertyMutation = {
+type CdePropertyMutation = {
   key: string
   fieldKey: string
   value: unknown
 }
 
-export type CdePropertyAddMutation = Omit<CdePropertyMutation, 'value'>
+type CdePropertyAddMutation = Omit<CdePropertyMutation, 'value'>
 
-export type CdePropertyResetMutation = {
+type CdePropertyResetMutation = {
   key: string
   fieldKey: string
 }
 
-export type CdeAdditionalFieldCreateMutation = {
+type CdeAdditionalFieldCreateMutation = {
   key: string
   fieldKey: string
   definition: AdditionalFieldDefinition
 }
 
-export type CdePropertyDeleteMutation = {
+type CdePropertyDeleteMutation = {
   key: string
   fieldKey: string
 }
 
 export type CdeAdditionalFieldType = (typeof additionalFieldTypes)[number]
 
-export type CdeAdditionalFieldCreateDraft = {
+type CdeAdditionalFieldCreateDraft = {
   fieldKey: string
   fieldType: CdeAdditionalFieldType
   title: string

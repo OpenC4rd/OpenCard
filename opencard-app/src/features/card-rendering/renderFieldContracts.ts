@@ -1,6 +1,6 @@
 import type { ResourceReferenceKind } from '../workspace/services/resourceReference'
 
-export type RenderFieldKind =
+type RenderFieldKind =
   | 'string'
   | 'number'
   | 'boolean'

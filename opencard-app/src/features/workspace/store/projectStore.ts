@@ -86,7 +86,7 @@ const FILE_CHANGE_REFRESH_DELAY_MS = 150
 const FILE_CHANGE_INDEX_REFRESH_KEY = 'project-index-refresh'
 const PROJECT_FONT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc'])
 
-export type ImportedProjectFontFiles = {
+type ImportedProjectFontFiles = {
   sources: readonly string[]
   copied: boolean
 }
@@ -104,14 +104,14 @@ type RenameEntryResult =
   | { ok: true; fromPath: string; toPath: string }
   | { ok: false; reason: 'project-not-open' | 'invalid-name' | 'same-path' | 'target-exists' | 'rename-failed' }
 
-export type WorkspaceEntryMoveRequest = {
+type WorkspaceEntryMoveRequest = {
   key: string
   targetKey: string | null
   position: OcNodeDropPosition
 }
 
 /** Files dragged in from outside the application, addressed to one place in the project tree. */
-export type WorkspaceExternalDropRequest = {
+type WorkspaceExternalDropRequest = {
   paths: readonly string[]
   targetKey: string | null
   position: OcNodeDropPosition

@@ -3,7 +3,7 @@ import { isTauri } from '@tauri-apps/api/core'
 import { Effect, EffectState, getCurrentWindow } from '@tauri-apps/api/window'
 import { isMacPlatform } from '../../../shared/model/platform'
 
-export type WindowBackdropTheme = 'dark' | 'light'
+type WindowBackdropTheme = 'dark' | 'light'
 
 /**
  * Windows 11 从 build 22000 起在 User-Agent Client Hints 中上报平台主版本 13，
@@ -30,11 +30,19 @@ const MACOS_EFFECTS = {
   state: EffectState.FollowsWindowActiveState,
 } satisfies { effects: Effect[]; state: EffectState }
 
+/**
+ * 上一次真正写进窗口外观的值。
+ *
+ * macOS 上重复写同一个外观不是白做：窗口外观是在颜色过渡开始之后才落地的，WebKit 收到外观变更会把
+ * 所有 `--oc-*` 过渡直接跳到终值 —— 那一下明暗切换就没有渐变。所以只在取值变化时才写。
+ */
+let appliedWindowTheme: WindowBackdropTheme | null | undefined
+
 interface UserAgentDataHints {
   getHighEntropyValues?: (hints: readonly string[]) => Promise<{ platformVersion?: string }>
 }
 
-export function isMicaPlatformVersion(platformVersion: string | undefined): boolean {
+function isMicaPlatformVersion(platformVersion: string | undefined): boolean {
   const major = Number.parseInt(platformVersion ?? '', 10)
   return Number.isFinite(major) && major >= MICA_MINIMUM_PLATFORM_MAJOR
 }
@@ -73,7 +81,11 @@ export async function applyMicaBackdrop(
       await window.setEffects({ effects: [MICA_EFFECT_BY_THEME[theme]] })
       return true
     }
-    await window.setTheme(followsSystemTheme ? null : theme)
+    const windowTheme = followsSystemTheme ? null : theme
+    if (windowTheme !== appliedWindowTheme) {
+      await window.setTheme(windowTheme)
+      appliedWindowTheme = windowTheme
+    }
     await window.setEffects(MACOS_EFFECTS)
     return true
   } catch {
@@ -85,5 +97,8 @@ export async function clearMicaBackdrop(): Promise<void> {
   if (!isTauri()) return
   const window = getCurrentWindow()
   await window.clearEffects().catch(() => undefined)
-  if (isMacPlatform()) await window.setTheme(null).catch(() => undefined)
+  if (isMacPlatform()) {
+    await window.setTheme(null).catch(() => undefined)
+    appliedWindowTheme = null
+  }
 }

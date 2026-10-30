@@ -28,8 +28,8 @@ function textChild(
   id: string,
   x: string,
   y: string,
-  width = '100px',
-  height = '80px',
+  width = '100mm',
+  height = '80mm',
   options: {
     anchor?: AnchorPosition
     rotation?: number
@@ -120,7 +120,7 @@ describe('CardViewport', () => {
   it('coalesces pan input into one transform per frame without re-measuring content', async () => {
     const wrapper = mount(CardViewport, { props: {
       resourceContext,
-      face: { ...face, children: [textChild('selected', '0px', '0px')] },
+      face: { ...face, children: [textChild('selected', '0mm', '0mm')] },
       selectedBlockId: 'selected',
       selectedLocationType: 'simple-container-location',
       selectedAnchor: 'lt',
@@ -281,7 +281,7 @@ describe('CardViewport', () => {
   })
 
   it('pauses viewport zoom while layer view is active and restores it on exit', async () => {
-    const layerFace: RenderReadyCardFace = { ...face, children: [textChild('layer-block', '0px', '0px')] }
+    const layerFace: RenderReadyCardFace = { ...face, children: [textChild('layer-block', '0mm', '0mm')] }
     const wrapper = mount(CardViewport, {
       props: { resourceContext, face: layerFace, layerViewActive: true },
     })
@@ -306,16 +306,16 @@ describe('CardViewport', () => {
   it('emits anchor-preserving geometry actions and nudges from the public viewport API', async () => {
     const parentContainer = parseRenderReadyBlockForTest(createSimpleContainerBlock({
       id: 'parent',
-      width: '400px',
-      height: '300px',
+      width: '400mm',
+      height: '300mm',
       children: [{
-        block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected', width: '100px', height: '80px' } as unknown as Parameters<typeof createTextBlock>[0])),
+        block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected', width: '100mm', height: '80mm' } as unknown as Parameters<typeof createTextBlock>[0])),
         location: {
           id: 'selected-location',
           type: 'simple-container-location',
           anchor: 'lt',
-          x: '50px',
-          y: '50px',
+          x: '50mm',
+          y: '50mm',
         },
       }],
     }))
@@ -324,7 +324,7 @@ describe('CardViewport', () => {
       ...face,
       children: [{
         block: parentContainer,
-        location: { id: 'parent-location', type: 'simple-container-location', anchor: 'lt', x: '100px', y: '100px' },
+        location: { id: 'parent-location', type: 'simple-container-location', anchor: 'lt', x: '100mm', y: '100mm' },
       }],
     }
 
@@ -363,16 +363,16 @@ describe('CardViewport', () => {
   it('drops a locked axis from the emitted quick action', async () => {
     const parentContainer = parseRenderReadyBlockForTest(createSimpleContainerBlock({
       id: 'parent',
-      width: '400px',
-      height: '300px',
+      width: '400mm',
+      height: '300mm',
       children: [{
-        block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected', width: '100px', height: '80px' } as unknown as Parameters<typeof createTextBlock>[0])),
+        block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected', width: '100mm', height: '80mm' } as unknown as Parameters<typeof createTextBlock>[0])),
         location: {
           id: 'selected-location',
           type: 'simple-container-location',
           anchor: 'lt',
-          x: '50px',
-          y: '50px',
+          x: '50mm',
+          y: '50mm',
         },
       }],
     }))
@@ -381,7 +381,7 @@ describe('CardViewport', () => {
       ...face,
       children: [{
         block: parentContainer,
-        location: { id: 'parent-location', type: 'simple-container-location', anchor: 'lt', x: '100px', y: '100px' },
+        location: { id: 'parent-location', type: 'simple-container-location', anchor: 'lt', x: '100mm', y: '100mm' },
       }],
     }
 
@@ -412,11 +412,11 @@ describe('CardViewport', () => {
   it('emits only the resized axis for a flow child', async () => {
     const flowContainer = parseRenderReadyBlockForTest(createFlowContainerBlock({
       id: 'parent',
-      width: '400px',
-      height: '300px',
+      width: '400mm',
+      height: '300mm',
       direction: 'lr',
       children: [{
-        block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected', width: '225px', height: '80px' } as unknown as Parameters<typeof createTextBlock>[0])),
+        block: parseRenderReadyBlockForTest(createTextBlock({ id: 'selected', width: '225mm', height: '80mm' } as unknown as Parameters<typeof createTextBlock>[0])),
         location: {
           id: 'selected-location',
           type: 'flow-container-location',
@@ -430,7 +430,7 @@ describe('CardViewport', () => {
       ...face,
       children: [{
         block: flowContainer,
-        location: { id: 'parent-location', type: 'simple-container-location', anchor: 'lt', x: '100px', y: '100px' },
+        location: { id: 'parent-location', type: 'simple-container-location', anchor: 'lt', x: '100mm', y: '100mm' },
       }],
     }
 
@@ -466,7 +466,7 @@ describe('CardViewport', () => {
     const snappingFace: RenderReadyCardFace = {
       ...face,
       children: [
-        textChild('selected', '50px', '50px', '100px', '80px'),
+        textChild('selected', '50mm', '50mm', '100mm', '80mm'),
       ],
     }
 
@@ -504,11 +504,15 @@ describe('CardViewport', () => {
     })
   })
 
-  it('keeps the original aspect ratio while Shift resizes from a corner', async () => {
+  /**
+   * 拖一次选择手柄并返回提交的尺寸。比例尺不是 1px=1mm（视口会 fit），
+   * 所以这里只固定块选区自己的几何行为，与卡面尺寸拖动精度分开验证。
+   */
+  async function runResizeDrag(handle: string, deltaX: number, deltaY: number, shiftKey = false) {
     const snappingFace: RenderReadyCardFace = {
       ...face,
       children: [
-        textChild('selected', '50px', '50px', '100px', '80px'),
+        textChild('selected', '50mm', '50mm', '100mm', '80mm'),
       ],
     }
 
@@ -527,105 +531,42 @@ describe('CardViewport', () => {
     await wrapper.setProps({ selectedBlockId: 'selected' })
     await nextTick()
     await flushPromises()
-    await wrapper.get('.selection-handle-rb').trigger('pointerdown')
+    await wrapper.get(`.selection-handle-${handle}`).trigger('pointerdown')
 
     const drag = createSelectionDrag()
     drag.begin()
-    drag.moveBy(40, 0, { shiftKey: true })
+    drag.moveBy(deltaX, deltaY, { shiftKey })
     window.dispatchEvent(new Event('pointerup'))
-    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
-      blockId: 'selected',
-      width: 140,
-      height: 112,
-      x: 50,
-      y: 50,
-    })
+    return wrapper.emitted('resize-selection')?.[0]?.[0] as {
+      width: number
+      height: number
+      x: number
+      y: number
+    }
+  }
+
+  it('resizes in tenth-millimeter steps and ignores the perpendicular drag', async () => {
+    const horizontal = await runResizeDrag('r', 37, 0)
+    const diagonal = await runResizeDrag('r', 37, 91)
+
+    expect(diagonal.width).toBeCloseTo(Math.round(diagonal.width * 10) / 10, 6)
+    expect(diagonal.height).toBe(horizontal.height)
+    expect(diagonal.y).toBe(horizontal.y)
   })
 
-  it('follows the taller edge when Shift resizing a selection that is taller than it is wide', async () => {
-    const snappingFace: RenderReadyCardFace = {
-      ...face,
-      children: [
-        textChild('selected', '50px', '50px', '60px', '150px'),
-      ],
-    }
+  it('does not apply face dimension precision to block resize', async () => {
+    const payload = await runResizeDrag('rb', 50.4, 20.6, true)
 
-    const wrapper = mount(CardViewport, {
-      props: {
-        resourceContext,
-        face: snappingFace,
-        selectedBlockId: null,
-        selectedLocationType: 'simple-container-location',
-        selectedAnchor: 'lt',
-        alignmentSnappingEnabled: false,
-      },
-    })
-    await flushPromises()
-
-    await wrapper.setProps({ selectedBlockId: 'selected' })
-    await nextTick()
-    await flushPromises()
-    await wrapper.get('.selection-handle-rb').trigger('pointerdown')
-
-    const drag = createSelectionDrag()
-    drag.begin()
-    drag.moveBy(0, 30, { shiftKey: true })
-    window.dispatchEvent(new Event('pointerup'))
-    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
-      blockId: 'selected',
-      width: 72,
-      height: 180,
-      x: 50,
-      y: 50,
-    })
-  })
-
-  it('snaps the ratio-driven edge while Shift resizing and commits only the snapped size', async () => {
-    const snappingFace: RenderReadyCardFace = {
-      ...face,
-      children: [
-        textChild('selected', '50px', '150px', '100px', '80px'),
-        textChild('sibling', '200px', '265px', '80px', '60px'),
-      ],
-    }
-
-    const wrapper = mount(CardViewport, {
-      props: {
-        resourceContext,
-        face: snappingFace,
-        selectedBlockId: null,
-        selectedLocationType: 'simple-container-location',
-        selectedAnchor: 'lt',
-      },
-    })
-    const viewportEl = wrapper.get('.card-viewport').element as HTMLElement
-    viewportEl.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
-    viewportEl.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
-
-    await wrapper.setProps({ selectedBlockId: 'selected' })
-    await nextTick()
-    await flushPromises()
-    await wrapper.get('.selection-handle-rb').trigger('pointerdown')
-
-    const drag = createSelectionDrag()
-    drag.begin()
-    drag.moveBy(40, 0, { shiftKey: true })
-    window.dispatchEvent(new Event('pointerup'))
-    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
-      blockId: 'selected',
-      width: 143.75,
-      height: 115,
-      x: 50,
-      y: 150,
-    })
+    expect(Number.isInteger(payload.width)).toBe(false)
+    expect(Number.isInteger(payload.height)).toBe(false)
   })
 
   it('snaps absolute resize and move edges to a direct sibling', async () => {
     const snappingFace: RenderReadyCardFace = {
       ...face,
       children: [
-        textChild('selected', '50px', '50px', '100px', '80px'),
-        textChild('sibling', '158px', '20px', '80px', '60px'),
+        textChild('selected', '50mm', '50mm', '100mm', '80mm'),
+        textChild('sibling', '158mm', '20mm', '80mm', '60mm'),
       ],
     }
 
@@ -683,7 +624,7 @@ describe('CardViewport', () => {
     })
   })
 
-  it('drags face dimensions by axis and snaps to half-millimeters with Shift', async () => {
+  it('drags face dimensions on one axis and snaps to millimeters with Shift', async () => {
     const wrapper = mount(CardViewport, {
       props: { resourceContext, face },
       slots: { 'left-info': 'Height', 'bottom-info': 'Width' },
@@ -707,8 +648,8 @@ describe('CardViewport', () => {
     window.dispatchEvent(new MouseEvent('pointerup'))
 
     expect(wrapper.emitted('face-dimension-change')).toEqual([
-      [{ dimension: 'width', value: face.width + 35.5, final: false }],
-      [{ dimension: 'width', value: face.width + 35.5, final: true }],
+      [{ dimension: 'width', value: face.width + 35, final: false }],
+      [{ dimension: 'width', value: face.width + 35, final: true }],
       [{ dimension: 'height', value: face.height + 30, final: false }],
       [{ dimension: 'height', value: face.height + 30, final: true }],
     ])
@@ -721,24 +662,24 @@ describe('CardViewport', () => {
       global: { stubs: { CardFaceRenderer: true } },
     })
 
-    // Pulling bottom resizer downward increases width
+    // Pulling bottom resizer horizontally increases width
     wrapper.find('.card-viewport-bottom-info').element.dispatchEvent(new MouseEvent('pointerdown', {
       button: 0,
       clientX: 100,
       clientY: 100,
       bubbles: true,
     }))
-    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100, clientY: 150 }))
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 150, clientY: 150 }))
     window.dispatchEvent(new MouseEvent('pointerup'))
 
-    // Pulling left resizer leftward increases height
+    // Pulling left resizer upward increases height
     wrapper.find('.card-viewport-left-info').element.dispatchEvent(new MouseEvent('pointerdown', {
       button: 0,
       clientX: 100,
       clientY: 100,
       bubbles: true,
     }))
-    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 60, clientY: 100 }))
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 60, clientY: 60 }))
     window.dispatchEvent(new MouseEvent('pointerup'))
 
     expect(wrapper.emitted('face-dimension-change')).toEqual([
@@ -782,8 +723,8 @@ describe('CardViewport', () => {
     const overlappingFace: RenderReadyCardFace = {
       ...face,
       children: [
-        textChild('under', '50px', '50px', '200px', '200px', { zIndex: 1 }),
-        textChild('top', '100px', '100px', '100px', '100px', { zIndex: 10 }),
+        textChild('under', '50mm', '50mm', '200mm', '200mm', { zIndex: 1 }),
+        textChild('top', '100mm', '100mm', '100mm', '100mm', { zIndex: 10 }),
       ],
     }
     const wrapper = mount(CardViewport, { props: { resourceContext, face: overlappingFace } })
@@ -804,7 +745,7 @@ describe('CardViewport', () => {
   it('emits blank-click when canvas click misses all blocks', async () => {
     const faceWithBlock: RenderReadyCardFace = {
       ...face,
-      children: [textChild('single', '50px', '50px', '100px', '50px')],
+      children: [textChild('single', '50mm', '50mm', '100mm', '50mm')],
     }
     const wrapper = mount(CardViewport, { props: { resourceContext, face: faceWithBlock } })
     await flushPromises()

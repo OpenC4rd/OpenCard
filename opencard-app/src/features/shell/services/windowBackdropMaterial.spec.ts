@@ -17,16 +17,22 @@ vi.mock('@tauri-apps/api/window', () => ({
   EffectState: { FollowsWindowActiveState: 'followsWindowActiveState' },
 }))
 
-import { applyMicaBackdrop, clearMicaBackdrop } from './windowBackdropMaterial'
+import type { applyMicaBackdrop as ApplyMicaBackdrop, clearMicaBackdrop as ClearMicaBackdrop } from './windowBackdropMaterial'
+
+let applyMicaBackdrop: typeof ApplyMicaBackdrop
+let clearMicaBackdrop: typeof ClearMicaBackdrop
 
 function setUserAgent(userAgent: string): void {
   Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => userAgent })
 }
 
 describe('window backdrop material', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     setUserAgent(macosUserAgent)
+    // 模块记着上一次写进去的外观，每个用例都要一份干净的状态。
+    vi.resetModules()
+    ;({ applyMicaBackdrop, clearMicaBackdrop } = await import('./windowBackdropMaterial'))
   })
 
   it('uses the macOS system material and pins the window appearance to a forced theme', async () => {
@@ -59,5 +65,14 @@ describe('window backdrop material', () => {
 
     expect(windowApi.clearEffects).toHaveBeenCalled()
     expect(windowApi.setTheme).toHaveBeenCalledWith(null)
+  })
+
+  it('writes the window appearance only when it actually changes', async () => {
+    await applyMicaBackdrop('dark', false)
+    windowApi.setTheme.mockClear()
+
+    await applyMicaBackdrop('dark', false)
+
+    expect(windowApi.setTheme).not.toHaveBeenCalled()
   })
 })

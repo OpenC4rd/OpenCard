@@ -7,27 +7,27 @@
 </template>
 
 <script lang="ts">
-import type { ExtractPropTypes, PropType } from 'vue'
+import type { PropType } from 'vue'
 
-export const OC_PANEL_GAPS = ['none', '1', '2', '3', '4', '5', '6', '8'] as const
-export const OC_PANEL_PADDINGS = ['none', '1', '2', '3', '4', '5', '6'] as const
-export const OC_PANEL_ALIGNS = ['start', 'center', 'end', 'stretch'] as const
-export const OC_PANEL_TONES = ['base', 'surface', 'raised', 'glass', 'accent', 'transparent'] as const
-export const OC_PANEL_BORDERS = ['none', 'default', 'muted', 'strong', 'accent'] as const
-export const OC_PANEL_RADII = ['none', 'sm', 'md', 'lg'] as const
-export const OC_PANEL_SHADOWS = ['none', 'sm', 'md', 'lg'] as const
-export const OC_PANEL_OVERFLOWS = ['visible', 'hidden', 'auto', 'scroll'] as const
+const OC_PANEL_GAPS = ['none', '1', '2', '3', '4', '5', '6', '8'] as const
+const OC_PANEL_PADDINGS = ['none', '1', '2', '3', '4', '5', '6'] as const
+const OC_PANEL_ALIGNS = ['start', 'center', 'end', 'stretch'] as const
+const OC_PANEL_TONES = ['base', 'surface', 'raised', 'glass', 'accent', 'transparent'] as const
+const OC_PANEL_BORDERS = ['none', 'default', 'muted', 'strong', 'accent'] as const
+const OC_PANEL_RADII = ['none', 'sm', 'md', 'lg'] as const
+const OC_PANEL_SHADOWS = ['none', 'sm', 'md', 'lg'] as const
+const OC_PANEL_OVERFLOWS = ['visible', 'hidden', 'auto', 'scroll'] as const
 
-export type OcPanelGap = (typeof OC_PANEL_GAPS)[number]
-export type OcPanelPadding = (typeof OC_PANEL_PADDINGS)[number]
-export type OcPanelAlign = (typeof OC_PANEL_ALIGNS)[number]
-export type OcPanelTone = (typeof OC_PANEL_TONES)[number]
-export type OcPanelBorder = (typeof OC_PANEL_BORDERS)[number]
-export type OcPanelRadius = (typeof OC_PANEL_RADII)[number]
-export type OcPanelShadow = (typeof OC_PANEL_SHADOWS)[number]
-export type OcPanelOverflow = (typeof OC_PANEL_OVERFLOWS)[number]
+type OcPanelGap = (typeof OC_PANEL_GAPS)[number]
+type OcPanelPadding = (typeof OC_PANEL_PADDINGS)[number]
+type OcPanelAlign = (typeof OC_PANEL_ALIGNS)[number]
+type OcPanelTone = (typeof OC_PANEL_TONES)[number]
+type OcPanelBorder = (typeof OC_PANEL_BORDERS)[number]
+type OcPanelRadius = (typeof OC_PANEL_RADII)[number]
+type OcPanelShadow = (typeof OC_PANEL_SHADOWS)[number]
+type OcPanelOverflow = (typeof OC_PANEL_OVERFLOWS)[number]
 
-export const ocPanelProps = {
+const ocPanelProps = {
   /** 根元素标签。默认 'div' */
   as: {
     type: String,
@@ -79,8 +79,6 @@ export const ocPanelProps = {
     default: 'visible',
   },
 } as const
-
-export type OcPanelProps = Readonly<ExtractPropTypes<typeof ocPanelProps>>
 </script>
 
 <script setup lang="ts">

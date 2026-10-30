@@ -21,7 +21,7 @@ import OcButton from '../base/OcButton.vue'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 
-export type OcEnumStepperOption = {
+type OcEnumStepperOption = {
   value: string
   label: string
 }

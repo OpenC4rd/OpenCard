@@ -1,7 +1,7 @@
 import { reactive, type Ref } from 'vue'
 import { resolveOcPixelToken, type OcThemeTokenKey } from '../foundation'
 
-export type DataGridColumnSizingOptions = {
+type DataGridColumnSizingOptions = {
   root: Ref<HTMLElement | null>
   defaultWidthToken: (key: string) => OcThemeTokenKey
 }

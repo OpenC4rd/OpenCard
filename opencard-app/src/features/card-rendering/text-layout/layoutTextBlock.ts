@@ -52,7 +52,7 @@ const SEGMENT = new RegExp(`\\s+|[${CJK_CHAR_CLASS}]|[^\\s${CJK_CHAR_CLASS}]+`, 
 const NO_LINE_START = new Set([...'，。、；：！？）】」』》〉”’·…—～'])
 
 function resolveSize(value: string | undefined, em: number, percentBase: number, rem: number): number | undefined {
-  const match = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|em|rem|%|pt|mm|cm|in)?\s*$/i.exec(value ?? '')
+  const match = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(em|rem|%|pt|mm|cm|in)?\s*$/i.exec(value ?? '')
   if (!match) return undefined
   const n = Number(match[1])
   switch (match[2]?.toLowerCase()) {
@@ -78,8 +78,8 @@ function applySpan(parent: ResolvedRunStyle, spec: InlineStyleSpec, baseSize: nu
   if (spec.backgroundColor !== undefined) style.backgroundColor = spec.backgroundColor
   if (spec.fontFamily !== undefined) style.fontFamily = spec.fontFamily
   if (spec.fontSize !== undefined) {
-    const size = resolveSize(spec.fontSize, parent.fontSizePx, parent.fontSizePx, baseSize)
-    if (size !== undefined && size > 0) style.fontSizePx = size
+    const size = resolveSize(spec.fontSize, parent.fontSize, parent.fontSize, baseSize)
+    if (size !== undefined && size > 0) style.fontSize = size
   }
   if (spec.strokeColor !== undefined) style.strokeColor = spec.strokeColor
   if (spec.strokeWidth !== undefined) style.strokeWidth = spec.strokeWidth
@@ -95,7 +95,7 @@ function applySpan(parent: ResolvedRunStyle, spec: InlineStyleSpec, baseSize: nu
 function baseStyle(input: TextLayoutInput): ResolvedRunStyle {
   return {
     fontFamily: input.baseFontFamily,
-    fontSizePx: input.baseFontSizePx,
+    fontSize: input.baseFontSize,
     fontWeight: input.baseFontWeight,
     italic: false,
     underline: false,
@@ -112,7 +112,7 @@ function baseStyle(input: TextLayoutInput): ResolvedRunStyle {
 function measure(ctx: Ctx, text: string, style: ResolvedRunStyle) {
   return ctx.measurer.measureText(text, {
     fontFamily: style.fontFamily,
-    fontSizePx: style.fontSizePx,
+    fontSize: style.fontSize,
     fontWeight: style.fontWeight,
     italic: style.italic,
   })
@@ -123,7 +123,7 @@ function glyphUnit(ctx: Ctx, text: string, style: ResolvedRunStyle, kind: 'text'
   const upright = ctx.vertical && kind === 'text' && isCjkChar(text[0]!)
   return {
     kind, text, style,
-    advance: upright ? style.fontSizePx : sample.width,
+    advance: upright ? style.fontSize : sample.width,
     ascent: sample.ascent,
     descent: sample.descent,
     rotated: ctx.vertical && !upright,
@@ -156,7 +156,7 @@ function breakUnit(style: ResolvedRunStyle): Unit {
 }
 
 function iconUnit(ctx: Ctx, icon: CardMarkupIconNode, style: ResolvedRunStyle): Unit {
-  const size = resolveSize(icon.size ?? '1em', style.fontSizePx, style.fontSizePx, ctx.input.baseFontSizePx) ?? style.fontSizePx
+  const size = resolveSize(icon.size ?? '1em', style.fontSize, style.fontSize, ctx.input.baseFontSize) ?? style.fontSize
   const objH = Math.max(0, size)
   const objW = objH * (ctx.measurer.resolveIconAspectRatio?.(icon) ?? 1)
   return {
@@ -168,9 +168,9 @@ function iconUnit(ctx: Ctx, icon: CardMarkupIconNode, style: ResolvedRunStyle): 
 
 function imageUnit(ctx: Ctx, image: CardMarkupImageNode, style: ResolvedRunStyle): Unit {
   const { input } = ctx
-  const fs = style.fontSizePx
-  const w = resolveSize(image.width, fs, input.boxWidth, input.baseFontSizePx)
-  const h = resolveSize(image.height, fs, input.boxHeight, input.baseFontSizePx)
+  const fs = style.fontSize
+  const w = resolveSize(image.width, fs, input.boxWidth, input.baseFontSize)
+  const h = resolveSize(image.height, fs, input.boxHeight, input.baseFontSize)
   const objW = Math.max(0, w ?? h ?? fs)
   const objH = Math.max(0, h ?? w ?? fs)
   let ascent = objH
@@ -191,7 +191,7 @@ function collect(ctx: Ctx, nodes: readonly CardMarkupInlineNode[], style: Resolv
       case 'br': out.push(breakUnit(style)); break
       case 'icon': out.push(iconUnit(ctx, node, style)); break
       case 'img': out.push(imageUnit(ctx, node, style)); break
-      case 'span': collect(ctx, node.children, applySpan(style, node.style, ctx.input.baseFontSizePx), out); break
+      case 'span': collect(ctx, node.children, applySpan(style, node.style, ctx.input.baseFontSize), out); break
     }
   }
 }
@@ -232,8 +232,8 @@ function layoutParagraph(
   emptyMetrics: { ascent: number; descent: number },
 ): LogicalLine[] {
   const available = Math.max(0, ctx.limit - indent)
-  const lineRatio = (ctx.input.baseFontSizePx > 0 && ctx.input.lineHeightPx > 0)
-    ? ctx.input.lineHeightPx / ctx.input.baseFontSizePx
+  const lineRatio = (ctx.input.baseFontSize > 0 && ctx.input.lineHeight > 0)
+    ? ctx.input.lineHeight / ctx.input.baseFontSize
     : 1.2
   return breakLines(units, available).map(({ units: row, hard }, index) => {
     const natural = row.reduce((sum, unit) => sum + unit.advance, 0)
@@ -252,7 +252,7 @@ function layoutParagraph(
       return item
     })
     if (index === 0 && marker) {
-      items.unshift({ unit: marker, offset: Math.max(0, indent - marker.advance - marker.style.fontSizePx * 0.25) })
+      items.unshift({ unit: marker, offset: Math.max(0, indent - marker.advance - marker.style.fontSize * 0.25) })
     }
 
     let ascent = items.length > 0 ? -Infinity : emptyMetrics.ascent
@@ -265,14 +265,14 @@ function layoutParagraph(
         growth = Math.max(growth, ctx.vertical ? unit.objW : unit.ascent + unit.descent)
       } else if (unit.kind === 'text' || unit.kind === 'space') {
         const unitCross = ctx.vertical
-          ? Math.max(unit.style.fontSizePx * lineRatio, unit.rotated ? unit.ascent + unit.descent : unit.objW)
-          : Math.max(unit.style.fontSizePx * lineRatio, unit.ascent + unit.descent)
+          ? Math.max(unit.style.fontSize * lineRatio, unit.rotated ? unit.ascent + unit.descent : unit.objW)
+          : Math.max(unit.style.fontSize * lineRatio, unit.ascent + unit.descent)
         growth = Math.max(growth, unitCross)
       }
     }
     const lineCross = items.length > 0 && !ctx.vertical
-      ? Math.max(ctx.input.lineHeightPx, growth, ascent + descent)
-      : Math.max(ctx.input.lineHeightPx, growth)
+      ? Math.max(ctx.input.lineHeight, growth, ascent + descent)
+      : Math.max(ctx.input.lineHeight, growth)
     return {
       items,
       start,
@@ -395,7 +395,7 @@ function documentLines(ctx: Ctx, document: CardMarkupDocument): LogicalLine[] {
       lines.push(...paragraphLines(ctx, block, base, empty))
       continue
     }
-    const indent = base.fontSizePx * (block.ordered ? 2 : 1.5)
+    const indent = base.fontSize * (block.ordered ? 2 : 1.5)
     block.items.forEach((item, itemIndex) => {
       const marker = listMarker(ctx, base, block.ordered, itemIndex + 1)
       const paragraphs = item.length > 0 ? item : [{ type: 'paragraph', children: [] } as CardMarkupParagraphNode]

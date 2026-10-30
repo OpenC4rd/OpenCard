@@ -25,7 +25,7 @@ import type { ProjectIcon } from '../model/projectIcons'
 import { PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME } from '../model/projectStructure'
 import { parseCustomBlockRegistryText, serializeCustomBlockRegistry, type CustomBlockCollection } from '../model/customBlockRegistry'
 
-export type ResourcePackageProjectBuildOptions = {
+type ResourcePackageProjectBuildOptions = {
   fs: Pick<FileSystemService, 'readFile' | 'fileExists'>
   projectRootPath: string
   /** 身份由打包界面填:包自己说清楚自己是谁,文件名不算数。 */
@@ -81,7 +81,7 @@ type ResourcePackageIconProjection = {
   publicIconSeries: readonly ResourcePackagePublicIconSeries[]
 }
 
-export type ResourcePackageProjectBuildResult = {
+type ResourcePackageProjectBuildResult = {
   outputPath: string
   fingerprint: string
 }

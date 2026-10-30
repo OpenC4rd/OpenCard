@@ -79,7 +79,7 @@
 
 <script lang="ts">
 export type ProjectFontSlotKey = 'light.upright' | 'light.italic' | 'normal.upright' | 'normal.italic' | 'bold.upright' | 'bold.italic'
-export type ProjectFontSlotRequest = {
+type ProjectFontSlotRequest = {
   originalSource?: string
   sourcePath: string
   collectionIndex?: number

@@ -17,7 +17,7 @@ function createHarness(resourceEnvironment = ref<ProjectResourceEnvironment>()) 
     name: 'Text',
     content: 'Instance content',
     fontFamily: 'font:body; Arial; sans-serif',
-    fontSize: '18px',
+    fontSize: '4mm',
   })
   const parent = createSimpleContainerBlock({ id: 'parent', name: 'Parent' })
   parent.children.push({
@@ -129,7 +129,7 @@ describe('useCdePropertyEditorProjection', () => {
       fieldType: 'richText',
       richTextBaseStyle: {
         fontFamily: '"OpenCardProjectFont-body", Arial, sans-serif',
-        fontSize: '18px',
+        fontSize: '4mm',
       },
     })
   })

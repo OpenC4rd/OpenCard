@@ -8,7 +8,7 @@ import type { OcNodeKey } from './node.types'
 
 export type OcNodeSelectionMode = 'none' | 'single' | 'multiple'
 
-export type OcNodeSelectionIntent = {
+type OcNodeSelectionIntent = {
   /** 一次能选中几个键。 */
   mode: OcNodeSelectionMode
   /** 当前渲染出来的条目，按视觉顺序；区间选择沿着这个顺序展开。 */
@@ -22,7 +22,7 @@ export type OcNodeSelectionIntent = {
   range: boolean
 }
 
-export type OcNodeSelectionResolution = {
+type OcNodeSelectionResolution = {
   selectedKeys: OcNodeKey[]
   /** 这次手势是否成为下一个锚点：替换与切换会，区间不会。 */
   movesAnchor: boolean

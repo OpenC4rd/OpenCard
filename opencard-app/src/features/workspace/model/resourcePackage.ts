@@ -24,7 +24,7 @@ export type ResourcePackagePublicBlockCollection = {
   count: number
 }
 
-export type ResourcePackagePublicResources = {
+type ResourcePackagePublicResources = {
   fonts: readonly ResourcePackagePublicFont[]
   iconSeries: readonly ResourcePackagePublicIconSeries[]
   blockCollections?: readonly ResourcePackagePublicBlockCollection[]
@@ -47,12 +47,12 @@ export type ResourcePackageManifest = {
   public: ResourcePackagePublicResources
 }
 
-export type ResourcePackageManifestIssue = {
+type ResourcePackageManifestIssue = {
   path: string
   message: string
 }
 
-export type ResourcePackageManifestNormalization = {
+type ResourcePackageManifestNormalization = {
   manifest: ResourcePackageManifest
   issues: readonly ResourcePackageManifestIssue[]
 }

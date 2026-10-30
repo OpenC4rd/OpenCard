@@ -7,8 +7,8 @@ import { hexToRgba, normalizeHexColor, rgbaToHex } from '../../../components/sta
 
 const defaults = {
   fontFamily: '', fontSize: '', foregroundColor: '#24292f', backgroundColor: '#00000000',
-  foregroundType: 'solid', foregroundSource: '', strokeColor: '#24292f', strokeWidth: '0px',
-  shadowColor: '#00000000', shadowOffsetX: '0px', shadowOffsetY: '0px', shadowBlur: '0px',
+  foregroundType: 'solid', foregroundSource: '', strokeColor: '#24292f', strokeWidth: '0mm',
+  shadowColor: '#00000000', shadowOffsetX: '0mm', shadowOffsetY: '0mm', shadowBlur: '0mm',
   textAlign: 'left',
 }
 type Field = keyof typeof defaults
@@ -19,7 +19,7 @@ const styleAttributes: Partial<Record<Field, string>> = {
   shadowColor: 'textShadowColor', shadowOffsetX: 'textShadowOffsetX',
   shadowOffsetY: 'textShadowOffsetY', shadowBlur: 'textShadowBlur',
 }
-const sizeSteps = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80, 96]
+const sizeSteps = [2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32]
 
 export function useRichTextFormatting(
   getEditor: () => Editor | undefined,
@@ -32,7 +32,7 @@ export function useRichTextFormatting(
     const editor = getEditor()
     const inheritedStyle = editor?.view.dom ? getComputedStyle(editor.view.dom) : null
     const inherited = { ...defaults,
-      fontSize: normalizeLength(inheritedStyle?.fontSize || baseSize() || '16px') || '16px',
+      fontSize: normalizeLength(inheritedStyle?.fontSize || baseSize() || '3.5mm') || '3.5mm',
       foregroundColor: inheritedStyle?.color || defaults.foregroundColor,
       strokeColor: inheritedStyle?.color || defaults.strokeColor,
       textAlign: inheritedStyle?.textAlign && inheritedStyle.textAlign !== 'start' ? inheritedStyle.textAlign : defaults.textAlign,
@@ -175,21 +175,19 @@ export function useRichTextFormatting(
     if (mutation.key === 'rich-text-selection') preview(mutation.fieldKey, String(mutation.value ?? ''))
   }
   function adjustSize(direction: -1 | 1) {
-    const editor = getEditor()
     const active = value('fontSize')
-    const rendered = editor?.view.domAtPos(editor.state.selection.from).node
-    const element = rendered instanceof Element ? rendered : rendered?.parentElement
-    const size = Number.parseFloat(active.endsWith('px') ? active : element ? getComputedStyle(element).fontSize : active) || 16
-    apply('fontSize', String(direction > 0
+    const size = Number.parseFloat(active) || 3.5
+    const next = direction > 0
       ? sizeSteps.find(step => step > size) ?? sizeSteps[sizeSteps.length - 1]
-      : [...sizeSteps].reverse().find(step => step < size) ?? sizeSteps[0]))
+      : [...sizeSteps].reverse().find(step => step < size) ?? sizeSteps[0]
+    apply('fontSize', `${next}mm`)
   }
   return { state, value, apply, reset, update, preview, previewProperty, adjustSize, sizeSteps }
 }
 
 function normalizeLength(raw: string): string | null {
   const value = raw.trim().toLowerCase()
-  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|em|rem|pt|mm|cm|in|%)?$/.test(value)
-    ? /[a-z%]$/.test(value) ? value : `${value}px`
+  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:em|rem|pt|mm|cm|in|%)?$/.test(value)
+    ? /[a-z%]$/.test(value) ? value : `${value}mm`
     : null
 }

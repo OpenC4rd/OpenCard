@@ -109,7 +109,7 @@ const afterDocument = createCdeDocument({
       id: 'face-front',
       children: [
         unchangedContainer,
-        textChild('text-1', 'Title', 'Hello world', { x: '12px' }),
+        textChild('text-1', 'Title', 'Hello world', { x: '12mm' }),
         textChild('text-added', 'Added block', 'New'),
       ],
     }),
@@ -264,7 +264,7 @@ describe('CardDesignEditor diff mode', () => {
 
     // Only the field that actually differs is projected; a moved block adds a layout pair.
     const layoutInput = inputs[1]!
-    expect(layoutInput.record).toEqual({ 'x@new': '12px' })
+    expect(layoutInput.record).toEqual({ 'x@new': '12mm' })
     expect(layoutInput.fields['x@new']?.isReadonly).toBe(true)
 
     // A blank canvas click clears the diff selection without touching the edit-mode selection.

@@ -75,14 +75,14 @@ describe('tiptapBridge: Inline Marks', () => {
   })
 
   it('round-trips textStyle marks with color, fontSize, and fontFamily', () => {
-    const markup = '@color(#ff0000){red} @size(20px){big} @font(Noto Sans){custom}'
+    const markup = '@color(#ff0000){red} @size(20mm){big} @font(Noto Sans){custom}'
     const tiptap = cardMarkupToTiptap(markup)
     const textStyles = tiptap.content![0]!.content!
       .map(n => n.marks?.find(m => m.type === 'textStyle')?.attrs)
       .filter(Boolean)
     expect(textStyles).toMatchObject([
       { color: '#ff0000' },
-      { fontSize: '20px' },
+      { fontSize: '20mm' },
       { fontFamily: 'Noto Sans' },
     ])
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
@@ -106,11 +106,11 @@ describe('tiptapBridge: Inline Marks', () => {
       type: 'textStyle',
       attrs: {
         textStrokeColor: '#000000',
-        textStrokeWidth: '2px',
+        textStrokeWidth: '2mm',
         textShadowColor: '#111111',
-        textShadowOffsetX: '1px',
-        textShadowOffsetY: '2px',
-        textShadowBlur: '3px',
+        textShadowOffsetX: '1mm',
+        textShadowOffsetY: '2mm',
+        textShadowBlur: '3mm',
         textFillType: 'image',
         textFillSource: 'art.png',
       },
@@ -118,7 +118,7 @@ describe('tiptapBridge: Inline Marks', () => {
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
     // Also parses when arguments are quoted
     expect(cardMarkupToTiptap('@style(stroke="#000000 2"){styled}').content![0]!.content![0]!.marks).toEqual([
-      { type: 'textStyle', attrs: { textStrokeColor: '#000000', textStrokeWidth: '2px' } },
+      { type: 'textStyle', attrs: { textStrokeColor: '#000000', textStrokeWidth: '2mm' } },
     ])
   })
 })

@@ -4,7 +4,7 @@ type ProjectFontFaceStyle =
   | { kind: 'italic' }
   | { kind: 'oblique', angle: NumericRange }
 
-export type InspectedProjectFontFace = {
+type InspectedProjectFontFace = {
   collectionIndex?: number
   familyName: string
   faceName: string

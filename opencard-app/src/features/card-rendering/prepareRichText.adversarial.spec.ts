@@ -75,7 +75,6 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
         expect(item).toBeDefined()
         expect(item!.valid).toBe(true)
         expect(item!.document.blocks).toBeDefined()
-        expect(item!.document.children).toBeDefined()
       }
     })
 
@@ -181,7 +180,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
       expect(issues.length).toBeGreaterThan(0)
       // Check that all diagnostics are properly converted to pipeline issues
       for (const issue of issues) {
-        expect(issue.type).toBe('card-designer.rich-text.invalid-html')
+        expect(issue.type).toBe('card-designer.rich-text.invalid-markup')
         expect(issue.location.blockId).toBe('orphan-block')
       }
     })
@@ -219,7 +218,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
       expect(issues.length).toBeGreaterThanOrEqual(2)
 
       for (const issue of issues) {
-        expect(issue.type).toBe('card-designer.rich-text.invalid-html')
+        expect(issue.type).toBe('card-designer.rich-text.invalid-markup')
         expect(issue.location.blockId).toBe('style-err')
         expect(issue.location.fieldKey).toBe('content')
         expect(issue.location.characterOffset).toBe(5) // Offset of @style
@@ -296,7 +295,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
       // 3. pipeline issues contain the rich-text issue
       const richTextIssue = rendered.issues.find((i) => i.location.blockId === 'broken-t')
       expect(richTextIssue).toBeDefined()
-      expect(richTextIssue?.type).toBe('card-designer.rich-text.invalid-html')
+      expect(richTextIssue?.type).toBe('card-designer.rich-text.invalid-markup')
 
       // 4. resource context also received richText catalog
       expect(rendered.resources.richText).toBe(rendered.richText)

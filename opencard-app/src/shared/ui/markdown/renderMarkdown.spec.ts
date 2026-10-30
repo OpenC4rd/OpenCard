@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ProjectIconCatalog } from '../../workspace/services/projectIconCatalog'
+import type { ProjectIconCatalog } from '../../../features/workspace/services/projectIconCatalog'
 import { renderMarkdown } from './renderMarkdown'
 
 const catalog: ProjectIconCatalog = {

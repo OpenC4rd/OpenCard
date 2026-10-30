@@ -84,14 +84,14 @@ export const appLocaleOptions = computed<readonly AppLocaleOption[]>(() => [
   ...userLocaleIds.value.map(id => ({ id, label: appLocaleLanguageTag(id) })),
 ])
 
-export interface AppLocaleResolution {
+interface AppLocaleResolution {
   locale: string
   /** 设置里选中的语言文件不在了：这里是它的文件名，界面已经退回系统默认语言。 */
   missingFile: string | null
 }
 
 /** 把设置里的选择解释成真正可用的语言：认不出来就退回系统默认语言。 */
-export function resolveAppLocale(preference: AppLocale): AppLocaleResolution {
+function resolveAppLocale(preference: AppLocale): AppLocaleResolution {
   const systemLocale = resolveSystemLocaleId(browserLanguage())
   if (preference === 'system') return { locale: systemLocale, missingFile: null }
   if (isBuiltinAppLocaleId(preference)) return { locale: preference, missingFile: null }

@@ -13,7 +13,7 @@ const BASE_COLUMN = 2
 
 type ExcelJsModule = typeof import('exceljs')
 
-export type ProjectDictionaryWorkbookLabels = {
+type ProjectDictionaryWorkbookLabels = {
   key: string
   base: string
 }
@@ -25,7 +25,7 @@ export type ProjectDictionaryWorkbookImportResult = {
   updatedCells: number
 }
 
-export class ProjectDictionaryWorkbookError extends Error {
+class ProjectDictionaryWorkbookError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'ProjectDictionaryWorkbookError'

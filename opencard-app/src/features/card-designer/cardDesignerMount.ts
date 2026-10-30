@@ -36,7 +36,7 @@ import { createTestSession, getTestSession } from '../editor-runtime/editorTestS
 import CardDesignEditor from './CardDesignEditor.vue'
 
 /** A child replacement: a double component, or `false` to force the real child. */
-export type CdeStub = Component | boolean
+type CdeStub = Component | boolean
 
 export interface CdeMountOptions {
   /** Editor props; `filePath` and `modelValue` have suite defaults, `modelValue` accepts a document. */
@@ -47,7 +47,7 @@ export interface CdeMountOptions {
   attachToBody?: boolean
 }
 
-export interface CdeStubOptions {
+interface CdeStubOptions {
   props?: Record<string, unknown>
   emits?: string[]
   exposed?: Record<string, unknown>
@@ -71,7 +71,7 @@ const cdeNoopViewportMethods = {
 }
 
 /** The viewport double the editor projects into; the real viewport is covered by `CardViewport.spec.ts`. */
-export const CdeCardViewportStub = defineComponent({
+const CdeCardViewportStub = defineComponent({
   name: 'CardViewport',
   props: {
     selectedBlockId: String,
@@ -115,7 +115,7 @@ function slotStub(name: string, props: string[]): Component {
 }
 
 /** The children this suite replaces in nearly every test; see the module comment. */
-export const CdeDefaultStubs: Record<string, CdeStub> = {
+const CdeDefaultStubs: Record<string, CdeStub> = {
   CardViewport: CdeCardViewportStub,
   OcCard: slotStub('OcCard', ['title', 'actions', 'variant', 'icon']),
   OcPanel: slotStub('OcPanel', ['fill', 'tone', 'border', 'padding', 'overflow', 'align']),

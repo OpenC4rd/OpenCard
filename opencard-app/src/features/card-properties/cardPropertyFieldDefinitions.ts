@@ -18,7 +18,7 @@ export type CardPropertyEditorInput = Omit<PropertyEditorInput, 'fields'> & {
   fields: Readonly<Record<string, CardPropertyFieldDefinition>>
 }
 
-export type CardPropertyFieldDefinitionOptions = {
+type CardPropertyFieldDefinitionOptions = {
   translate: (messageKey: string) => string
   hasMessage: (messageKey: string) => boolean
   override?: Readonly<Record<string, Partial<EditorPropertyDefinition>>>

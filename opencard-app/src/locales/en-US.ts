@@ -204,7 +204,7 @@ export default {
         DEPRECATED_PROPERTY: 'Property "{propertyName}" is deprecated and has no effect',
       },
       richTextCodes: {
-        INVALID_HTML: 'Rich-text HTML failed safety validation; the original content was preserved',
+        INVALID_MARKUP: 'Rich-text markup failed syntax validation; the original content was preserved',
         LIMIT_EXCEEDED: 'Rich-text embeds exceeded the safety limit; additional embeds were not rendered',
       },
       resourceCodes: {

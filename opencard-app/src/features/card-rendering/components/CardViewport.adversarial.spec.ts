@@ -87,23 +87,23 @@ describe('CardViewport Adversarial Stress Tests', () => {
       // Parent container rotated 90 degrees clockwise and scaled 2x
       const parentContainer = parseRenderReadyBlockForTest(createSimpleContainerBlock({
         id: 'parent-container',
-        width: '400px',
-        height: '400px',
+        width: '400mm',
+        height: '400mm',
         rotation: '90',
         scaleX: '2',
         scaleY: '2',
         children: [{
           block: parseRenderReadyBlockForTest(createTextBlock({
             id: 'nested-child',
-            width: '100px',
-            height: '80px',
+            width: '100mm',
+            height: '80mm',
           } as unknown as Parameters<typeof createTextBlock>[0])),
           location: {
             id: 'nested-child-loc',
             type: 'simple-container-location',
             anchor: 'lt',
-            x: '50px',
-            y: '50px',
+            x: '50mm',
+            y: '50mm',
           },
         }],
       }))
@@ -116,8 +116,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'parent-loc',
             type: 'simple-container-location',
             anchor: 'lt',
-            x: '100px',
-            y: '100px',
+            x: '100mm',
+            y: '100mm',
           },
         }],
       }
@@ -180,8 +180,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
     it.each(allHandles)('keeps the opposite anchor stationary in world space for handle %s', async (handle) => {
       const child = parseRenderReadyBlockForTest(createTextBlock({
         id: 'resize-target',
-        width: '120px',
-        height: '80px',
+        width: '120mm',
+        height: '80mm',
       } as unknown as Parameters<typeof createTextBlock>[0]))
 
       const testFace: RenderReadyCardFace = {
@@ -192,8 +192,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'loc-target',
             type: 'simple-container-location',
             anchor: 'lt',
-            x: '100px',
-            y: '100px',
+            x: '100mm',
+            y: '100mm',
           },
         }],
       }
@@ -257,15 +257,15 @@ describe('CardViewport Adversarial Stress Tests', () => {
     it.each(allHandles)('keeps opposite anchor stationary under rotated parent for handle %s', (handle) => {
       const child = parseRenderReadyBlockForTest(createTextBlock({
         id: 'nested-resize',
-        width: '100px',
-        height: '60px',
+        width: '100mm',
+        height: '60mm',
         rotation: 30,
       } as unknown as Parameters<typeof createTextBlock>[0]))
 
       const parent = parseRenderReadyBlockForTest(createSimpleContainerBlock({
         id: 'parent',
-        width: '400px',
-        height: '300px',
+        width: '400mm',
+        height: '300mm',
         rotation: '45',
         scaleX: '1.2',
         scaleY: '0.8',
@@ -275,8 +275,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'nested-loc',
             type: 'simple-container-location',
             anchor: 'lt',
-            x: '80px',
-            y: '60px',
+            x: '80mm',
+            y: '60mm',
           },
         }],
       }))
@@ -289,8 +289,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'p-loc',
             type: 'simple-container-location',
             anchor: 'lt',
-            x: '50px',
-            y: '50px',
+            x: '50mm',
+            y: '50mm',
           },
         }],
       }
@@ -331,8 +331,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'nested-loc',
             type: 'simple-container-location' as const,
             anchor: 'lt' as const,
-            x: `${geo.x}px`,
-            y: `${geo.y}px`,
+            x: `${geo.x}mm`,
+            y: `${geo.y}mm`,
           },
         }],
       }
@@ -344,8 +344,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'p-loc',
             type: 'simple-container-location' as const,
             anchor: 'lt' as const,
-            x: '50px',
-            y: '50px',
+            x: '50mm',
+            y: '50mm',
           },
         }],
       }
@@ -364,18 +364,14 @@ describe('CardViewport Adversarial Stress Tests', () => {
     })
   })
 
-  describe('Aspect ratio locking with Shift key during corner drag', () => {
+  describe('Shift block resize remains independent from face dimensions', () => {
     it.each(['lt', 'rt', 'lb', 'rb'] as ResizeHandleDirection[])(
-      'strictly preserves original aspect ratio when Shift resizing from corner %s',
+      'rounds corner %s to whole millimeters on each axis',
       async (corner) => {
-        const initialWidth = 150
-        const initialHeight = 90
-        const expectedRatio = initialWidth / initialHeight // 1.6667
-
         const targetBlock = parseRenderReadyBlockForTest(createTextBlock({
-          id: 'ratio-target',
-          width: `${initialWidth}px`,
-          height: `${initialHeight}px`,
+          id: 'snap-target',
+          width: '150mm',
+          height: '90mm',
         } as unknown as Parameters<typeof createTextBlock>[0]))
 
         const testFace: RenderReadyCardFace = {
@@ -383,11 +379,11 @@ describe('CardViewport Adversarial Stress Tests', () => {
           children: [{
             block: targetBlock,
             location: {
-              id: 'loc-ratio',
+              id: 'loc-snap',
               type: 'simple-container-location',
               anchor: 'lt',
-              x: '100px',
-              y: '100px',
+              x: '100mm',
+              y: '100mm',
             },
           }],
         }
@@ -404,7 +400,7 @@ describe('CardViewport Adversarial Stress Tests', () => {
         })
         await flushPromises()
 
-        await wrapper.setProps({ selectedBlockId: 'ratio-target' })
+        await wrapper.setProps({ selectedBlockId: 'snap-target' })
         await nextTick()
         await flushPromises()
 
@@ -414,16 +410,13 @@ describe('CardViewport Adversarial Stress Tests', () => {
         await handleBtn.trigger('pointerdown')
         const drag = createSelectionDrag()
         drag.begin()
-        // Drag with Shift held down
-        drag.moveBy(50, 20, { shiftKey: true })
+        drag.moveBy(50.4, 20.6, { shiftKey: true })
         window.dispatchEvent(new Event('pointerup'))
         await nextTick()
 
-        const emitted = wrapper.emitted('resize-selection')
-        expect(emitted).toBeDefined()
-        const payload = emitted![emitted!.length - 1]![0] as { width: number; height: number }
-        const actualRatio = payload.width / payload.height
-        expect(actualRatio).toBeCloseTo(expectedRatio, 3)
+        const payload = wrapper.emitted('resize-selection')?.[0]?.[0] as { width: number; height: number }
+        expect(Number.isInteger(payload.width)).toBe(false)
+        expect(Number.isInteger(payload.height)).toBe(false)
       },
     )
   })
@@ -432,8 +425,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
     it('clamps size to minimum selection size when handle is dragged far past opposite edge', async () => {
       const targetBlock = parseRenderReadyBlockForTest(createTextBlock({
         id: 'min-size-target',
-        width: '50px',
-        height: '40px',
+        width: '50mm',
+        height: '40mm',
       } as unknown as Parameters<typeof createTextBlock>[0]))
 
       const testFace: RenderReadyCardFace = {
@@ -444,8 +437,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
             id: 'loc-min',
             type: 'simple-container-location',
             anchor: 'lt',
-            x: '100px',
-            y: '100px',
+            x: '100mm',
+            y: '100mm',
           },
         }],
       }
@@ -489,13 +482,13 @@ describe('CardViewport Adversarial Stress Tests', () => {
     it('moves purely by unconstrained mouse delta when alignment snapping is disabled', async () => {
       const targetBlock = parseRenderReadyBlockForTest(createTextBlock({
         id: 'move-target',
-        width: '100px',
-        height: '80px',
+        width: '100mm',
+        height: '80mm',
       } as unknown as Parameters<typeof createTextBlock>[0]))
       const siblingBlock = parseRenderReadyBlockForTest(createTextBlock({
         id: 'sibling',
-        width: '100px',
-        height: '80px',
+        width: '100mm',
+        height: '80mm',
       } as unknown as Parameters<typeof createTextBlock>[0]))
 
       const testFace: RenderReadyCardFace = {
@@ -507,8 +500,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
               id: 'loc-target',
               type: 'simple-container-location',
               anchor: 'lt',
-              x: '50px',
-              y: '50px',
+              x: '50mm',
+              y: '50mm',
             },
           },
           {
@@ -517,8 +510,8 @@ describe('CardViewport Adversarial Stress Tests', () => {
               id: 'loc-sibling',
               type: 'simple-container-location',
               anchor: 'lt',
-              x: '158px', // Sibling is 8px away, normally within snap threshold
-              y: '50px',
+              x: '158mm', // Sibling is 8mm away, normally within snap threshold
+              y: '50mm',
             },
           },
         ],

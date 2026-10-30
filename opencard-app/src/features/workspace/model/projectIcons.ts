@@ -16,7 +16,7 @@ export type ProjectIconTint = typeof PROJECT_ICON_TINTS[number]
  * Tint of an icon whose persisted field is absent. `context` is the default because an icon set exists
  * to be recolored by the surrounding context; importers persist the tint they detect.
  */
-export const DEFAULT_PROJECT_ICON_TINT: ProjectIconTint = 'context'
+const DEFAULT_PROJECT_ICON_TINT: ProjectIconTint = 'context'
 
 /**
  * One icon of a set: exactly one project-relative file. A vector source is tinted through its alpha
