@@ -187,4 +187,34 @@ describe('OcColorPicker', () => {
 
     expect((wrapper.get('.oc-color-picker__field-input').element as HTMLInputElement).value).toBe('#445566')
   })
+
+  it('shows the dragged color in the field before it is committed', async () => {
+    const wrapper = mount(OcColorPicker, {
+      props: { modelValue: '#112233', variant: 'field' },
+      attachTo: document.body,
+    })
+    await wrapper.get('.oc-color-picker__field-trigger').trigger('click')
+    await flushPromises()
+
+    const area = document.body.querySelector<HTMLElement>('.oc-color-picker__saturation')!
+    area.getBoundingClientRect = () => ({
+      left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+    }) as DOMRect
+    const fieldValue = () => (wrapper.get('.oc-color-picker__field-input').element as HTMLInputElement).value
+
+    area.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, clientX: 100, clientY: 0 }))
+    await wrapper.vm.$nextTick()
+    const previews = wrapper.emitted('preview') as string[][]
+    const dragged = previews[previews.length - 1]![0]
+    // 预览中的值必须先出现在字段上：上层是否响应 preview 不影响控件自己的呈现。
+    expect(dragged).not.toBe('#112233')
+    expect(fieldValue()).toBe(dragged)
+    expect(wrapper.emitted('commit')).toBeUndefined()
+
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, clientX: 100, clientY: 0 }))
+    await wrapper.vm.$nextTick()
+    expect(fieldValue()).toBe(dragged)
+    expect(wrapper.emitted('commit')).toEqual([[dragged]])
+    wrapper.unmount()
+  })
 })

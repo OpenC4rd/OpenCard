@@ -52,8 +52,8 @@
       @click="togglePicker"
       @keydown.esc.stop="closePicker(true)"
     >
-      <slot name="trigger" :color="mixed && !open ? 'transparent' : committedValue" :open="open">
-        <span class="oc-color-picker__swatch" :style="{ backgroundColor: mixed && !open ? 'transparent' : committedValue }" />
+      <slot name="trigger" :color="mixed && !open ? 'transparent' : displayColor" :open="open">
+        <span class="oc-color-picker__swatch" :style="{ backgroundColor: mixed && !open ? 'transparent' : displayColor }" />
       </slot>
     </button>
 
@@ -108,6 +108,7 @@ import OcOverlayMarker from './OcOverlayMarker.vue'
 import {
   getReadableForegroundColor,
   hexToHsva,
+  hexToRgba,
   hsvaToHex,
   hsvaToRgba,
   normalizeHexColor,
@@ -119,6 +120,8 @@ import {
 defineOptions({ name: 'OcColorPicker', inheritAttrs: false })
 
 const PRESETS: readonly string[] = ['#FFFFFF', '#B8B8B8', '#1F2430', '#000000', '#F14C4C', '#F59E0B', '#3FB950', '#58A6FF', '#7C6CFF', '#A855F7']
+/** 半透明色的棋盘格：8px 一格、实显 4px 方块，28px 的字段和 12px 的滑轨都是它的整数倍。 */
+const ALPHA_CHECKER = 'repeating-conic-gradient(color-mix(in srgb, var(--oc-fg-default) 14%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 8px 8px'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -204,8 +207,9 @@ const sliderChannels = computed<ColorSliderField[]>(() => {
   }
   return [colorSlider('hue', 'H', 'Hue', Math.round(hsva.value.hue), 359, hueGradient())]
 })
+/* Alpha 滑轨：颜色渐变叠在棋盘格上，透明端才看得出「这里没有颜色」。 */
 const alphaSliderStyle = computed<CSSProperties>(() => colorSliderStyle(
-  `linear-gradient(to right, transparent, ${opaqueColor.value})`,
+  `linear-gradient(to right, transparent, ${opaqueColor.value}), ${ALPHA_CHECKER}`,
 ))
 const channelFields = computed<ColorChannelField[]>(() => {
   const alphaField: ColorChannelField = {
@@ -241,17 +245,29 @@ const channelFields = computed<ColorChannelField[]>(() => {
   return props.allowAlpha ? [...fields, alphaField] : fields
 })
 /**
- * 字段底色：输入框正在编辑时跟 hexDraft（用户就在字段上看颜色），
- * 面板拖拽时 hexDraft 不动，所以底色也不动。
+ * 字段底色：跟 hexDraft（输入框里显示的、用户眼下看到的颜色）。
+ * 拖拽和滑条也会把即时值写回 hexDraft，所以底色始终等于当前呈现值；
+ * 输入到一半非法时退回上一次提交的颜色。
  */
 const fieldBackground = computed(() => normalizedDraft.value ?? committedValue.value)
 const fieldStyle = computed<CSSProperties>(() => {
   if (props.mixed && !open.value && !inlineEditing.value) return {}
   return {
-    backgroundColor: fieldBackground.value,
+    ...alphaPreviewStyle(fieldBackground.value),
     color: getReadableForegroundColor(fieldBackground.value.slice(0, 7)),
   }
 })
+
+/**
+ * 半透明色垫棋盘格：颜色铺在上层、格子在下一层，才看得出「这里真的透明」。
+ * 不透明色走普通底色，省掉两层背景图。下层沿用字段自身的表面色，不新增 token。
+ */
+function alphaPreviewStyle(color: string): CSSProperties {
+  if ((hexToRgba(color)?.alpha ?? 1) >= 1) return { backgroundColor: color }
+  return {
+    background: `linear-gradient(${color}, ${color}), ${ALPHA_CHECKER} var(--oc-field-surface-background, var(--oc-bg-input))`,
+  }
+}
 
 watch(() => props.modelValue, value => {
   if (open.value || dragKind) return
@@ -327,8 +343,10 @@ function preserveAchromaticAxes(next: HsvaColor, previous: HsvaColor): HsvaColor
 
 function previewHsva(next: HsvaColor): void {
   hsva.value = next
-  // 预览只动面板；字段上的色块和 hex 只在 commit 时更新，不能跟着拖拽跳。
-  emit('preview', hsvaToHex(next))
+  // 拖拽/滑条/键盘调整都是同一个「即时值」：面板、字段和触发器要一起走，
+  // 只有写回宿主模型才等 commit —— 上层不响应 preview 时控件也不能停在旧颜色上。
+  hexDraft.value = hsvaToHex(next)
+  emit('preview', hexDraft.value)
 }
 
 function commitColor(value = displayColor.value): void {
@@ -552,7 +570,7 @@ function clampUnit(value: number): number {
   display: grid;
   flex: 0 0 var(--oc-size-sm);
   width: var(--oc-size-sm);
-  height: 100%;
+  height: var(--oc-size-sm);
   padding: 0;
   place-items: center;
   border: 0;

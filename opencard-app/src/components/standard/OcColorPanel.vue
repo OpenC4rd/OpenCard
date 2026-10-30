@@ -43,7 +43,7 @@
     </div>
 
     <div class="oc-color-picker__channels" :style="channelGridStyle">
-      <OcFieldFrame v-for="channel in channelFields" :key="channel.key" size="sm"
+      <OcFieldFrame v-for="channel in channelFields" :key="channel.key" size="md"
         full-width
       >
         <template #prefix>
@@ -52,7 +52,7 @@
         <OcFieldInput
           class="oc-color-picker__channel-input"
           variant="plain"
-          size="sm"
+          size="md"
           :type="channel.type"
           :value="channel.value"
           :min="channel.min"
@@ -195,7 +195,8 @@ function selectInputMode(mode: string): void {
   box-sizing: border-box;
   display: grid;
   gap: var(--oc-space-xs);
-  width: 220px;
+  /* 一行要放下 4 个「前缀标签 + 三位数」的 md 字段：220px 会把 255 的末位裁掉。 */
+  width: 264px;
   max-height: inherit;
   padding: var(--oc-space-sm);
   overflow-y: auto;
