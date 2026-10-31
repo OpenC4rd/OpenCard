@@ -32,9 +32,9 @@ function listbox(): HTMLElement | null {
 
 describe('OcRichTextEditor locale reactivity', () => {
   it.each([
-    '@b{Hello world}',
-    '@i{Italic} and @u{Underline}',
-    '@ul{@li{Alpha}@li{Beta}}',
+    '@bold{Hello world}',
+    '@italic{Italic} and @underline{Underline}',
+    '@list{@item{Alpha}@item{Beta}}',
     'Level: {{player.lvl}} @icon(key=star)',
     '@style(color=red,size="5mm"){Custom text}',
   ])('preserves Card Markup content and structure through source handoff: %s', async source => {
@@ -65,7 +65,7 @@ describe('OcRichTextEditor locale reactivity', () => {
   it('saves stable resource references instead of resolved preview sources', async () => {
     const wrapper = mount(OcRichTextEditor, {
       props: {
-        initialHtml: '@style(font="font:brand",fill="image:素材/a.png"){AB}',
+        initialHtml: '@style(font="font:brand",fill="素材/a.png"){AB}',
         capabilities: {
           fonts: [{
             key: 'project',
@@ -93,7 +93,7 @@ describe('OcRichTextEditor locale reactivity', () => {
   it('composes image fill, background and outline through previews, undo and source handoff', async () => {
     const wrapper = mount(OcRichTextEditor, {
       props: {
-        initialHtml: '@mark(color=yellow){@style(color=red,stroke="blue 1",fill="image:assets/a.png"){ABC}}',
+        initialHtml: '@style(bg=yellow){@style(color=red,stroke="blue 1mm",fill="assets/a.png"){ABC}}',
         capabilities: {
           resolveImagePreview: reference => `https://example.test/${reference}`,
         },

@@ -22,6 +22,16 @@ export function isWithinOverlayOwners(target: Node, owners: readonly HTMLElement
   return false
 }
 
+/**
+ * 焦点去向是否还属于这一层：落在层内、或落在层的祖先容器上都算「没离开」。
+ * 浮层经 Teleport 挂到模态根（弹窗遮罩）里，焦点也常常回落到那层宿主上；
+ * 只判 contains 会把「回到宿主」当成离开，延迟关闭随即拆掉正在按下的浮层，click 就落空了。
+ */
+export function isFocusWithin(next: EventTarget | null | undefined, container: HTMLElement | null | undefined): boolean {
+  if (!(next instanceof Node) || !container) return false
+  return container.contains(next) || next.contains(container)
+}
+
 function updateBackground(): void {
   const active = activeDialogRoot.value
   for (const element of document.body.children) {

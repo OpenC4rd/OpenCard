@@ -37,6 +37,62 @@ describe('OcActionButton', () => {
     expect(markedUp.get('button').attributes('aria-label')).toBe('Fill F')
   })
 
+  it('stays open when focus returns to the container that hosts its floating layer', async () => {
+    // 模态根（弹窗遮罩）同时是 Teleport 浮层的宿主和控件的祖先：焦点回到它上面不是「点了外面」。
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const wrapper = mount(OcActionButton, {
+      attachTo: container,
+      props: {
+        action: { key: 'icons', title: 'Icons', children: [{ key: 'diamond', title: 'Diamond' }] },
+      },
+    })
+
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    expect(menus()).toHaveLength(1)
+
+    container.dispatchEvent(new FocusEvent('focusin', { bubbles: true, composed: true }))
+    await flushPromises()
+    expect(menus()).toHaveLength(1)
+
+    const outside = document.createElement('div')
+    document.body.appendChild(outside)
+    outside.dispatchEvent(new FocusEvent('focusin', { bubbles: true, composed: true }))
+    await flushPromises()
+    expect(menus()).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it('does not schedule a close when focus returns to the container', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const wrapper = mount(OcActionButton, {
+      attachTo: container,
+      props: {
+        action: { key: 'icons', title: 'Icons', children: [{ key: 'diamond', title: 'Diamond' }] },
+      },
+    })
+
+    // 焦点进入打开（不钉住），这样 focusout 排的延迟关闭才是真的生效路径。
+    wrapper.element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    await flushPromises()
+    expect(menus()).toHaveLength(1)
+
+    wrapper.element.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: container }))
+    await new Promise((resolve) => window.setTimeout(resolve, 150))
+    await flushPromises()
+    expect(menus()).toHaveLength(1)
+
+    const outside = document.createElement('div')
+    document.body.appendChild(outside)
+    wrapper.element.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }))
+    await new Promise((resolve) => window.setTimeout(resolve, 150))
+    await flushPromises()
+    expect(menus()).toHaveLength(0)
+    wrapper.unmount()
+  })
+
   it('keeps a clicked menu open after the pointer leaves and reports the chosen command', async () => {
     const wrapper = mount(OcActionButton, {
       attachTo: document.body,

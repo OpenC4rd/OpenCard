@@ -17,7 +17,20 @@ function quoteMarkupArg(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&')}"`
 }
 
+/** AST 里的描边宽度与阴影偏移都以毫米数值保存，写出时补上单位。 */
+function formatMm(value: number): string {
+  const rounded = Number.isFinite(value) ? Number(value.toFixed(4)) : 0
+  return `${rounded}mm`
+}
+
 const FLAG_TAGS: readonly (readonly [keyof InlineStyleSpec, string])[] = [
+  ['bold', 'bold'],
+  ['italic', 'italic'],
+  ['underline', 'underline'],
+  ['strikethrough', 'strikethrough'],
+]
+
+const FLAG_KEYS: readonly (readonly [keyof InlineStyleSpec, string])[] = [
   ['bold', 'b'],
   ['italic', 'i'],
   ['underline', 'u'],
@@ -26,42 +39,34 @@ const FLAG_TAGS: readonly (readonly [keyof InlineStyleSpec, string])[] = [
 
 function styleArgs(style: InlineStyleSpec): string[] {
   const args: string[] = []
-  for (const [field, key] of FLAG_TAGS) if (style[field] !== undefined) args.push(`${key}=${style[field]}`)
+  for (const [field, key] of FLAG_KEYS) if (style[field] === true) args.push(key)
   const text = (key: string, value: string | undefined) => {
     if (value !== undefined) args.push(`${key}=${quoteMarkupArg(value)}`)
   }
-  text('mark', style.markColor)
   text('color', style.color)
   text('bg', style.backgroundColor)
   text('size', style.fontSize)
   text('font', style.fontFamily)
+  text('fill', style.fillSource)
   if (style.strokeColor !== undefined || style.strokeWidth !== undefined) {
-    text('stroke', `${style.strokeColor ?? 'currentColor'} ${style.strokeWidth ?? 1}`)
+    text('stroke', `${style.strokeColor ?? 'currentColor'} ${formatMm(style.strokeWidth ?? 1)}`)
   }
   if (
     style.shadowColor !== undefined || style.shadowOffsetX !== undefined ||
     style.shadowOffsetY !== undefined || style.shadowBlur !== undefined
   ) {
-    text('shadow', `${style.shadowColor ?? 'currentColor'} ${style.shadowOffsetX ?? 0} ${style.shadowOffsetY ?? 0} ${style.shadowBlur ?? 0}`)
-  }
-  if (style.fillType !== undefined || style.fillSource !== undefined) {
-    const source = style.fillSource ?? ''
-    text('fill', style.fillType === 'image' ? `image:${source}` : source)
+    text('shadow', `${style.shadowColor ?? 'currentColor'} ${formatMm(style.shadowOffsetX ?? 0)} ${formatMm(style.shadowOffsetY ?? 0)} ${formatMm(style.shadowBlur ?? 0)}`)
   }
   return args
 }
 
-/** 只有单个属性时用简写（`@b`、`@color(red)` …），否则落到 `@style(...)`。 */
+/** 只有单个标记时用全称标签（`@bold{…}`），否则落到 `@style(...){…}`。 */
 function openSpan(style: InlineStyleSpec): string {
-  const defined = (Object.keys(style) as (keyof InlineStyleSpec)[]).filter((key) => style[key] !== undefined)
+  const defined = (Object.keys(style) as (keyof InlineStyleSpec)[]).filter((key) => style[key] !== undefined && style[key] !== false)
   if (defined.length === 1) {
     const [only] = defined
     const flag = FLAG_TAGS.find(([field]) => field === only)
     if (flag && style[only!] === true) return `@${flag[1]}{`
-    if (only === 'markColor') return `@mark(color=${quoteMarkupArg(style.markColor!)}){`
-    if (only === 'color') return `@color(${quoteMarkupArg(style.color!)}){`
-    if (only === 'fontSize') return `@size(${quoteMarkupArg(style.fontSize!)}){`
-    if (only === 'fontFamily') return `@font(${quoteMarkupArg(style.fontFamily!)}){`
   }
   return `@style(${styleArgs(style).join(',')}){`
 }
@@ -102,8 +107,8 @@ function serializeParagraph(paragraph: CardMarkupParagraphNode): string {
 
 function serializeBlock(block: CardMarkupBlockNode): string {
   if (block.type === 'paragraph') return serializeParagraph(block)
-  const items = block.items.map((item) => `@li{${item.map(serializeParagraph).join('\n')}}`).join('')
-  return `${block.ordered ? '@ol' : '@ul'}{${items}}`
+  const items = block.items.map((item) => `@item{${item.map(serializeParagraph).join('\n')}}`).join('')
+  return `${block.ordered ? '@list(ordered)' : '@list'}{${items}}`
 }
 
 /** 序列化是解析的逆运算：`parse(serialize(parse(s)))` 与 `parse(s)` 结构相同。 */

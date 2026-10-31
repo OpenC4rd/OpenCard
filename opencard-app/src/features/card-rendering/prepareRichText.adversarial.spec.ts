@@ -43,7 +43,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
       expect(typeof (globalThis as any).DOMParser).toBe('undefined')
 
       const doc = createTestDoc([
-        createTextBlock({ id: 't1', content: '@b{Bold} and @i{Italic} with {{binding}}' }),
+        createTextBlock({ id: 't1', content: '@bold{Bold} and @italic{Italic} with {{binding}}' }),
         createTextBlock({ id: 't2', content: '<p style="color: red;">Legacy HTML fallback</p>' }),
       ])
 
@@ -80,7 +80,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
 
     it('survives deeply nested unclosed tags (1000 levels) without call stack overflow', () => {
       const depth = 1000
-      const content = '@b{'.repeat(depth) + 'Deeply unclosed text'
+      const content = '@bold{'.repeat(depth) + 'Deeply unclosed text'
       const block = createTextBlock({ id: 'deep-unclosed', content })
       const doc = createTestDoc([block])
 
@@ -96,7 +96,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
 
     it('survives deeply nested balanced tags (1000 levels) without call stack overflow', () => {
       const depth = 1000
-      const content = '@b{'.repeat(depth) + 'Deeply balanced text' + '}'.repeat(depth)
+      const content = '@bold{'.repeat(depth) + 'Deeply balanced text' + '}'.repeat(depth)
       const block = createTextBlock({ id: 'deep-balanced', content })
       const doc = createTestDoc([block])
 
@@ -111,7 +111,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
 
     it('processes multi-megabyte text payloads deterministically in sub-second time', () => {
       // 2 Megabytes of mixed text, tags, bindings, and line breaks
-      const baseChunk = '@b{Header line} with {{expression}} and @color(color=#336699){colored span}.'
+      const baseChunk = '@bold{Header line} with {{expression}} and @style(color=#336699){colored span}.'
       const repeatCount = 25000 // ~1.9 MB
       const hugeContent = Array(repeatCount).fill(baseChunk).join('\n')
 
@@ -131,7 +131,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
     })
 
     it('handles arbitrary binary, null bytes, surrogate pairs, and invalid control characters', () => {
-      const content = 'Null \0 bytes \x01\x02\x03 and surrogate \uD83D\uDE00 emoji @b{bold \0 content}'
+      const content = 'Null \0 bytes \x01\x02\x03 and surrogate \uD83D\uDE00 emoji @bold{bold \0 content}'
       const block = createTextBlock({ id: 'binary-block', content })
       const doc = createTestDoc([block])
 
@@ -169,8 +169,8 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
       expect(duration).toBeLessThan(100)
     })
 
-    it('gracefully handles missing bodies and orphan block tags (@ul, @ol, @li)', () => {
-      const orphanMarkup = '@ul\n@ol\n@li{Orphan li}\n@align(center)\n@style(color=red)'
+    it('gracefully handles missing bodies and orphan block tags (@list, @item)', () => {
+      const orphanMarkup = '@list\n@list(ordered)\n@item{Orphan li}\n@align(center)\n@style(color=red)'
       const block = createTextBlock({ id: 'orphan-block', content: orphanMarkup })
       const doc = createTestDoc([block])
 
@@ -188,20 +188,20 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
 
   describe('Invariant 3: Precise diagnostic codes and character offset emission', () => {
     it('pinpoints exact token offsets for unclosed tags, unclosed bindings, and unclosed args', () => {
-      // Offset 0: @b{
-      // Offset 3: Hello 
-      // Offset 9: {{unclosedBinding
-      const content = '@b{Hello {{unclosedBinding'
+      // Offset 0: @bold{
+      // Offset 6: Hello 
+      // Offset 12: {{unclosedBinding
+      const content = '@bold{Hello {{unclosedBinding'
       const block = createTextBlock({ id: 'err-block', content })
       const doc = createTestDoc([block])
 
       const { issues } = prepareRichText({ document: doc })
       expect(issues.length).toBe(2)
 
-      // First issue: binding unclosed at offset 9
+      // First issue: binding unclosed at offset 12
       const bindingIssue = issues.find((i) => i.details?.code === 'unclosed-tag' && i.token?.includes('}}'))
       expect(bindingIssue).toBeDefined()
-      expect(bindingIssue!.location.characterOffset).toBe(9)
+      expect(bindingIssue!.location.characterOffset).toBe(12)
 
       // Second issue: @b unclosed at offset 0
       const tagIssue = issues.find((i) => i.details?.code === 'unclosed-tag' && i.token?.includes('@b'))
@@ -226,7 +226,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
     })
 
     it('emits invalid-structure diagnostics when block tags are improperly nested inside spans', () => {
-      const content = '@b{Inline text @align(center){Nested block}}'
+      const content = '@bold{Inline text @align(center){Nested block}}'
       const block = createTextBlock({ id: 'struct-err', content })
       const doc = createTestDoc([block])
 
@@ -239,8 +239,8 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
 
   describe('Invariant 4: Integration with renderPipeline.ts', () => {
     it('integrates seamlessly with prepareCardRender, propagating richText catalog and issues', () => {
-      const validBlock = createTextBlock({ id: 'valid-t', content: 'Valid @b{Content}' })
-      const brokenBlock = createTextBlock({ id: 'broken-t', content: '@i{Unclosed' })
+      const validBlock = createTextBlock({ id: 'valid-t', content: 'Valid @bold{Content}' })
+      const brokenBlock = createTextBlock({ id: 'broken-t', content: '@italic{Unclosed' })
       const shapeBlock = createShapeBlock({ id: 'shape-1' })
 
       const doc: CardDocument = {
@@ -302,7 +302,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
     })
 
     it('supports card instances with overrides and instance IDs in location tracking', () => {
-      const block = createTextBlock({ id: 'tmpl-text', content: '@u{Initial}' })
+      const block = createTextBlock({ id: 'tmpl-text', content: '@underline{Initial}' })
       const doc = createTestDoc([block])
       const instance: CardInstanceRecord = {
         type: 'card-instance',
@@ -310,7 +310,7 @@ describe('prepareRichText - Empirical Adversarial Challenge', () => {
         name: 'Instance 42',
         amount: '1',
         data: {
-          'tmpl-text': { content: '@b{Overridden unclosed' },
+          'tmpl-text': { content: '@bold{Overridden unclosed' },
         },
       }
 

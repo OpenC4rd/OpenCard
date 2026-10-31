@@ -26,14 +26,12 @@ export type ResolvedRunStyle = {
   strikethrough: boolean
   color: string
   backgroundColor?: string
-  markColor?: string
   strokeColor?: string
   strokeWidth: number
   shadowColor?: string
   shadowOffsetX: number
   shadowOffsetY: number
   shadowBlur: number
-  fillType: 'color' | 'image'
   fillSource?: string
 }
 

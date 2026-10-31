@@ -194,7 +194,7 @@ describe('canvasAssetStore', () => {
   it('preloads images, masks, and inline markup icons across the scene graph', async () => {
     const store = createCanvasAssetStore()
     const img = block('pic', { type: 'image-block', source: 'img.png', maskSource: 'mask.png' })
-    const txt = block('doc', { type: 'text-block', content: 'See @img(src="icon.png") @icon(tools/gear)' })
+    const txt = block('doc', { type: 'text-block', content: 'See @img(src="icon.png") @icon(key=tools/gear)' })
     const scene = computeSceneLayout(face(at(img), at(txt)))
 
     const context = createCardRenderResourceContext({

@@ -16,13 +16,13 @@ function sortMarks(marks?: readonly TiptapBridgeMark[]): TiptapBridgeMark[] {
 
 describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () => {
   it('round-trips basic flag tags (@b, @i, @u, @s) individually and combined', () => {
-    const markup = '@b{bold} and @i{italic} and @u{underlined} and @s{strikethrough}'
+    const markup = '@bold{bold} and @italic{italic} and @underline{underlined} and @strikethrough{strikethrough}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content).toHaveLength(7)
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
 
     // All four flags simultaneously on one run
-    const quad = '@style(b=true,i=true,u=true,s=true){all four}'
+    const quad = '@style(b,i,u,s){all four}'
     const quadDoc = cardMarkupToTiptap(quad)
     const marks = quadDoc.content![0]!.content![0]!.marks!.map(m => m.type)
     expect(marks).toContain('bold')
@@ -34,15 +34,15 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
 
   it('round-trips typography tags (@color, @size, @font) with various length units and quotes', () => {
     const cases = [
-      '@color(#123456){hex}',
-      '@color(rgb(10, 20, 30)){rgb}',
-      '@color(rgba(255, 0, 0, 0.5)){rgba}',
-      '@size(14mm){millimeter size}',
-      '@size(1.5rem){rem size}',
-      '@size(120%){percent size}',
-      '@font(Roboto){unquoted font}',
-      '@font("Times New Roman"){quoted font}',
-      '@font("PingFang SC"){cjk font}',
+      '@style(color=#123456){hex}',
+      '@style(color=rgb(10, 20, 30)){rgb}',
+      '@style(color=rgba(255, 0, 0, 0.5)){rgba}',
+      '@style(size=14mm){millimeter size}',
+      '@style(size=1.5rem){rem size}',
+      '@style(size=120%){percent size}',
+      '@style(font=Roboto){unquoted font}',
+      '@style(font="Times New Roman"){quoted font}',
+      '@style(font="PingFang SC"){cjk font}',
     ]
 
     for (const markup of cases) {
@@ -57,9 +57,9 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
 
   it('round-trips stroke, shadow, and fill variations via @style', () => {
     const strokeVariants = [
-      '@style(stroke=#ff0000 2){stroke with px}',
-      '@style(stroke=rgba(0,0,0,0.5) 1.5){stroke with fractional and rgba}',
-      '@style(stroke=currentColor 3){stroke with currentColor}',
+      '@style(stroke=#ff0000 2mm){stroke with px}',
+      '@style(stroke=rgba(0,0,0,0.5) 1.5mm){stroke with fractional and rgba}',
+      '@style(stroke=currentColor 3mm){stroke with currentColor}',
     ]
 
     for (const markup of strokeVariants) {
@@ -71,8 +71,8 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
     }
 
     const shadowVariants = [
-      '@style(shadow=#000000 2 3 4){shadow with blur}',
-      '@style(shadow=rgba(10,20,30,0.8) -2 -4 0){negative offsets}',
+      '@style(shadow=#000000 2mm 3mm 4mm){shadow with blur}',
+      '@style(shadow=rgba(10,20,30,0.8) -2mm -4mm 0mm){negative offsets}',
     ]
 
     for (const markup of shadowVariants) {
@@ -84,8 +84,8 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
     }
 
     const fillVariants = [
-      '@style(fill=image:texture.webp){image fill}',
-      '@style(fill=#abcdef){color fill}',
+      '@style(fill=image/texture.webp){image fill}',
+      '@style(fill=image/pattern.png){pattern fill}',
     ]
 
     for (const markup of fillVariants) {
@@ -97,8 +97,8 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
     }
   })
 
-  it('round-trips @mark highlight styles', () => {
-    const markup = '@mark(color=#ffeedd){highlighted text}'
+  it('round-trips highlighted styles', () => {
+    const markup = '@style(bg=#ffeedd){highlighted text}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content![0]!.marks).toEqual([
       { type: 'highlight', attrs: { color: '#ffeedd' } },
@@ -123,7 +123,7 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
     expect(serializeTiptapMarkup(tiptap1)).toBe(unquotedMarkup)
 
     // Quoted path with spaces
-    const quotedMarkup = '@img(src="assets/my hero.png",w=100,h=100,fit=contain,align=start)'
+    const quotedMarkup = '@img(src="assets/my hero.png",w=100mm,h=100mm,fit=contain,align=start)'
     const tiptap2 = cardMarkupToTiptap(quotedMarkup)
     expect(tiptap2.content![0]!.content![0]).toMatchObject({
       type: 'image',
@@ -132,11 +132,11 @@ describe('tiptapBridge Adversarial: All @tag Variants Roundtrip Fidelity', () =>
       },
     })
     // Serialized output normalizes non-delimited strings to unquoted shape
-    expect(serializeTiptapMarkup(tiptap2)).toBe('@img(src=assets/my hero.png,w=100,h=100,fit=contain,align=start)')
+    expect(serializeTiptapMarkup(tiptap2)).toBe('@img(src=assets/my hero.png,w=100mm,h=100mm,fit=contain,align=start)')
     expect(parseCardMarkup(serializeTiptapMarkup(tiptap2)).document.blocks).toEqual(parseCardMarkup(quotedMarkup).document.blocks)
 
     // When value contains delimiters like comma, quotes are strictly preserved
-    const commaMarkup = '@img(src="assets/hero,special.png",w=50,h=50)'
+    const commaMarkup = '@img(src="assets/hero,special.png",w=50mm,h=50mm)'
     const tiptap3 = cardMarkupToTiptap(commaMarkup)
     expect(serializeTiptapMarkup(tiptap3)).toBe(commaMarkup)
   })
@@ -242,7 +242,7 @@ describe('tiptapBridge Adversarial: Atom Nodes (@bind, @icon)', () => {
   })
 
   it('preserves marks applied to atom nodes across roundtrips', () => {
-    const markup = '@b{@color(red){{{user.name}} @icon(key=verified)}}'
+    const markup = '@bold{@style(color=red){{{user.name}} @icon(key=verified)}}'
     const tiptap = cardMarkupToTiptap(markup)
     const binding = tiptap.content![0]!.content![0]!
     const icon = tiptap.content![0]!.content![2]!
@@ -269,16 +269,16 @@ describe('tiptapBridge Adversarial: Deep Nesting & Conflicting Styles', () => {
   it('correctly flattens and factors 10-level deep nested spans', () => {
     // 10 nested levels of styles
     let markup = 'Deep text'
-    markup = `@color(red){${markup}}`
-    markup = `@size(18mm){${markup}}`
-    markup = `@font(Arial){${markup}}`
-    markup = `@b{${markup}}`
-    markup = `@i{${markup}}`
-    markup = `@u{${markup}}`
-    markup = `@s{${markup}}`
-    markup = `@mark(color=yellow){${markup}}`
-    markup = `@style(stroke=#000 2){${markup}}`
-    markup = `@style(shadow=#111 1 1 2){${markup}}`
+    markup = `@style(color=red){${markup}}`
+    markup = `@style(size=18mm){${markup}}`
+    markup = `@style(font=Arial){${markup}}`
+    markup = `@bold{${markup}}`
+    markup = `@italic{${markup}}`
+    markup = `@underline{${markup}}`
+    markup = `@strikethrough{${markup}}`
+    markup = `@style(bg=yellow){${markup}}`
+    markup = `@style(stroke=#000 2mm){${markup}}`
+    markup = `@style(shadow=#111 1mm 1mm 2mm){${markup}}`
 
     const tiptap = cardMarkupToTiptap(markup)
     const textNode = tiptap.content![0]!.content![0]!
@@ -315,7 +315,7 @@ describe('tiptapBridge Adversarial: Deep Nesting & Conflicting Styles', () => {
 
   it('resolves conflicting styles with inner-override semantics', () => {
     // Outer is red, middle is green, innermost is blue
-    const markup = '@color(red){outer @color(green){middle @color(blue){inner} middle2} outer2}'
+    const markup = '@style(color=red){outer @style(color=green){middle @style(color=blue){inner} middle2} outer2}'
     const tiptap = cardMarkupToTiptap(markup)
     const nodes = tiptap.content![0]!.content!
 
@@ -357,7 +357,7 @@ describe('tiptapBridge Adversarial: Deep Nesting & Conflicting Styles', () => {
 
 describe('tiptapBridge Adversarial: Lists, Nesting & Structural Complexities', () => {
   it('round-trips lists containing formatted inline spans, bindings, and icons', () => {
-    const markup = '@ul{@li{@b{Item 1} {{score}}}@li{@i{Item 2} @icon(key=star)}}'
+    const markup = '@list{@item{@bold{Item 1} {{score}}}@item{@italic{Item 2} @icon(key=star)}}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.type).toBe('bulletList')
     expect(tiptap.content![0]!.content).toHaveLength(2)
@@ -374,7 +374,7 @@ describe('tiptapBridge Adversarial: Lists, Nesting & Structural Complexities', (
   })
 
   it('round-trips list items containing multiple paragraphs', () => {
-    const markup = '@ol{@li{Step 1 paragraph 1\nStep 1 paragraph 2}@li{Step 2}}'
+    const markup = '@list(ordered){@item{Step 1 paragraph 1\nStep 1 paragraph 2}@item{Step 2}}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.type).toBe('orderedList')
     const item1 = tiptap.content![0]!.content![0]!
@@ -476,7 +476,7 @@ describe('tiptapBridge Adversarial: Whitespace & Special Character Fidelity', ()
   })
 
   it('preserves leading, trailing, and standalone whitespaces in styled text runs', () => {
-    const markup = '@b{  leading} and @i{trailing  } and @u{   middle   }'
+    const markup = '@bold{  leading} and @italic{trailing  } and @underline{   middle   }'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content![0]!.text).toBe('  leading')
     expect(tiptap.content![0]!.content![2]!.text).toBe('trailing  ')
@@ -588,19 +588,19 @@ describe('tiptapBridge Adversarial: Malformed Inputs & Edge Cases', () => {
     expect(tiptapToCardMarkup(emptyListDoc).blocks).toEqual([{ type: 'list', ordered: false, items: [] }])
 
     // Empty list in markup provides schema-valid fallback listItem and paragraph
-    const emptyMarkupList = cardMarkupToTiptap('@ul{}')
+    const emptyMarkupList = cardMarkupToTiptap('@list{}')
     expect(emptyMarkupList.content![0]!.type).toBe('bulletList')
     expect(emptyMarkupList.content![0]!.content![0]!.type).toBe('listItem')
     expect(emptyMarkupList.content![0]!.content![0]!.content![0]!.type).toBe('paragraph')
 
     // Empty list item provides schema-valid fallback paragraph
-    const emptyItemMarkup = cardMarkupToTiptap('@ul{@li{}}')
+    const emptyItemMarkup = cardMarkupToTiptap('@list{@item{}}')
     expect(emptyItemMarkup.content![0]!.content![0]!.content![0]!.type).toBe('paragraph')
   })
 
   it('handles malformed markup strings gracefully through the bridge', () => {
     // Unclosed tags
-    const unclosedTag = '@b{bold text without closing brace'
+    const unclosedTag = '@bold{bold text without closing brace'
     const tiptap1 = cardMarkupToTiptap(unclosedTag)
     expect(tiptap1.content![0]!.content![0]!.text).toBe('bold text without closing brace')
     expect(tiptap1.content![0]!.content![0]!.marks).toEqual([{ type: 'bold' }])
@@ -652,7 +652,7 @@ describe('tiptapBridge Adversarial: Malformed Inputs & Edge Cases', () => {
       }],
     }
     const markupWithString = tiptapToCardMarkup(docWithString)
-    expect(markupWithString.source).toBe('@size(24mm){big}')
+    expect(markupWithString.source).toBe('@style(size=24mm){big}')
   })
 })
 
@@ -661,11 +661,11 @@ describe('tiptapBridge Stress Test: High Volume & Scale', () => {
     const paragraphs: string[] = []
     for (let i = 0; i < 500; i++) {
       if (i % 3 === 0) {
-        paragraphs.push(`@b{Paragraph ${i}} with @color(#ff0000){red} and {{stats.value_${i}}}`)
+        paragraphs.push(`@bold{Paragraph ${i}} with @style(color=#ff0000){red} and {{stats.value_${i}}}`)
       } else if (i % 3 === 1) {
-        paragraphs.push(`@align(center){@i{Centered ${i}} @icon(key=icon_${i})}`)
+        paragraphs.push(`@align(center){@italic{Centered ${i}} @icon(key=icon_${i})}`)
       } else {
-        paragraphs.push(`@style(stroke=#000 1,shadow=#111 1 1 1){Styled line ${i}}`)
+        paragraphs.push(`@style(stroke=#000 1mm,shadow=#111 1mm 1mm 1mm){Styled line ${i}}`)
       }
     }
     const fullMarkup = paragraphs.join('\n')
@@ -685,7 +685,7 @@ describe('tiptapBridge Stress Test: High Volume & Scale', () => {
   it('processes 1,000 inline items in a single paragraph without stack overflow or performance degradation', () => {
     const items: string[] = []
     for (let i = 0; i < 1000; i++) {
-      if (i % 4 === 0) items.push(`@b{b${i}}`)
+      if (i % 4 === 0) items.push(`@bold{b${i}}`)
       else if (i % 4 === 1) items.push(`{{v${i}}}`)
       else if (i % 4 === 2) items.push(`@icon(key=k${i})`)
       else items.push(`plain${i}`)

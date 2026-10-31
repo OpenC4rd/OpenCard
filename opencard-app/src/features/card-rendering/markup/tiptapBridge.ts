@@ -54,7 +54,7 @@ function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   if (style.underline) marks.push({ type: 'underline' })
   if (style.strikethrough) marks.push({ type: 'strike' })
 
-  const highlightColor = style.markColor ?? style.backgroundColor
+  const highlightColor = style.backgroundColor
   if (highlightColor) {
     marks.push({ type: 'highlight', attrs: { color: highlightColor } })
   }
@@ -69,9 +69,9 @@ function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   if (style.shadowOffsetX !== undefined) textStyleAttrs.textShadowOffsetX = `${style.shadowOffsetX}mm`
   if (style.shadowOffsetY !== undefined) textStyleAttrs.textShadowOffsetY = `${style.shadowOffsetY}mm`
   if (style.shadowBlur !== undefined) textStyleAttrs.textShadowBlur = `${style.shadowBlur}mm`
-  if (style.fillType !== undefined) {
-    textStyleAttrs.textFillType = style.fillType
-    if (style.fillSource !== undefined) textStyleAttrs.textFillSource = style.fillSource
+  if (style.fillSource !== undefined) {
+    textStyleAttrs.textFillType = 'image'
+    textStyleAttrs.textFillSource = style.fillSource
   }
 
   if (Object.keys(textStyleAttrs).length > 0) {
@@ -102,7 +102,7 @@ function marksToStyle(marks?: readonly TiptapBridgeMark[]): InlineStyleSpec {
         break
       case 'highlight': {
         const color = mark.attrs?.color
-        if (typeof color === 'string' && color) style.markColor = color
+        if (typeof color === 'string' && color) style.backgroundColor = color
         break
       }
       case 'textStyle': {
@@ -125,9 +125,8 @@ function marksToStyle(marks?: readonly TiptapBridgeMark[]): InlineStyleSpec {
         if (sy !== undefined) style.shadowOffsetY = sy
         const sb = parseLength(attrs.textShadowBlur)
         if (sb !== undefined) style.shadowBlur = sb
-        if (attrs.textFillType === 'image' || attrs.textFillType === 'color') {
-          style.fillType = attrs.textFillType
-          if (typeof attrs.textFillSource === 'string') style.fillSource = attrs.textFillSource
+        if (attrs.textFillType === 'image' && typeof attrs.textFillSource === 'string' && attrs.textFillSource) {
+          style.fillSource = attrs.textFillSource
         }
         break
       }

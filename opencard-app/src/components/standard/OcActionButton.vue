@@ -11,7 +11,7 @@
     v-bind="$attrs"
     @pointerleave="scheduleCloseMenu"
     @focusin="openMenu"
-    @focusout="scheduleCloseMenu"
+    @focusout="handleRootFocusOut"
     @keydown="handleRootKeydown"
   >
     <OcButton
@@ -86,6 +86,7 @@ import type {
 import OcActionMenu from './OcActionMenu.vue'
 import OcOverlayMarker from './OcOverlayMarker.vue'
 import { useOverlayDismiss } from '../../shared/ui/useOverlayDismiss'
+import { isFocusWithin } from '../../shared/ui/overlayScope'
 import { isFocusOpenSuppressed, withFocusOpenSuppressed } from '../../composables/overlayGroups'
 import { actionAccessibleLabel, actionTitleText, formatActionBadge, hasActionBadge } from './actionBadge'
 
@@ -148,6 +149,12 @@ function scheduleCloseMenu(): void {
     closeTimer = null
     closeMenu()
   }, CLOSE_DELAY_MS)
+}
+
+/** 焦点还在自己这一层（含宿主容器）就不排关闭；焦点回到模态根不算离开。 */
+function handleRootFocusOut(event: FocusEvent): void {
+  if (isFocusWithin(event.relatedTarget, rootRef.value)) return
+  scheduleCloseMenu()
 }
 
 function handleButtonClick(): void {

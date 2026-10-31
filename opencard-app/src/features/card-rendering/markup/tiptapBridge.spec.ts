@@ -67,7 +67,7 @@ describe('tiptapBridge: Text Alignment', () => {
 
 describe('tiptapBridge: Inline Marks', () => {
   it('round-trips standard inline marks (bold, italic, underline, strike)', () => {
-    const markup = '@b{Bold} @i{Italic} @u{Underline} @s{Strike}'
+    const markup = '@bold{Bold} @italic{Italic} @underline{Underline} @strikethrough{Strike}'
     const tiptap = cardMarkupToTiptap(markup)
     const marks = tiptap.content![0]!.content!.map(n => n.marks?.[0]?.type).filter(Boolean)
     expect(marks).toEqual(['bold', 'italic', 'underline', 'strike'])
@@ -75,7 +75,7 @@ describe('tiptapBridge: Inline Marks', () => {
   })
 
   it('round-trips textStyle marks with color, fontSize, and fontFamily', () => {
-    const markup = '@color(#ff0000){red} @size(20mm){big} @font(Noto Sans){custom}'
+    const markup = '@style(color=#ff0000){red} @style(size=20mm){big} @style(font=Noto Sans){custom}'
     const tiptap = cardMarkupToTiptap(markup)
     const textStyles = tiptap.content![0]!.content!
       .map(n => n.marks?.find(m => m.type === 'textStyle')?.attrs)
@@ -87,20 +87,20 @@ describe('tiptapBridge: Inline Marks', () => {
     ])
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
     // Also parses when font is quoted
-    expect(cardMarkupToTiptap('@font("Noto Sans"){custom}').content![0]!.content![0]!.marks).toEqual([
+    expect(cardMarkupToTiptap('@style(font="Noto Sans"){custom}').content![0]!.content![0]!.marks).toEqual([
       { type: 'textStyle', attrs: { fontFamily: 'Noto Sans' } },
     ])
   })
 
-  it('round-trips highlight marks with background markColor', () => {
-    const markup = '@mark(color=#ffff00){highlighted}'
+  it('round-trips highlight marks with background color', () => {
+    const markup = '@style(bg=#ffff00){highlighted}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content![0]!.marks).toEqual([{ type: 'highlight', attrs: { color: '#ffff00' } }])
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
   })
 
   it('round-trips stroke, shadow, and image fill styles', () => {
-    const markup = '@style(stroke=#000000 2,shadow=#111111 1 2 3,fill=image:art.png){styled}'
+    const markup = '@style(fill=art.png,stroke=#000000 2mm,shadow=#111111 1mm 2mm 3mm){styled}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content![0]!.marks).toEqual([{
       type: 'textStyle',
@@ -117,7 +117,7 @@ describe('tiptapBridge: Inline Marks', () => {
     }])
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
     // Also parses when arguments are quoted
-    expect(cardMarkupToTiptap('@style(stroke="#000000 2"){styled}').content![0]!.content![0]!.marks).toEqual([
+    expect(cardMarkupToTiptap('@style(stroke="#000000 2mm"){styled}').content![0]!.content![0]!.marks).toEqual([
       { type: 'textStyle', attrs: { textStrokeColor: '#000000', textStrokeWidth: '2mm' } },
     ])
   })
@@ -136,7 +136,7 @@ describe('tiptapBridge: Custom Nodes (@bind, @icon)', () => {
   })
 
   it('preserves marks on binding nodes', () => {
-    const markup = '@b{{{stats.hp}}}'
+    const markup = '@bold{{{stats.hp}}}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content).toEqual([
       { type: 'binding', attrs: { expression: 'stats.hp' }, marks: [{ type: 'bold' }] },
@@ -145,7 +145,7 @@ describe('tiptapBridge: Custom Nodes (@bind, @icon)', () => {
   })
 
   it('converts @icon into a ProseMirror projectIcon atom node and back', () => {
-    const markup = 'Power: @icon(mana/fire)'
+    const markup = 'Power: @icon(key=mana/fire)'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content).toEqual([
       { type: 'text', text: 'Power: ' },
@@ -170,7 +170,7 @@ describe('tiptapBridge: Custom Nodes (@bind, @icon)', () => {
 
 describe('tiptapBridge: Lists', () => {
   it('round-trips unordered bullet lists with multiple items', () => {
-    const markup = '@ul{@li{Alpha}@li{Beta}@li{Gamma}}'
+    const markup = '@list{@item{Alpha}@item{Beta}@item{Gamma}}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.type).toBe('bulletList')
     expect(tiptap.content![0]!.content).toHaveLength(3)
@@ -182,7 +182,7 @@ describe('tiptapBridge: Lists', () => {
   })
 
   it('round-trips ordered lists with paragraph items', () => {
-    const markup = '@ol{@li{Step 1}@li{Step 2}}'
+    const markup = '@list(ordered){@item{Step 1}@item{Step 2}}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.type).toBe('orderedList')
     expect(tiptap.content![0]!.content).toHaveLength(2)
@@ -192,7 +192,7 @@ describe('tiptapBridge: Lists', () => {
 
 describe('tiptapBridge: Mixed Formatting & Normalization', () => {
   it('round-trips nested formatting across text, bindings, and icons', () => {
-    const markup = '@b{Level: @i{{{player.lvl}}} @icon(key=star)}'
+    const markup = '@bold{Level: @italic{{{player.lvl}}} @icon(key=star)}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content).toEqual([
       { type: 'text', text: 'Level: ', marks: [{ type: 'bold' }] },
@@ -219,7 +219,7 @@ describe('tiptapBridge: Mixed Formatting & Normalization', () => {
       type: 'paragraph',
       children: [{ type: 'span', style: { bold: true }, children: [{ type: 'text', value: 'Hello world!' }] }],
     })
-    expect(serializeTiptapMarkup(doc)).toBe('@b{Hello world!}')
+    expect(serializeTiptapMarkup(doc)).toBe('@bold{Hello world!}')
   })
 
   it('normalizes empty input to an empty paragraph doc structure', () => {

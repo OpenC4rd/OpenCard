@@ -25,7 +25,7 @@
         @pointerenter="handleBranchPointerEnter(entry)"
         @pointerleave="handleBranchPointerLeave(entry)"
         @focusin="handleBranchFocusIn(entry)"
-        @focusout="handleBranchFocusOut(entry)"
+        @focusout="handleBranchFocusOut($event, entry)"
       >
         <button
           :ref="(element) => setBranchAnchor(entry.key, element)"
@@ -131,6 +131,7 @@ import OcOverlayMarker from './OcOverlayMarker.vue'
 import OcShortcut from './OcShortcut.vue'
 import { actionAccessibleLabel, formatActionBadge, hasActionBadge } from './actionBadge'
 import { isFocusOpenSuppressed, withFocusOpenSuppressed, type OverlayAnchor } from '../../composables/overlayGroups'
+import { isFocusWithin } from '../../shared/ui/overlayScope'
 
 defineOptions({ name: 'OcActionMenu' })
 
@@ -254,7 +255,7 @@ function keepMenuOpen(): void {
 function releaseMenu(event: Event): void {
   if (!isSubmenu.value) return
   const next = event instanceof FocusEvent ? event.relatedTarget : null
-  if (next instanceof Node && menuElement.value?.contains(next)) return
+  if (isFocusWithin(next, menuElement.value)) return
   scheduleLayerClose()
 }
 
@@ -334,8 +335,10 @@ function handleBranchFocusIn(action: OcActionDefinition): void {
   if (hasActionChildren(action)) openBranchLayer(action.key)
 }
 
-function handleBranchFocusOut(action: OcActionDefinition): void {
-  if (hasActionChildren(action)) scheduleBranchClose(action.key)
+function handleBranchFocusOut(event: FocusEvent, action: OcActionDefinition): void {
+  // 焦点还在这一层（含宿主容器）就没离开，不排延迟关闭。
+  if (!hasActionChildren(action) || isFocusWithin(event.relatedTarget, menuElement.value)) return
+  scheduleBranchClose(action.key)
 }
 
 function handleActionClick(action: OcActionDefinition): void {

@@ -69,16 +69,16 @@ describe('layoutTextBlock alignment', () => {
 
 describe('layoutTextBlock runs', () => {
   it('merges contiguous same-style glyphs and splits at style boundaries', () => {
-    const result = layout('ab cd@b{ef}')
+    const result = layout('ab cd@bold{ef}')
     expect(result.runs).toHaveLength(2)
     expect(result.runs[0]).toMatchObject({ kind: 'glyph', text: 'ab cd', x: 0, width: 23 })
     expect(result.runs[1]).toMatchObject({ text: 'ef', x: 23, style: { fontWeight: 'bold' } })
   })
 
   it('resolves nested span styles and relative font sizes against the enclosing span', () => {
-    const [run] = layout('@size(20mm){@size(0.5em){x}}').runs
+    const [run] = layout('@style(size=20mm){@style(size=0.5em){x}}').runs
     expect(run).toMatchObject({ style: { fontSize: 10 } })
-    const [colored] = layout('@style(b=true,color=red,stroke=#000 2){x}').runs
+    const [colored] = layout('@style(b,color=red,stroke=#000 2mm){x}').runs
     expect(colored).toMatchObject({ style: { fontWeight: 'bold', color: 'red', strokeColor: '#000', strokeWidth: 2 } })
   })
 
@@ -91,7 +91,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('grows line height for larger font spans and prevents successive lines from overlapping', () => {
-    const result = layout('Line 1\n@size(40mm){BIG}\nLine 3')
+    const result = layout('Line 1\n@style(size=40mm){BIG}\nLine 3')
     expect(result.lines.map((l) => [l.y, l.height])).toEqual([
       [0, 20],
       [20, 80],
@@ -104,7 +104,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('keeps enlarged line height across wrapped lines when a large text wraps', () => {
-    const result = layout('@size(40mm){Line 2}') // 112 wide, wraps in 100 box
+    const result = layout('@style(size=40mm){Line 2}') // 112 wide, wraps in 100 box
     expect(result.lines.map((l) => [l.y, l.height])).toEqual([
       [0, 80],
       [80, 80],
@@ -113,7 +113,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('aligns mixed font sizes on the same line to a common baseline without clipping', () => {
-    const result = layout('small@size(40mm){BIG}')
+    const result = layout('small@style(size=40mm){BIG}')
     const line = result.lines[0]!
     expect(line.height).toBe(80)
     const [smallRun, bigRun] = line.runs
@@ -128,7 +128,7 @@ describe('layoutTextBlock runs', () => {
   })
 
   it('indents list paragraphs and puts the marker before the text', () => {
-    const result = layout('@ol{@li{一二}@li{三}}')
+    const result = layout('@list(ordered){@item{一二}@item{三}}')
     expect(texts(result)).toEqual(['1.一二', '2.三'])
     expect(result.lines[0]!.runs[1]).toMatchObject({ x: 20 })
   })

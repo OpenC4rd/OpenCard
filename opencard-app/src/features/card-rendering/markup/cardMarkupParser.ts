@@ -1,5 +1,5 @@
 import type { AlignmentPosition } from '../../../entities/card/model'
-import { isRenderCssLength } from '../renderValueSyntax'
+import { evaluateRenderLength } from '../geometry/lengthMath'
 import type {
   CardMarkupBlockNode,
   CardMarkupDiagnostic,
@@ -15,19 +15,40 @@ import { lexCardMarkup, type CardMarkupToken } from './cardMarkupLexer'
 type Arg = { key: string; value: string }
 type TagToken = Extract<CardMarkupToken, { kind: 'tag' }>
 
-const BLOCK_TAGS = new Set(['p', 'paragraph', 'align', 'ul', 'ol', 'li'])
-const FLAG_SPANS: Record<string, keyof InlineStyleSpec> = {
+const BLOCK_TAGS = new Set(['align', 'list'])
+const BARE_FLAGS = new Set(['b', 'i', 'u', 's'])
+type FlagField = 'bold' | 'italic' | 'underline' | 'strikethrough'
+const FLAG_SPANS: Record<string, FlagField> = {
   b: 'bold',
-  strong: 'bold',
   i: 'italic',
-  em: 'italic',
   u: 'underline',
   s: 'strikethrough',
-  strike: 'strikethrough',
-  del: 'strikethrough',
+  bold: 'bold',
+  italic: 'italic',
+  underline: 'underline',
+  strikethrough: 'strikethrough',
 }
+const STYLE_KEYS = new Set(['color', 'bg', 'size', 'font', 'fill', 'stroke', 'shadow'])
+const ICON_SCOPES = new Set(['current', 'host', 'package'])
+const IMAGE_FITS = new Set(['contain', 'cover', 'fill'])
+const IMAGE_ALIGNS = new Set(['start', 'center', 'end'])
 const ALIGNMENTS: Record<string, AlignmentPosition> = {
-  start: 'start', left: 'start', center: 'center', end: 'end', right: 'end', justify: 'justify',
+  start: 'start', center: 'center', end: 'end', justify: 'justify',
+}
+const LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:mm|cm|in|pt|em|rem|%)$/i
+const ABSOLUTE_LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:mm|cm|in|pt)$/i
+
+function isLength(value: string): boolean {
+  return LENGTH.test(value.trim())
+}
+
+function isAbsoluteLength(value: string): boolean {
+  return ABSOLUTE_LENGTH.test(value.trim())
+}
+
+/** 绝对长度换算成毫米；stroke / shadow 在 AST 里以毫米数值保存。 */
+function toMm(value: string): number {
+  return evaluateRenderLength(value.trim(), 0)
 }
 
 export function parseCardMarkup(source: string): CardMarkupParseResult {
@@ -35,12 +56,6 @@ export function parseCardMarkup(source: string): CardMarkupParseResult {
   const parser = new MarkupParser(tokens, diagnostics)
   const blocks = parser.parseBlocks(0)
   return { document: { source, blocks }, diagnostics, valid: diagnostics.length === 0 }
-}
-
-function isValidFontSize(value: string): boolean {
-  const candidate = value.trim()
-  if (!candidate) return true
-  return /^-?(?:\d+\.?\d*|\.\d+)(?:em|rem|%|pt|mm|cm|in)?$/i.test(candidate) || isRenderCssLength(candidate)
 }
 
 class MarkupParser {
@@ -65,22 +80,21 @@ class MarkupParser {
     this.diagnostics.push({ code, offset, message })
   }
 
-  private expectClose(tag: TagToken) {
-    if (this.peek().kind === 'close') this.next()
-    else this.report('unclosed-tag', tag.offset, `@${tag.name} 缺少结尾的 }`)
-  }
-
   /** 有正文的标签：吃掉 `{`，由 `parseContent` 解析到配对的 `}`。 */
   private body<T>(tag: TagToken, parseContent: () => T): T | null {
     if (this.peek().kind !== 'open') return null
     this.next()
     const content = parseContent()
-    this.expectClose(tag)
+    if (this.peek().kind !== 'close') {
+      this.report('unclosed-tag', tag.offset, `@${tag.name} 缺少结尾的 }`)
+    } else {
+      this.next()
+    }
     return content
   }
 
   /**
-   * 块级内容：换行分段；`@align`/`@ul`/`@ol` 自成一块。
+   * 块级内容：换行分段；`@align` / `@list` 自成一块。
    * 紧跟块级标签后的换行只是分隔符，不产生空段落。
    */
   parseBlocks(depth: number): CardMarkupBlockNode[] {
@@ -125,38 +139,31 @@ class MarkupParser {
   private parseBlockTag(tag: TagToken, depth: number): CardMarkupBlockNode[] {
     const name = tag.name.toLowerCase()
     const args = parseArgs(tag.args)
-    if (name === 'ul' || name === 'ol') {
+    if (name === 'list') {
+      let ordered = false
+      if (args.length > 0) {
+        if (args.length === 1 && args[0]!.key === '' && args[0]!.value.toLowerCase() === 'ordered') ordered = true
+        else this.report('invalid-argument', tag.offset, '@list 只接受一个 ordered 标记')
+      }
       const items = this.body(tag, () => this.parseListItems())
       if (!items) {
-        this.report('invalid-structure', tag.offset, `@${name} 缺少正文`)
+        this.report('invalid-structure', tag.offset, '@list 缺少正文')
         return []
       }
-      return [{ type: 'list', ordered: name === 'ol', items }]
+      return [{ type: 'list', ordered, items }]
     }
-    if (name === 'p' || name === 'paragraph') {
-      const blocks = this.body(tag, () => this.parseBlocks(depth + 1))
-      if (blocks === null) {
-        this.report('invalid-structure', tag.offset, `@${name} 缺少正文`)
-        return []
-      }
-      const raw = args.find((a) => a.key === 'align')?.value ?? args[0]?.value ?? ''
-      const align = raw ? ALIGNMENTS[raw.toLowerCase()] : undefined
-      if (raw && !align) this.report('invalid-argument', tag.offset, `@${name} 不支持的对齐方式：${raw}`)
-      if (blocks.length === 0) return [{ type: 'paragraph', ...(align ? { align } : {}), children: [] }]
-      return align ? blocks.map((block) => (block.type === 'paragraph' && !block.align ? { ...block, align } : block)) : blocks
+    let align: AlignmentPosition | undefined
+    if (args.length !== 1 || args[0]!.key !== '') {
+      this.report('invalid-argument', tag.offset, '@align 需要且只需要一个方向参数')
+    } else {
+      align = ALIGNMENTS[args[0]!.value.toLowerCase()]
+      if (!align) this.report('invalid-argument', tag.offset, `@align 不支持的方向：${args[0]!.value || '(空)'}`)
     }
     const blocks = this.body(tag, () => this.parseBlocks(depth + 1))
     if (blocks === null) {
-      this.report('invalid-structure', tag.offset, `@${name} 缺少正文`)
+      this.report('invalid-structure', tag.offset, '@align 缺少正文')
       return []
     }
-    if (name === 'li') {
-      this.report('invalid-structure', tag.offset, '@li 只能出现在 @ul / @ol 内')
-      return blocks
-    }
-    const raw = args.find((a) => a.key === 'align')?.value ?? args[0]?.value ?? ''
-    const align = ALIGNMENTS[raw.toLowerCase()]
-    if (!align) this.report('invalid-argument', tag.offset, `@align 不支持的对齐方式：${raw || '(空)'}`)
     if (blocks.length === 0) return [{ type: 'paragraph', ...(align ? { align } : {}), children: [] }]
     return align ? blocks.map((block) => (block.type === 'paragraph' && !block.align ? { ...block, align } : block)) : blocks
   }
@@ -168,16 +175,16 @@ class MarkupParser {
       if (token.kind === 'eof' || token.kind === 'close') break
       this.next()
       if (token.kind === 'newline' || (token.kind === 'text' && !token.value.trim())) continue
-      if (token.kind === 'tag' && token.name.toLowerCase() === 'li') {
+      if (token.kind === 'tag' && token.name.toLowerCase() === 'item') {
         const blocks = this.body(token, () => this.parseBlocks(1))
         if (blocks === null) {
-          this.report('invalid-structure', token.offset, '@li 缺少正文')
+          this.report('invalid-structure', token.offset, '@item 缺少正文')
           continue
         }
         items.push(this.paragraphsOf(blocks, token.offset))
         continue
       }
-      this.report('invalid-structure', token.offset, '@ul / @ol 内只能包含 @li')
+      this.report('invalid-structure', token.offset, '@list 内只能包含 @item')
       if (token.kind === 'tag') this.body(token, () => this.parseBlocks(1))
     }
     return items
@@ -221,19 +228,28 @@ class MarkupParser {
 
     const name = token.name.toLowerCase()
     const args = parseArgs(token.args)
-    if (name === 'br') return [{ type: 'br' }]
+    if (name === 'br') {
+      if (args.length > 0) this.report('invalid-argument', token.offset, '@br 不接受参数')
+      return [{ type: 'br' }]
+    }
     if (name === 'icon') return [this.buildIcon(token, args)]
     if (name === 'img') return [this.buildImage(token, args)]
 
-    const isSpanTag = name in FLAG_SPANS || ['mark', 'color', 'size', 'font', 'style'].includes(name)
     const content = this.body(token, () => this.parseInlineNodes())
     if (BLOCK_TAGS.has(name)) {
       this.report('invalid-structure', token.offset, `@${name} 是块级标签，不能嵌在行内标签里`)
       return content ?? []
     }
-    if (!isSpanTag) {
+    if (name === 'item') {
+      this.report('invalid-structure', token.offset, '@item 只能出现在 @list 内')
+      return content ?? []
+    }
+    if (!(name in FLAG_SPANS) && name !== 'style') {
       this.report('invalid-structure', token.offset, `未知标签 @${token.name}`)
-      const literal: CardMarkupInlineNode = { type: 'text', value: `@${token.name}${token.args === null ? '' : `(${token.args})`}` }
+      const literal: CardMarkupInlineNode = {
+        type: 'text',
+        value: `@${token.name}${token.args === null ? '' : `(${token.args})`}`,
+      }
       return content ? [literal, ...content] : [literal]
     }
     if (content === null) {
@@ -245,117 +261,141 @@ class MarkupParser {
 
   private buildStyle(tag: TagToken, name: string, args: Arg[]): InlineStyleSpec {
     const style: InlineStyleSpec = {}
-    const first = args[0]?.value
-    if (name in FLAG_SPANS) style[FLAG_SPANS[name]! as 'bold'] = true
-    else if (name === 'mark') style.markColor = this.required(tag, args, 'color', first)
-    else if (name === 'color') style.color = this.required(tag, args, 'color', first)
-    else if (name === 'size') {
-      const val = this.required(tag, args, 'size', first)
-      if (val && !isValidFontSize(val)) this.report('invalid-argument', tag.offset, `@size 含有无效长度：${val}`)
-      else if (val) style.fontSize = val
+    if (name in FLAG_SPANS) {
+      if (args.length > 0) this.report('invalid-argument', tag.offset, `@${name} 不接受参数`)
+      style[FLAG_SPANS[name]!] = true
+      return style
     }
-    else if (name === 'font') style.fontFamily = this.required(tag, args, 'family', first)
-    else if (name === 'style') for (const arg of args) this.applyStyleArg(tag, style, arg)
+    if (args.length === 0) this.report('invalid-argument', tag.offset, '@style 缺少参数')
+    for (const arg of args) this.applyStyleArg(tag, style, arg)
     return style
   }
 
-  private required(tag: TagToken, args: Arg[], label: string, positional: string | undefined): string {
-    const named = args.find((arg) => {
-      if (arg.key === label) return true
-      if (label === 'color' && (arg.key === 'color' || arg.key === 'c' || arg.key === 'bg' || arg.key === 'mark')) return true
-      if (label === 'family' && (arg.key === 'family' || arg.key === 'name' || arg.key === 'font')) return true
-      if (label === 'size' && (arg.key === 'size' || arg.key === 's')) return true
-      return false
-    })
-    const value = named?.value ?? positional
-    if (value) return value
-    this.report('invalid-argument', tag.offset, `@${tag.name} 缺少 ${label} 参数`)
-    return ''
-  }
-
   private applyStyleArg(tag: TagToken, style: InlineStyleSpec, { key, value }: Arg) {
-    const number = (text: string | undefined, fallback = 0) => {
-      if (text === undefined) return fallback
-      const parsed = Number.parseFloat(text)
-      if (Number.isFinite(parsed)) return parsed
-      this.report('invalid-argument', tag.offset, `@style 的 ${key} 含有无效数字：${text}`)
-      return fallback
-    }
-    switch (key) {
-      case 'b': case 'i': case 'u': case 's': {
-        const flag = /^(true|1|yes)$/i.test(value) ? true : /^(false|0|no)$/i.test(value) ? false : null
-        if (flag === null) this.report('invalid-argument', tag.offset, `@style 的 ${key} 只接受 true / false`)
-        else style[FLAG_SPANS[key]! as 'bold'] = flag
+    if (key === '') {
+      const flag = value.toLowerCase()
+      if (!BARE_FLAGS.has(flag)) {
+        this.report('invalid-argument', tag.offset, `未知样式标记：${value || '(空)'}`)
         return
       }
-      case 'mark': style.markColor = value; return
-      case 'color': style.color = value; return
-      case 'bg': case 'background': style.backgroundColor = value; return
+      style[FLAG_SPANS[flag]!] = true
+      return
+    }
+    if (BARE_FLAGS.has(key)) {
+      this.report('invalid-argument', tag.offset, `标记 ${key} 不带值`)
+      return
+    }
+    switch (key) {
+      case 'color':
+        if (!value) this.report('invalid-argument', tag.offset, 'color 为空')
+        else style.color = value
+        return
+      case 'bg':
+        if (!value) this.report('invalid-argument', tag.offset, 'bg 为空')
+        else style.backgroundColor = value
+        return
       case 'size':
-        if (!isValidFontSize(value)) this.report('invalid-argument', tag.offset, `@style 的 size 含有无效长度：${value}`)
+        if (!isLength(value)) this.report('invalid-argument', tag.offset, `size 需要带单位的长度：${value || '(空)'}`)
         else style.fontSize = value
         return
-      case 'font': style.fontFamily = value; return
+      case 'font':
+        if (!value) this.report('invalid-argument', tag.offset, 'font 为空')
+        else style.fontFamily = value
+        return
+      case 'fill':
+        if (!value) this.report('invalid-argument', tag.offset, 'fill 为空')
+        else style.fillSource = value
+        return
       case 'stroke': {
         const [color, width] = splitTopLevel(value, /\s/)
+        if (color === undefined || width === undefined) {
+          this.report('invalid-argument', tag.offset, 'stroke 需要 颜色 + 长度')
+          return
+        }
+        if (!isAbsoluteLength(width)) {
+          this.report('invalid-argument', tag.offset, `stroke 长度需要绝对单位（mm/cm/in/pt）：${width}`)
+          return
+        }
         style.strokeColor = color
-        style.strokeWidth = number(width, 1)
+        style.strokeWidth = toMm(width)
         return
       }
       case 'shadow': {
         const [color, x, y, blur] = splitTopLevel(value, /\s/)
+        if (color === undefined || x === undefined || y === undefined || blur === undefined) {
+          this.report('invalid-argument', tag.offset, 'shadow 需要 颜色 + x + y + 模糊')
+          return
+        }
+        if (![x, y, blur].every(isAbsoluteLength)) {
+          this.report('invalid-argument', tag.offset, 'shadow 偏移与模糊需要绝对单位（mm/cm/in/pt）')
+          return
+        }
         style.shadowColor = color
-        style.shadowOffsetX = number(x)
-        style.shadowOffsetY = number(y)
-        style.shadowBlur = number(blur)
+        style.shadowOffsetX = toMm(x)
+        style.shadowOffsetY = toMm(y)
+        style.shadowBlur = toMm(blur)
         return
       }
-      case 'fill':
-        if (value.startsWith('image:')) {
-          style.fillType = 'image'
-          style.fillSource = value.slice('image:'.length)
-        } else {
-          style.fillType = 'color'
-          style.fillSource = value
-        }
-        return
       default:
-        this.report('invalid-argument', tag.offset, `@style 不支持的参数：${key || value}`)
+        this.report('invalid-argument', tag.offset, STYLE_KEYS.has(key) ? `@style 参数无效：${key}` : `未知样式键：${key}`)
     }
   }
 
   private buildIcon(tag: TagToken, args: Arg[]): CardMarkupIconNode {
-    const get = (key: string) => args.find((arg) => arg.key === key)?.value
-    const key = get('key') ?? args.find((arg) => arg.key === '')?.value ?? ''
-    if (!key) this.report('invalid-argument', tag.offset, '@icon 缺少图标 key')
-    const icon: CardMarkupIconNode = { type: 'icon', key }
-    const pkg = get('pkg')
-    const version = get('version')
-    const scope = get('scope')
-    const size = get('size')
-    if (pkg !== undefined) icon.pkg = pkg
-    if (version !== undefined) icon.version = version
-    if (scope === 'current' || scope === 'host' || scope === 'package') icon.scope = scope
-    else if (scope !== undefined) this.report('invalid-argument', tag.offset, `@icon 不支持的 scope：${scope}`)
-    if (size !== undefined) icon.size = size
+    const icon: CardMarkupIconNode = { type: 'icon', key: '' }
+    for (const arg of args) {
+      if (arg.key === '') {
+        this.report('invalid-argument', tag.offset, `@icon 参数必须具名：${arg.value}`)
+        continue
+      }
+      switch (arg.key) {
+        case 'key': icon.key = arg.value; break
+        case 'pkg': icon.pkg = arg.value; break
+        case 'version': icon.version = arg.value; break
+        case 'scope':
+          if (ICON_SCOPES.has(arg.value)) icon.scope = arg.value as CardMarkupIconNode['scope']
+          else this.report('invalid-argument', tag.offset, `@icon 不支持的 scope：${arg.value}`)
+          break
+        case 'size':
+          if (!isLength(arg.value)) this.report('invalid-argument', tag.offset, `@icon size 需要带单位的长度：${arg.value}`)
+          else icon.size = arg.value
+          break
+        default:
+          this.report('invalid-argument', tag.offset, `@icon 未知参数：${arg.key}`)
+      }
+    }
+    if (!icon.key) this.report('invalid-argument', tag.offset, '@icon 缺少 key')
     return icon
   }
 
   private buildImage(tag: TagToken, args: Arg[]): CardMarkupImageNode {
-    const get = (...keys: string[]) => args.find((arg) => keys.includes(arg.key))?.value
-    const src = get('src') ?? args.find((arg) => arg.key === '')?.value ?? ''
-    if (!src) this.report('invalid-argument', tag.offset, '@img 缺少 src')
-    const image: CardMarkupImageNode = { type: 'img', src }
-    const width = get('w', 'width')
-    const height = get('h', 'height')
-    const fit = get('fit')
-    const align = get('align')
-    if (width !== undefined) image.width = width
-    if (height !== undefined) image.height = height
-    if (fit === 'contain' || fit === 'cover' || fit === 'fill') image.fit = fit
-    else if (fit !== undefined) this.report('invalid-argument', tag.offset, `@img 不支持的 fit：${fit}`)
-    if (align === 'start' || align === 'center' || align === 'end') image.align = align
-    else if (align !== undefined) this.report('invalid-argument', tag.offset, `@img 不支持的 align：${align}`)
+    const image: CardMarkupImageNode = { type: 'img', src: '' }
+    for (const arg of args) {
+      if (arg.key === '') {
+        this.report('invalid-argument', tag.offset, `@img 参数必须具名：${arg.value}`)
+        continue
+      }
+      switch (arg.key) {
+        case 'src': image.src = arg.value; break
+        case 'w':
+        case 'h':
+          if (!isLength(arg.value)) this.report('invalid-argument', tag.offset, `@img ${arg.key} 需要带单位的长度：${arg.value}`)
+          else if (arg.key === 'w') image.width = arg.value
+          else image.height = arg.value
+          break
+        case 'fit':
+          if (IMAGE_FITS.has(arg.value)) image.fit = arg.value as CardMarkupImageNode['fit']
+          else this.report('invalid-argument', tag.offset, `@img 不支持的 fit：${arg.value}`)
+          break
+        case 'align':
+          if (IMAGE_ALIGNS.has(arg.value)) image.align = arg.value as CardMarkupImageNode['align']
+          else this.report('invalid-argument', tag.offset, `@img 不支持的 align：${arg.value}`)
+          break
+        default:
+          this.report('invalid-argument', tag.offset, `@img 未知参数：${arg.key}`)
+      }
+    }
+    if (!image.src) this.report('invalid-argument', tag.offset, '@img 缺少 src')
     return image
   }
 }
@@ -400,8 +440,8 @@ function parseArgs(raw: string | null): Arg[] {
   if (raw === null || !raw.trim()) return []
   return splitTopLevel(raw, /,/).map((part) => {
     const eq = part.indexOf('=')
-    const key = eq > 0 ? part.slice(0, eq).trim() : ''
-    if (eq > 0 && /^[A-Za-z][\w-]*$/.test(key)) return { key, value: unquote(part.slice(eq + 1)) }
+    const key = eq > 0 ? part.slice(0, eq).trim().toLowerCase() : ''
+    if (eq > 0 && /^[a-z][\w-]*$/i.test(key)) return { key, value: unquote(part.slice(eq + 1)) }
     return { key: '', value: unquote(part) }
   })
 }

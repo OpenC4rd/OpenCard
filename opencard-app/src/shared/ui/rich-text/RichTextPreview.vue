@@ -89,9 +89,7 @@ function renderInlines(nodes: readonly CardMarkupInlineNode[]): VNodeChild[] {
           const resolved = fontFamilyByValue.value.get(node.style.fontFamily) ?? node.style.fontFamily
           style.fontFamily = resolved
         }
-        if (node.style.markColor || node.style.backgroundColor) {
-          style.backgroundColor = node.style.markColor ?? node.style.backgroundColor!
-        }
+        if (node.style.backgroundColor) style.backgroundColor = node.style.backgroundColor
         return h('span', { style }, renderInlines(node.children))
       }
     }

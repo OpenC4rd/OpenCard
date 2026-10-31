@@ -73,7 +73,6 @@ function applySpan(parent: ResolvedRunStyle, spec: InlineStyleSpec, baseSize: nu
   if (spec.italic !== undefined) style.italic = spec.italic
   if (spec.underline !== undefined) style.underline = spec.underline
   if (spec.strikethrough !== undefined) style.strikethrough = spec.strikethrough
-  if (spec.markColor !== undefined) style.markColor = spec.markColor
   if (spec.color !== undefined) style.color = spec.color
   if (spec.backgroundColor !== undefined) style.backgroundColor = spec.backgroundColor
   if (spec.fontFamily !== undefined) style.fontFamily = spec.fontFamily
@@ -87,7 +86,6 @@ function applySpan(parent: ResolvedRunStyle, spec: InlineStyleSpec, baseSize: nu
   if (spec.shadowOffsetX !== undefined) style.shadowOffsetX = spec.shadowOffsetX
   if (spec.shadowOffsetY !== undefined) style.shadowOffsetY = spec.shadowOffsetY
   if (spec.shadowBlur !== undefined) style.shadowBlur = spec.shadowBlur
-  if (spec.fillType !== undefined) style.fillType = spec.fillType
   if (spec.fillSource !== undefined) style.fillSource = spec.fillSource
   return style
 }
@@ -105,7 +103,6 @@ function baseStyle(input: TextLayoutInput): ResolvedRunStyle {
     shadowOffsetX: 0,
     shadowOffsetY: 0,
     shadowBlur: 0,
-    fillType: 'color',
   }
 }
 

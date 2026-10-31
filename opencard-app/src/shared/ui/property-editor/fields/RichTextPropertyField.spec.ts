@@ -103,7 +103,7 @@ describe('RichTextPropertyField', () => {
       await nextTick()
       await resetField(wrapper, 'fontSize')
       expect(vm.getHtml()).not.toContain('size')
-      expect(vm.getHtml()).toContain('@color(red)')
+      expect(vm.getHtml()).toContain('@style(color=red)')
       expect(panel(wrapper).find('[data-field-key="fontSize"] [data-action-key="reset-property"]').exists()).toBe(false)
       await resetField(wrapper, 'foregroundColor')
       await resetField(wrapper, 'textAlign')
@@ -115,7 +115,7 @@ describe('RichTextPropertyField', () => {
   })
 
   it('clears only pending caret formatting without changing existing text or leaving empty style marks', async () => {
-    const wrapper = mountField('@size(6mm){A}')
+    const wrapper = mountField('@style(size=6mm){A}')
     try {
       const { editor } = await openEditor(wrapper)
       editor.commands.setTextSelection(2)
@@ -154,7 +154,7 @@ describe('RichTextPropertyField', () => {
 
   it('recognizes inherited size and equivalent CSS colors as common selection values without rewriting them', async () => {
     const wrapper = mountField(
-      '@b{@color(red){A}@style(size="5mm",color="#ff0000"){B}}',
+      '@bold{@style(color=red){A}@style(size="5mm",color="#ff0000"){B}}',
       { baseStyle: { fontSize: '5mm' } },
     )
     try {
@@ -168,7 +168,7 @@ describe('RichTextPropertyField', () => {
   })
 
   it('changes only the requested selection property and types over it using its first character format', async () => {
-    const wrapper = mountField('@size(2.5mm){O}@b{@style(size="3mm",color=red){A}@style(size="6mm",color=blue){B}}')
+    const wrapper = mountField('@style(size=2.5mm){O}@bold{@style(size="3mm",color=red){A}@style(size="6mm",color=blue){B}}')
     try {
       const { editor } = await openEditor(wrapper)
       editor.commands.setTextSelection({ from: 2, to: 4 })
@@ -251,7 +251,7 @@ describe('RichTextPropertyField', () => {
   })
 
   it('allows bi-directional roundtrip switching between visual and source modes and displays syntax diagnostics', async () => {
-    const source = '@b{Bold} {{user.name}} @icon(key=star)'
+    const source = '@bold{Bold} {{user.name}} @icon(key=star)'
     const wrapper = mountField(source)
     try {
       const vm = await openEditor(wrapper)
@@ -263,7 +263,7 @@ describe('RichTextPropertyField', () => {
       expect(sourceArea().value).toBe(source)
 
       // Inject unclosed tag syntax error
-      sourceArea().value = '@b{Unclosed'
+      sourceArea().value = '@bold{Unclosed'
       sourceArea().dispatchEvent(new Event('input'))
       await nextTick()
 

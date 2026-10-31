@@ -5,7 +5,6 @@ export type InlineStyleSpec = {
   italic?: boolean
   underline?: boolean
   strikethrough?: boolean
-  markColor?: string
   color?: string
   backgroundColor?: string
   fontSize?: string
@@ -16,7 +15,6 @@ export type InlineStyleSpec = {
   shadowOffsetX?: number
   shadowOffsetY?: number
   shadowBlur?: number
-  fillType?: 'color' | 'image'
   fillSource?: string
 }
 

@@ -102,25 +102,27 @@ flowchart LR
    - 世界矩阵：$M_{\text{world}} = M_{\text{parent}} \cdot M_{\text{local}}$。
    - **拖拽与缩放逆投影**：鼠标在卡面世界坐标的移动量 $\Delta P_{\text{world}}$，通过乘以 $M_{\text{parent}}^{-1}$ 投影到父容器局部空间更新 `location.x/y`；缩放手柄拖拽时通过乘以 $M_{\text{world}}^{-1}$ 投影到块的自身局部正交空间更新 `width/height`，**永远不需要关闭 `transform`！**
 
-### 3.2 `@tag(arg=value,...){content}` 富文本语法规格（`markup/`）
+### 3.2 AtTag 富文本语法规格（`markup/`）
 
-1. **词法优先级（LL(2) 状态机）**：
-   - **最高优先级 `{{...}}`**：遇到连续两个 `{{` 立即进入绑定词法，读取至 `}}` 产出 `BindingNode`（即使写在 `@b{{{damage}}}` 中，第一个 `{` 开启 `@b` 块，紧接着的 `{{damage}}` 被识别为绑定节点，最后一个 `}` 闭合 `@b`）。
-   - **指令触发 `@name`**：`@` 后紧跟合法指令名且紧跟 `(` 或 `{`（或独立指令 `@br`）时触发指令；进入 `(...)` 后切换为参数词法状态（内部允许出现任意字符，支持引号包裹或无引号键值，直到 `,` 或 `)`）。
-   - **转义序列**：`\@`、`\{`、` text \}`、`\\`。
-   - **自然分段**：顶层文本中的 `\n` 直接切分为段落（`ParagraphNode`）。
-2. **标准指令集**：
-   - **行内布尔修饰（带 `{content}`）**：`@b{...}`、`@i{...}`、`@u{...}`、`@s{...}`
-   - **行内样式修饰（带 `(args){content}`）**：
-     - `@style(color=#ff4d4f, bg=#ffff00, size=5mm, font=font:title, stroke=#000000 0.5mm, shadow=#000000 0.5mm 0.5mm 1mm, fill=assets/gold.png){...}`
-     - 常用语法糖简写：`@color(#ff4d4f){...}`、`@size(5mm){...}`、`@font(font:title){...}`、`@mark(color=#ffff00){...}`
-   - **块级/段落指令（带 `{content}`）**：
-     - `@align(center|start|end|justify){...}`
-     - `@ul{@li{...} @li{...}}`、`@ol{@li{...} @li{...}}`
-   - **自闭合内联叶子指令（只带 `(args)`，无 `{content}`）**：
-     - 图标：`@icon(mana/fire)` 或 `@icon(key=mana/fire, pkg=author/name, version=1.0.0, size=1.2em)`（`scope=host` 表示宿主项目）
-     - 图片：`@img(src=assets/coin.png, w=10mm, h=10mm, fit=contain, align=center)`
-     - 段内强制换行：`@br`
+> **命名**：**AtTag**（符号形态 **@Tag**，读作 “a Tag”）专指 `@tag(args){content}` 标签语法。`{{...}}` 绑定是独立的文本插值机制，**不属于 AtTag**：两者共存于同一个文本字段，词法上绑定优先。
+
+1. **词法规则**：
+   - `{{...}}` 最高优先级，整体成为绑定原子；其余文本按 `@标签` 解析。
+   - `\n` 分段；标签正文内的换行变成 `br`。
+   - `@name` 后紧跟 `(` 或 `{` 才成标签；裸 `@br` 后必须是 `(`、空白或行尾，因此规范写法是 `@br()`。
+   - 转义 `\@ \{ \} \\`；未配对的 `}` 按字面量处理；大小写不敏感，规范小写。
+2. **参数规则**：
+   - 逗号分隔；括号与引号内的逗号不切分；空格属于值。
+   - 值含顶层逗号或首尾空格时用引号，引号内只认 `\" \' \\`。
+   - 位置参数只有 `@align`；`@style` 的 `b/i/u/s` 与 `@list` 的 `ordered` 为裸标记。
+   - 长度必须带单位：`mm`、`cm`、`in`、`pt`、`em`、`rem`、`%`；`stroke` / `shadow` 只接受绝对单位，AST 内换算为毫米。
+3. **标签集**：
+   - 强调（必须有正文）：`@bold`、`@italic`、`@underline`、`@strikethrough`；`@b @i @u @s` 是语法糖，序列化只写全称。
+   - 样式：`@style(args){正文}`。键：裸标记 `b/i/u/s`；`color`、`bg`、`size`、`font`、`fill`；`stroke=颜色 长度`；`shadow=颜色 x y 模糊`（多段值用空格分隔）。
+   - 叶子：`@icon(key=…, pkg=…, version=…, scope=current|host|package, size=…)`、`@img(src=…, w=…, h=…, fit=contain|cover|fill, align=start|center|end)`、`@br`。
+   - 块：`@align(start|center|end|justify){正文}`、`@list{@item{正文}}`、`@list(ordered){…}`；`@item` 只能出现在 `@list` 内；列表不嵌套；块标签不能进入行内标签。
+4. **序列化规范**：单个标记输出全称标签，其余输出 `@style(...)`（裸标记在前，键按 color/bg/size/font/fill/stroke/shadow 顺序）；列表输出 `@list` / `@list(ordered)`；换行输出 `@br()`；`@icon` / `@img` 参数全部具名。
+5. **已移除**：`@p`、`@ul/@ol/@li`、`@color/@size/@font/@mark`、HTML 别名（`@strong/@em/@strike/@del`）、`b=true` 布尔字面量、`fill=image:` 前缀，以及 AST 中的 `markColor` 与 `fillType` 字段。
 
 ### 3.3 Canvas 2D 统一绘制细节（`painter/`）
 
@@ -133,7 +135,7 @@ flowchart LR
    - 替代以前脆弱的 CSS `-webkit-mask-image`：在离屏小缓冲 Canvas（或当前层）先画原图，再设置 `ctx.globalCompositeOperation = 'destination-in'` 画遮罩图，100% 跨平台一致且无需 Base64 内联黑魔法。
 4. **富文本多通道绘制（Multi-pass Glyph/Run Painter）**：
    - 对每一行排好坐标的 `PositionedRun` 依次执行：
-     1. **背景高亮通道**（`bg` / `@mark`）
+     1. **背景高亮通道**（`bg`）
      2. **阴影与外描边通道**（设置 `ctx.lineJoin = 'round'; ctx.miterLimit = 2`，先 `strokeText` 再 `fillText`，彻底解决文字描边吃字问题）
      3. **主填充通道**（纯色 `fillText` 或图案纹理 `createPattern` 填充，及内联图标/图片绘制）
      4. **装饰线通道**（下划线 `u` / 删除线 `s`）

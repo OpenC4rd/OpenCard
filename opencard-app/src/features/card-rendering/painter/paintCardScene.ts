@@ -557,11 +557,11 @@ function paintTextBlock(
     measurer,
   )
 
-  // 1. 通道一：背景高亮（markColor / backgroundColor）
+  // 1. 通道一：背景高亮（backgroundColor）
   for (const run of textLayout.runs) {
-    if (run.kind === 'glyph' && (run.style.markColor || run.style.backgroundColor)) {
+    if (run.kind === 'glyph' && run.style.backgroundColor) {
       ctx.save()
-      ctx.fillStyle = parsePaintStyle(run.style.markColor || run.style.backgroundColor, ctx)
+      ctx.fillStyle = parsePaintStyle(run.style.backgroundColor, ctx)
       ctx.fillRect(run.x, run.y, run.width, run.height)
       ctx.restore()
     }
@@ -631,7 +631,7 @@ function resolveGlyphFillStyle(
   assets: CanvasAssetStore,
   resourceContext?: CardRenderResourceContext,
 ): string | CanvasGradient | CanvasPattern {
-  if (style.fillType === 'image' && style.fillSource) {
+  if (style.fillSource) {
     const res = resourceContext
       ? resolveCardResource({
           value: style.fillSource,

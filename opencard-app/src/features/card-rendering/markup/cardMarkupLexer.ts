@@ -74,6 +74,7 @@ export function lexCardMarkup(source: string): { tokens: CardMarkupToken[]; diag
       const name = match[0]
       const start = i
       const nextChar = source[TAG_NAME.lastIndex]
+      // 裸 `@br` 后面必须是分隔符，避免把 `admin@br.com`、`@brLine` 读成标签。
       const isBrTag = name.toLowerCase() === 'br' && (nextChar === '(' || !nextChar || /\s/.test(nextChar))
       if (!isBrTag && nextChar !== '(' && nextChar !== '{') {
         pushText(source.slice(start, TAG_NAME.lastIndex), start)
@@ -97,6 +98,8 @@ export function lexCardMarkup(source: string): { tokens: CardMarkupToken[]; diag
       if (!BODYLESS_TAGS.has(name.toLowerCase()) && source[i] === '{') {
         tokens.push({ kind: 'open', offset: i })
         i += 1
+      } else if (BODYLESS_TAGS.has(name.toLowerCase()) && source[i] === '{' && source[i + 1] !== '{') {
+        diagnostics.push({ code: 'invalid-structure', offset: i, message: `@${name} 没有正文，'{' 按普通字符处理` })
       }
     } else {
       pushText(ch, i)
