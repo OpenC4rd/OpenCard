@@ -22,3 +22,8 @@
 /opencard-app/output/
 /.agents
 /.dsh-computer-use
+
+# OS cruft, installs and regenerated artifacts that must never be tracked
+.DS_Store
+node_modules/
+docs/media/blueprint-instance/out/
