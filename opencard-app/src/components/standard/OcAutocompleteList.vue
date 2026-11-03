@@ -4,17 +4,19 @@
   职责边界：
   - 不创建浮层、不做定位、不判断打开状态。
   - 键盘由输入框一侧消费；这里只用 @pointerdown.prevent 选择，保持焦点留在输入框。
+  - 指针移入即成为当前项：任何时候只有一行高亮。
 -->
 <template>
   <div :id="id" class="oc-autocomplete-list" role="listbox">
     <OcRow
       v-for="item in items"
-      :id="getOptionId(item.key)"
+      :id="completionOptionId(id, item.key)"
       :key="item.key"
       :ref="(element) => setOptionElement(item.key, element)"
       :class="{ 'is-active': item.key === activeKey }"
       role="option"
       :aria-selected="item.key === activeKey"
+      @pointerenter="emit('activate', item.key)"
       @pointerdown.prevent="emit('select', item.key)"
     >
       <template v-if="item.icon || item.thumbnailStyle" #leading>
@@ -27,14 +29,9 @@
         <span class="oc-autocomplete-list__title">
           <OcOverflowText class="oc-autocomplete-list__label" :text="item.label"
             :active="item.key === activeKey" :content-style="item.labelStyle" />
-          <OcOverflowText v-if="item.detail && detailLayout === 'inline'"
-            class="oc-autocomplete-list__detail oc-autocomplete-list__detail--inline"
+          <OcOverflowText v-if="item.detail" class="oc-autocomplete-list__detail"
             :text="item.detail" :active="item.key === activeKey" align="right" />
         </span>
-      </template>
-      <template v-if="item.detail && detailLayout === 'stacked'" #subtitle>
-        <OcOverflowText class="oc-autocomplete-list__detail"
-          :text="item.detail" :active="item.key === activeKey" align="right" />
       </template>
     </OcRow>
   </div>
@@ -43,6 +40,7 @@
 <script setup lang="ts">
 import { nextTick, watch, type ComponentPublicInstance } from 'vue'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
+import { completionOptionId } from '../../shared/ui/useCompletionList'
 import { isProjectIconStyle } from '../../shared/ui/visual/projectIconStyle'
 import OcIcon from '../base/OcIcon.vue'
 import OcOverflowText from './OcOverflowText.vue'
@@ -58,24 +56,18 @@ export type OcAutocompleteItem = {
   labelStyle?: Readonly<Record<string, string>>
 }
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   id: string
   items: readonly OcAutocompleteItem[]
   activeKey: string | null
-  detailLayout?: 'stacked' | 'inline'
-}>(), {
-  detailLayout: 'stacked',
-})
+}>()
 
 const emit = defineEmits<{
+  activate: [key: string]
   select: [key: string]
 }>()
 
 const optionElements = new Map<string, HTMLElement>()
-
-function getOptionId(key: string): string {
-  return `${props.id}-option-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-}
 
 /** 行由 OcRow 渲染，组件实例要把根元素取出来才能用于滚动定位。 */
 function setOptionElement(key: string, element: Element | ComponentPublicInstance | null): void {
@@ -128,7 +120,12 @@ watch(
   flex: 1 1 auto;
 }
 
-.oc-autocomplete-list__detail--inline {
+/* 指针所在行已经通过 activate 成为当前项；hover 不再另画一层，免得和键盘当前项同时亮。 */
+.oc-autocomplete-list > .oc-row:hover:not(.is-active):not(.is-disabled) {
+  background-image: none;
+}
+
+.oc-autocomplete-list__detail {
   flex: 0 1 auto;
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-sm);

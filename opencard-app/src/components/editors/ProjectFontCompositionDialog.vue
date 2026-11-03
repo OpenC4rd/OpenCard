@@ -19,25 +19,13 @@
           autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list"
           :aria-label="t('projectConfig.fonts.searchMembers')" :aria-expanded="memberMenuOpen"
           :aria-controls="memberAutocompleteId" :aria-activedescendant="activeMemberOptionId"
-          @focus="openMemberMenu" @input="updateMemberQuery" @blur="closeMemberMenu"
+          @focus="openMemberMenu" @input="updateMemberQuery"
           @keydown="handleMemberKeydown" />
         <OcButton type="button" icon-only variant="soft" icon="mdiPlus" :disabled="!candidateMemberKey"
           :aria-label="t('projectConfig.fonts.addMember')" :data-tooltip="t('projectConfig.fonts.addMember')"
           @click="addCandidateMember" />
 
-        <OcOverlayMarker
-          :group="`completion:${memberAutocompleteId}`"
-          :anchor="memberPickerRef"
-          :owner="activeMemberInput"
-          placement="bottom-start"
-          :max-height="220"
-          :open="memberMenuOpen"
-          @update:open="memberMenuOpen = $event"
-          @close="memberMenuOpen = false"
-        >
-          <OcAutocompleteList :id="memberAutocompleteId" :items="memberSuggestions"
-            :active-key="activeMemberKey" @select="selectMemberSuggestion" />
-        </OcOverlayMarker>
+        <OcCompletionPopup :list="memberList" :anchor="memberPickerRef" @select="selectMemberSuggestion" />
       </div>
       <OcButton type="button" variant="ghost" icon="mdiCogOutline" @click="advancedOpen = !advancedOpen">
         {{ t('projectConfig.fonts.advancedRanges') }}
@@ -97,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
   ProjectFontComposition,
@@ -112,9 +100,9 @@ import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
-import OcAutocompleteList from '../standard/OcAutocompleteList.vue'
+import OcCompletionPopup from '../standard/OcCompletionPopup.vue'
+import { useCompletionList } from '../../shared/ui/useCompletionList'
 import OcDialog from '../standard/OcDialog.vue'
-import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 
 export type ProjectFontCompositionRequest = {
   originalKey?: string
@@ -141,9 +129,6 @@ const memberQuery = ref('')
 const selectedCandidateKey = ref<string | null>(null)
 const memberPickerRef = ref<HTMLElement | null>(null)
 const activeMemberInput = ref<HTMLInputElement | null>(null)
-const memberMenuOpen = ref(false)
-const activeMemberKey = ref<string | null>(null)
-const memberAutocompleteId = useId()
 const rangePresets = [
   { key: 'latin', labelKey: 'projectConfig.fonts.rangePresetLatin', ranges: [{ start: 0x0000, end: 0x024f }] },
   { key: 'cjk', labelKey: 'projectConfig.fonts.rangePresetCjk', ranges: [
@@ -182,6 +167,9 @@ const memberSuggestions = computed(() => {
       icon: 'mdiFormatFont' as const,
     }))
 })
+const memberList = useCompletionList(() => memberSuggestions.value, () => activeMemberInput.value)
+const { open: memberMenuOpen, activeKey: activeMemberKey, id: memberAutocompleteId,
+  activeDescendantId: activeMemberOptionId } = memberList
 const candidateMemberKey = computed(() => {
   if (selectedCandidateKey.value
     && selectableEntries.value.some(entry => entry.key === selectedCandidateKey.value)) {
@@ -189,9 +177,6 @@ const candidateMemberKey = computed(() => {
   }
   return memberQuery.value.trim() ? activeMemberKey.value : null
 })
-const activeMemberOptionId = computed(() => activeMemberKey.value
-  ? `${memberAutocompleteId}-option-${activeMemberKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-  : undefined)
 const canSubmit = computed(() => Boolean(
   name.value.trim() && validKey.value && uniqueKey.value
     && selectedMembers.value.length > 0 && invalidRangeIndexes.value.size === 0,
@@ -225,13 +210,6 @@ watch([() => props.open, () => props.originalKey], ([open]) => {
   resetMemberPicker()
 }, { immediate: true })
 
-watch(memberSuggestions, suggestions => {
-  activeMemberKey.value = suggestions.some(entry => entry.key === activeMemberKey.value)
-    ? activeMemberKey.value
-    : (suggestions[0]?.key ?? null)
-})
-
-
 function createDefaultSetName(): string {
   const existingNames = new Set(props.compositions.map(composition => composition.name.toLocaleLowerCase()))
   let index = 1
@@ -246,17 +224,14 @@ function updateText(field: 'name' | 'key', event: Event): void {
 }
 function openMemberMenu(event: FocusEvent): void {
   activeMemberInput.value = event.target as HTMLInputElement
-  memberMenuOpen.value = memberSuggestions.value.length > 0
+  memberList.show()
 }
 function updateMemberQuery(event: Event): void {
   if (!(event.target instanceof HTMLInputElement)) return
   activeMemberInput.value = event.target
   memberQuery.value = event.target.value
   selectedCandidateKey.value = null
-  memberMenuOpen.value = memberSuggestions.value.length > 0
-}
-function closeMemberMenu(): void {
-  window.setTimeout(() => { memberMenuOpen.value = false }, 0)
+  memberList.show()
 }
 function selectMemberSuggestion(memberKey: string): void {
   const entry = selectableEntries.value.find(candidate => candidate.key === memberKey)
@@ -264,7 +239,7 @@ function selectMemberSuggestion(memberKey: string): void {
   memberQuery.value = entry.name
   selectedCandidateKey.value = entry.key
   activeMemberKey.value = entry.key
-  memberMenuOpen.value = false
+  memberList.close()
   void nextTick(() => activeMemberInput.value?.focus())
 }
 function addCandidateMember(): void {
@@ -275,30 +250,21 @@ function addCandidateMember(): void {
   resetMemberPicker()
   void nextTick(() => activeMemberInput.value?.focus())
 }
-function moveActiveMember(offset: 1 | -1): void {
-  if (!memberSuggestions.value.length) return
-  const current = Math.max(0, memberSuggestions.value.findIndex(entry => entry.key === activeMemberKey.value))
-  activeMemberKey.value = memberSuggestions.value[
-    (current + offset + memberSuggestions.value.length) % memberSuggestions.value.length
-  ]?.key ?? null
-}
 function handleMemberKeydown(event: KeyboardEvent): void {
+  if (memberList.handleKeydown(event)) return
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    // 收起后方向键重新打开候选，和输入时一样从第一项开始。
     event.preventDefault()
-    memberMenuOpen.value = memberSuggestions.value.length > 0
-    moveActiveMember(event.key === 'ArrowDown' ? 1 : -1)
+    memberList.show()
   } else if (event.key === 'Enter' && candidateMemberKey.value) {
     event.preventDefault()
     addCandidateMember()
-  } else if (event.key === 'Escape') {
-    memberMenuOpen.value = false
   }
 }
 function resetMemberPicker(): void {
   memberQuery.value = ''
   selectedCandidateKey.value = null
-  memberMenuOpen.value = false
-  activeMemberKey.value = memberSuggestions.value[0]?.key ?? null
+  memberList.close()
 }
 function moveMember(from: number, to: number): void {
   if (to < 0 || to >= selectedMembers.value.length) return

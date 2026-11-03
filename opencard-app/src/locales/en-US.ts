@@ -1378,7 +1378,7 @@ export default {
     },
     references: {
       currentCard: 'Current card',
-      currentCardBlueprint: 'Current document',
+      currentCardBlueprint: 'Current card (blueprint)',
       document: 'Current document',
       currentFace: 'Same face',
       oppositeFace: 'Opposite face',

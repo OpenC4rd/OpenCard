@@ -5,26 +5,14 @@
       <div ref="pickerRef" class="project-export-task-editor__picker">
         <OcFieldInput full-width :value="query" :placeholder="t('projectExport.searchDocuments')"
           autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" :disabled="busy"
-          :aria-expanded="menuOpen" :aria-controls="autocompleteId"
-          @focus="openMenu" @input="updateQuery" @blur="closeMenu" @keydown="handleKeydown" />
+          :aria-expanded="menuOpen" :aria-controls="autocompleteId" :aria-activedescendant="activeDescendantId"
+          @focus="openMenu" @input="updateQuery" @keydown="handleKeydown" />
         <OcButton type="button" icon-only variant="soft" icon="mdiPlus"
           :disabled="busy || !candidatePath" :aria-label="t('projectExport.addDocument')"
           :data-tooltip="t('projectExport.addDocument')"
           @click="addCandidate" />
 
-        <OcOverlayMarker
-          :group="`completion:${autocompleteId}`"
-          :anchor="pickerRef"
-          :owner="activeInput"
-          placement="bottom-start"
-          :max-height="220"
-          :open="menuOpen"
-          @update:open="menuOpen = $event"
-          @close="menuOpen = false"
-        >
-          <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activePath"
-            @select="selectSuggestion" />
-        </OcOverlayMarker>
+        <OcCompletionPopup :list="documentList" :anchor="pickerRef" @select="selectSuggestion" />
       </div>
       <OcTree v-if="selectedDocuments.length" class="project-export-task-editor__documents"
         :data="documentTreeData" :selected-keys="[]"
@@ -88,16 +76,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { open as openDirectory } from '@tauri-apps/plugin-dialog'
 import OcButton from '../base/OcButton.vue'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
-import OcAutocompleteList, { type OcAutocompleteItem } from '../standard/OcAutocompleteList.vue'
+import { type OcAutocompleteItem } from '../standard/OcAutocompleteList.vue'
+import OcCompletionPopup from '../standard/OcCompletionPopup.vue'
+import { useCompletionList } from '../../shared/ui/useCompletionList'
 import OcEnumStepper from '../standard/OcEnumStepper.vue'
-import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 import OcSelect, { type OcSelectOption } from '../standard/OcSelect.vue'
 import OcTree from '../standard/OcTree.vue'
 import NumberPropertyField from '../../shared/ui/property-editor/fields/NumberPropertyField.vue'
@@ -140,8 +129,6 @@ const preparationIssues = computed(() => props.preparationIssues)
 
 const pickerRef = ref<HTMLElement | null>(null)
 const query = ref('')
-const menuOpen = ref(false)
-const activePath = ref<string | null>(null)
 const selectedDocuments = ref<ExportDocumentCandidate[]>([])
 const outputDirectory = ref('')
 const selectionMode = ref<ProjectExportTask['selectionMode']>('blueprint-and-instances')
@@ -150,7 +137,6 @@ const conflictMode = ref<ProjectExportTask['conflictMode']>('replace')
 const errorPolicy = ref<NonNullable<ProjectExportTask['errorPolicy']>>('continue')
 const quality = ref<'preview' | 'standard' | 'high' | 'ultra' | 'custom'>('standard')
 const dpiText = ref('300')
-const autocompleteId = useId()
 const activeInput = ref<HTMLInputElement | null>(null)
 
 const qualityDpi = { preview: 150, standard: 300, high: 450, ultra: 600 } as const
@@ -193,6 +179,8 @@ const suggestions = computed<OcAutocompleteItem[]>(() => {
     .filter(document => !normalizedQuery || document.path.toLocaleLowerCase().includes(normalizedQuery))
     .map(document => ({ key: document.path, label: document.path, detail: '.ocdocument', icon: 'mdiCardsOutline' }))
 })
+const documentList = useCompletionList(() => suggestions.value, () => activeInput.value)
+const { open: menuOpen, activeKey: activePath, id: autocompleteId, activeDescendantId } = documentList
 const documentTreeData = computed<OcNodeCollection>(() => {
   const removeDocumentActions: readonly OcNodeAction[] = [{
     key: REMOVE_DOCUMENT_ACTION_KEY,
@@ -213,7 +201,6 @@ const documentTreeData = computed<OcNodeCollection>(() => {
 })
 const candidatePath = computed(() => activePath.value && suggestions.value.some(item => item.key === activePath.value)
   ? activePath.value : null)
-
 
 const dpi = computed(() => Number(dpiText.value))
 const canSubmit = computed(() => selectedDocuments.value.length > 0
@@ -248,7 +235,6 @@ watch([() => props.modelValue, () => props.documents], ([task]) => {
   layoutMode.value = task.layoutMode
   conflictMode.value = task.conflictMode
   errorPolicy.value = task.errorPolicy ?? 'continue'
-  refreshActiveSuggestion()
   void nextTick(() => { syncingFromProps = false })
 }, { immediate: true })
 
@@ -259,27 +245,19 @@ watch([
   emit('update:modelValue', buildTask())
 }, { deep: true })
 
-function refreshActiveSuggestion(): void {
-  activePath.value = suggestions.value[0]?.key ?? null
-}
 function openMenu(event: FocusEvent): void {
   activeInput.value = event.target as HTMLInputElement
-  menuOpen.value = suggestions.value.length > 0
-  refreshActiveSuggestion()
+  documentList.show()
 }
 function updateQuery(event: Event): void {
   activeInput.value = event.target as HTMLInputElement
   query.value = activeInput.value.value
-  menuOpen.value = suggestions.value.length > 0
-  refreshActiveSuggestion()
-}
-function closeMenu(): void {
-  window.setTimeout(() => { menuOpen.value = false }, 0)
+  documentList.show()
 }
 function selectSuggestion(path: string): void {
   query.value = path
   activePath.value = path
-  menuOpen.value = false
+  documentList.close()
   void nextTick(() => activeInput.value?.focus())
 }
 function addCandidate(): void {
@@ -288,15 +266,13 @@ function addCandidate(): void {
   if (!document) return
   selectedDocuments.value.push(document)
   query.value = ''
-  refreshActiveSuggestion()
   void nextTick(() => activeInput.value?.focus())
 }
 function handleKeydown(event: KeyboardEvent): void {
+  if (documentList.handleKeydown(event)) return
   if (event.key === 'Enter' && candidatePath.value) {
     event.preventDefault()
     addCandidate()
-  } else if (event.key === 'Escape') {
-    menuOpen.value = false
   }
 }
 function moveDocument(from: number, to: number): void {
@@ -309,7 +285,6 @@ function moveDocument(from: number, to: number): void {
 }
 function removeDocument(index: number): void {
   selectedDocuments.value = selectedDocuments.value.filter((_, candidate) => candidate !== index)
-  refreshActiveSuggestion()
 }
 function handleDocumentTreeAction(event: OcNodeActionEvent): void {
   if (busy.value || event.actionKey !== REMOVE_DOCUMENT_ACTION_KEY) return

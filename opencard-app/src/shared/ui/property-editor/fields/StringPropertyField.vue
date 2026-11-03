@@ -71,34 +71,17 @@
       </div>
     </OcFieldFrame>
 
-    <OcOverlayMarker
-      :group="`completion:${autocompleteId}`"
-      :anchor="completionAnchor"
-      :owner="completionControl"
-      placement="bottom-start"
-      :max-height="220"
-      :open="isMenuOpen"
-      @update:open="isMenuOpen = $event"
-      @close="isMenuOpen = false"
-    >
-      <OcAutocompleteList
-        :id="autocompleteId"
-        :items="suggestions"
-        :active-key="activeKey"
-        @select="acceptSuggestionByKey"
-      />
-    </OcOverlayMarker>
+    <OcCompletionPopup :list="completion.list" :anchor="completionAnchor" @select="acceptSuggestionByKey" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
-import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
+import OcCompletionPopup from '../../../../components/standard/OcCompletionPopup.vue'
 import OcEnumStepper from '../../../../components/standard/OcEnumStepper.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 import OcOptionGroup from '../../../../components/standard/OcOptionGroup.vue'
-import OcOverlayMarker from '../../../../components/standard/OcOverlayMarker.vue'
 import OcSelect from '../../../../components/standard/OcSelect.vue'
 import type {
   PropertyCompletionItem,
@@ -134,16 +117,8 @@ const activeInput = ref<TextControl | null>(null)
 let cancelPending = false
 
 const completion = usePropertyCompletion(() => activeInput.value)
-const {
-  completionState,
-  suggestions,
-  isMenuOpen,
-  activeKey,
-  autocompleteId,
-  activeDescendantId,
-  anchor: completionAnchor,
-  control: completionControl,
-} = completion
+const { completionState, anchor: completionAnchor } = completion
+const { items: suggestions, open: isMenuOpen, id: autocompleteId, activeDescendantId } = completion.list
 
 
 const selectOptions = computed(() =>

@@ -1,42 +1,33 @@
-import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import type { PropertyCompletionItem, PropertyCompletionResult } from '../propertyEditor.types'
+import { useCompletionList } from '../../useCompletionList'
 import { useOverlayDismiss } from '../../useOverlayDismiss'
 
+/** 由 provider 异步给出候选的补全：在通用补全列表上加替换区间、父级项与 Tab / Enter 接受。 */
 export function usePropertyCompletion(getControl: () => HTMLElement | null) {
   const completionState = ref<PropertyCompletionResult | null>(null)
-  const isMenuOpen = ref(false)
   const isPending = ref(false)
-  const activeKey = ref<string | null>(null)
-  const autocompleteId = useId()
   let requestId = 0
-  const suggestions = computed(() => {
+  const list = useCompletionList(() => {
     const result = completionState.value
     return result ? [...result.items, ...(result.parent ? [result.parent] : [])] : []
-  })
-  const activeDescendantId = computed(() => isMenuOpen.value && activeKey.value
-    ? `${autocompleteId}-option-${activeKey.value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-    : undefined)
-  const control = computed(() => getControl())
+  }, getControl)
   /** 单行输入的光标事实上固定在一行，锚控件就够；多行才需要跟随光标所在行。 */
   const anchor = computed<HTMLElement | (() => DOMRect | null) | null>(() => {
-    const element = control.value
+    const element = list.control.value
     if (!element) return null
     return element instanceof HTMLTextAreaElement ? () => caretRectOf(element) : element
   })
 
-  watch(suggestions, items => {
-    if (!items.some(item => item.key === activeKey.value)) activeKey.value = items[0]?.key ?? null
-  })
-
-  function invalidate(): void { requestId += 1; isPending.value = false }
   function clear(): void {
-    invalidate()
+    requestId += 1
+    isPending.value = false
     completionState.value = null
-    activeKey.value = null
-    isMenuOpen.value = false
+    list.close()
   }
 
-  useOverlayDismiss(() => isMenuOpen.value || isPending.value, getControl, clear)
+  // 列表关着、请求还在路上时点外面：作废这次请求，免得结果回来又把列表打开。
+  useOverlayDismiss(() => isPending.value, getControl, clear)
 
   async function refresh(load: () => PropertyCompletionResult | null | Promise<PropertyCompletionResult | null>, canOpen = () => true): Promise<boolean> {
     const currentRequest = ++requestId
@@ -45,8 +36,8 @@ export function usePropertyCompletion(getControl: () => HTMLElement | null) {
       const result = await load()
       if (currentRequest !== requestId) return false
       completionState.value = result
-      activeKey.value = suggestions.value[0]?.key ?? null
-      isMenuOpen.value = document.activeElement === getControl() && canOpen() && suggestions.value.length > 0
+      if (document.activeElement === getControl() && canOpen()) list.show()
+      else list.close()
       return true
     } catch (error) {
       if (currentRequest !== requestId) return false
@@ -58,28 +49,22 @@ export function usePropertyCompletion(getControl: () => HTMLElement | null) {
 
   function handleKeydown(event: KeyboardEvent, accept: (item: PropertyCompletionItem) => void): boolean {
     if (event.isComposing || event.keyCode === 229) return false
-    if (event.key === 'Escape' && (isMenuOpen.value || isPending.value)) {
+    if (event.key === 'Escape' && (list.open.value || isPending.value)) {
       event.preventDefault()
       event.stopPropagation()
       clear()
       return true
     }
-    if (!isMenuOpen.value || suggestions.value.length === 0) return false
+    if (list.handleKeydown(event)) return true
+    if (!list.open.value || list.items.value.length === 0) return false
     if (event.key === 'Tab' && event.shiftKey) {
       const parent = completionState.value?.parent
       if (parent) { event.preventDefault(); accept(parent) }
       return true
     }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      const index = Math.max(0, suggestions.value.findIndex(item => item.key === activeKey.value))
-      const offset = event.key === 'ArrowDown' ? 1 : -1
-      activeKey.value = suggestions.value[(index + offset + suggestions.value.length) % suggestions.value.length]?.key ?? null
-      return true
-    }
     if (event.key === 'Tab' || event.key === 'Enter') {
       event.preventDefault()
-      const item = suggestions.value.find(item => item.key === activeKey.value)
+      const item = list.activeItem.value
       if (item) accept(item)
       return true
     }
@@ -87,8 +72,7 @@ export function usePropertyCompletion(getControl: () => HTMLElement | null) {
   }
 
   onBeforeUnmount(clear)
-  return { completionState, suggestions, isMenuOpen, isPending, activeKey, autocompleteId, activeDescendantId,
-    control, anchor, refresh, clear, invalidate, handleKeydown }
+  return { list, completionState, isPending, anchor, refresh, clear, handleKeydown }
 }
 
 /**

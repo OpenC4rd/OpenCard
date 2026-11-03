@@ -27,6 +27,7 @@
         aria-autocomplete="list"
         :aria-expanded="menuOpen"
         :aria-controls="autocompleteId"
+        :aria-activedescendant="activeDescendantId"
         @input="handleInput"
         @keydown="handleKeydown"
         @blur="handleBlur"
@@ -47,19 +48,7 @@
       @dblclick.stop="startEditing"
     >{{ bindingLabel }}</span>
 
-    <OcOverlayMarker
-      :group="`completion:${autocompleteId}`"
-      :anchor="completionAnchor"
-      :owner="completionControl"
-      placement="bottom-start"
-      :max-height="220"
-      :open="menuOpen"
-      @update:open="menuOpen = $event"
-      @close="menuOpen = false"
-    >
-      <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activeKey"
-        detail-layout="inline" @select="acceptSuggestionByKey" />
-    </OcOverlayMarker>
+    <OcCompletionPopup :list="completion.list" @select="acceptSuggestionByKey" />
   </NodeViewWrapper>
 </template>
 
@@ -68,8 +57,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import OcFieldInput from '../../../components/base/OcFieldInput.vue'
-import OcAutocompleteList from '../../../components/standard/OcAutocompleteList.vue'
-import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
+import OcCompletionPopup from '../../../components/standard/OcCompletionPopup.vue'
 import type { BindingNodeOptions } from './bindingNode'
 import type { PropertyCompletionItem } from '../property-editor/propertyEditor.types'
 import { usePropertyCompletion } from '../property-editor/fields/usePropertyCompletion'
@@ -87,8 +75,8 @@ const closeBrace = '}}'
 const input = ref<ComponentPublicInstance | null>(null)
 const editSession = ref<{ original: string, draft: string } | null>(null)
 const completion = usePropertyCompletion(() => inputElement.value)
-const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, suggestions,
-  anchor: completionAnchor, control: completionControl } = completion
+const { completionState } = completion
+const { items: suggestions, open: menuOpen, id: autocompleteId, activeDescendantId } = completion.list
 let composing = false
 let disposed = false
 let blurTimer: ReturnType<typeof setTimeout> | undefined

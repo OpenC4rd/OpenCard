@@ -31,19 +31,7 @@
         @keydown="handleKeydown" @keyup="handleCursorKeyup" @paste="handlePaste" />
     </OcFieldFrame>
 
-    <OcOverlayMarker
-      :group="`completion:${autocompleteId}`"
-      :anchor="completionAnchor"
-      :owner="completionControl"
-      placement="bottom-start"
-      :max-height="220"
-      :open="isMenuOpen"
-      @update:open="isMenuOpen = $event"
-      @close="isMenuOpen = false"
-    >
-      <OcAutocompleteList :id="autocompleteId" :items="suggestions" :active-key="activeKey"
-        @select="acceptSuggestionByKey" />
-    </OcOverlayMarker>
+    <OcCompletionPopup :list="completion.list" :anchor="completionAnchor" @select="acceptSuggestionByKey" />
   </div>
 </template>
 
@@ -62,11 +50,10 @@ import {
   splitReferenceStringTokens,
   type ReferenceStringListSeparator,
 } from './referenceStringTokens'
-import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
+import OcCompletionPopup from '../../../../components/standard/OcCompletionPopup.vue'
 import OcButton from '../../../../components/base/OcButton.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
 import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
-import OcOverlayMarker from '../../../../components/standard/OcOverlayMarker.vue'
 
 import { usePropertyCompletion } from './usePropertyCompletion'
 
@@ -95,9 +82,8 @@ const draft = ref(initial.draft)
 let lastEmitted = ''
 const activeInput = ref<TextControl | null>(null)
 const completion = usePropertyCompletion(() => activeInput.value)
-const { completionState, suggestions, isMenuOpen, activeKey, autocompleteId, activeDescendantId,
-  anchor: completionAnchor, control: completionControl } = completion
-
+const { completionState, anchor: completionAnchor } = completion
+const { items: suggestions, open: isMenuOpen, id: autocompleteId, activeDescendantId } = completion.list
 /** 补全 provider 拿到的是整串 + 整串光标，所以尾巴要补回已提交项的前缀。 */
 const editedValue = computed(() => `${referenceStringTokenPrefix(tokens.value, separator.value)}${draft.value}`)
 const hasInvalidToken = computed(() => [...tokens.value, draft.value]
