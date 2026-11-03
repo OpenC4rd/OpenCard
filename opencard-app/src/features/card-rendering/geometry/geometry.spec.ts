@@ -86,6 +86,15 @@ describe('computeSceneLayout', () => {
   })
 })
 
+describe('transform frame', () => {
+  it('reports the rotation pivot inside the block, including translate and its own rotation', () => {
+    const rotated = block('r', { width: '100', height: '50', rotation: 30, translateX: '10', translateY: '-5', transformAnchor: 'cc' })
+    const node = computeSceneLayout(face(at(rotated, 'lt', '20', '40'))).nodeMap.get('r')!
+    expect(node.transformCenter).toEqual({ x: 80, y: 60 })
+    expect(node.worldRotationDeg).toBeCloseTo(30)
+  })
+})
+
 describe('hitTestScene', () => {
   it('hits the topmost block inside its rotated outline and misses outside it', () => {
     const rotated = block('r', { width: '100', height: '20', rotation: 90, zIndex: 1 })

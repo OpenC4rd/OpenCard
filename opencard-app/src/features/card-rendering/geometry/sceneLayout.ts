@@ -32,6 +32,10 @@ export type SceneNodeLayout = {
   inverseParentWorldMatrix: Matrix2D
   obbCorners: readonly [Point2D, Point2D, Point2D, Point2D] // lt, rt, rb, lb
   worldAabb: Rect2D
+  /** 变换中心（父容器局部坐标）：旋转与缩放的不动点，由 rect、translate 与 transformAnchor 决定。 */
+  transformCenter: Point2D
+  /** 块自身 x 轴在世界坐标下的方向角（度，屏幕顺时针为正），已含祖先旋转。 */
+  worldRotationDeg: number
   clip: boolean
   zIndex: number
   visible: boolean
@@ -184,6 +188,7 @@ function buildNode(
   const ys = corners.map((p) => p.y)
   const minX = Math.min(...xs)
   const minY = Math.min(...ys)
+  const { fx, fy } = anchorFractions(block.transformAnchor)
 
   const node: SceneNodeLayout = {
     id: block.id,
@@ -197,6 +202,11 @@ function buildNode(
     inverseParentWorldMatrix: invertMatrix(parent.world),
     obbCorners: corners,
     worldAabb: { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY },
+    transformCenter: {
+      x: rect.x + translation.x + size.width * fx,
+      y: rect.y + translation.y + size.height * fy,
+    },
+    worldRotationDeg: (Math.atan2(worldMatrix[1], worldMatrix[0]) * 180) / Math.PI,
     clip: 'clip' in block && block.clip === true,
     zIndex: block.zIndex,
     visible,

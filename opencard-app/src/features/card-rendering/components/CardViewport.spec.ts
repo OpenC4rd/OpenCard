@@ -108,7 +108,7 @@ describe('CardViewport', () => {
         y = originY
         window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y }))
       },
-      moveBy(deltaX: number, deltaY: number, modifiers: { shiftKey?: boolean } = {}): void {
+      moveBy(deltaX: number, deltaY: number, modifiers: { shiftKey?: boolean; altKey?: boolean } = {}): void {
         x += deltaX
         y += deltaY
         window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y, ...modifiers }))
@@ -353,7 +353,7 @@ describe('CardViewport', () => {
     const selectionActions = wrapper.emitted('selection-action') ?? []
     expect(selectionActions[selectionActions.length - 1]).toEqual([{
       type: 'geometry.apply', operation: 'outset', blockId: 'selected',
-      width: 120, height: 100, x: 240, y: 160,
+      width: 102, height: 82, x: 249, y: 169,
     }])
 
     expect(wrapper.vm.nudgeSelection(1, -1)).toBe(true)
@@ -405,7 +405,7 @@ describe('CardViewport', () => {
     const actions = wrapper.emitted('selection-action') ?? []
     expect(actions[actions.length - 1]).toEqual([{
       type: 'geometry.apply', operation: 'outset', blockId: 'selected',
-      height: 100, y: 160,
+      height: 82, y: 169,
     }])
   })
 
@@ -508,7 +508,7 @@ describe('CardViewport', () => {
    * 拖一次选择手柄并返回提交的尺寸。比例尺不是 1px=1mm（视口会 fit），
    * 所以这里只固定块选区自己的几何行为，与卡面尺寸拖动精度分开验证。
    */
-  async function runResizeDrag(handle: string, deltaX: number, deltaY: number, shiftKey = false) {
+  async function runResizeDrag(handle: string, deltaX: number, deltaY: number, shiftKey = false, altKey = false) {
     const snappingFace: RenderReadyCardFace = {
       ...face,
       children: [
@@ -535,7 +535,7 @@ describe('CardViewport', () => {
 
     const drag = createSelectionDrag()
     drag.begin()
-    drag.moveBy(deltaX, deltaY, { shiftKey })
+    drag.moveBy(deltaX, deltaY, { shiftKey, altKey })
     window.dispatchEvent(new Event('pointerup'))
     return wrapper.emitted('resize-selection')?.[0]?.[0] as {
       width: number
@@ -554,11 +554,60 @@ describe('CardViewport', () => {
     expect(diagonal.y).toBe(horizontal.y)
   })
 
+  it('mirrors the opposite edge around the start center when resizing with Alt', async () => {
+    const plain = await runResizeDrag('rt', 40, -30)
+    const mirrored = await runResizeDrag('rt', 40, -30, false, true)
+
+    // 起始矩形是 100×80 @ (50, 50)，Alt 下中心固定在 (100, 90)。
+    expect(mirrored.y).toBeCloseTo(plain.y, 6)
+    expect(mirrored.width).toBeCloseTo(100 + 2 * (plain.width - 100), 6)
+    expect(mirrored.height).toBeCloseTo(80 + 2 * (plain.height - 80), 6)
+    expect(mirrored.x).toBeCloseTo(50 - (plain.width - 100), 6)
+    expect(mirrored.x + mirrored.width / 2).toBeCloseTo(100, 6)
+    expect(mirrored.y + mirrored.height / 2).toBeCloseTo(90, 6)
+  })
+
   it('does not apply face dimension precision to block resize', async () => {
     const payload = await runResizeDrag('rb', 50.4, 20.6, true)
 
     expect(Number.isInteger(payload.width)).toBe(false)
     expect(Number.isInteger(payload.height)).toBe(false)
+  })
+
+  it('rotates around the transform center by the pointer angle dragged on the dial', async () => {
+    const wrapper = mount(CardViewport, {
+      props: {
+        resourceContext,
+        face: { ...face, children: [textChild('selected', '50mm', '50mm', '100mm', '80mm')] },
+        selectedBlockId: null,
+        selectedLocationType: 'simple-container-location',
+        selectedAnchor: 'lt',
+        alignmentSnappingEnabled: false,
+      },
+    })
+    await flushPromises()
+
+    await wrapper.setProps({ selectedBlockId: 'selected' })
+    await nextTick()
+    await flushPromises()
+
+    // jsdom 没有布局：手柄容器圆心回退到 (0, 0)，极角直接由 client 坐标给出。
+    wrapper.get('.selection-rotation__handle').element.dispatchEvent(new MouseEvent('pointerdown', {
+      button: 0, clientX: 0, clientY: -100, bubbles: true,
+    }))
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100, clientY: 0 }))
+    await flushAnimation()
+
+    // 拖动中：引线转到 90°，虚线标出调整前的位置，刻度窗口跟着引线走。
+    expect(wrapper.get('.selection-rotation__handle').attributes('aria-valuenow')).toBe('90')
+    expect(wrapper.find('.selection-rotation__ghost').exists()).toBe(true)
+    expect(wrapper.find('.selection-rotation__fade').exists()).toBe(true)
+    expect(wrapper.get('.selection-rotation__handle').attributes('style')).toContain('rotate(90deg)')
+
+    window.dispatchEvent(new MouseEvent('pointerup'))
+    await nextTick()
+    expect(wrapper.find('.selection-rotation__ghost').exists()).toBe(false)
+    expect(wrapper.emitted('rotate-selection')).toEqual([[{ blockId: 'selected', rotation: 90 }]])
   })
 
   it('snaps absolute resize and move edges to a direct sibling', async () => {
@@ -620,6 +669,48 @@ describe('CardViewport', () => {
     expect(wrapper.emitted('move-selection')?.[1]?.[0]).toEqual({
       blockId: 'selected',
       x: 55,
+      y: 50,
+    })
+  })
+
+  it('keeps the center fixed while snapping a symmetric resize', async () => {
+    const snappingFace: RenderReadyCardFace = {
+      ...face,
+      children: [
+        textChild('selected', '50mm', '50mm', '100mm', '80mm'),
+        textChild('sibling', '158mm', '20mm', '80mm', '60mm'),
+      ],
+    }
+
+    const wrapper = mount(CardViewport, {
+      props: {
+        resourceContext,
+        face: snappingFace,
+        selectedBlockId: null,
+        selectedLocationType: 'simple-container-location',
+        selectedAnchor: 'lt',
+      },
+    })
+    const viewportEl = wrapper.get('.card-viewport').element as HTMLElement
+    viewportEl.style.setProperty('--oc-viewport-alignment-snap-distance', '8px')
+    viewportEl.style.setProperty('--oc-viewport-alignment-snap-release-distance', '12px')
+
+    await wrapper.setProps({ selectedBlockId: 'selected' })
+    await nextTick()
+    await flushPromises()
+    await wrapper.get('.selection-handle-r').trigger('pointerdown')
+    const drag = createSelectionDrag()
+    drag.begin()
+    drag.moveBy(5, 0, { altKey: true })
+    window.dispatchEvent(new Event('pointerup'))
+    await nextTick()
+
+    // 右边缘吸到 sibling 的 158mm，左边缘镜像回 42mm：中心仍在 100mm。
+    expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
+      blockId: 'selected',
+      width: 116,
+      height: 80,
+      x: 42,
       y: 50,
     })
   })

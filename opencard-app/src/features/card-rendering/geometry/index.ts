@@ -1,4 +1,5 @@
 export { evaluateRenderLength } from './lengthMath'
+export { anchorFractions } from './anchor'
 export {
   identityMatrix,
   invertMatrix,

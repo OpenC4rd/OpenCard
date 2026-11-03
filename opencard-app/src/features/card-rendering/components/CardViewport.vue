@@ -211,6 +211,47 @@
           :class="[`selection-handle-${handle}`, { 'is-active': activeHandle === handle }]"
           :aria-label="`Resize ${handle}`"
           @pointerdown.stop.prevent="startResize(handle)" />
+        <div v-if="rotationControl" class="selection-rotation"
+          :class="{ 'is-active': isRotatingSelection }"
+          :style="{ left: `${rotationControl.offsetX}px`, top: `${rotationControl.offsetY}px` }">
+          <svg class="selection-rotation__dial" viewBox="-84 -84 168 168" aria-hidden="true">
+            <defs>
+              <filter :id="rotationFadeId" x="-25%" y="-25%" width="150%" height="150%">
+                <feGaussianBlur stdDeviation="4" />
+              </filter>
+              <mask :id="rotationMaskId" maskUnits="userSpaceOnUse" x="-84" y="-84" width="168" height="168">
+                <path class="selection-rotation__fade" :d="rotationControl.fadePath"
+                  :filter="`url(#${rotationFadeId})`" />
+              </mask>
+            </defs>
+            <g :mask="`url(#${rotationMaskId})`">
+              <line v-for="tick in ROTATION_SCALE_TICKS" :key="tick.angle" :class="{ 'is-major': tick.major }"
+                :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" />
+              <text v-for="label in ROTATION_SCALE_LABELS" :key="label.angle"
+                :x="label.x" :y="label.y">{{ label.text }}</text>
+            </g>
+            <template v-if="rotationControl.ghost">
+              <line class="selection-rotation__ghost" x1="0" y1="0"
+                :x2="rotationControl.ghost.tipX" :y2="rotationControl.ghost.tipY" />
+              <line class="selection-rotation__ghost-bar"
+                :x1="rotationControl.ghost.barX1" :y1="rotationControl.ghost.barY1"
+                :x2="rotationControl.ghost.barX2" :y2="rotationControl.ghost.barY2" />
+            </template>
+            <line class="selection-rotation__arm" x1="0" y1="0"
+              :x2="rotationControl.handleX" :y2="rotationControl.handleY" />
+            <circle class="selection-rotation__center-ring" r="5" />
+            <circle class="selection-rotation__center-dot" r="1.5" />
+          </svg>
+          <button type="button" class="selection-rotation__handle" role="slider" tabindex="0"
+            aria-label="Rotate selection" :aria-valuemin="-180" :aria-valuemax="180" :aria-valuenow="rotationControl.angle"
+            :style="{
+              transform: `translate(-50%, -50%) translate(${rotationControl.handleX}px, ${rotationControl.handleY}px) rotate(${rotationControl.angle}deg)`,
+            }"
+            @pointerdown.stop.prevent="startRotate" @keydown="handleRotationKeydown" />
+          <output v-if="isRotatingSelection" class="selection-size-label selection-rotation__value">
+            {{ rotationControl.valueLabel }}
+          </output>
+        </div>
       </div>
     </div>
     <OcOverlayMarker
@@ -298,7 +339,7 @@ export interface CardViewportComparison {
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useSlots, watch, type CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useId, useSlots, watch, type CSSProperties } from 'vue'
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
 import { clamp } from '../../../shared/model/number'
 import { taskScheduler } from '../../../utils/taskScheduler'
@@ -316,6 +357,7 @@ import { buildCardLayerGroups } from './cardLayerModel'
 import type { RenderReadyCardFace } from '../render.types'
 import type { CardRenderResourceContext } from '../cardRenderResources'
 import {
+  anchorFractions,
   computeSceneLayout,
   projectWorldDeltaToParentLocation,
   transformPoint,
@@ -390,15 +432,67 @@ type MovePayload = {
   y: number
 }
 type FaceDimension = 'width' | 'height'
+type RotateDrag = {
+  blockId: string
+  centerClientX: number
+  centerClientY: number
+  startPointerAngle: number
+  startRotation: number
+  lastRotation: number
+}
+type RotationScaleTick = {
+  angle: number
+  major: boolean
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+type RotationScaleLabel = {
+  angle: number
+  x: number
+  y: number
+  text: string
+}
+type RotationGhost = {
+  tipX: number
+  tipY: number
+  barX1: number
+  barY1: number
+  barX2: number
+  barY2: number
+}
+type RotationControl = {
+  offsetX: number
+  offsetY: number
+  angle: number
+  handleX: number
+  handleY: number
+  valueLabel: string
+  fadePath: string
+  ghost: RotationGhost | null
+}
 type ViewportTransform = {
   x: number
   y: number
   scale: number
 }
 const TRANSFORM_EPSILON = 0.0001
-const SELECTION_INSET_STEP = 10
+const SELECTION_INSET_STEP = 1
 const MIN_SELECTION_SIZE = 2
 const DIMENSION_LINE_GAP = 12
+/** 旋转控件：固定的 360° 刻度，±50°（共 100°）可读遮罩随角度转，引线末端是径向长条把手。 */
+const ROTATION_ARM_RADIUS = 44
+const ROTATION_FAN_HALF = 50
+const ROTATION_TICK_STEP = 15
+const ROTATION_SNAP_STEP = 15
+const ROTATION_FADE_RADIUS = 78
+const ROTATION_TICK_INNER = 53
+const ROTATION_TICK_MINOR_OUTER = 59
+const ROTATION_TICK_MAJOR_OUTER = 64
+const ROTATION_LABEL_RADIUS = 71
+const ROTATION_LABEL_STEP = 45
+const ROTATION_HANDLE_BAR_HALF = 9
 /** 缩放尺寸网格：默认 0.1mm，按住 Shift 落到整毫米。 */
 
 const emit = defineEmits<{
@@ -406,6 +500,7 @@ const emit = defineEmits<{
   (e: 'blank-click', event: MouseEvent): void
   (e: 'resize-selection', payload: ResizePayload & { blockId: string }): void
   (e: 'move-selection', payload: MovePayload & { blockId: string }): void
+  (e: 'rotate-selection', payload: { blockId: string; rotation: number }): void
   (e: 'selection-action', payload: CardViewportSelectionAction): void
   (e: 'selection-command', payload: CardViewportSelectionCommand): void
   (e: 'viewport-transform-change', payload: { x: number; y: number; scale: number }): void
@@ -466,8 +561,8 @@ const props = withDefaults(defineProps<{
     label: 'Selection layout actions',
     fillParent: 'Fill parent',
     centerInParent: 'Center in parent',
-    inset: 'Inset 10 mm',
-    outset: 'Outset 10 mm',
+    inset: 'Inset 1 mm',
+    outset: 'Outset 1 mm',
     fillCrossAxis: 'Fill cross axis',
     centerCrossAxis: 'Center on cross axis',
   }),
@@ -546,6 +641,8 @@ const comparisonHoverLink = computed(() => {
 })
 const activeHandle = ref<ResizeHandle | null>(null)
 const isMovingSelection = ref(false)
+const rotateDrag = ref<RotateDrag | null>(null)
+const rotationPreview = ref<{ blockId: string; rotation: number } | null>(null)
 const dragMeasurement = ref<SelectionMeasurement | null>(null)
 const previewWorldRect = ref<SelectionFrame | null>(null)
 const rawPreviewWorldRect = ref<SelectionFrame | null>(null)
@@ -569,6 +666,7 @@ const sceneGraph = computed<CardSceneGraph>(() => computeSceneLayout(props.face)
 let zoomAnimationFrame: number | null = null
 const panInput = taskScheduler.frame(applyPan)
 const transformInput = taskScheduler.frame(applyTransformMove)
+const rotateInput = taskScheduler.frame(applyRotateMove)
 const faceDimensionInput = taskScheduler.frame(applyFaceDimensionDrag)
 let lastEmittedTransform: ViewportTransform | null = null
 let pendingTransformEchoes: ViewportTransform[] = []
@@ -1024,7 +1122,43 @@ const selectionFrameStyle = computed(() => {
     height: `${frame.height}px`,
   }
 })
-const isTransformingSelection = computed(() => Boolean(activeHandle.value) || isMovingSelection.value)
+const rotationMaskId = `oc-rotation-mask-${useId().replace(/:/g, '')}`
+const rotationFadeId = `${rotationMaskId}-fade`
+const isRotatingSelection = computed(() => rotateDrag.value !== null)
+const isTransformingSelection = computed(() => Boolean(activeHandle.value)
+  || isMovingSelection.value
+  || isRotatingSelection.value)
+/**
+ * 旋转控件：以块的变换中心（`transformAnchor` 的不动点）为圆心，整圈刻度固定不动，
+ * 只有 ±50° 的可读遮罩跟着当前角度转，引线末端是径向长条把手；
+ * 拖动期间另画一条虚线标出调整前的位置。线色跟选区边框同源：平时是 glow，改框时变亮。
+ */
+const rotationControl = computed<RotationControl | null>(() => {
+  const blockId = props.selectedBlockId
+  if (props.readonly || !blockId || activeHandle.value || isMovingSelection.value) return null
+  const node = sceneGraph.value.nodeMap.get(blockId)
+  const frame = selectionFrame.value
+  if (!node || !frame) return null
+
+  const safeScale = scale.value || 1
+  const preview = rotationPreview.value?.blockId === blockId ? rotationPreview.value.rotation : node.block.rotation
+  const angle = normalizeRotation(node.worldRotationDeg + preview - node.block.rotation)
+  const startAngle = rotateDrag.value?.blockId === blockId ? normalizeRotation(node.worldRotationDeg) : null
+  // 控件是选区框的子元素，位置只算相对框左上角的偏移；两者一起已经含了父级变换。
+  // 拖动中用预览矩形算，Alt 对称缩放时中心不动，控件也就跟着钉在中心。
+  const { fx, fy } = anchorFractions(node.block.transformAnchor)
+  const liveRect = previewWorldRect.value ?? node.localRect
+  return {
+    offsetX: (node.transformCenter.x - node.localRect.x + (liveRect.width - node.localRect.width) * fx) * safeScale,
+    offsetY: (node.transformCenter.y - node.localRect.y + (liveRect.height - node.localRect.height) * fy) * safeScale,
+    angle,
+    handleX: polarPoint(angle, ROTATION_ARM_RADIUS).x,
+    handleY: polarPoint(angle, ROTATION_ARM_RADIUS).y,
+    valueLabel: formatRotationLabel(angle),
+    fadePath: sectorPath(angle - ROTATION_FAN_HALF, angle + ROTATION_FAN_HALF, ROTATION_FADE_RADIUS),
+    ghost: startAngle === null ? null : buildRotationGhost(startAngle),
+  }
+})
 const resizeMetrics = computed(() => {
   const preview = previewWorldRect.value
   const handle = activeHandle.value
@@ -1098,6 +1232,74 @@ function formatGeometryValue(value: number): string {
   const rounded = Math.round(value * 10) / 10
   return `${Object.is(rounded, -0) ? 0 : rounded} mm`
 }
+
+/** 归一化到 [-180, 180)：刻度盘只认朝向，存进文档的角度保持可读的连续区间。 */
+function normalizeRotation(value: number): number {
+  const wrapped = ((value + 180) % 360 + 360) % 360 - 180
+  return Object.is(wrapped, -0) ? 0 : wrapped
+}
+
+function formatRotationLabel(angle: number): string {
+  const rounded = Math.round(angle * 10) / 10
+  return `${Object.is(rounded, -0) ? 0 : rounded}°`
+}
+
+/** 指针相对圆心的极角：0 在正上方，顺时针为正，与刻度盘的读数一致。 */
+function pointerPolarAngle(centerX: number, centerY: number, clientX: number, clientY: number): number {
+  return (Math.atan2(clientX - centerX, centerY - clientY) * 180) / Math.PI
+}
+
+/** 极坐标点：0° 在正上方，顺时针为正；坐标以变换中心为原点。 */
+function polarPoint(angle: number, radius: number): { x: number; y: number } {
+  const radians = ((angle - 90) * Math.PI) / 180
+  return { x: Math.cos(radians) * radius, y: Math.sin(radians) * radius }
+}
+
+/** 遮罩半径取到外圈刻度之外，模糊只作用在两侧角度边上，不削刻度。 */
+function sectorPath(startAngle: number, endAngle: number, radius: number): string {
+  const tip = polarPoint(startAngle, radius)
+  const end = polarPoint(endAngle, radius)
+  return [
+    'M 0 0',
+    `L ${tip.x} ${tip.y}`,
+    `A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`,
+    'Z',
+  ].join(' ')
+}
+
+/** 遮罩扇区：模糊后两侧角度边自然渐隐，区域外的刻度就看不见了。 */
+/** 固定的整圈刻度：位置不随角度变化，只有遮罩在动。 */
+function buildRotationScaleTicks(): RotationScaleTick[] {
+  return Array.from({ length: 360 / ROTATION_TICK_STEP }, (_, index) => {
+    const angle = index * ROTATION_TICK_STEP
+    const major = angle % ROTATION_LABEL_STEP === 0
+    const inner = polarPoint(angle, ROTATION_TICK_INNER)
+    const outer = polarPoint(angle, major ? ROTATION_TICK_MAJOR_OUTER : ROTATION_TICK_MINOR_OUTER)
+    return { angle, major, x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y }
+  })
+}
+
+/** 固定读数：整 45° 一个度数，文字永远正着放。 */
+function buildRotationScaleLabels(): RotationScaleLabel[] {
+  return Array.from({ length: 360 / ROTATION_LABEL_STEP }, (_, index) => {
+    const angle = index * ROTATION_LABEL_STEP
+    const point = polarPoint(angle, ROTATION_LABEL_RADIUS)
+    return { angle, x: point.x, y: point.y, text: `${angle}°` }
+  })
+}
+
+/** 调整前的位置：同角度方向的虚线引线 + 同款径向长条，只是停在起始角度。 */
+function buildRotationGhost(angle: number): RotationGhost {
+  const tip = polarPoint(angle, ROTATION_ARM_RADIUS + ROTATION_HANDLE_BAR_HALF)
+  const tail = polarPoint(angle, ROTATION_ARM_RADIUS - ROTATION_HANDLE_BAR_HALF)
+  return {
+    tipX: tip.x, tipY: tip.y,
+    barX1: tail.x, barY1: tail.y, barX2: tip.x, barY2: tip.y,
+  }
+}
+
+const ROTATION_SCALE_TICKS = buildRotationScaleTicks()
+const ROTATION_SCALE_LABELS = buildRotationScaleLabels()
 
 function getAnchorPoint(frame: SelectionFrame, anchor: AnchorPosition): { x: number; y: number } {
   const horizontal = anchor[0]
@@ -1766,7 +1968,7 @@ function requestSelectionFrameSync() {
 
 async function syncSelectionFrame() {
   await nextTick()
-  if (activeHandle.value || isMovingSelection.value) return
+  if (isTransformingSelection.value) return
   syncDiffOverlayHighlights()
   const measurement = measureSelection()
   const nextFrame = measurement?.frame ?? null
@@ -1783,7 +1985,7 @@ function sameSelectionFrame(current: SelectionFrame | null, next: SelectionFrame
 }
 
 function startResize(handle: ResizeHandle) {
-  if (resizeMode.value === 'none' || isMovingSelection.value) {
+  if (resizeMode.value === 'none' || isTransformingSelection.value) {
     return
   }
 
@@ -1808,7 +2010,7 @@ function startResize(handle: ResizeHandle) {
 }
 
 function startMove() {
-  if (!showMoveHandle.value || activeHandle.value || isMovingSelection.value) {
+  if (!showMoveHandle.value || isTransformingSelection.value) {
     return
   }
 
@@ -1930,6 +2132,12 @@ function applyTransformMove(event: PointerEvent) {
     )
   }
 
+  // 按住 Alt 就是对称缩放：拖动的边继续跟手，对面的边围绕起始中心镜像；吸附只落在拖动的边上。
+  const symmetricResize = resizeMode.value === 'absolute' && event.altKey && activeHandle.value !== null
+  if (symmetricResize && activeHandle.value) {
+    interactionPreview = symmetricResizeRect(interactionPreview, measurement.worldRect, activeHandle.value)
+  }
+
   // 按住 Shift 就是等比：文本流里高度由内容决定，等比没有意义，所以这条路不参与。
   const proportionalResize = resizeMode.value === 'absolute' && event.shiftKey && activeHandle.value !== null
 
@@ -1943,7 +2151,7 @@ function applyTransformMove(event: PointerEvent) {
     })
     Object.assign(preview, snapped.rect)
     alignmentSnapLocks.value = snapped.locks
-  } else if (proportionalResize && activeHandle.value && alignmentSnapDistances.value) {
+  } else if (proportionalResize && !symmetricResize && activeHandle.value && alignmentSnapDistances.value) {
     const constrained = constrainProportionalResize(
       interactionPreview,
       activeHandle.value,
@@ -1969,12 +2177,17 @@ function applyTransformMove(event: PointerEvent) {
       previousLocks: alignmentSnapLocks.value,
       minSize: MIN_SELECTION_SIZE,
     })
-    Object.assign(preview, snapped.rect)
+    Object.assign(
+      preview,
+      symmetricResize && activeHandle.value
+        ? symmetricResizeRect(snapped.rect, measurement.worldRect, activeHandle.value)
+        : snapped.rect,
+    )
     alignmentSnapLocks.value = snapped.locks
   } else {
     Object.assign(
       preview,
-      proportionalResize && activeHandle.value
+      proportionalResize && !symmetricResize && activeHandle.value
         ? constrainResizeToRatio(interactionPreview, activeHandle.value, measurement.worldRect)
         : interactionPreview,
     )
@@ -2083,6 +2296,113 @@ function stopTransform() {
   window.removeEventListener('pointerup', stopTransform)
   window.removeEventListener('pointercancel', stopTransform)
   requestSelectionFrameSync()
+}
+
+/**
+ * 拖动旋转手柄 = 绕变换中心转：只跟指针的极角差，不看指针半径，
+ * 所以拖出手柄圈、跨过 ±180° 都连续；拖拽期间只动手指手势，松手才写一次文档。
+ */
+function startRotate(event: PointerEvent): void {
+  if (props.readonly || rotateDrag.value || activeHandle.value || isMovingSelection.value) return
+  const blockId = props.selectedBlockId
+  const node = blockId ? sceneGraph.value.nodeMap.get(blockId) : undefined
+  if (!blockId || !node) return
+
+  const dial = event.currentTarget instanceof Element
+    ? event.currentTarget.closest('.selection-rotation')
+    : null
+  const bounds = dial?.getBoundingClientRect()
+  const centerClientX = bounds ? bounds.left + bounds.width / 2 : 0
+  const centerClientY = bounds ? bounds.top + bounds.height / 2 : 0
+  rotateDrag.value = {
+    blockId,
+    centerClientX,
+    centerClientY,
+    startPointerAngle: pointerPolarAngle(centerClientX, centerClientY, event.clientX, event.clientY),
+    startRotation: node.block.rotation,
+    lastRotation: node.block.rotation,
+  }
+  rotationPreview.value = null
+  window.addEventListener('pointermove', handleRotateMove)
+  window.addEventListener('pointerup', stopRotate)
+  window.addEventListener('pointercancel', stopRotate)
+}
+
+function handleRotateMove(event: PointerEvent): void {
+  rotateInput.schedule(event)
+}
+
+function applyRotateMove(event: PointerEvent): void {
+  const drag = rotateDrag.value
+  if (!drag) return
+  const pointerAngle = pointerPolarAngle(drag.centerClientX, drag.centerClientY, event.clientX, event.clientY)
+  const raw = drag.startRotation + normalizeRotation(pointerAngle - drag.startPointerAngle)
+  const next = normalizeRotation(event.shiftKey ? Math.round(raw / ROTATION_SNAP_STEP) * ROTATION_SNAP_STEP : raw)
+  if (Math.abs(next - drag.lastRotation) < TRANSFORM_EPSILON) return
+  drag.lastRotation = next
+  rotationPreview.value = { blockId: drag.blockId, rotation: next }
+}
+
+function stopRotate(): void {
+  rotateInput.flush()
+  const drag = rotateDrag.value
+  const preview = rotationPreview.value
+  rotateDrag.value = null
+  rotationPreview.value = null
+  window.removeEventListener('pointermove', handleRotateMove)
+  window.removeEventListener('pointerup', stopRotate)
+  window.removeEventListener('pointercancel', stopRotate)
+  if (!drag || !preview || preview.blockId !== drag.blockId) return
+  if (Math.abs(preview.rotation - drag.startRotation) < TRANSFORM_EPSILON) return
+  emit('rotate-selection', { blockId: drag.blockId, rotation: preview.rotation })
+}
+
+/** 键盘微调：方向键 1°，Shift 15°，与拖动吸同一套步长。 */
+function handleRotationKeydown(event: KeyboardEvent): void {
+  const blockId = props.selectedBlockId
+  const node = blockId ? sceneGraph.value.nodeMap.get(blockId) : undefined
+  if (!blockId || !node) return
+  const step = event.shiftKey ? ROTATION_SNAP_STEP : 1
+  const delta = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? step
+    : event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -step
+      : null
+  if (delta === null) return
+  event.preventDefault()
+  event.stopPropagation()
+  emit('rotate-selection', { blockId, rotation: normalizeRotation(node.block.rotation + delta) })
+}
+
+/**
+ * Alt 对称缩放：拖动的边跟手，对面的边围绕起始中心镜像，中心点因此钉住不动。
+ * 缩到最小尺寸后手柄停住等指针追上来，不再翻边。
+ */
+function symmetricResizeRect(
+  raw: SelectionFrame,
+  start: SelectionFrame,
+  handle: ResizeHandle,
+): SelectionFrame {
+  const centerX = start.left + start.width / 2
+  const centerY = start.top + start.height / 2
+  let left = start.left
+  let right = start.left + start.width
+  let top = start.top
+  let bottom = start.top + start.height
+  if (handle.includes('l')) left = raw.left
+  if (handle.includes('r')) right = raw.left + raw.width
+  if (handle.includes('t')) top = raw.top
+  if (handle.includes('b')) bottom = raw.top + raw.height
+  if (handle.includes('l')) right = centerX * 2 - left
+  if (handle.includes('r')) left = centerX * 2 - right
+  if (handle.includes('t')) bottom = centerY * 2 - top
+  if (handle.includes('b')) top = centerY * 2 - bottom
+  const width = Math.max(MIN_SELECTION_SIZE, right - left)
+  const height = Math.max(MIN_SELECTION_SIZE, bottom - top)
+  return {
+    left: centerX - width / 2,
+    top: centerY - height / 2,
+    width,
+    height,
+  }
 }
 
 /** 等比缩放的最小缩放系数：两条边都不能小于最小选择尺寸。 */
@@ -2347,8 +2667,10 @@ onBeforeUnmount(() => {
   panInput.cancel()
   transformInput.cancel()
   faceDimensionInput.cancel()
+  rotateInput.cancel()
   visualReadiness.dispose()
   stopTransform()
+  stopRotate()
   stopFaceDimensionDrag()
   stopZoomAnimation()
   if (renderedScaleSettleTimer !== null) {
@@ -2395,7 +2717,7 @@ watch(
     props.selectedAnchor,
   ],
   () => {
-    if (activeHandle.value || isMovingSelection.value) {
+    if (isTransformingSelection.value) {
       return
     }
     requestSelectionFrameSync()
@@ -2427,7 +2749,7 @@ watch([translateX, translateY, scale], () => {
 watch(
   () => props.face,
   () => {
-    if (activeHandle.value || isMovingSelection.value) {
+    if (isTransformingSelection.value) {
       return
     }
     requestSelectionFrameSync()
@@ -3176,6 +3498,138 @@ watch(
   height: 5px;
 }
 
+.selection-rotation {
+  --selection-rotation-line: var(--oc-accent-glow);
+  position: absolute;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* 按住手柄：和边框被改动时一样变亮。 */
+.selection-rotation.is-active {
+  --selection-rotation-line: var(--oc-accent);
+}
+
+.selection-rotation__dial {
+  position: absolute;
+  top: -84px;
+  left: -84px;
+  width: 168px;
+  height: 168px;
+}
+
+.selection-rotation__fade {
+  fill: white;
+}
+
+.selection-rotation__dial line,
+.selection-rotation__arm,
+.selection-rotation__center-ring {
+  stroke: var(--selection-rotation-line);
+  transition: stroke 100ms ease-out;
+}
+
+.selection-rotation__dial line {
+  stroke-width: 1;
+}
+
+.selection-rotation__dial line.is-major {
+  stroke-width: 1.5;
+}
+
+.selection-rotation__dial text {
+  fill: var(--selection-rotation-line);
+  transition: fill 100ms ease-out;
+  font-size: 8.5px;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.selection-rotation__arm {
+  stroke: var(--selection-rotation-line);
+  stroke-width: 1.5;
+}
+
+.selection-rotation__center-ring {
+  fill: none;
+  stroke: var(--selection-rotation-line);
+  stroke-width: 1;
+}
+
+.selection-rotation__center-dot {
+  fill: var(--selection-rotation-line);
+  transition: fill 100ms ease-out;
+}
+
+.selection-rotation__ghost {
+  stroke: var(--oc-fg-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.selection-rotation__ghost-bar {
+  stroke: var(--oc-fg-muted);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.selection-rotation__handle {
+  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.selection-rotation__handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 18px;
+  border: 1px solid var(--oc-accent-fg);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--oc-accent) 55%, transparent);
+  box-shadow: 0 0 0 1px var(--oc-handle-shadow);
+  transform: translate(-50%, -50%);
+  transition: background-color 100ms ease-out, box-shadow 100ms ease-out;
+}
+
+.selection-rotation__handle:hover::before,
+.selection-rotation__handle:focus-visible::before {
+  background: color-mix(in srgb, var(--oc-accent) 75%, transparent);
+  box-shadow: 0 0 0 1px var(--oc-accent-fg), 0 0 0 3px var(--oc-accent-glow);
+}
+
+.selection-rotation.is-active .selection-rotation__handle {
+  cursor: grabbing;
+}
+
+.selection-rotation.is-active .selection-rotation__handle::before {
+  background: var(--oc-accent);
+  box-shadow: 0 0 0 1px var(--oc-accent-fg), 0 0 0 4px var(--oc-accent-glow);
+}
+
+.selection-rotation__handle:focus-visible {
+  outline: none;
+}
+
+.selection-rotation__value {
+  top: 14px;
+  left: 0;
+  transform: translateX(-50%);
+}
+
 .selection-overlay-fade-enter-active {
   transition: opacity 140ms ease-out;
 }
@@ -3216,7 +3670,13 @@ watch(
 
   .selection-frame,
   .selection-handle,
-  .selection-handle::before {
+  .selection-handle::before,
+  .selection-rotation__dial line,
+  .selection-rotation__arm,
+  .selection-rotation__center-ring,
+  .selection-rotation__dial text,
+  .selection-rotation__center-dot,
+  .selection-rotation__handle::before {
     transition: none;
   }
 }

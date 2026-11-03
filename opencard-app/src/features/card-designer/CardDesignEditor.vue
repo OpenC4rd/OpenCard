@@ -58,7 +58,8 @@
                   :dot-grid-spacing-mm="settingsStore.settings.value.workspace.cdeDotGridSpacingMm ?? 5"
                   @pointerdown.capture="handleCanvasPointerDown" @block-click="handleEffectiveViewportBlockClick"
                   @blank-click="clearEffectiveBlockSelection" @resize-selection="handleSelectionResize"
-                  @move-selection="handleSelectionMove" @selection-action="handleSelectionAction"
+                  @move-selection="handleSelectionMove" @rotate-selection="handleSelectionRotate"
+                  @selection-action="handleSelectionAction"
                   @selection-command="handleSelectionCommand" @z-index-step="handleLayerZIndexStep"
                   @face-dimension-change="handleFaceDimensionChange"
                   @viewport-transform-change="handleViewportTransformChange"
@@ -1244,6 +1245,17 @@ async function handleSelectionCommand(intent: CardViewportSelectionCommand): Pro
 
   await nextTick()
   await propertyEditorRef.value?.activateField(block.id, 'content')
+}
+
+/** 刻度盘与键盘改 rotation：走字段更新，实例卡写覆盖值，一次拖拽只记一条撤销。 */
+function handleSelectionRotate(intent: { blockId: string; rotation: number }): void {
+  if (selectedBlock.value?.id !== intent.blockId) return
+  const rotation = Math.round(intent.rotation * 10) / 10
+  blockFieldCommands.updateField({
+    cardId: selectedCardId.value ?? BLUEPRINT_CARD_ID,
+    blockId: intent.blockId,
+    fieldKey: 'rotation',
+  }, String(Object.is(rotation, -0) ? 0 : rotation), 'action')
 }
 const layerViewShortcutHints = computed(() => [
   {
