@@ -85,7 +85,17 @@ function toggle(): void {
   else open()
 }
 
-onBeforeUnmount(registerCloser(markerId, hide))
+const unregisterCloser = registerCloser(markerId, hide)
+// 卸载时自己若还占着组，先退出组：否则组仍指向这个已经没有内容的 marker，留下一块空面板。
+onBeforeUnmount(() => {
+  close()
+  unregisterCloser()
+})
+
+// 开着时换锚点 / 布局：同一个 id 重新激活不算抢占，组只换布局，宿主滑到新位置。
+watch([() => props.anchor, () => props.owner, () => props.placement, () => props.maxHeight], () => {
+  if (visible.value && props.open !== false) open()
+})
 
 watch(() => props.open, next => {
   if (next === undefined) return

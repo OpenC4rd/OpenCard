@@ -51,7 +51,6 @@
     </section>
 
     <OcOverlayMarker
-      ref="fontInfoLayer"
       group="font-info"
       :anchor="fontInfoLayerAnchor"
       :owner="fontInfoAnchor"
@@ -130,7 +129,6 @@ type FontInfoContent = {
 const fontInfoAnchor = ref<HTMLElement | null>(null)
 const fontInfo = ref<FontInfoContent | null>(null)
 const fontInfoOpen = ref(false)
-const fontInfoLayer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 /** 锚点是「被悬停的那一段预览」；每次换片段都返回一个新函数，marker 才会把新锚点推进组里。 */
 const fontInfoLayerAnchor = computed<OverlayAnchor>(() => {
   const anchor = fontInfoAnchor.value
@@ -436,10 +434,6 @@ function hideFontInfo(): void {
 }
 /** 提示描述的是预览里的片段：预览换条目或消失时不再保留，免得停在一个已经被替换掉的锚点上。 */
 watch(selectedEntry, () => { fontInfoOpen.value = false })
-// 从一段预览划到另一段时这一层一直开着：post-flush 时新锚点已经交给 marker，重开一次才贴到新片段上。
-watch(fontInfoAnchor, () => {
-  if (fontInfoOpen.value) fontInfoLayer.value?.open()
-}, { flush: 'post' })
 async function navigateToFont(kind: 'family' | 'composition', key: string): Promise<boolean> {
   if (kind === 'family') {
     if (!props.families.some(family => family.key === key)) return false

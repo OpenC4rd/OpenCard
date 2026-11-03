@@ -407,8 +407,6 @@ function handleActionKeydown(event: KeyboardEvent, action: OcActionDefinition): 
 onBeforeUnmount(() => {
   cancelBranchClose()
   cancelLayerClose()
-  // 这一层没了，它打开的子层不能留在自己的组宿主里变成空面板。
-  sublayer.value?.close()
 })
 </script>
 

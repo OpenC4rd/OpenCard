@@ -40,7 +40,6 @@
       抢先打开时旧菜单收到 close（真正关闭），这里只跟 marker 的结果。
     -->
     <OcOverlayMarker
-      ref="menuLayer"
       group="menu"
       :anchor="rootRef"
       :owner="rootRef"
@@ -119,7 +118,6 @@ const emit = defineEmits<{
 const CLOSE_DELAY_MS = 90
 
 const rootRef = ref<HTMLElement | null>(null)
-const menuLayer = ref<{ open(): void; close(): void } | null>(null)
 /** 只用来给这一份菜单的子层组名定位，不再参与任何注册表。 */
 const overlayKey = `action-button:${useId()}`
 /** 打开状态由 marker 同步上来：它既是渲染输入（aria / 图标），也是 marker 的打开意图。 */
@@ -130,11 +128,7 @@ let closeTimer: number | null = null
 
 useOverlayDismiss(() => isMenuOpen.value, () => rootRef.value, () => closeMenu())
 
-// 按钮被卸载（页面切换、行重键）时，它打开的那一层不能留在 "menu" 组里变成空面板。
-onBeforeUnmount(() => {
-  cancelCloseMenu()
-  menuLayer.value?.close()
-})
+onBeforeUnmount(cancelCloseMenu)
 
 function cancelCloseMenu(): void {
   if (closeTimer === null) return

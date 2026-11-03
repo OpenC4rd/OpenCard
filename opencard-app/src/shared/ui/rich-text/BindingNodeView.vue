@@ -48,7 +48,6 @@
     >{{ bindingLabel }}</span>
 
     <OcOverlayMarker
-      ref="layer"
       :group="`completion:${autocompleteId}`"
       :anchor="completionAnchor"
       :owner="completionControl"
@@ -86,7 +85,6 @@ const tr = (key: string, fallback: string, parameters?: Record<string, unknown>)
 const openBrace = '{{'
 const closeBrace = '}}'
 const input = ref<ComponentPublicInstance | null>(null)
-const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const editSession = ref<{ original: string, draft: string } | null>(null)
 const completion = usePropertyCompletion(() => inputElement.value)
 const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, suggestions,
@@ -94,8 +92,7 @@ const { completionState, activeKey, isMenuOpen: menuOpen, autocompleteId, sugges
 let composing = false
 let disposed = false
 let blurTimer: ReturnType<typeof setTimeout> | undefined
-// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
-onBeforeUnmount(() => { disposed = true; clearTimeout(blurTimer); editSession.value = null; layer.value?.close() })
+onBeforeUnmount(() => { disposed = true; clearTimeout(blurTimer); editSession.value = null })
 
 const expression = computed(() => String(props.node.attrs.expression ?? '').trim())
 const editing = computed(() => editSession.value !== null)

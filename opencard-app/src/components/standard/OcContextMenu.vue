@@ -1,7 +1,7 @@
 <template>
-  <OcOverlayMarker ref="markerRef" v-model:open="view.open" group="context-menu"
-    :anchor="view.anchor" :owner="view.owner" @close="handleClose">
-    <OcActionMenu :actions="view.items" overlay-key="context-menu" :on-select="select" @close="handleClose" />
+  <OcOverlayMarker v-model:open="view.open" group="context-menu" :anchor="view.anchor" :owner="view.owner"
+    @close="close">
+    <OcActionMenu :actions="view.items" overlay-key="context-menu" :on-select="select" @close="close" />
   </OcOverlayMarker>
 </template>
 
@@ -14,5 +14,5 @@ defineOptions({ name: 'OcContextMenu' })
 
 const props = defineProps<{ menu: ContextMenu }>()
 // 宿主整个生命周期只持有同一个 menu，解构一次即可。
-const { markerRef, view, select, handleClose } = props.menu.binding
+const { view, select, close } = props.menu.binding
 </script>

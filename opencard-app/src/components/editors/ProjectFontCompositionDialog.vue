@@ -26,7 +26,6 @@
           @click="addCandidateMember" />
 
         <OcOverlayMarker
-          ref="layer"
           :group="`completion:${memberAutocompleteId}`"
           :anchor="memberPickerRef"
           :owner="activeMemberInput"
@@ -98,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type {
   ProjectFontComposition,
@@ -141,7 +140,6 @@ const characterInputs = ref<string[]>([])
 const memberQuery = ref('')
 const selectedCandidateKey = ref<string | null>(null)
 const memberPickerRef = ref<HTMLElement | null>(null)
-const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const activeMemberInput = ref<HTMLInputElement | null>(null)
 const memberMenuOpen = ref(false)
 const activeMemberKey = ref<string | null>(null)
@@ -233,8 +231,6 @@ watch(memberSuggestions, suggestions => {
     : (suggestions[0]?.key ?? null)
 })
 
-// 卸载时关掉自己那一层：组宿主活在别处，不留空面板。
-onBeforeUnmount(() => { layer.value?.close() })
 
 function createDefaultSetName(): string {
   const existingNames = new Set(props.compositions.map(composition => composition.name.toLocaleLowerCase()))

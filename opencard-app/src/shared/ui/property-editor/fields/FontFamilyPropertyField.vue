@@ -47,7 +47,6 @@
     </OcFieldFrame>
 
     <OcOverlayMarker
-      ref="layer"
       :group="pickerId"
       :anchor="triggerRef"
       :owner="rootRef"
@@ -156,7 +155,6 @@ const tr = (key: string, fallback: string, parameters?: Record<string, unknown>)
 const {
   rootRef,
   triggerRef,
-  layer,
   pickerId,
   open,
   togglePopover,

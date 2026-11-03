@@ -45,7 +45,6 @@ const emit = defineEmits<{
 const PANEL_CLOSE_DELAY = 120;
 
 /** 菜单、任务面板、通知面板各一个 marker：宿主与互斥归组，这里只持自己的开关。 */
-const menuLayer = ref<InstanceType<typeof OcOverlayMarker> | null>(null);
 // 响应式 Map：模板 ref 回填必须触发重渲染，锚点函数才读得到当前按钮。
 const menuAnchors = reactive(new Map<string, HTMLElement>());
 const openMenuKey = ref<string | null>(null);
@@ -160,12 +159,6 @@ function openTitleMenu(key: string): void {
 function switchOpenMenu(key: string): void {
   if (menuOpen.value) openTitleMenu(key);
 }
-
-// 换菜单时 open 一直是 true，marker 不会重新激活；post-flush 时新锚点已经交给 marker，
-// 这时再重开一次，同一个宿主节点才会滑到新按钮下面。
-watch(openMenuKey, () => {
-  if (menuOpen.value) menuLayer.value?.open();
-}, { flush: 'post' });
 
 function toggleMenu(key: string): void {
   if (isMenuOpen(key)) {
@@ -330,7 +323,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleWindowKeydown,
     </div>
 
     <OcOverlayMarker
-      ref="menuLayer"
       group="menu"
       :anchor="activeMenuAnchor"
       :owner="activeMenuButton"

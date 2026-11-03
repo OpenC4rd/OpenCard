@@ -72,7 +72,6 @@
     </OcFieldFrame>
 
     <OcOverlayMarker
-      ref="layer"
       :group="`completion:${autocompleteId}`"
       :anchor="completionAnchor"
       :owner="completionControl"
@@ -93,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import OcAutocompleteList from '../../../../components/standard/OcAutocompleteList.vue'
 import OcEnumStepper from '../../../../components/standard/OcEnumStepper.vue'
 import OcFieldFrame from '../../../../components/base/OcFieldFrame.vue'
@@ -132,7 +131,6 @@ const optionLabel = (option: string) =>
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)))
 const draftValue = ref(stringValue.value)
 const activeInput = ref<TextControl | null>(null)
-const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 let cancelPending = false
 
 const completion = usePropertyCompletion(() => activeInput.value)
@@ -147,7 +145,6 @@ const {
   control: completionControl,
 } = completion
 
-onBeforeUnmount(() => layer.value?.close())
 
 const selectOptions = computed(() =>
   props.definition.options?.map(option => ({ value: option, label: optionLabel(option) })) ?? [],

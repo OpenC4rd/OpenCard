@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref, useId, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
 import { useOverlayDismiss } from '../../useOverlayDismiss'
 import type { OcNode, OcNodeCollection, OcNodeKey } from '../../node/node.types'
 import type { IconToken } from '../../icon/iconRegistry'
@@ -11,7 +11,6 @@ interface UseFieldPopoverOptions {
 export function useFieldPopover(prefix: string, options: UseFieldPopoverOptions = {}) {
   const rootRef = ref<HTMLElement | null>(null)
   const triggerRef = ref<HTMLButtonElement | null>(null)
-  const layer = ref<{ close: () => void } | null>(null)
   const pickerId = `${prefix}-${useId().replace(/:/g, '')}`
   const open = ref(false)
 
@@ -52,12 +51,9 @@ export function useFieldPopover(prefix: string, options: UseFieldPopoverOptions 
     })
   }
 
-  onBeforeUnmount(() => layer.value?.close())
-
   return {
     rootRef,
     triggerRef,
-    layer,
     pickerId,
     open,
     openPopover,

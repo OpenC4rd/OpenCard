@@ -44,7 +44,6 @@
     </OcFieldFrame>
 
     <OcOverlayMarker
-      ref="layer"
       :group="selectId"
       :anchor="triggerRef"
       :owner="rootRef"
@@ -115,7 +114,6 @@ const emit = defineEmits<{
 }>()
 
 const attrs = useAttrs()
-const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const activeIndex = ref(-1)
@@ -167,7 +165,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  layer.value?.close()
   triggerObserver?.disconnect()
   triggerObserver = null
   clearTypeahead()

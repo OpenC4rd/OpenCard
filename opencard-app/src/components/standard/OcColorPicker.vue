@@ -58,7 +58,6 @@
     </button>
 
     <OcOverlayMarker
-      ref="layer"
       :group="pickerKey"
       :anchor="variant === 'field' ? rootRef : triggerRef"
       :owner="rootRef"
@@ -151,7 +150,6 @@ const emit = defineEmits<{
 }>()
 
 const attrs = useAttrs()
-const layer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 // 每实例一个组：picker 是「点击打开 + 外部点击关闭」，点另一个 picker 时
 // dismiss 的 pointerdown 会先把旧的关掉，共享组只会变成「先关后开」，滑不起来。
 const pickerKey = `color-picker:${useId()}`
@@ -281,10 +279,7 @@ watch(open, isOpen => {
   cancelUncommittedPreview()
 })
 
-onBeforeUnmount(() => {
-  stopDragListeners()
-  layer.value?.close()
-})
+onBeforeUnmount(stopDragListeners)
 
 function syncColor(value: string): void {
   const normalized = normalizePickerColor(value) ?? '#000000'

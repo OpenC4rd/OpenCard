@@ -16,7 +16,7 @@
       </template>
     </OcFieldFrame>
 
-    <OcOverlayMarker ref="layer" :group="pickerId" :anchor="triggerRef" :owner="rootRef" placement="bottom-start"
+    <OcOverlayMarker :group="pickerId" :anchor="triggerRef" :owner="rootRef" placement="bottom-start"
       :max-height="360" :open="open" @update:open="open = $event" @close="open = false">
       <div class="image-source-field__popover" role="dialog" :aria-label="definition.title" @keydown.esc.stop.prevent="closePopover(true)">
         <OcOptionGroup :model-value="activeTab" :options="tabOptions" appearance="sliding-outline" size="sm" fill @update:model-value="setActiveTab" />
@@ -116,7 +116,6 @@ const activeTab = ref<PickerTab>('file')
 const {
   rootRef,
   triggerRef,
-  layer,
   pickerId,
   open,
   togglePopover,

@@ -86,7 +86,6 @@
     <EditorContent :editor="editor" class="oc-rich-text-editor__surface" :style="baseStyle" />
 
     <OcOverlayMarker
-      ref="nodeEditLayer"
       group="rich-text-node-edit"
       :anchor="nodeEditAnchor"
       :owner="editor?.view.dom ?? null"
@@ -132,7 +131,6 @@ const properties = computed(() => ({
 }))
 /** 选中项目图标时浮出替换按钮：层的开关只跟选择走。 */
 const nodeEditLayerOpen = ref(false)
-const nodeEditLayer = ref<InstanceType<typeof OcOverlayMarker> | null>(null)
 /** 选区一变就换一个锚点函数：组只在换锚点时重新求值，宿主才会挪到新节点上。 */
 const nodeEditAnchor = computed<OverlayAnchor>(() => () => selectedNodeAnchor.value)
 watch(
@@ -140,10 +138,6 @@ watch(
   ([open, kind]) => { nodeEditLayerOpen.value = open && kind === 'projectIcon' },
   { flush: 'sync' },
 )
-// 从一个图标节点换到另一个时这一层一直开着：post-flush 时新锚点已经交给 marker，重开一次宿主才跟过去。
-watch(nodeEditAnchor, () => {
-  if (nodeEditLayerOpen.value) nodeEditLayer.value?.open()
-}, { flush: 'post' })
 defineExpose({ editor, focus, getHtml, applyHtml, getContent, setContent, flushPendingInput, endInteraction, properties })
 </script>
 
