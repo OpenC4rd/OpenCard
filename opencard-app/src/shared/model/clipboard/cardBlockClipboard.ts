@@ -4,14 +4,12 @@ import type {
   FlowContainerLocationInfo,
   SimpleContainerLocationInfo,
 } from '../../../entities/card/model'
-import { parseStoredCardBlock } from '../../../entities/card/storage'
 import { isBlockContainer } from '../../../entities/card/tree'
 import { isRecord } from '../../../shared/model/record'
 
 export const OC_CLIPBOARD_MIME = 'application/x-opencard-clipboard+json'
 const OC_CLIPBOARD_PROTOCOL = 'opencard.clipboard'
 const OC_CLIPBOARD_VERSION = 1
-const MAX_CLIPBOARD_BYTES = 2 * 1024 * 1024
 
 type OcClipboardKind = 'card-block' | 'card-blocks'
 type CardBlockLocation = SimpleContainerLocationInfo | FlowContainerLocationInfo
@@ -37,42 +35,6 @@ function clone<T>(value: T): T {
   return structuredClone(value)
 }
 
-function normalizeLocation(value: unknown): CardBlockLocation | null {
-  if (!isRecord(value)) return null
-  if (value.type === 'simple-container-location') {
-    return {
-      id: typeof value.id === 'string' && value.id ? value.id : `simple-location-${crypto.randomUUID()}`,
-      type: 'simple-container-location',
-      anchor: typeof value.anchor === 'string' ? value.anchor : 'lt',
-      x: typeof value.x === 'string' ? value.x : '0',
-      y: typeof value.y === 'string' ? value.y : '0',
-    } as SimpleContainerLocationInfo
-  }
-  if (value.type === 'flow-container-location') {
-    return {
-      id: typeof value.id === 'string' && value.id ? value.id : `flow-location-${crypto.randomUUID()}`,
-      type: 'flow-container-location',
-      index: typeof value.index === 'string' ? value.index : '0',
-      ...(typeof value.align === 'string' ? { align: value.align } : {}),
-    } as FlowContainerLocationInfo
-  }
-  return null
-}
-
-function normalizeBlockPayload(value: unknown): CardBlockPayload | null {
-  if (!isRecord(value)) return null
-  const block = parseStoredCardBlock(value.block)
-  const location = normalizeLocation(value.location)
-  if (!block || !location) return null
-  return { block, location }
-}
-
-function normalizeBlocksPayload(value: unknown): CardBlocksPayload | null {
-  if (!isRecord(value) || !Array.isArray(value.blocks) || value.blocks.length === 0) return null
-  const blocks = value.blocks.map(normalizeBlockPayload)
-  return blocks.every((block): block is CardBlockPayload => block !== null) ? { blocks } : null
-}
-
 export function createCardBlocksClipboard(
   blocks: readonly CardBlockPayload[],
   source?: OcClipboardEnvelope['source'],
@@ -89,38 +51,8 @@ export function createCardBlocksClipboard(
   }
 }
 
-function parseOcClipboard(value: unknown): OcClipboardEnvelope | null {
-  if (!isRecord(value)
-    || value.protocol !== OC_CLIPBOARD_PROTOCOL
-    || value.version !== OC_CLIPBOARD_VERSION
-    || (value.kind !== 'card-block' && value.kind !== 'card-blocks')) return null
-  const payload = value.kind === 'card-block'
-    ? normalizeBlockPayload(value.payload)
-    : normalizeBlocksPayload(value.payload)
-  if (!payload) return null
-  const source = isRecord(value.source)
-    ? Object.fromEntries(Object.entries(value.source).filter(([, item]) => typeof item === 'string'))
-    : undefined
-  return {
-    protocol: OC_CLIPBOARD_PROTOCOL,
-    version: OC_CLIPBOARD_VERSION,
-    kind: value.kind,
-    ...(source ? { source } : {}),
-    payload,
-  } as OcClipboardEnvelope
-}
-
 export function serializeOcClipboard(envelope: OcClipboardEnvelope): string {
   return JSON.stringify(envelope)
-}
-
-export function parseOcClipboardText(text: string): OcClipboardEnvelope | null {
-  if (text.length > MAX_CLIPBOARD_BYTES) return null
-  try {
-    return parseOcClipboard(JSON.parse(text) as unknown)
-  } catch {
-    return null
-  }
 }
 
 export function getClipboardBlockPayloads(envelope: OcClipboardEnvelope): CardBlockPayload[] {

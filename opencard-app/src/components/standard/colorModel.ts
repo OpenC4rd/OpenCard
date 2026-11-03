@@ -26,13 +26,6 @@ export function normalizeHexColor(value: string): string | null {
   return `#${trimmed.slice(1).split('').map(channel => channel.repeat(2)).join('')}`.toUpperCase()
 }
 
-export function hexToHsv(value: string): HsvColor | null {
-  const hsva = hexToHsva(value)
-  if (!hsva) return null
-  const { alpha: _alpha, ...hsv } = hsva
-  return hsv
-}
-
 export function hexToHsva(value: string): HsvaColor | null {
   const rgba = hexToRgba(value)
   return rgba ? rgbaToHsva(rgba) : null
@@ -71,10 +64,6 @@ export function rgbaToHsva(color: RgbaColor): HsvaColor {
     value: maximum,
     alpha: clampUnit(color.alpha),
   }
-}
-
-export function hsvToHex(color: HsvColor): string {
-  return hsvaToHex({ ...color, alpha: 1 })
 }
 
 export function hsvaToHex(color: HsvaColor): string {

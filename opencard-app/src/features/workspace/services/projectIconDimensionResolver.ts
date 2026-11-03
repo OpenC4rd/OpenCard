@@ -21,7 +21,7 @@ import type { ProjectIconCatalogEntry } from './projectIconCatalog'
 import type { ProjectIconDimensions } from './projectIconDimensions'
 
 /** Measures an icon by letting the webview decode it, which covers every raster format. */
-export async function loadProjectImageDimensions(src: string): Promise<ProjectIconDimensions> {
+async function loadProjectImageDimensions(src: string): Promise<ProjectIconDimensions> {
   return await new Promise((resolve, reject) => {
     const image = new Image()
     image.onload = () => {

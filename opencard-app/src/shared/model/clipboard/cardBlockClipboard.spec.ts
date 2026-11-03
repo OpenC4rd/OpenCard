@@ -5,12 +5,10 @@ import {
   cloneClipboardBlocksWithNewIds,
   createCardBlocksClipboard,
   getClipboardBlockPayloads,
-  parseOcClipboardText,
-  serializeOcClipboard,
 } from './cardBlockClipboard'
 
 describe('cardBlockClipboard', () => {
-  it('round trips a block envelope with nested children', () => {
+  it('reads a block envelope with nested children', () => {
     const block = createSimpleContainerBlock({
       id: 'container',
       children: [{
@@ -22,13 +20,7 @@ describe('cardBlockClipboard', () => {
       block,
       location: { id: 'root-location', type: 'simple-container-location', anchor: 'lt', x: '0', y: '0' },
     }])
-    expect(parseOcClipboardText(serializeOcClipboard(envelope))?.kind).toBe('card-block')
     expect(getClipboardBlockPayloads(envelope)[0]?.block).toMatchObject({ id: 'container', children: [{ block: { id: 'child' } }] })
-  })
-
-  it('rejects invalid protocol data', () => {
-    expect(parseOcClipboardText('{"protocol":"wrong","version":1,"kind":"card-block"}')).toBeNull()
-    expect(parseOcClipboardText('not json')).toBeNull()
   })
 
   it('remaps every block and location id when cloning', () => {

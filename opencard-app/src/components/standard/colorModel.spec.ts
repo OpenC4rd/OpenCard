@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   getReadableForegroundTone,
-  hexToHsv,
   hexToHsva,
   hsvaToHex,
-  hsvToHex,
   normalizeHexColor,
 } from './colorModel'
 
@@ -16,11 +14,6 @@ describe('colorModel', () => {
     expect(normalizeHexColor('#12abEF80')).toBe('#12ABEF80')
     expect(normalizeHexColor('red')).toBeNull()
   })
-
-  it.each(['#FF0000', '#00FF00', '#0000FF', '#7C6CFF', '#000000', '#FFFFFF'])(
-    'round-trips %s through HSV',
-    (hex) => expect(hsvToHex(hexToHsv(hex)!)).toBe(hex),
-  )
 
   it('round-trips alpha through HSVA and omits opaque alpha from HEX', () => {
     expect(hsvaToHex(hexToHsva('#33669980')!)).toBe('#33669980')
