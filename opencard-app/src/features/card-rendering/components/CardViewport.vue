@@ -179,9 +179,8 @@
         'is-moving': isMovingSelection,
       }"
         :style="selectionFrameStyle" tabindex="0" @pointerdown="handleSelectionFramePointerDown"
-        @contextmenu="openSelectionContextMenu"
-        @keydown="openSelectionKeyboardMenu"
-        @keydown.esc="dismissContextMenuOnEscape">
+        @contextmenu="openSelectionMenu"
+        @keydown="openSelectionMenu">
         <Transition name="selection-overlay-fade">
         <OcOverlayToolbar v-if="selectionQuickActions.length > 0 && !isTransformingSelection"
           class="selection-quick-actions" :label="selectionActionLabels.label"
@@ -254,18 +253,7 @@
         </div>
       </div>
     </div>
-    <OcOverlayMarker
-      ref="contextMenu"
-      group="context-menu"
-      :anchor="contextAnchor"
-      :owner="contextOwner"
-      :open="contextOpen"
-      @update:open="contextOpen = $event"
-      @close="handleContextMenuClose"
-    >
-      <OcActionMenu :actions="contextItems" overlay-key="context-menu" :on-select="selectContextAction"
-        @close="handleContextMenuClose" />
-    </OcOverlayMarker>
+    <OcContextMenu :menu="contextMenu" />
   </div>
 </template>
 
@@ -339,17 +327,16 @@ export interface CardViewportComparison {
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useId, useSlots, watch, type CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, useSlots, watch, type CSSProperties } from 'vue'
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
 import { clamp } from '../../../shared/model/number'
 import { taskScheduler } from '../../../utils/taskScheduler'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../../shared/ui/action/action.types'
-import OcActionMenu from '../../../components/standard/OcActionMenu.vue'
-import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
+import OcContextMenu from '../../../components/standard/OcContextMenu.vue'
 import OcOverlayToolbar from '../../../components/standard/OcOverlayToolbar.vue'
 import type { OcShortcutPart } from '../../../components/standard/OcShortcut.vue'
-import { useOverlayDismiss } from '../../../shared/ui/useOverlayDismiss'
+import { useContextMenu } from '../../../shared/ui/useContextMenu'
 import CardFaceRenderer from './CardFaceRenderer.vue'
 import { createCardVisualReadiness, type CardVisualReadinessState } from './cardRenderReadiness'
 import CardLayerView from './CardLayerView.vue'
@@ -1048,69 +1035,12 @@ function findSelectionAction(
   return null
 }
 
-const contextMenu = ref<{ open: () => void; close: () => void } | null>(null)
-const contextOpen = ref(false)
-const contextItems = shallowRef<readonly OcActionMenuEntry[]>([])
-/** 未打开时的占位：marker 要求锚点非空，openMenuAt 一定先写锚点再 open()。 */
-const contextAnchor = shallowRef<HTMLElement | DOMRect>(new DOMRect())
-const contextOwner = shallowRef<HTMLElement | null>(null)
-const contextHandler = shallowRef<((key: string) => void) | null>(null)
+const contextMenu = useContextMenu()
 
-function openMenuAt(
-  anchor: HTMLElement | DOMRect,
-  items: readonly OcActionMenuEntry[],
-  onSelect: (key: string) => void,
-  owner: HTMLElement,
-): void {
-  if (items.length === 0) return
-  contextItems.value = items
-  contextAnchor.value = anchor
-  contextOwner.value = owner
-  contextHandler.value = onSelect
-  // marker 的 open() 读的是已提交的 props：等这帧把新锚点与归属落到 marker 上再开，
-  // 否则换触发元素时会沿用上一次的 anchor / owner。
-  void nextTick(() => contextMenu.value?.open())
+function openSelectionMenu(event: MouseEvent | KeyboardEvent): void {
+  contextMenu.trigger(event, () => selectionContextMenuActions.value, handleSelectionQuickAction)
 }
 
-function handleContextMenuClose(): void {
-  contextOpen.value = false
-  contextHandler.value = null
-}
-
-/** Esc：菜单开着时收掉它并阻止上层弹窗把同一个 Esc 当成自己的关闭；没开就保持原义。 */
-function dismissContextMenuOnEscape(event: KeyboardEvent): void {
-  if (!contextOpen.value) return
-  event.preventDefault()
-  contextMenu.value?.close()
-}
-
-/** 选中一项先收起菜单再执行：动作自己带闭包，不依赖菜单还开着。 */
-function selectContextAction(key: string): void {
-  const handler = contextHandler.value
-  contextMenu.value?.close()
-  handler?.(key)
-}
-
-useOverlayDismiss(() => contextOpen.value, () => contextOwner.value, () => contextMenu.value?.close())
-
-// 画布被卸载时它打开的菜单不能留在组里变成空面板。
-onBeforeUnmount(() => { contextMenu.value?.close() })
-
-function openSelectionContextMenu(event: MouseEvent): void {
-  const owner = event.currentTarget
-  if (!(owner instanceof HTMLElement)) return
-  event.preventDefault()
-  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), selectionContextMenuActions.value,
-    handleSelectionQuickAction, owner)
-}
-
-function openSelectionKeyboardMenu(event: KeyboardEvent): void {
-  if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
-  const owner = event.currentTarget
-  if (!(owner instanceof HTMLElement)) return
-  event.preventDefault()
-  openMenuAt(owner, selectionContextMenuActions.value, handleSelectionQuickAction, owner)
-}
 const selectionFrameStyle = computed(() => {
   const frame = selectionFrame.value
   if (!frame) {

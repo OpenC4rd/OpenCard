@@ -31,9 +31,8 @@
             <header v-else-if="row.kind === 'category' && row.category" class="property-editor__category-header"
               :style="indentStyle(row.level)"
               :tabindex="resolveCategoryActions(row.category).length > 0 ? 0 : undefined"
-              @contextmenu="openCategoryContextMenu($event, row.category)"
-              @keydown="openCategoryKeyboardMenu($event, row.category)"
-              @keydown.esc="dismissContextMenuOnEscape">
+              @contextmenu="openCategoryMenu($event, row.category)"
+              @keydown="openCategoryMenu($event, row.category)">
               <span class="property-editor__icon-slot" aria-hidden="true">
                 <OcIcon :name="row.category.icon" size="md" tone="muted" />
               </span>
@@ -97,25 +96,14 @@
         </div>
       </OcPanel>
     </template>
-    <OcOverlayMarker
-      ref="contextMenu"
-      group="context-menu"
-      :anchor="contextAnchor"
-      :owner="contextOwner"
-      :open="contextOpen"
-      @update:open="contextOpen = $event"
-      @close="handleContextMenuClose"
-    >
-      <OcActionMenu :actions="contextItems" overlay-key="context-menu" :on-select="selectContextAction"
-        @close="handleContextMenuClose" />
-    </OcOverlayMarker>
+    <OcContextMenu :menu="contextMenu" />
   </div>
 
 </template>
 
 <script setup lang="ts">
 // Vue 基础能力与依赖组件。
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, toRef, type CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, toRef, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notifyAppError } from '../../../features/notifications/titlebarNotices'
 import type {
@@ -136,9 +124,8 @@ import {
 } from './usePropertyEditorView'
 import OcEmpty from '../../../components/base/OcEmpty.vue'
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
-import OcActionMenu from '../../../components/standard/OcActionMenu.vue'
-import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
-import type { OcActionDefinition, OcActionMenuEntry } from '../action/action.types'
+import OcContextMenu from '../../../components/standard/OcContextMenu.vue'
+import type { OcActionDefinition } from '../action/action.types'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcText from '../../../components/base/OcText.vue'
 import OcPanel from '../../../components/base/OcPanel.vue'
@@ -150,7 +137,7 @@ import {
 } from './propertyFieldEditorMode'
 import { getPropertyFieldIcon } from './propertyFieldRegistry'
 import { formatPropertyFieldReadonlyValue } from './propertyFieldRegistry'
-import { useOverlayDismiss } from '../useOverlayDismiss'
+import { useContextMenu } from '../useContextMenu'
 import { normalizeNodeTail } from '../node/node.types'
 
 // 输出事件协议。
@@ -361,68 +348,10 @@ function handleCategoryAction(payload: { key: string }, category: PropertyEditor
   emit('add-property', { key: category.inputKey, fieldKey: field.key })
 }
 
-const contextMenu = ref<{ open: () => void; close: () => void } | null>(null)
-const contextOpen = ref(false)
-const contextItems = shallowRef<readonly OcActionMenuEntry[]>([])
-/** 未打开时的占位：marker 要求锚点非空，openMenuAt 一定先写锚点再 open()。 */
-const contextAnchor = shallowRef<HTMLElement | DOMRect>(new DOMRect())
-const contextOwner = shallowRef<HTMLElement | null>(null)
-const contextHandler = shallowRef<((key: string) => void) | null>(null)
+const contextMenu = useContextMenu()
 
-function openMenuAt(
-  anchor: HTMLElement | DOMRect,
-  items: readonly OcActionMenuEntry[],
-  onSelect: (key: string) => void,
-  owner: HTMLElement,
-): void {
-  if (items.length === 0) return
-  contextItems.value = items
-  contextAnchor.value = anchor
-  contextOwner.value = owner
-  contextHandler.value = onSelect
-  // marker 的 open() 读的是已提交的 props：等这帧把新锚点与归属落到 marker 上再开，
-  // 否则换触发元素时会沿用上一次的 anchor / owner。
-  void nextTick(() => contextMenu.value?.open())
-}
-
-function handleContextMenuClose(): void {
-  contextOpen.value = false
-  contextHandler.value = null
-}
-
-/** Esc：菜单开着时收掉它并阻止上层弹窗把同一个 Esc 当成自己的关闭；没开就保持原义。 */
-function dismissContextMenuOnEscape(event: KeyboardEvent): void {
-  if (!contextOpen.value) return
-  event.preventDefault()
-  contextMenu.value?.close()
-}
-
-/** 选中一项先收起菜单再执行：动作自己带闭包，不依赖菜单还开着。 */
-function selectContextAction(key: string): void {
-  const handler = contextHandler.value
-  contextMenu.value?.close()
-  handler?.(key)
-}
-
-useOverlayDismiss(() => contextOpen.value, () => contextOwner.value, () => contextMenu.value?.close())
-
-// 属性面板被卸载时它打开的菜单不能留在组里变成空面板。
-onBeforeUnmount(() => { contextMenu.value?.close() })
-
-function openCategoryContextMenu(event: MouseEvent, category: PropertyEditorCategoryView): void {
-  const owner = event.currentTarget
-  if (!(owner instanceof HTMLElement)) return
-  event.preventDefault()
-  openMenuAt(new DOMRect(event.clientX, event.clientY, 0, 0), resolveCategoryActions(category),
-    key => handleCategoryAction({ key }, category), owner)
-}
-
-function openCategoryKeyboardMenu(event: KeyboardEvent, category: PropertyEditorCategoryView): void {
-  if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
-  const owner = event.currentTarget
-  if (!(owner instanceof HTMLElement)) return
-  event.preventDefault()
-  openMenuAt(owner, resolveCategoryActions(category), key => handleCategoryAction({ key }, category), owner)
+function openCategoryMenu(event: MouseEvent | KeyboardEvent, category: PropertyEditorCategoryView): void {
+  contextMenu.trigger(event, () => resolveCategoryActions(category), key => handleCategoryAction({ key }, category))
 }
 
 function emitDeleteProperty(sourceKey: string, fieldKey: string): void {
