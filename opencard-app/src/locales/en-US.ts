@@ -655,8 +655,6 @@ export default {
       renameLanguage: 'Rename Language',
       resetOverride: 'Remove Override',
       resizeColumn: 'Resize {title} column',
-      recordActions: 'Record Actions',
-      languageActions: 'Language Actions',
       deleteRecords: 'Delete {count} records',
       deleteLanguages: 'Delete {count} languages',
       confirmDeleteRecords: 'Confirm deleting {count} records',
@@ -862,7 +860,6 @@ export default {
     noRecentProjects: 'No recent projects',
     openProject: 'Open Project Folder',
     fileActions: {
-      more: 'More Actions',
       rename: 'Rename',
       delete: 'Move to Trash',
       confirmDeleteFile: 'Move {fileName} to Trash',
@@ -1047,7 +1044,6 @@ export default {
       addChild: 'Add Child Block',
       show: 'Show',
       hide: 'Hide',
-      more: 'More Actions',
       exportCustomBlock: 'Export as Custom Block',
     },
     layout: {
@@ -1138,7 +1134,6 @@ export default {
       fieldColumn: 'Block Name / Field',
       blueprint: 'Blueprint',
       addInstance: 'Add instance',
-      instanceActions: 'Instance actions',
       renameInstance: 'Rename instance',
       duplicateInstance: 'Duplicate instance',
       deleteInstance: 'Delete instance',

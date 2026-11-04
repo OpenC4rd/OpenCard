@@ -41,7 +41,7 @@ import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
 import OcContextMenu from './OcContextMenu.vue'
 import OcTreeRow, { type OcTreeRowEntry as VisibleEntry, type OcTreeRowContext } from './OcTreeRow.vue'
-import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
+import { useTreeTailActions } from './useTreeTailActions'
 import { resolveNodeSelection, type OcNodeSelectionMode } from '../../shared/ui/node/nodeSelection'
 import type { OcActionMenuEntry } from '../../shared/ui/action/action.types'
 import { useContextMenu } from '../../shared/ui/useContextMenu'
@@ -58,7 +58,6 @@ import type {
   OcNodeMoveEvent,
   OcNodeRenameCommitEvent,
   OcNodeSelectionEvent,
-  OcNodeTailPart,
 } from '../../shared/ui/node/node.types'
 import { resolveOcPixelToken } from '../../shared/ui/foundation'
 import { readThemePixels } from '../../shared/ui/foundation/themeTokenPixels'
@@ -108,7 +107,7 @@ const props = withDefaults(defineProps<OcTreeProps>(), {
   selectionExpansionMode: 'none',
   scrollToSelection: false,
   virtualized: false,
-  actionOverflowTitle: 'More actions',
+  actionOverflowTitle: undefined,
   actionVisibility: 'on-interaction',
   tabNavigation: 'roving',
   placeholder: '',
@@ -276,7 +275,10 @@ function syncVirtualMetrics(): void {
   virtualScrollTop.value = root.scrollTop
 }
 
-function syncTreeMetrics(): void { syncVirtualMetrics() }
+function syncTreeMetrics(): void {
+  syncVirtualMetrics()
+  syncTailSlots()
+}
 
 function resolveSelectionAncestorKeys(key: OcNodeKey): OcNodeKey[] {
   const ancestors: OcNodeKey[] = []
@@ -477,26 +479,7 @@ function handleRowDoubleClick(event: MouseEvent, key: OcNodeKey): void {
   if (props.activationMode === 'double-click') emit('node-activate', { key })
 }
 
-/**
- * 常显命令直接保留，其余多个命令合并成菜单。
- */
-function resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNodeTailPart[] {
-  const parts = normalizeNodeTail(tail)
-  const actions = parts.filter(isNodeTailAction).filter(action => !action.alwaysVisible)
-  if (actions.length <= 1) return parts
-  let overflowPlaced = false
-  return parts.flatMap((part): OcNodeTailPart[] => {
-    if (!isNodeTailAction(part) || part.alwaysVisible) return [part]
-    if (overflowPlaced) return []
-    overflowPlaced = true
-    return [{
-      key: `__oc-tree-action-overflow__:${key}`,
-      icon: 'mdiDotsHorizontal',
-      title: props.actionOverflowTitle,
-      children: actions,
-    }]
-  })
-}
+const { syncTailSlots, resolveTailParts } = useTreeTailActions(() => treeRootElement.value, () => props.actionOverflowTitle)
 
 const contextMenu = useContextMenu()
 

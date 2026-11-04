@@ -2,7 +2,8 @@ import { createTestSession } from '../../editor-runtime/editorTestSession'
 import { nextTick, ref, type Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
-import { useWorkbenchFileTree } from './useWorkbenchFileTree'
+import { isNodeTailAction, normalizeNodeTail, type OcNodeAction } from '../../../shared/ui/node/node.types'
+import { PROJECT_ENTRY_RENAME_ACTION_KEY, useWorkbenchFileTree } from './useWorkbenchFileTree'
 
 function createTree(options: {
   projectPath?: string
@@ -56,6 +57,19 @@ describe('useWorkbenchFileTree', () => {
 
     expect(tree.projectTreeData.value.rootKeys).toEqual([`${projectPath}/notes.txt`])
     expect([...tree.projectTreeData.value.items.keys()]).toEqual([`${projectPath}/notes.txt`])
+  })
+
+  it('keeps row commands in step with the selection without rebuilding the tree', async () => {
+    const tree = createTree({ entries: [{ name: 'a.png' }, { name: 'b.png' }] })
+    const path = 'D:/project/a.png'
+    await vi.waitFor(() => expect(tree.projectTreeData.value.items.has(path)).toBe(true))
+    const node = tree.projectTreeData.value.items.get(path)!
+    const renameDisabled = () => normalizeNodeTail(node.tail)
+      .find(part => isNodeTailAction(part) && part.key === PROJECT_ENTRY_RENAME_ACTION_KEY) as OcNodeAction
+
+    expect(renameDisabled().disabled).toBe(false)
+    tree.selectedProjectEntryKeys.value = [path, 'D:/project/b.png']
+    expect(renameDisabled().disabled).toBe(true)
   })
 
   it('treats .opencard like an ordinary directory when dot entries are visible', () => {

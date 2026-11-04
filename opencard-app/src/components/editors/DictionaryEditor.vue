@@ -49,8 +49,8 @@
                           ? t('dictionaryEditor.actions.useBase')
                           : t('dictionaryEditor.actions.setActive')"
                         @click="setActiveLanguage(column.sourceKey)" />
-                      <OcActionButton v-if="column.kind === 'language'" :action="languageAction()"
-                        size="sm" variant="ghost" @select="handleLanguageAction(column.sourceKey!, $event.key)" />
+                      <OcActionBar v-if="column.kind === 'language'" :items="languageCommands()" :overflow="1"
+                        @select="handleLanguageAction(column.sourceKey!, $event.key)" />
                     </span>
                   </div>
                   <OcDataGridColumnResizeHandle :minimum="minimumColumnWidth" :maximum="maximumColumnWidth"
@@ -95,7 +95,7 @@
                   </form>
                   <div v-else class="dictionary-editor__record-heading">
                     <code>{{ row.key }}</code>
-                    <OcActionButton :action="recordAction()" size="sm" variant="ghost"
+                    <OcActionBar :items="recordCommands()" :overflow="1"
                       @select="handleRecordAction(row.key, $event.key)" />
                   </div>
                 </th>
@@ -205,7 +205,6 @@ import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
 import OcText from '../base/OcText.vue'
-import OcActionButton from '../standard/OcActionButton.vue'
 import OcContextMenu from '../standard/OcContextMenu.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../shared/ui/action/action.types'
 
@@ -451,15 +450,6 @@ function recordCommands(): OcActionMenuEntry[] {
   ]
 }
 
-function recordAction(): OcActionDefinition {
-  return {
-    key: 'more',
-    icon: 'mdiDotsHorizontal',
-    title: t('dictionaryEditor.actions.recordActions'),
-    children: recordCommands(),
-  }
-}
-
 function handleRecordAction(recordKey: string, actionKey: string): void {
   if (actionKey === 'copy') void copyDictionaryKey(recordKey, 'record')
   else if (actionKey === 'rename') beginRecordRename(recordKey)
@@ -487,15 +477,6 @@ function languageCommands(): OcActionMenuEntry[] {
       }],
     },
   ]
-}
-
-function languageAction(): OcActionDefinition {
-  return {
-    key: 'more',
-    icon: 'mdiDotsHorizontal',
-    title: t('dictionaryEditor.actions.languageActions'),
-    children: languageCommands(),
-  }
 }
 
 function handleLanguageAction(language: string, actionKey: string): void {

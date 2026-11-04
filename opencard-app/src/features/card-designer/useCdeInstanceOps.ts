@@ -14,7 +14,6 @@ import { cdeNodeAction } from './cdeNodeAction'
 import type { CdeDocumentChangeMode } from './useCdeDocumentState'
 
 type InstanceActionSet = {
-  more: OcNodeAction
   rename: OcNodeAction
   duplicate: OcNodeAction
   remove: OcNodeAction
@@ -25,7 +24,6 @@ function createInstanceActions(translate: (messageKey: string) => string): Insta
   const duplicate = cdeNodeAction('duplicate-instance', 'mdiContentCopy', translate('cardDesigner.dataTable.duplicateInstance'), { shortcut: 'instance.duplicate' })
   const remove = cdeNodeAction('delete-instance', 'mdiTrashCanOutline', translate('cardDesigner.dataTable.deleteInstance'), { shortcut: 'instance.delete' })
   return {
-    more: cdeNodeAction('instance-more', 'mdiDotsHorizontal', translate('cardDesigner.treeActions.more'), { children: [rename, duplicate, remove] }),
     rename,
     duplicate,
     remove,
@@ -69,7 +67,7 @@ export function useCdeInstanceOps(options: UseCdeInstanceOpsOptions) {
         visual: { type: 'icon', icon: 'mdiViewDashboardEditOutline' },
         renamable: true,
         draggable: true,
-        tail: [actions.more],
+        tail: [actions.rename, actions.duplicate, actions.remove],
         contextActions: [
           actions.rename,
           actions.duplicate,

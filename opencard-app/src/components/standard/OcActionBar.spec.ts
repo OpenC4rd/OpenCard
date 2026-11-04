@@ -43,6 +43,22 @@ describe('OcActionBar', () => {
     expect(shown).toEqual(['a', 'b', '__oc-action-bar-more__'])
   })
 
+  it('folds by a fixed budget without measuring', () => {
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    const wrapper = mount(OcActionBar, { props: { items: ACTIONS, overflow: 3 } })
+    const shown = wrapper.findAll('[data-action-key]').map(node => node.attributes('data-action-key'))
+    expect(shown).toEqual(['a', 'b', '__oc-action-bar-more__'])
+    expect(rect).not.toHaveBeenCalled()
+  })
+
+  it('does not measure again when a caller passes an equal new array', async () => {
+    const wrapper = mount(OcActionBar, { attachTo: document.body, props: { items: ACTIONS } })
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    await wrapper.setProps({ items: ACTIONS.map(item => (typeof item === 'object' ? { ...item } : item)) })
+    await flushPromises()
+    expect(rect).not.toHaveBeenCalled()
+  })
+
   it('keeps everything when the content exactly fills the bar', async () => {
     stubLayout(90.4, 30.2)
     const wrapper = mount(OcActionBar, { attachTo: document.body, props: { items: ACTIONS.slice(0, 2) } })

@@ -3,6 +3,7 @@
 
   - appearance：方形图标按钮，或以标题为文字的按钮。
   - overflow="fit"：放不下时从末尾往前收进「更多」；文字与 alwaysVisible 的操作不收。
+    overflow 给数字时是固定预算，不测量：列表行这种数量多的地方用。
     条是父 flex 行里可收缩的一项（min-width: 0），父容器给多少空间就按多少折叠。
   - menubar：每一项都是一个菜单入口，点击开关、开着时悬停切换，同一时刻只有一个菜单。
   - 方向键在按钮之间移动焦点。
@@ -12,7 +13,10 @@
     v-show="items.length > 0"
     ref="rootRef"
     class="oc-action-bar"
-    :class="[`oc-action-bar--${orientation}`, { 'oc-action-bar--fit': overflow === 'fit' }]"
+    :class="[`oc-action-bar--${orientation}`, {
+      'oc-action-bar--fit': overflow === 'fit',
+      'is-folded': folded.overflow.length > 0,
+    }]"
     role="toolbar"
     :aria-orientation="orientation"
     data-tooltip-group
@@ -94,7 +98,7 @@ import {
   type OcActionDefinition,
   type OcActionSelectPayload,
 } from '../../shared/ui/action/action.types'
-import { actionContains, foldActionBar, isFoldableAction } from '../../shared/ui/action/actionBar'
+import { actionContains, budgetKeep, foldActionBar, isFoldableAction } from '../../shared/ui/action/actionBar'
 import { useMenubar } from '../../shared/ui/action/useMenubar'
 import OcActionButton from './OcActionButton.vue'
 import OcActionMenu from './OcActionMenu.vue'
@@ -107,7 +111,7 @@ const props = withDefaults(defineProps<{
   items: readonly OcActionBarItem[]
   orientation?: 'horizontal' | 'vertical'
   appearance?: 'icon' | 'text'
-  overflow?: 'fit' | 'none'
+  overflow?: 'fit' | 'none' | number
   menubar?: boolean
   size?: ActionButtonSize
   iconSize?: OcIconSize
@@ -131,7 +135,8 @@ const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
 
 const rootRef = ref<HTMLElement | null>(null)
 const keep = ref(Number.POSITIVE_INFINITY)
-const folded = computed(() => foldActionBar(props.items, keep.value))
+const folded = computed(() => foldActionBar(props.items,
+  typeof props.overflow === 'number' ? budgetKeep(props.items, props.overflow) : keep.value))
 const moreAction = computed<OcActionDefinition>(() => ({
   key: '__oc-action-bar-more__',
   icon: 'mdiDotsHorizontal',
@@ -212,7 +217,10 @@ onMounted(() => {
   observer.observe(parent)
 })
 onBeforeUnmount(() => observer?.disconnect())
-watch(() => props.items, () => { void refit() })
+// 调用方常在模板里现拼数组：只有内容真的变了才重量。
+const itemsSignature = computed(() => props.items
+  .map(item => (isAction(item) ? `${item.key}:${item.title}` : typeof item === 'string' ? item : item.key)).join('\n'))
+watch(itemsSignature, () => { void refit() })
 
 function moveFocus(event: KeyboardEvent): void {
   const forward = props.orientation === 'horizontal' ? 'ArrowRight' : 'ArrowDown'
@@ -248,6 +256,11 @@ function moveFocus(event: KeyboardEvent): void {
 .oc-action-bar--fit {
   min-width: 0;
   min-height: 0;
+}
+
+/* 折叠的结果已经量过：不再被同一行的兄弟压窄，否则「更多」会盖到旁边的内容上。 */
+.oc-action-bar--fit.is-folded {
+  flex-shrink: 0;
 }
 
 .oc-action-bar__text {

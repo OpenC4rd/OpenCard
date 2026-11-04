@@ -27,7 +27,6 @@ export const PROJECT_ENTRY_RENAME_ACTION_KEY = 'project-entry-rename'
 export const PROJECT_ENTRY_REVEAL_ACTION_KEY = 'project-entry-reveal'
 export const PROJECT_ENTRY_COPY_RELATIVE_PATH_ACTION_KEY = 'project-entry-copy-relative-path'
 export const PROJECT_ENTRY_COPY_ABSOLUTE_PATH_ACTION_KEY = 'project-entry-copy-absolute-path'
-const PROJECT_ENTRY_MORE_ACTION_KEY = 'project-entry-more'
 const PROJECT_ENTRY_DELETE_ACTION_KEY = 'project-entry-delete'
 export const PROJECT_ENTRY_CONFIRM_DELETE_ACTION_KEY = 'project-entry-confirm-delete'
 export const PROJECT_PACKAGE_ADD_ACTION_KEY = 'project-package-add'
@@ -191,7 +190,6 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
     copyRelativePath: options.translate('sidebar.fileActions.copyRelativePath'),
     copyAbsolutePath: options.translate('sidebar.fileActions.copyAbsolutePath'),
     delete: options.translate('sidebar.fileActions.delete'),
-    more: options.translate('sidebar.fileActions.more'),
     confirmDeleteSelected: options.translate('sidebar.fileActions.confirmDeleteSelected', { count: selectedProjectEntryKeys.value.length }),
   }))
 
@@ -251,7 +249,7 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
       get loading() { return entry.isDirectory && options.getDirectoryState?.(entry.key)?.status === 'loading' },
       get disabledReason() { return options.getDirectoryState?.(entry.key)?.error },
       renamable: true, draggable: true,
-      tail: [{ key: PROJECT_ENTRY_MORE_ACTION_KEY, get title() { return projectEntryLabels.value.more }, icon: 'mdiDotsHorizontal', children: () => menus().inline }],
+      get tail() { return menus().inline },
       contextActions: () => menus().context,
     })
   }
@@ -323,7 +321,8 @@ export function useWorkbenchFileTree(options: UseWorkbenchFileTreeOptions) {
             const coordinate = options.packageCoordinates?.value.get(nodeKey)
             items.set(nodeKey, {
               ...node,
-              tail: [...(coordinate ? [coordinate] : []), ...normalizeNodeTail(node.tail)],
+              // getter：菜单内容跟着当前选中数变化，不能在这里算成定值。
+              get tail() { return [...(coordinate ? [coordinate] : []), ...normalizeNodeTail(node.tail)] },
             })
             targetByNodeKey.set(nodeKey, nodeKey)
             nodeKeyByTargetPath.set(nodeKey, nodeKey)

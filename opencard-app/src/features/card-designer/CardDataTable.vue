@@ -49,7 +49,7 @@
                     ? t('cardDesigner.dataTable.excludeInstanceFromExport')
                     : t('cardDesigner.dataTable.includeInstanceInExport')"
                   @click="emit('set-instance-exported', column.key, !column.exported)" />
-                <OcActionButton v-if="!props.readonly" :action="columnAction(column)" size="sm" variant="ghost"
+                <OcActionBar v-if="!props.readonly" :items="columnCommands(column)"
                   @select="handleColumnAction(column, $event.key)" />
               </div>
               <OcDataGridColumnResizeHandle class="card-data-table__column-resize"
@@ -379,17 +379,6 @@ function columnCommands(column: CdeDataTableColumn): OcActionMenuEntry[] {
     { type: 'divider', key: 'column-danger-divider' },
     { key: 'delete', icon: 'mdiTrashCanOutline', iconTone: 'danger', title: t('cardDesigner.dataTable.deleteInstance') },
   ]
-}
-
-function columnAction(column: CdeDataTableColumn): OcActionDefinition {
-  const commands = columnCommands(column)
-  if (column.kind === 'blueprint') return commands[0] as OcActionDefinition
-  return {
-    key: 'more',
-    icon: 'mdiDotsHorizontal',
-    title: t('cardDesigner.dataTable.instanceActions'),
-    children: commands,
-  }
 }
 
 function handleColumnAction(column: CdeDataTableColumn, actionKey: string): void {

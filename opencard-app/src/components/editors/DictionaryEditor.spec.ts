@@ -19,8 +19,10 @@ function latestDictionary(wrapper: ReturnType<typeof mount>) {
   return JSON.parse(updates as string)
 }
 
-function actionButton(wrapper: ReturnType<typeof mount>, title: string) {
-  return wrapper.findAllComponents(OcActionButton).find(candidate => candidate.props('action').title === title)!
+/** 记录行在 tbody、语言列在 thead，各自的命令都收在「更多」里。 */
+function moreActions(wrapper: ReturnType<typeof mount>, section: 'thead' | 'tbody') {
+  return wrapper.findAllComponents(OcActionButton)
+    .find(candidate => candidate.props('action').key === '__oc-action-bar-more__' && candidate.element.closest(section))!
 }
 
 describe('DictionaryEditor', () => {
@@ -122,7 +124,7 @@ describe('DictionaryEditor', () => {
     expect(wrapper.find('tbody .dictionary-editor__inline-create').exists()).toBe(false)
     expect(getTestSession(wrapper).state.isDirty).toBe(false)
 
-    actionButton(wrapper, 'dictionaryEditor.actions.recordActions').vm.$emit('select', { key: 'rename' })
+    moreActions(wrapper, 'tbody').vm.$emit('select', { key: 'rename' })
     await wrapper.vm.$nextTick()
     const renameInput = wrapper.get('tbody .dictionary-editor__rename input')
     await renameInput.setValue('body')
@@ -168,7 +170,7 @@ describe('DictionaryEditor', () => {
         }) }) },
     })
 
-    actionButton(wrapper, 'dictionaryEditor.actions.recordActions').vm.$emit('select', { key: 'rename' })
+    moreActions(wrapper, 'tbody').vm.$emit('select', { key: 'rename' })
     await wrapper.vm.$nextTick()
     const recordRenameInput = wrapper.get('tbody .dictionary-editor__rename input')
     expect(document.activeElement).toBe(recordRenameInput.element)
@@ -181,7 +183,7 @@ describe('DictionaryEditor', () => {
       languages: { en_US: { heading: 'English' } },
     })
 
-    actionButton(wrapper, 'dictionaryEditor.actions.languageActions').vm.$emit('select', { key: 'rename' })
+    moreActions(wrapper, 'thead').vm.$emit('select', { key: 'rename' })
     await wrapper.vm.$nextTick()
     const languageRenameInput = wrapper.get('thead .dictionary-editor__rename input')
     expect(document.activeElement).toBe(languageRenameInput.element)
@@ -189,7 +191,7 @@ describe('DictionaryEditor', () => {
     await languageRenameInput.trigger('blur')
     expect(latestDictionary(wrapper).languages).toEqual({ en_GB: { heading: 'English' } })
 
-    actionButton(wrapper, 'dictionaryEditor.actions.recordActions').vm.$emit('select', { key: 'confirm-delete' })
+    moreActions(wrapper, 'tbody').vm.$emit('select', { key: 'confirm-delete' })
     await wrapper.vm.$nextTick()
     expect(latestDictionary(wrapper)).toEqual({ base: { body: '正文' }, languages: { en_GB: {} } })
     wrapper.unmount()
@@ -200,11 +202,11 @@ describe('DictionaryEditor', () => {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/locale.json', draftContent: JSON.stringify({ base: { title: 'Default' }, languages: { en_US: {} } }) }) },
     })
 
-    actionButton(wrapper, 'dictionaryEditor.actions.recordActions').vm.$emit('select', { key: 'copy' })
+    moreActions(wrapper, 'tbody').vm.$emit('select', { key: 'copy' })
     await flushPromises()
     expect(clipboard.writeText).toHaveBeenCalledWith('title')
 
-    actionButton(wrapper, 'dictionaryEditor.actions.languageActions').vm.$emit('select', { key: 'copy' })
+    moreActions(wrapper, 'thead').vm.$emit('select', { key: 'copy' })
     await flushPromises()
     expect(clipboard.writeText).toHaveBeenLastCalledWith('en_US')
   })

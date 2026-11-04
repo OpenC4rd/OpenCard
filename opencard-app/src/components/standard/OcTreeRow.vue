@@ -107,7 +107,7 @@
         <template v-if="entry.item.tail" #append>
           <OcNodeTail
             class="oc-tree__tail"
-            :tail="context.resolveTailParts(entry.key, entry.item.tail)"
+            :tail="context.resolveTailParts(entry)"
             :action-visibility="context.props.actionVisibility"
             :button-tabindex="context.props.tabNavigation === 'none' ? -1 : undefined"
             @action="context.emitActionIntent(entry.key, $event.key)"
@@ -157,7 +157,7 @@ export type OcTreeRowContext = {
   handleRenameInput(event: Event): void
   handleRenameKeydown(event: KeyboardEvent, key: OcNodeKey): void
   commitRename(key: OcNodeKey): void
-  resolveTailParts(key: OcNodeKey, tail: OcNode['tail']): readonly OcNodeTailPart[]
+  resolveTailParts(entry: OcTreeRowEntry): readonly OcNodeTailPart[]
   emitActionIntent(key: OcNodeKey, actionKey: string): void
 }
 </script>

@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OcNode, OcNodeCollection } from '../../shared/ui/node/node.types'
+import { readThemePixels } from '../../shared/ui/foundation/themeTokenPixels'
 import OcTree from './OcTree.vue'
 import OverlayGroupRoot from '../ui/OverlayGroupRoot.vue'
 import { disposeGroup, overlayGroups } from '../../composables/overlayGroups'
@@ -175,6 +176,76 @@ describe('OcTree commands', () => {
     expect(wrapper.emitted('action')).toEqual([[
       { key: 'root', actionKey: 'duplicate', source: 'inline' },
     ]])
+  })
+
+  describe('row command budget', () => {
+    const SLOT = readThemePixels('--oc-size-sm') + readThemePixels('--oc-space-2xs')
+    const INDENT = readThemePixels('--oc-indent-step')
+    const RESERVED = 160
+    const commands = ['a', 'b', 'c'].map(key => ({ key, title: key.toUpperCase(), icon: 'mdiPlus' as const }))
+    const buttons = (row: ReturnType<ReturnType<typeof mount>['get']>) =>
+      row.findAll('button').map(button => button.attributes('aria-label'))
+
+    async function mountWithWidth(width: number, data: OcNodeCollection, expandedKeys: string[] = []) {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width)
+      const wrapper = mount(OcTree, { props: { data, expandedKeys } })
+      await nextTick()
+      return wrapper
+    }
+
+    afterEach(() => { vi.restoreAllMocks() })
+
+    it('shows commands directly when the tree is wide enough', async () => {
+      const wrapper = await mountWithWidth(RESERVED + SLOT * 3, createData({ items: [['root', { label: 'Root', tail: commands }]] }))
+      expect(buttons(wrapper.get('.oc-tree__row'))).toEqual(['A', 'B', 'C'])
+      wrapper.unmount()
+    })
+
+    it('folds from the end as the tree narrows, down to a single more button', async () => {
+      const data = createData({ items: [['root', { label: 'Root', tail: commands }]] })
+      const narrower = await mountWithWidth(RESERVED + SLOT * 2, data)
+      expect(buttons(narrower.get('.oc-tree__row'))).toEqual(['A', 'More actions'])
+      narrower.unmount()
+
+      const narrow = await mountWithWidth(100, data)
+      expect(buttons(narrow.get('.oc-tree__row'))).toEqual(['More actions'])
+      narrow.unmount()
+    })
+
+    it('gives deeper rows less room and counts always-visible commands', async () => {
+      const wrapper = await mountWithWidth(RESERVED + SLOT * 3, createData({
+        items: [
+          ['root', { label: 'Root', tail: [{ key: 'pin', title: 'Pin', icon: 'mdiPlus', alwaysVisible: true }, ...commands] }],
+          ['child', { label: 'Child', tail: commands }],
+        ],
+        children: [['root', ['child']]],
+      }), ['root'])
+      const rows = wrapper.findAll('.oc-tree__row')
+      expect(buttons(rows[0]!)).toEqual(['Pin', 'A', 'More actions'])
+      // 子行少 ceil(INDENT / SLOT) 格，三个命令放不下时留一格给「更多」。
+      const childBudget = 3 - Math.ceil(INDENT / SLOT)
+      expect(buttons(rows[1]!)).toEqual([...['A', 'B', 'C'].slice(0, childBudget - 1), 'More actions'])
+      wrapper.unmount()
+    })
+
+    it('updates when the tree is resized', async () => {
+      let notify = () => {}
+      vi.stubGlobal('ResizeObserver', class {
+        constructor(callback: () => void) { notify = callback }
+        observe() {}
+        disconnect() {}
+      })
+      const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
+      const wrapper = mount(OcTree, { props: { data: createData({ items: [['root', { label: 'Root', tail: commands }]] }) } })
+      expect(buttons(wrapper.get('.oc-tree__row'))).toEqual(['More actions'])
+
+      width.mockReturnValue(RESERVED + SLOT * 3)
+      notify()
+      await nextTick()
+      expect(buttons(wrapper.get('.oc-tree__row'))).toEqual(['A', 'B', 'C'])
+      wrapper.unmount()
+      vi.unstubAllGlobals()
+    })
   })
 
   it('groups overflowing commands into the row menu and reports the chosen one', async () => {

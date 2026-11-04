@@ -53,9 +53,9 @@ type BlockActionSet = {
   add: OcNodeAction
   package: OcNodeAction
   unpackage: OcNodeAction
-  blockMore: OcNodeAction
-  containerMore: OcNodeAction
-  packagedContainerMore: OcNodeAction
+  blockCommands: readonly OcNodeAction[]
+  containerCommands: readonly OcNodeAction[]
+  packagedContainerCommands: readonly OcNodeAction[]
   exportCustomBlock: OcNodeAction
 }
 
@@ -87,9 +87,6 @@ function createBlockActions(translate: (messageKey: string) => string): BlockAct
   const pack = cdeNodeAction('package', 'mdiPackageVariantClosed', translate('cardDesigner.treeActions.package'))
   const unpack = cdeNodeAction('unpackage', 'mdiPackageVariantClosed', translate('cardDesigner.treeActions.unpackage'))
   const exportCustomBlock = cdeNodeAction('export-custom-block', 'mdiToyBrickOutline', translate('cardDesigner.treeActions.exportCustomBlock'))
-  const more = (key: string, children: readonly OcNodeAction[]): OcNodeAction => (
-    cdeNodeAction(key, 'mdiDotsHorizontal', translate('cardDesigner.treeActions.more'), { children })
-  )
 
   return {
     show: cdeNodeAction('show-block', 'mdiEyeOffOutline', translate('cardDesigner.treeActions.show')),
@@ -102,9 +99,9 @@ function createBlockActions(translate: (messageKey: string) => string): BlockAct
     add,
     package: pack,
     unpackage: unpack,
-    blockMore: more('block-more', [copyBlock, pasteBlock, rename, duplicate, remove]),
-    containerMore: more('container-more', [copyBlock, pasteBlock, rename, add, pack, exportCustomBlock, duplicate, remove]),
-    packagedContainerMore: more('packaged-container-more', [rename, unpack, duplicate, remove]),
+    blockCommands: [copyBlock, pasteBlock, rename, duplicate, remove],
+    containerCommands: [copyBlock, pasteBlock, rename, add, pack, exportCustomBlock, duplicate, remove],
+    packagedContainerCommands: [rename, unpack, duplicate, remove],
     exportCustomBlock,
   }
 }
@@ -155,15 +152,15 @@ export function useCdeTreeOps(options: UseCdeTreeOpsOptions) {
       const visibility = getBlockProperty<string>(block, 'visible') === 'false' ? 'hidden' : 'visible'
       const presentation = getBlockPresentation(block.type)
       const visibilityAction = visibility === 'hidden' ? actions.show : actions.hide
-      const moreAction = container
-        ? (packaged ? actions.packagedContainerMore : actions.containerMore)
-        : actions.blockMore
+      const commands = container
+        ? (packaged ? actions.packagedContainerCommands : actions.containerCommands)
+        : actions.blockCommands
       const structureEntries: OcNodeContextEntry[] = container
         ? (packaged ? [actions.unpackage] : [actions.add, actions.package, actions.exportCustomBlock])
         : []
       const tail = block.type === 'custom-block'
-        ? [block.source, visibilityAction, moreAction]
-        : [visibilityAction, moreAction]
+        ? [block.source, visibilityAction, ...commands]
+        : [visibilityAction, ...commands]
       items.set(block.id, {
         label: getBlockProperty<string>(block, 'name')?.trim() || block.id,
         visual: {

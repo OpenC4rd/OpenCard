@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OcActionBarItem } from './action.types'
-import { foldActionBar } from './actionBar'
+import { budgetKeep, foldActionBar } from './actionBar'
 
 const keys = (items: readonly OcActionBarItem[]) =>
   items.map(item => typeof item === 'string' ? `"${item}"` : item.type === 'divider' ? '|' : item.key)
@@ -31,5 +31,30 @@ describe('foldActionBar', () => {
     const folded = foldActionBar([{ key: 'a' }, { type: 'divider', key: 'd' }, { key: 'b' }], 1)
     expect(keys(folded.visible)).toEqual(['a'])
     expect(keys(folded.overflow)).toEqual(['b'])
+  })
+
+  it('leaves read-only tail parts such as badges on the row', () => {
+    const badge = { type: 'badge' as const, icon: 'mdiPlus' as const, label: 'Synced' }
+    const folded = foldActionBar([badge, 'hint', { key: 'a' }, { key: 'b' }], 0)
+    expect(folded.visible).toEqual([badge, 'hint'])
+    expect(folded.overflow.map(entry => entry.key)).toEqual(['a', 'b'])
+  })
+})
+
+describe('budgetKeep', () => {
+  const actions = (count: number) => Array.from({ length: count }, (_, index) => ({ key: `a${index}` }))
+
+  it('shows everything that fits the budget', () => {
+    expect(budgetKeep(actions(1), 1)).toBe(1)
+    expect(budgetKeep(actions(3), 3)).toBe(3)
+  })
+
+  it('gives the last slot to the more button once over budget', () => {
+    expect(budgetKeep(actions(2), 1)).toBe(0)
+    expect(budgetKeep(actions(5), 3)).toBe(2)
+  })
+
+  it('does not count always-visible actions or text', () => {
+    expect(budgetKeep(['text', { key: 'pin', alwaysVisible: true }, { key: 'a' }], 1)).toBe(1)
   })
 })

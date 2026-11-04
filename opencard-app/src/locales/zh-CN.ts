@@ -655,8 +655,6 @@ export default {
       renameLanguage: '重命名语言',
       resetOverride: '移除覆写',
       resizeColumn: '调整“{title}”列宽',
-      recordActions: '记录操作',
-      languageActions: '语言操作',
       deleteRecords: '删除 {count} 条记录',
       deleteLanguages: '删除 {count} 个语言',
       confirmDeleteRecords: '确认删除 {count} 条记录',
@@ -862,7 +860,6 @@ export default {
     noRecentProjects: '暂无最近项目',
     openProject: '打开项目文件夹',
     fileActions: {
-      more: '更多操作',
       rename: '重命名',
       delete: '移到回收站',
       confirmDeleteFile: '将 {fileName} 移到回收站',
@@ -1047,7 +1044,6 @@ export default {
       addChild: '添加子块',
       show: '显示',
       hide: '隐藏',
-      more: '更多操作',
       exportCustomBlock: '导出为自定义块',
     },
     layout: {
@@ -1138,7 +1134,6 @@ export default {
       fieldColumn: '块名 / 属性',
       blueprint: '蓝图',
       addInstance: '新增实例',
-      instanceActions: '实例操作',
       renameInstance: '重命名实例',
       duplicateInstance: '复制实例',
       deleteInstance: '删除实例',
