@@ -178,9 +178,9 @@ describe('text shadow device-space conversion', () => {
     expect(frame?.method).toBe('fillText')
   })
 
-  it('casts the shadow from the outline when the text has a stroke', () => {
-    const [frame] = paintShadowFrames(faceWithText('@style(stroke=#00ff00 1mm,shadow=#0000ff 1mm 1mm 0mm){Hg}'), [2, 0, 0, 2])
-    expect(frame?.method).toBe('strokeText')
+  it('casts the shadow from the whole outlined glyph so it never turns hollow', () => {
+    const frames = paintShadowFrames(faceWithText('@style(stroke=#00ff00 1mm,shadow=#0000ff 1mm 1mm 0mm){Hg}'), [2, 0, 0, 2])
+    expect(frames.map(frame => frame.method)).toEqual(['strokeText', 'fillText'])
   })
 
   it('rotates the offset with the device transform', () => {
@@ -221,6 +221,8 @@ describe('text shadow device-space conversion', () => {
       expect(buffers).toHaveLength(1)
       expect(buffers[0]!.shadowBlurs).toEqual([Math.min(ratio, 16)])
       expect(ctx.drawImage).toHaveBeenCalledTimes(1)
+      expect(buffers[0]!.ctx.globalCompositeOperation).toBe('source-in')
+      expect(buffers[0]!.ctx.fillStyle).toBe('#0000ff')
     } finally {
       vi.unstubAllGlobals()
     }
