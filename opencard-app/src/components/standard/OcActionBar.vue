@@ -4,11 +4,12 @@
   - appearance：方形图标按钮，或以标题为文字的按钮。
   - overflow="fit"：放不下时从末尾往前收进「更多」；文字与 alwaysVisible 的操作不收。
     条是父 flex 行里可收缩的一项（min-width: 0），父容器给多少空间就按多少折叠。
+  - menubar：每一项都是一个菜单入口，点击开关、开着时悬停切换，同一时刻只有一个菜单。
   - 方向键在按钮之间移动焦点。
 -->
 <template>
   <div
-    v-if="items.length > 0"
+    v-show="items.length > 0"
     ref="rootRef"
     class="oc-action-bar"
     :class="[`oc-action-bar--${orientation}`, { 'oc-action-bar--fit': overflow === 'fit' }]"
@@ -23,6 +24,16 @@
       </span>
       <span v-else-if="item.type === 'divider'" class="oc-action-bar__divider" role="separator"
         :data-index="items.indexOf(item)" />
+      <OcMenubarButton
+        v-else-if="menubar"
+        :data-index="items.indexOf(item)"
+        :data-action-key="item.key"
+        :action="item"
+        :size="size"
+        :open="menus.openKey.value === item.key"
+        @pointerenter="menus.hover(item.key)"
+        @click="menus.toggle(item.key)"
+      />
       <OcActionButton
         v-else
         :data-index="items.indexOf(item)"
@@ -37,8 +48,19 @@
         @select="emit('select', $event)"
       />
     </template>
+    <OcMenubarButton
+      v-if="menubar && folded.overflow.length > 0"
+      :data-action-key="moreAction.key"
+      :action="moreAction"
+      :size="size"
+      :open="menus.openKey.value === moreAction.key"
+      icon-only
+      :aria-label="moreAction.title"
+      @pointerenter="menus.hover(moreAction.key)"
+      @click="menus.toggle(moreAction.key)"
+    />
     <OcActionButton
-      v-if="folded.overflow.length > 0"
+      v-else-if="folded.overflow.length > 0"
       :data-action-key="moreAction.key"
       :action="moreAction"
       :size="size"
@@ -46,21 +68,38 @@
       :variant="variant"
       @select="emit('select', $event)"
     />
+    <OcOverlayMarker
+      v-if="menubar"
+      group="menu"
+      :anchor="menus.anchor.value"
+      :owner="rootRef"
+      placement="bottom-start"
+      :open="menus.isOpen.value"
+      @update:open="open => { if (!open) menus.close() }"
+    >
+      <OcActionMenu v-if="menus.openMenu.value" :actions="actionChildren(menus.openMenu.value)" overlay-key="menu"
+        :on-select="menus.select" @close="menus.close" />
+    </OcOverlayMarker>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { OcIconSize } from '../base/OcIcon.vue'
-import type {
-  ActionButtonSize,
-  ActionButtonVariant,
-  OcActionBarItem,
-  OcActionDefinition,
-  OcActionSelectPayload,
+import {
+  actionChildren,
+  type ActionButtonSize,
+  type ActionButtonVariant,
+  type OcActionBarItem,
+  type OcActionDefinition,
+  type OcActionSelectPayload,
 } from '../../shared/ui/action/action.types'
-import { foldActionBar, isFoldableAction } from '../../shared/ui/action/actionBar'
+import { actionContains, foldActionBar, isFoldableAction } from '../../shared/ui/action/actionBar'
+import { useMenubar } from '../../shared/ui/action/useMenubar'
 import OcActionButton from './OcActionButton.vue'
+import OcActionMenu from './OcActionMenu.vue'
+import OcMenubarButton from './OcMenubarButton.vue'
+import OcOverlayMarker from './OcOverlayMarker.vue'
 
 defineOptions({ name: 'OcActionBar' })
 
@@ -69,6 +108,7 @@ const props = withDefaults(defineProps<{
   orientation?: 'horizontal' | 'vertical'
   appearance?: 'icon' | 'text'
   overflow?: 'fit' | 'none'
+  menubar?: boolean
   size?: ActionButtonSize
   iconSize?: OcIconSize
   variant?: ActionButtonVariant
@@ -99,6 +139,20 @@ const moreAction = computed<OcActionDefinition>(() => ({
   children: folded.value.overflow,
 }))
 
+const menus = useMenubar(() => rootRef.value, () => [
+  ...folded.value.visible.filter(isAction),
+  ...(folded.value.overflow.length > 0 ? [moreAction.value] : []),
+], (menu, key) => emit('select', {
+  key,
+  rootKey: menu.key === moreAction.value.key
+    ? folded.value.overflow.find(entry => actionContains(entry, key))?.key
+    : menu.key,
+}))
+
+function isAction(item: OcActionBarItem): item is OcActionDefinition {
+  return typeof item !== 'string' && item.type !== 'divider'
+}
+
 function itemKey(item: OcActionBarItem): string {
   return typeof item === 'string' ? `text:${props.items.indexOf(item)}` : item.key
 }
@@ -113,7 +167,9 @@ async function measure(): Promise<void> {
   keep.value = Number.POSITIVE_INFINITY
   await nextTick()
   const horizontal = props.orientation === 'horizontal'
-  const available = horizontal ? root.clientWidth : root.clientHeight
+  // 与子项同用 getBoundingClientRect：clientWidth 取整后会比恰好放下的内容小一点，误判成放不下。
+  const bounds = root.getBoundingClientRect()
+  const available = (horizontal ? bounds.width : bounds.height) + 0.5
   const style = getComputedStyle(root)
   const gap = Number.parseFloat(horizontal ? style.columnGap : style.rowGap) || 0
   const sizes = new Map<number, number>()
@@ -125,7 +181,7 @@ async function measure(): Promise<void> {
   const content = [...sizes.values()].reduce((total, size) => total + size, 0) + gap * (sizes.size - 1)
   if (content <= available) return
   // 「更多」是方形图标按钮：边长取条的另一个方向。
-  const moreSize = horizontal ? root.clientHeight : root.clientWidth
+  const moreSize = horizontal ? bounds.height : bounds.width
   const foldable = props.items.filter(isFoldableAction).length
   for (let candidate = foldable - 1; candidate >= 0; candidate -= 1) {
     const visible = foldActionBar(props.items, candidate).visible
@@ -138,6 +194,11 @@ async function measure(): Promise<void> {
   }
 }
 
+async function refit(): Promise<void> {
+  await measure()
+  menus.closeIfGone()
+}
+
 let observer: ResizeObserver | null = null
 let measuredParentSize = ''
 const sizeOf = (element: HTMLElement) => `${element.clientWidth}x${element.clientHeight}`
@@ -146,22 +207,24 @@ onMounted(() => {
   if (props.overflow !== 'fit' || !parent || typeof ResizeObserver === 'undefined') return
   // 折叠本身可能改变父容器尺寸：只在尺寸不是自己量完后留下的那个时才重量，免得来回震荡。
   observer = new ResizeObserver(() => {
-    if (sizeOf(parent) !== measuredParentSize) void measure().then(() => nextTick()).then(() => { measuredParentSize = sizeOf(parent) })
+    if (sizeOf(parent) !== measuredParentSize) void refit().then(() => nextTick()).then(() => { measuredParentSize = sizeOf(parent) })
   })
   observer.observe(parent)
 })
 onBeforeUnmount(() => observer?.disconnect())
-watch(() => props.items, () => { void measure() })
+watch(() => props.items, () => { void refit() })
 
 function moveFocus(event: KeyboardEvent): void {
   const forward = props.orientation === 'horizontal' ? 'ArrowRight' : 'ArrowDown'
   const backward = props.orientation === 'horizontal' ? 'ArrowLeft' : 'ArrowUp'
   if (event.key !== forward && event.key !== backward) return
-  const buttons = [...rootRef.value?.querySelectorAll<HTMLButtonElement>('.oc-action-button > button:not(:disabled)') ?? []]
+  const buttons = [...rootRef.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []]
   const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
   if (index < 0) return
   event.preventDefault()
-  buttons[(index + (event.key === forward ? 1 : -1) + buttons.length) % buttons.length]?.focus()
+  const next = buttons[(index + (event.key === forward ? 1 : -1) + buttons.length) % buttons.length]
+  next?.focus()
+  if (next?.dataset.actionKey) menus.hover(next.dataset.actionKey)
 }
 </script>
 
@@ -181,11 +244,10 @@ function moveFocus(event: KeyboardEvent): void {
   flex: 0 0 auto;
 }
 
-/* 可收缩：父容器压缩时条变窄，measure 才量得到可用空间。 */
+/* 可收缩：父容器压缩时条变窄，measure 才量得到可用空间。不裁剪：按钮角上的徽标在盒子外面。 */
 .oc-action-bar--fit {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
 }
 
 .oc-action-bar__text {

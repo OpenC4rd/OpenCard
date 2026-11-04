@@ -73,6 +73,11 @@
   padding-left: 78px;
 }
 
+/* 左侧占满右侧之外的宽度，且不随菜单内容变化：折叠与否量到的可用空间都一样。 */
+.titlebar-left {
+  flex: 1 1 0;
+}
+
 .titlebar-left,
 .titlebar-right {
   position: relative;
@@ -139,7 +144,6 @@
 }
 
 .titlebar-icon,
-.titlebar-menu-button,
 .shell-sidebar-button {
   border-radius: var(--oc-radius-control);
   background: transparent;
@@ -340,18 +344,19 @@
   }
 }
 
-.titlebar-menu-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--oc-space-2xs);
-  height: var(--oc-size-md);
-  padding: 0 12px;
-  background: transparent;
+.titlebar .titlebar-menus .oc-button {
   color: var(--oc-fg-muted);
 }
 
+.titlebar .titlebar-menus .oc-button:not(.oc-button--icon-only) {
+  padding: 0 12px;
+}
+
+.titlebar .titlebar-menus .oc-button:hover {
+  color: var(--oc-fg-default);
+}
+
 .titlebar-icon:hover,
-.titlebar-menu-button:hover,
 .shell-sidebar-button:hover {
   background: var(--oc-bg-hover);
   color: var(--oc-fg-default);

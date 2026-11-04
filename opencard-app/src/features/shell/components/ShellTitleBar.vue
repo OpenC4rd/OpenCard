@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, type ComponentPublicInstance } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import OcIcon from '../../../components/base/OcIcon.vue';
-import OcActionMenu from '../../../components/standard/OcActionMenu.vue';
+import OcActionBar from '../../../components/standard/OcActionBar.vue';
 import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue';
-import { actionAccessibleLabel, formatActionBadge, hasActionBadge } from '../../../components/standard/actionBadge';
 import OcPhaseImage from '../../../components/standard/OcPhaseImage.vue';
 import wordmarkBrightness from '../../../assets/opencard-wordmark-brightness-map.png';
 import wordmarkPhase from '../../../assets/opencard-wordmark-phase-map.png';
@@ -13,7 +12,7 @@ import ShellNoticePanel from './ShellNoticePanel.vue';
 import ShellTaskPanel from './ShellTaskPanel.vue';
 import { titleBarNotices } from '../../notifications/titlebarNotices';
 import { useOverlayDismiss } from '../../../shared/ui/useOverlayDismiss';
-import type { OverlayAnchor } from '../../../composables/overlayGroups';
+import type { OcActionBarItem, OcActionSelectPayload } from '../../../shared/ui/action/action.types';
 import type {
   ShellProgressTask,
   ShellTitleBarAppAction,
@@ -44,10 +43,7 @@ const emit = defineEmits<{
 
 const PANEL_CLOSE_DELAY = 120;
 
-/** 菜单、任务面板、通知面板各一个 marker：宿主与互斥归组，这里只持自己的开关。 */
-// 响应式 Map：模板 ref 回填必须触发重渲染，锚点函数才读得到当前按钮。
-const menuAnchors = reactive(new Map<string, HTMLElement>());
-const openMenuKey = ref<string | null>(null);
+/** 任务面板、通知面板各一个 marker：宿主与互斥归组，这里只持自己的开关。 */
 const taskPanelAnchor = ref<HTMLElement | null>(null);
 const noticeAnchor = ref<HTMLElement | null>(null);
 const taskPanelOpen = ref(false);
@@ -55,20 +51,14 @@ const noticePanelOpen = ref(false);
 let taskPanelCloseTimer: number | null = null;
 let noticePanelCloseTimer: number | null = null;
 
-const activeMenu = computed(() => props.menuGroups.find(menu => menu.key === openMenuKey.value) ?? null);
-/** 当前激活的那个菜单按钮：锚点、归属、键盘关闭后的焦点去处都是它。 */
-const activeMenuButton = computed(() => (openMenuKey.value ? menuAnchors.get(openMenuKey.value) ?? null : null));
-/**
- * 锚点是「当前激活的那个菜单按钮」。每次换菜单都返回一个新函数，marker 才会把新锚点
- * 推进组里让宿主滑过去；函数锚点让 autoUpdate 每次重算都拿到按钮的当前矩形。
- */
-const activeMenuAnchor = computed<OverlayAnchor>(() => {
-  const button = activeMenuButton.value;
-  return () => button?.getBoundingClientRect() ?? null;
-});
-const menuOpen = computed(() => openMenuKey.value !== null);
-/** 「已打开」就是当前锚点等于这个按钮：被抢占时 marker 会把它清成 null。 */
-const isMenuOpen = (key: string) => openMenuKey.value === key;
+/** 菜单内容随 props.menuGroups 实时渲染：切页后条目归新的 owner 处理。 */
+const menuItems = computed<OcActionBarItem[]>(() => props.menuGroups.map(menu => ({
+  key: menu.key,
+  title: menu.label,
+  badge: menu.badge,
+  badgeLabel: menu.badgeLabel,
+  children: menu.actions,
+})));
 const activeProgressTasks = computed(() => (props.tasks ?? []).filter(task => task.active !== false));
 const titlebarProgress = computed(() => {
   if (activeProgressTasks.value.length === 0) return null;
@@ -145,59 +135,18 @@ watch(
   { flush: 'sync' },
 );
 
-function setMenuAnchor(menuKey: string, element: Element | ComponentPublicInstance | null): void {
-  if (element instanceof HTMLElement) menuAnchors.set(menuKey, element);
-  else menuAnchors.delete(menuKey);
+function runMenuCommand({ key, rootKey }: OcActionSelectPayload): void {
+  void props.menuGroups.find(menu => menu.key === rootKey)?.onAction?.(key);
 }
 
-function openTitleMenu(key: string): void {
-  if (!menuAnchors.has(key)) return;
-  openMenuKey.value = key;
-}
-
-/** 菜单已经打开时划到另一个按钮：宿主不变，只换锚点与条目。 */
-function switchOpenMenu(key: string): void {
-  if (menuOpen.value) openTitleMenu(key);
-}
-
-function toggleMenu(key: string): void {
-  if (isMenuOpen(key)) {
-    openMenuKey.value = null;
-    return;
-  }
-  openTitleMenu(key);
-}
-
-/** 菜单请求收掉自己所在的那一层：键盘关闭时焦点还给打开它的那个按钮。 */
-function handleMenuCloseRequest(restoreFocus: boolean): void {
-  const button = activeMenuButton.value;
-  openMenuKey.value = null;
-  if (restoreFocus) button?.focus();
-}
-
-/** 被抢占或主动关闭都从 marker 回来：菜单状态必须跟着退出。 */
-function handleMenuOpenChange(open: boolean): void {
-  if (!open) openMenuKey.value = null;
-}
-
-function runMenuCommand(actionKey: string): void {
-  const menu = activeMenu.value;
-  openMenuKey.value = null;
-  void menu?.onAction?.(actionKey);
-}
-
-useOverlayDismiss(() => menuOpen.value, () => activeMenuButton.value, () => { openMenuKey.value = null; });
 useOverlayDismiss(() => taskPanelOpen.value, () => taskPanelAnchor.value, () => { taskPanelOpen.value = false; });
 useOverlayDismiss(() => noticePanelOpen.value, () => noticeAnchor.value, () => { noticePanelOpen.value = false; });
 
-// marker 只负责显示，Esc 归调用点。焦点在菜单里时先让菜单自己收（它会把焦点还给触发按钮），
-// 这里只兜住焦点不在菜单里的情况；两个悬停面板没有别的关闭来源，一并收掉。
+// 两个悬停面板没有别的关闭来源，Esc 在这里收掉。
 function handleWindowKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return;
   taskPanelOpen.value = false;
   noticePanelOpen.value = false;
-  if (event.target instanceof Element && event.target.closest('.oc-action-menu')) return;
-  openMenuKey.value = null;
 }
 
 onMounted(() => window.addEventListener('keydown', handleWindowKeydown, true));
@@ -225,27 +174,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleWindowKeydown,
         <OcIcon :name="props.collapsed ? 'mdiArrowExpandRight' : 'mdiArrowCollapseLeft'" size="sm" />
       </button>
 
-      <div
-        v-for="menu in props.menuGroups"
-        :key="menu.key"
-        class="titlebar-menu"
-        @pointerenter="switchOpenMenu(menu.key)"
-      >
-        <button
-          :ref="(element) => setMenuAnchor(menu.key, element)"
-          class="titlebar-menu-button"
-          type="button"
-          :aria-label="actionAccessibleLabel(menu.label, menu.badgeLabel)"
-          :aria-haspopup="'menu'"
-          :aria-expanded="isMenuOpen(menu.key)"
-          @click="toggleMenu(menu.key)"
-        >
-          <span>{{ menu.label }}</span>
-          <span v-if="hasActionBadge(menu.badge)" class="oc-number-badge" aria-hidden="true">
-            {{ formatActionBadge(menu.badge) }}
-          </span>
-        </button>
-      </div>
+      <OcActionBar class="titlebar-menus" :items="menuItems" menubar size="md" @select="runMenuCommand" />
 
       <button
         v-for="action in props.appActions ?? []"
@@ -321,18 +250,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleWindowKeydown,
         <OcIcon :name="control.icon" size="sm" />
       </button>
     </div>
-
-    <OcOverlayMarker
-      group="menu"
-      :anchor="activeMenuAnchor"
-      :owner="activeMenuButton"
-      placement="bottom-start"
-      :open="menuOpen"
-      @update:open="handleMenuOpenChange"
-    >
-      <OcActionMenu v-if="activeMenu" :actions="activeMenu.actions" overlay-key="menu"
-        :on-select="runMenuCommand" @close="handleMenuCloseRequest" />
-    </OcOverlayMarker>
 
     <OcOverlayMarker
       group="titlebar-tasks"

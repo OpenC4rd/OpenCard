@@ -118,14 +118,13 @@ describe('ShellTitleBar', () => {
         { key: 'edit', label: 'Edit', actions: [] },
       ],
     })
-    const menus = wrapper.findAll('.titlebar-menu')
     const buttons = wrapper.findAll('button[aria-haspopup="menu"]')
 
-    await menus[1]!.trigger('pointerenter')
+    await buttons[1]!.trigger('pointerenter')
     expect(buttons[1]!.attributes('aria-expanded')).toBe('false')
 
     await buttons[0]!.trigger('click')
-    await menus[1]!.trigger('pointerenter')
+    await buttons[1]!.trigger('pointerenter')
 
     expect(buttons[0]!.attributes('aria-expanded')).toBe('false')
     expect(buttons[1]!.attributes('aria-expanded')).toBe('true')

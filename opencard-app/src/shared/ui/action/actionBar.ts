@@ -1,4 +1,4 @@
-import type { OcActionBarItem, OcActionDefinition, OcActionMenuEntry } from './action.types'
+import { actionChildren, type OcActionBarItem, type OcActionDefinition, type OcActionMenuEntry } from './action.types'
 
 export type FoldedActionBar = {
   visible: OcActionBarItem[]
@@ -26,6 +26,12 @@ export function foldActionBar(items: readonly OcActionBarItem[], keep: number): 
     else { visible.push(item); kept += 1 }
   }
   return { visible: trimDividers(visible), overflow: trimDividers(overflow) }
+}
+
+/** 这一项自身或它的任一层子项是不是 key。 */
+export function actionContains(entry: OcActionMenuEntry, key: string): boolean {
+  if (entry.key === key) return true
+  return entry.type !== 'divider' && actionChildren(entry).some(child => actionContains(child, key))
 }
 
 function trimDividers<T extends OcActionBarItem>(items: T[]): T[] {

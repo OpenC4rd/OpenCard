@@ -45,4 +45,6 @@ export function hasActionChildren(action: OcActionDefinition): boolean {
 
 export interface OcActionSelectPayload {
   key: string
+  /** 菜单栏里选中项所属的顶层菜单：折叠进「更多」后也能路由回原来的组。 */
+  rootKey?: string
 }
