@@ -1,0 +1,87 @@
+name: Sign macOS updater artifact
+
+# Builds and signs the macOS app for an existing draft release, then uploads
+# its .app.tar.gz, .sig and restyled .dmg and fills in the macOS entries of
+# latest.json. tauri-action reads the release's current latest.json first and
+# merges in the new platform entries, so the Linux/Windows entries already on
+# the release are kept untouched (see tauri-apps/tauri-action
+# src/upload-version-json.ts). The signing key never appears in any step's
+# output; it is only read by the Tauri CLI through the env vars below.
+#
+# Manual-only: this exists because the macOS runner queue made the normal
+# three-platform release build drop the macOS job, and a release already has
+# Linux/Windows assets uploaded that must not be re-triggered.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and sign the macOS assets for (e.g. v0.5.0-beta.2)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    name: Build and sign (macos-latest)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: opencard-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: opencard-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Type check and test
+        run: npm run verify
+
+      - name: Read release notes
+        id: release-notes
+        shell: bash
+        run: |
+          echo 'body<<OPENCARD_RELEASE_NOTES_EOF' >> "$GITHUB_OUTPUT"
+          cat RELEASE_NOTES.md >> "$GITHUB_OUTPUT"
+          echo 'OPENCARD_RELEASE_NOTES_EOF' >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish Tauri release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: opencard-app
+          tagName: ${{ github.event.inputs.tag }}
+          releaseName: OpenCard ${{ github.event.inputs.tag }}
+          releaseBody: ${{ steps.release-notes.outputs.body }}
+          releaseDraft: true
+          prerelease: ${{ contains(github.event.inputs.tag, '-') }}
+          updaterJsonPreferNsis: true
+
+      # Same step as the main release workflow: restyle the disk image tauri-action
+      # just uploaded, since bundle_dmg.sh's Finder background never survives on
+      # macOS 26+.
+      - name: Restyle macOS disk image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dmg=$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -n 1)
+          node scripts/restyle-dmg.mjs "$dmg"
+          gh release upload "${{ github.event.inputs.tag }}" "$dmg" --clobber
