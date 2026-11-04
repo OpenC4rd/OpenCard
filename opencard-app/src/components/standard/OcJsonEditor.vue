@@ -148,10 +148,10 @@ function tryParseJson(value: string): { ok: true; value: unknown } | { ok: false
 }
 
 .oc-json-editor__input--default {
-  min-height: var(--oc-json-editor-min-height);
+  min-height: 180px;
 }
 
 .oc-json-editor__input--array {
-  min-height: var(--oc-json-editor-array-min-height);
+  min-height: 220px;
 }
 </style>

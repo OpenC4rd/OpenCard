@@ -41,8 +41,8 @@ const props = withDefaults(defineProps<{
 }>(), { sidebar: true, size: 'md' })
 
 const SIDEBAR_WIDTH = readThemePixels('--oc-dialog-sidebar-width')
-const EXPAND_THRESHOLD = readThemePixels('--oc-dialog-sidebar-expand-threshold')
-const COLLAPSE_THRESHOLD = readThemePixels('--oc-dialog-sidebar-collapse-threshold')
+const EXPAND_THRESHOLD = 28
+const COLLAPSE_THRESHOLD = 70
 
 type SidebarDrag = {
   pointerId: number

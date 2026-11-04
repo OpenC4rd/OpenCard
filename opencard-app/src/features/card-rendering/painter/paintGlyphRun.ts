@@ -1,5 +1,5 @@
 import { resolveCardResource, type CardRenderResourceContext } from '../cardRenderResources'
-import type { PositionedGlyphRun } from '../text-layout'
+import type { PositionedGlyphRun, PositionedTextRun } from '../text-layout'
 import type { CanvasAssetStore } from './canvasAssetStore'
 import { createDeviceBuffer, readDeviceTransform } from './deviceBuffer'
 
@@ -60,42 +60,83 @@ export type GlyphPaintContext = {
 }
 
 /**
- * 投影在缓冲里按完整字形（填充加描边）生成，形状不随尺寸变化。
- * 模糊固定精度后再放大：WebKit 的大半径模糊会出现块状。
+ * 先把内容的完整外形画进遮罩，再从遮罩生成投影：字、描边、装饰线和行内对象
+ * 共用一条链路，形状不随尺寸变化。模糊固定精度后放大，避开 WebKit 大半径模糊的块状。
  */
-export function paintBufferedGlyphShadow(ctx: CanvasRenderingContext2D, run: PositionedGlyphRun, paint: GlyphPaintContext): void {
+export function paintRunShadow(
+  ctx: CanvasRenderingContext2D,
+  run: PositionedTextRun,
+  paintShape: (target: CanvasRenderingContext2D) => void,
+): void {
   const { shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, fontSize, strokeWidth } = run.style
   const padding = shadowBlur * 1.5 + strokeWidth + fontSize / 2
   const left = run.x + Math.min(shadowOffsetX, 0) - padding
   const top = run.y + Math.min(shadowOffsetY, 0) - padding
   const width = run.width + Math.abs(shadowOffsetX) + padding * 2
   const height = run.height + Math.abs(shadowOffsetY) + padding * 2
-  const buffer = createDeviceBuffer(ctx, width, height, GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS / shadowBlur)
-  if (!buffer) {
-    paintGlyphPass(ctx, run, 'shadow', paint)
-    return
-  }
-  const { offscreen, offCtx } = buffer
-  const { a, d } = readDeviceTransform(offCtx)
-  offCtx.translate(-left, -top)
-  // 字形移出缓冲，只留下投影
-  paintGlyphPass(offCtx, run, 'shadow', paint, width)
-  // 不透明地生成再上色，填充与描边重叠处不会叠深半透明投影
-  offCtx.globalCompositeOperation = 'source-in'
-  offCtx.fillStyle = shadowColor!
-  offCtx.fillRect(left, top, width, height)
+  const maxScale = GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS / shadowBlur
+  const mask = createDeviceBuffer(ctx, width, height, maxScale)
+  const shadow = createDeviceBuffer(ctx, width, height, maxScale)
+  if (!mask || !shadow) return
+
+  const { a, d } = readDeviceTransform(mask.offCtx)
+  mask.offCtx.translate(-left, -top)
+  paintShape(mask.offCtx)
+
+  // 遮罩画在缓冲外，只留下投影；不透明地生成再上色，半透明投影才均匀
+  const shift = mask.offscreen.width
+  const shadowCtx = shadow.offCtx
+  shadowCtx.setTransform(1, 0, 0, 1, 0, 0)
+  shadowCtx.shadowColor = GLYPH_SHADOW_MASK_COLOR
+  shadowCtx.shadowOffsetX = shadowOffsetX * a + shift
+  shadowCtx.shadowOffsetY = shadowOffsetY * d
+  shadowCtx.shadowBlur = shadowBlur * Math.sqrt(a * d)
+  shadowCtx.drawImage(mask.offscreen, -shift, 0)
+  shadowCtx.shadowColor = 'transparent'
+  shadowCtx.globalCompositeOperation = 'source-in'
+  shadowCtx.fillStyle = shadowColor!
+  shadowCtx.fillRect(0, 0, shadow.offscreen.width, shadow.offscreen.height)
+
   ctx.save()
   ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(offscreen, left, top, offscreen.width / a, offscreen.height / d)
+  ctx.drawImage(shadow.offscreen, left, top, shadow.offscreen.width / a, shadow.offscreen.height / d)
+  ctx.restore()
+}
+
+/** 字形的完整外形：描边、填充与装饰线。 */
+export function paintGlyphShape(ctx: CanvasRenderingContext2D, run: PositionedGlyphRun, paint: GlyphPaintContext): void {
+  paintGlyphPass(ctx, run, 'shape', paint)
+  paintGlyphDecorations(ctx, run, GLYPH_SHADOW_MASK_COLOR)
+}
+
+export function paintGlyphDecorations(ctx: CanvasRenderingContext2D, run: PositionedGlyphRun, color: string): void {
+  const { underline, strikethrough, fontSize } = run.style
+  if (!underline && !strikethrough) return
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = Math.max(0.1, fontSize * 0.07)
+  if (underline) {
+    const lineY = run.baselineY + ctx.lineWidth * 1.5
+    ctx.beginPath()
+    ctx.moveTo(run.x, lineY)
+    ctx.lineTo(run.x + run.width, lineY)
+    ctx.stroke()
+  }
+  if (strikethrough) {
+    const lineY = run.y + run.height / 2
+    ctx.beginPath()
+    ctx.moveTo(run.x, lineY)
+    ctx.lineTo(run.x + run.width, lineY)
+    ctx.stroke()
+  }
   ctx.restore()
 }
 
 export function paintGlyphPass(
   ctx: CanvasRenderingContext2D,
   run: PositionedGlyphRun,
-  pass: 'fill' | 'stroke' | 'shadow',
+  pass: 'fill' | 'stroke' | 'shape',
   { blockId, baseFontFamily, assets, resourceContext }: GlyphPaintContext,
-  glyphShift = 0,
 ): void {
   ctx.save()
   const style = run.style
@@ -106,14 +147,6 @@ export function paintGlyphPass(
     : resolveBlockFontFamily(style.fontFamily, blockId, 'content', resourceContext)
   ctx.font = `${italic}${weight} ${style.fontSize}px ${resolvedFont}`
   ctx.textBaseline = 'alphabetic'
-  // 在竖排旋转之前换算：投影方向跟随文字块，不跟随单个字形
-  if (pass === 'shadow' || (pass === 'stroke' && hasDirectGlyphShadow(style))) applyGlyphShadow(ctx, style)
-  if (glyphShift) {
-    ctx.shadowColor = GLYPH_SHADOW_MASK_COLOR
-    ctx.shadowOffsetX += glyphShift * readDeviceTransform(ctx).a
-    ctx.translate(-glyphShift, 0)
-  }
-
   let drawX = run.x
   let drawY = run.baselineY
   if (run.angleRad !== 0) {
@@ -124,16 +157,15 @@ export function paintGlyphPass(
     drawY = -run.width / 2 + (run.baselineY - run.y)
   }
 
-  const outlined = pass !== 'fill' && hasGlyphOutline(style)
-  if (outlined) {
+  if (pass !== 'fill' && hasGlyphOutline(style)) {
     ctx.lineJoin = 'round'
     ctx.miterLimit = 2
     ctx.lineWidth = style.strokeWidth * 2
-    ctx.strokeStyle = pass === 'shadow' ? GLYPH_SHADOW_MASK_COLOR : style.strokeColor!
+    ctx.strokeStyle = pass === 'shape' ? GLYPH_SHADOW_MASK_COLOR : style.strokeColor!
     ctx.strokeText(run.text, drawX, drawY)
   }
-  if (!outlined || pass === 'shadow') {
-    ctx.fillStyle = pass === 'shadow'
+  if (pass !== 'stroke') {
+    ctx.fillStyle = pass === 'shape'
       ? GLYPH_SHADOW_MASK_COLOR
       : resolveGlyphFillStyle(ctx, style, blockId, assets, resourceContext)
     ctx.fillText(run.text, drawX, drawY)
@@ -144,22 +176,4 @@ export function paintGlyphPass(
 
 export function hasGlyphOutline(style: PositionedGlyphRun['style']): boolean {
   return style.strokeWidth > 0 && Boolean(style.strokeColor)
-}
-
-export function hasBufferedGlyphShadow(style: PositionedGlyphRun['style']): boolean {
-  return Boolean(style.shadowColor) && (style.shadowBlur > 0 || hasGlyphOutline(style))
-}
-
-export function hasDirectGlyphShadow(style: PositionedGlyphRun['style']): boolean {
-  return Boolean(style.shadowColor) && !hasBufferedGlyphShadow(style)
-}
-
-/** Canvas 的 shadow* 以设备像素计且不受 CTM 影响，这里把卡片坐标换算到当前位图。 */
-function applyGlyphShadow(ctx: CanvasRenderingContext2D, style: PositionedGlyphRun['style']): void {
-  if (!style.shadowColor) return
-  const { a, b, c, d } = readDeviceTransform(ctx)
-  ctx.shadowColor = style.shadowColor
-  ctx.shadowOffsetX = a * style.shadowOffsetX + c * style.shadowOffsetY
-  ctx.shadowOffsetY = b * style.shadowOffsetX + d * style.shadowOffsetY
-  ctx.shadowBlur = style.shadowBlur * Math.sqrt(Math.abs(a * d - b * c))
 }

@@ -420,7 +420,7 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
   position: absolute;
   inset-inline: 0;
   bottom: 0;
-  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md));
+  height: var(--shell-bottom-panel-height, 240px);
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -433,7 +433,7 @@ function handleIssueActivate(event: OcNodeActivateEvent): void {
 }
 
 .shell-bottom-panel.is-expanded {
-  height: var(--shell-bottom-panel-height, var(--oc-list-max-height-md));
+  height: var(--shell-bottom-panel-height, 240px);
 }
 
 .shell-bottom-panel.is-expanded .shell-bottom-panel__content {

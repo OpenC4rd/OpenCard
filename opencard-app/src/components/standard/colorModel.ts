@@ -110,3 +110,10 @@ function clampUnit(value: number): number {
 function clampChannel(value: number): number {
   return Math.round(Math.min(255, Math.max(0, value)))
 }
+
+/** 表示「这里透明」的棋盘格 background 片段，tile 是一组黑白格的边长；底色由调用方接在后面。 */
+export const alphaChecker = (tile: number): string =>
+  `repeating-conic-gradient(color-mix(in srgb, var(--oc-fg-default) 14%, transparent) 0% 25%, transparent 0% 50%) 0 0 / ${tile}px ${tile}px`
+
+/** 控件内的棋盘格：8px 一格、实显 4px 方块，28px 的字段和 12px 的滑轨都是它的整数倍。 */
+export const ALPHA_CHECKER = alphaChecker(8)

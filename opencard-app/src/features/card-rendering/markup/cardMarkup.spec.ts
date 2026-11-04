@@ -42,8 +42,8 @@ describe('parseCardMarkup', () => {
       type: 'span',
       style: {
         bold: true, italic: true, color: 'rgb(1,2,3)', backgroundColor: '#fff', fontSize: '18mm',
-        strokeColor: '#000', strokeWidth: 2,
-        shadowColor: 'rgba(0,0,0,.5)', shadowOffsetX: 1, shadowOffsetY: 2, shadowBlur: 3,
+        stroke: { color: '#000', width: '2mm' },
+        shadow: { color: 'rgba(0,0,0,.5)', offsetX: '1mm', offsetY: '2mm', blur: '3mm' },
         fillSource: 'art/x.png',
       },
     })

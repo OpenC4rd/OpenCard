@@ -346,7 +346,7 @@ defineExpose({ selectSeries, navigateToKeyConflict, selectedRuntime })
 .project-icon-registry-workbench {
   display: grid;
   grid-template-columns:
-    var(--oc-project-icon-sets-width) minmax(0, 1fr) var(--oc-project-icon-inspector-width);
+    280px minmax(0, 1fr) 320px;
   width: 100%;
   height: 100%;
   min-width: 0;

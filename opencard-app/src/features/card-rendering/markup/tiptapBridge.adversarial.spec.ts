@@ -299,12 +299,8 @@ describe('tiptapBridge Adversarial: Deep Nesting & Conflicting Styles', () => {
       color: 'red',
       fontSize: '18mm',
       fontFamily: 'Arial',
-      textStrokeColor: '#000',
-      textStrokeWidth: '2mm',
-      textShadowColor: '#111',
-      textShadowOffsetX: '1mm',
-      textShadowOffsetY: '1mm',
-      textShadowBlur: '2mm',
+      textStroke: { color: '#000', width: '2mm' },
+      textShadow: { color: '#111', offsetX: '1mm', offsetY: '1mm', blur: '2mm' },
     })
 
     // Bi-directional roundtrip preserves all attributes regardless of mark array order

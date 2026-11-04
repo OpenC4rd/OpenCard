@@ -97,7 +97,7 @@ watch(
   width: max-content;
   max-width: min(420px, 80vw);
   max-height: inherit;
-  min-width: var(--oc-autocomplete-popover-min-width);
+  min-width: 240px;
   overflow-y: auto;
   padding: var(--oc-space-2xs);
 }

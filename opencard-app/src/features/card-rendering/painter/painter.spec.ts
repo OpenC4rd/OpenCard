@@ -120,11 +120,10 @@ function face(...children: ReturnType<typeof at>[]): RenderReadyCardFace {
 
 // --- Test Suites ---
 
-describe('text shadow device-space conversion', () => {
-  function faceWithText(content: string, transform: Record<string, unknown> = {}): RenderReadyCardFace {
+describe('run shadows', () => {
+  function faceWithText(content: string): RenderReadyCardFace {
     const text = block('txt', {
       type: 'text-block', content, fontFamily: 'sans-serif', fontSize: '10', lineHeight: '12', color: '#111111',
-      ...transform,
     })
     return {
       type: 'card-face', id: 'f', width: 200, height: 100, background: '#ffffff', dpi: 300,
@@ -132,100 +131,70 @@ describe('text shadow device-space conversion', () => {
     } as unknown as RenderReadyCardFace
   }
 
-  type ShadowFrame = { color: string; x: number; y: number; blur: number; method: string }
+  type ShadowPass = { x: number; y: number; blur: number; color: string }
 
-  function paintShadowFrames(face: RenderReadyCardFace, base: readonly [number, number, number, number]): ShadowFrame[] {
-    const ctx = createMockCanvasContext() as ReturnType<typeof createMockCanvasContext> & Record<string, unknown>
-    let matrix = [...base, 0, 0] as number[]
-    const stack: { matrix: number[]; shadow: [string, number, number, number] }[] = []
-    const frames: ShadowFrame[] = []
-    const capture = (method: string) => {
-      if (ctx.shadowColor === 'transparent') return
-      frames.push({ method, color: ctx.shadowColor as string, x: ctx.shadowOffsetX as number, y: ctx.shadowOffsetY as number, blur: ctx.shadowBlur as number })
-    }
-    const multiply = (a: number, b: number, c: number, d: number, e: number, f: number) => {
-      const [ma, mb, mc, md, me, mf] = matrix as [number, number, number, number, number, number]
-      matrix = [ma * a + mc * b, mb * a + md * b, ma * c + mc * d, mb * c + md * d, ma * e + mc * f + me, mb * e + md * f + mf]
-    }
-    ctx.getTransform = () => {
-      const [a, b, c, d] = matrix as [number, number, number, number]
-      return { a, b, c, d } as DOMMatrix
-    }
-    ctx.save = vi.fn(() => { stack.push({ matrix: [...matrix], shadow: [ctx.shadowColor as string, ctx.shadowOffsetX as number, ctx.shadowOffsetY as number, ctx.shadowBlur as number] }) })
-    ctx.restore = vi.fn(() => {
-      const top = stack.pop()!
-      matrix = top.matrix
-      ;[ctx.shadowColor, ctx.shadowOffsetX, ctx.shadowOffsetY, ctx.shadowBlur] = top.shadow
-    })
-    ctx.transform = vi.fn(multiply)
-    ctx.translate = vi.fn((x: number, y: number) => multiply(1, 0, 0, 1, x, y))
-    ctx.rotate = vi.fn((r: number) => multiply(Math.cos(r), Math.sin(r), -Math.sin(r), Math.cos(r), 0, 0))
-    ctx.fillText = vi.fn(() => capture('fillText'))
-    ctx.strokeText = vi.fn(() => capture('strokeText'))
-    paintCardScene(ctx, face, createMockAssetStore())
-    return frames
-  }
-
-  it.each([1, 2, 3.78, 7.56, 23.6])('keeps offset and blur constant in card units at render ratio %s', ratio => {
-    const [frame] = paintShadowFrames(faceWithText('@style(shadow=#0000ff 2mm 3mm 4mm){Hg}'), [ratio, 0, 0, ratio])
-    expect(frame?.x).toBeCloseTo(2 * ratio)
-    expect(frame?.y).toBeCloseTo(3 * ratio)
-    expect(frame?.blur).toBeCloseTo(4 * ratio)
-  })
-
-  it('casts the shadow from the glyph fill instead of an unconfigured black stroke', () => {
-    const [frame] = paintShadowFrames(faceWithText('@style(shadow=#0000ff 1mm 1mm 0mm){Hg}'), [2, 0, 0, 2])
-    expect(frame?.method).toBe('fillText')
-  })
-
-  it('casts the shadow from the whole outlined glyph so it never turns hollow', () => {
-    const frames = paintShadowFrames(faceWithText('@style(stroke=#00ff00 1mm,shadow=#0000ff 1mm 1mm 0mm){Hg}'), [2, 0, 0, 2])
-    expect(frames.map(frame => frame.method)).toEqual(['strokeText', 'fillText'])
-  })
-
-  it('rotates the offset with the device transform', () => {
-    const [frame] = paintShadowFrames(faceWithText('@style(shadow=#0000ff 2mm 0mm 0mm){Hg}'), [0, 3, -3, 0])
-    expect(frame?.x).toBeCloseTo(0)
-    expect(frame?.y).toBeCloseTo(6)
-  })
-
-  it('keeps the shadow in the block frame for rotated vertical glyphs', () => {
-    const vertical = faceWithText('@style(shadow=#0000ff 2mm 3mm 0mm){Hg}', { writingMode: 'vertical-rl' })
-    const [frame] = paintShadowFrames(vertical, [2, 0, 0, 2])
-    expect(frame?.x).toBeCloseTo(4)
-    expect(frame?.y).toBeCloseTo(6)
-  })
-
-  it.each([4, 23.6, 75.6])('renders blurred shadows at a fixed blur precision at render ratio %s', ratio => {
-    const buffers: { width: number; height: number; ctx: CanvasRenderingContext2D; shadowBlurs: number[] }[] = []
+  /** 每个带投影的 run 产生一对缓冲：遮罩与投影。 */
+  function paintShadows(content: string, ratio: number) {
+    const buffers: { width: number; height: number; ctx: ReturnType<typeof createMockCanvasContext> }[] = []
+    const shadowPasses: ShadowPass[] = []
     class FakeOffscreenCanvas {
-      ctx: CanvasRenderingContext2D
+      ctx: ReturnType<typeof createMockCanvasContext>
       constructor(public width: number, public height: number) {
-        const shadowBlurs: number[] = []
         const matrix = [1, 0, 0, 1]
         const ctx = createMockCanvasContext()
-        ctx.setTransform = vi.fn((a: number, b: number, c: number, d: number) => { matrix.splice(0, 4, a, b, c, d) }) as unknown as typeof ctx.setTransform
-        ctx.getTransform = vi.fn(() => ({ a: matrix[0], b: matrix[1], c: matrix[2], d: matrix[3] }) as DOMMatrix)
-        ctx.fillText = vi.fn(() => { shadowBlurs.push(ctx.shadowBlur as number) })
+        const bufferContext = ctx as unknown as CanvasRenderingContext2D
+        bufferContext.setTransform = vi.fn((a: number, b: number, c: number, d: number) => {
+          matrix.splice(0, 4, a, b, c, d)
+        }) as unknown as typeof bufferContext.setTransform
+        bufferContext.getTransform = vi.fn(() => ({ a: matrix[0], b: matrix[1], c: matrix[2], d: matrix[3] }) as DOMMatrix)
+        bufferContext.drawImage = vi.fn(() => {
+          shadowPasses.push({ x: ctx.shadowOffsetX, y: ctx.shadowOffsetY, blur: ctx.shadowBlur, color: ctx.shadowColor })
+        }) as unknown as typeof bufferContext.drawImage
         this.ctx = ctx
-        buffers.push({ width, height, ctx, shadowBlurs })
+        buffers.push({ width, height, ctx })
       }
       getContext() { return this.ctx }
     }
     vi.stubGlobal('OffscreenCanvas', FakeOffscreenCanvas)
     try {
       const ctx = createMockCanvasContext()
-      ctx.getTransform = vi.fn(() => ({ a: ratio, b: 0, c: 0, d: ratio }) as DOMMatrix)
-      paintCardScene(ctx, faceWithText('@style(shadow=#0000ff 3mm 3mm 1mm){Hg}'), createMockAssetStore())
-
-      expect(buffers).toHaveLength(1)
-      expect(buffers[0]!.shadowBlurs).toEqual([Math.min(ratio, 16)])
-      expect(ctx.drawImage).toHaveBeenCalledTimes(1)
-      expect(buffers[0]!.ctx.globalCompositeOperation).toBe('source-in')
-      expect(buffers[0]!.ctx.fillStyle).toBe('#0000ff')
+      ;(ctx as unknown as CanvasRenderingContext2D).getTransform = vi.fn(() => ({ a: ratio, b: 0, c: 0, d: ratio }) as DOMMatrix)
+      paintCardScene(ctx, faceWithText(content), createMockAssetStore())
+      return { ctx, buffers, shadowPasses }
     } finally {
       vi.unstubAllGlobals()
     }
+  }
+
+  it.each([1, 2, 3.78, 7.56, 23.6])('keeps a hard shadow offset constant in card units at render ratio %s', ratio => {
+    const { buffers, shadowPasses } = paintShadows('@style(shadow=#0000ff 2mm 3mm 0mm){Hg}', ratio)
+    expect(shadowPasses[0]?.x).toBeCloseTo(2 * ratio + buffers[0]!.width)
+    expect(shadowPasses[0]?.y).toBeCloseTo(3 * ratio)
+    expect(shadowPasses[0]?.blur).toBe(0)
+  })
+
+  it.each([4, 23.6, 75.6])('renders blur at a fixed precision at render ratio %s', ratio => {
+    const { shadowPasses } = paintShadows('@style(shadow=#0000ff 3mm 3mm 1mm){Hg}', ratio)
+    expect(shadowPasses[0]?.blur).toBeCloseTo(Math.min(ratio, 16))
+  })
+
+  it('tints the shadow after generating it opaquely', () => {
+    const { ctx, buffers, shadowPasses } = paintShadows('@style(shadow=#0000ff80 1mm 1mm 1mm){Hg}', 2)
+    expect(shadowPasses[0]?.color).toBe('#000000')
+    expect(buffers[1]!.ctx.globalCompositeOperation).toBe('source-in')
+    expect(buffers[1]!.ctx.fillStyle).toBe('#0000ff80')
+    expect(ctx.drawImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('builds the mask from the outline and the fill together', () => {
+    const { buffers } = paintShadows('@style(stroke=#00ff00 1mm,shadow=#0000ff 1mm 1mm 0mm){Hg}', 2)
+    expect(buffers[0]!.ctx.calls.filter(call => /Text$/.test(call.method)).map(call => call.method))
+      .toEqual(['strokeText', 'fillText'])
+  })
+
+  it('includes underline and strikethrough in the mask', () => {
+    const { buffers } = paintShadows('@style(shadow=#0000ff 1mm 1mm 0mm){@u{@s{Hg}}}', 2)
+    expect(buffers[0]!.ctx.calls.filter(call => call.method === 'stroke')).toHaveLength(2)
   })
 })
 

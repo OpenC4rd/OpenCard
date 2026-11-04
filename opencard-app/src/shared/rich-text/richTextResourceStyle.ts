@@ -8,7 +8,6 @@ export function resolveRichTextStyle(
 ): string {
   const style = document.createElement('span').style
   style.cssText = attributes.style ?? ''
-  if (attributes['data-oc-shadow-color']) style.textShadow = `${attributes['data-oc-shadow-offset-x'] || '0px'} ${attributes['data-oc-shadow-offset-y'] || '0px'} ${attributes['data-oc-shadow-blur'] || '0px'} ${attributes['data-oc-shadow-color']}`
   if (style.fontFamily) style.fontFamily = resolveFont(fromCssFontFamily(style.fontFamily)) ?? ''
   if (attributes['data-oc-fill-type'] === 'image' && style.backgroundImage !== 'none') {
     const source = attributes['data-oc-fill-source']

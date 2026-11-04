@@ -431,7 +431,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   --settings-preview-glass-opacity: 0;
 
   position: sticky;
-  top: var(--oc-settings-preview-sticky-offset);
+  top: 0;
   z-index: var(--oc-z-settings-preview);
   isolation: isolate;
   width: 100%;

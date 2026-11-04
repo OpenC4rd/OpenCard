@@ -54,12 +54,7 @@
                 <OcIcon v-if="fieldWarnings?.has(fieldIdentity(row.category.inputKey, row.entry.key))"
                   name="mdiAlertOutline" tone="warning" size="sm"
                   :data-tooltip="fieldWarnings.get(fieldIdentity(row.category.inputKey, row.entry.key))" />
-                <button type="button" class="property-editor__field-key-button"
-                  :data-tooltip="t('propertyEditor.actions.copyFieldKeyTooltip', { key: row.entry.key })"
-                  :aria-label="t('propertyEditor.actions.copyFieldKey', { key: row.entry.key })"
-                  @click.stop="copyFieldKey(row.entry.key)">
-                  <OcText class="property-editor__row-label-text" :truncate="true">{{ row.entry.label }}</OcText>
-                </button>
+                <PropertyFieldLabel :label="row.entry.label" :field-key="row.entry.key" :copyable="copyableFieldKeys" />
               </div>
               <div class="property-editor__value">
                 <span v-if="row.entry.readonly" class="property-editor__readonly-value">
@@ -103,7 +98,6 @@
 // Vue 基础能力与依赖组件。
 import { computed, nextTick, onBeforeUnmount, ref, toRef, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { notifyAppError } from '../../../features/notifications/titlebarNotices'
 import type {
   PropertyEditorBindingInterpreter,
   PropertyEditorCategoryDefinition,
@@ -128,6 +122,7 @@ import OcIcon from '../../../components/base/OcIcon.vue'
 import OcText from '../../../components/base/OcText.vue'
 import OcPanel from '../../../components/base/OcPanel.vue'
 import OcActionBar from '../../../components/standard/OcActionBar.vue'
+import PropertyFieldLabel from './PropertyFieldLabel.vue'
 import PropertyFieldRenderer from './PropertyFieldRenderer.vue'
 import {
   createPropertyFieldEditorModeAction,
@@ -158,6 +153,10 @@ const props = withDefaults(defineProps<{
   allowRawStringEditor?: boolean
   deleteMode?: boolean
   fieldWarnings?: ReadonlyMap<string, string>
+  /** 重置与删除回到哪里只有调用方知道；不传时用中性文案。 */
+  fieldActionLabels?: { reset?: string; delete?: string }
+  /** 属性 Key 对用户有意义时开启：点属性名复制 Key。 */
+  copyableFieldKeys?: boolean
   capabilities?: PropertyFieldCapabilities
 }>(), {
   allowRawStringEditor: false,
@@ -168,8 +167,8 @@ const { t } = useI18n()
 const fieldEditorModes = usePropertyFieldEditorModes()
 
 const addFieldActionText = computed(() => t('propertyEditor.actions.addField'))
-const resetFieldActionText = computed(() => t('propertyEditor.actions.reset'))
-const deleteFieldActionText = computed(() => t('propertyEditor.actions.delete'))
+const resetFieldActionText = computed(() => props.fieldActionLabels?.reset ?? t('propertyEditor.actions.reset'))
+const deleteFieldActionText = computed(() => props.fieldActionLabels?.delete ?? t('propertyEditor.actions.delete'))
 const ADD_PROPERTY_ACTION_KEY = 'add-property'
 const ADD_PROPERTY_FIELD_ACTION_PREFIX = 'add-property:'
 const propertyEditorRoot = ref<HTMLElement | null>(null)
@@ -181,14 +180,6 @@ function setFieldRendererRef(identity: string, component: unknown): void {
   const handle = component as { activate?: () => boolean | Promise<boolean> } | null
   if (handle?.activate) fieldRendererRefs.set(identity, { activate: handle.activate })
   else fieldRendererRefs.delete(identity)
-}
-
-async function copyFieldKey(fieldKey: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(fieldKey)
-  } catch (error) {
-    notifyAppError('OC-E1002', { source: 'property-field-key', fieldKey, error })
-  }
 }
 
 const { displaySources } = usePropertyEditorView({
@@ -554,34 +545,6 @@ onBeforeUnmount(() => {
   font-size: var(--oc-text-sm);
 }
 
-.property-editor__row-label-text {
-  min-width: 0;
-}
-
-.property-editor__field-key-button {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 1px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  transition: color var(--oc-duration-quick) var(--oc-ease);
-}
-
-.property-editor__field-key-button:hover,
-.property-editor__field-key-button:focus-visible {
-  color: var(--oc-fg-default);
-}
-
-.property-editor__field-key-button:focus-visible {
-  outline: none;
-  box-shadow: var(--oc-focus-ring);
-}
-
 /* 子编辑器占满整行高度，不再靠上下外边距留白。 */
 .entry-control {
   margin: 0;
@@ -591,7 +554,7 @@ onBeforeUnmount(() => {
 
 .property-editor__value {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) var(--property-action-column, auto);
   align-items: center;
   gap: var(--oc-space-2xs);
   min-width: 0;

@@ -702,7 +702,7 @@ defineExpose({ canSave, presentation, headerActions, onHeaderAction })
 .dictionary-editor__repair {
   flex: 1 1 auto;
   display: grid;
-  grid-template-rows: auto minmax(var(--oc-list-max-height-lg), 1fr);
+  grid-template-rows: auto minmax(320px, 1fr);
   gap: var(--oc-space-md);
   min-height: 0;
   padding-top: var(--oc-space-lg);
@@ -719,7 +719,7 @@ defineExpose({ canSave, presentation, headerActions, onHeaderAction })
 }
 
 .dictionary-editor__source {
-  min-height: var(--oc-list-max-height-lg);
+  min-height: 320px;
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
 }

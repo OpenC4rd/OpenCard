@@ -452,13 +452,13 @@ defineExpose({ navigateToFont })
 <style scoped>
 .project-font-registry-workbench {
   display: grid;
-  grid-template-columns: minmax(var(--oc-project-font-list-min-width), var(--oc-project-font-list-width)) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 48%) minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--oc-bg-inset);
+  background: var(--oc-bg-block);
 }
 .project-font-registry-workbench__left,
 .project-font-registry-workbench__right { min-width: 0; min-height: 0; overflow: hidden; }

@@ -274,7 +274,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   position: relative;
   display: block;
   min-width: 0;
-  aspect-ratio: var(--oc-album-card-aspect-ratio);
+  aspect-ratio: 1 / 1.4142;
   /* 固定格高时把按比例算出的高度夹回行高；不设 token 时是 `none`，封面卡的行为一点不变。 */
   max-block-size: var(--oc-album-cell-block-size, none);
   overflow: hidden;
@@ -344,7 +344,7 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 
 .oc-album__card:hover .oc-album__media,
 .oc-album__card:focus-visible .oc-album__media {
-  transform: scale(var(--oc-album-cover-zoom));
+  transform: scale(1.05);
 }
 
 @media (prefers-reduced-motion: reduce) {

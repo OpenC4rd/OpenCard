@@ -13,8 +13,10 @@ export type {
   CardMarkupSpanNode,
   CardMarkupTextNode,
   InlineStyleSpec,
+  TextShadow,
+  TextStroke,
 } from './cardMarkup.types'
-export { parseCardMarkup } from './cardMarkupParser'
+export { isAbsoluteLength, isLength, parseCardMarkup } from './cardMarkupParser'
 export { serializeCardMarkup } from './cardMarkupSerializer'
 export {
   cardMarkupToTiptap,

@@ -72,6 +72,7 @@ export type PositionedImageRun = {
   width: number
   height: number
   angleRad: number
+  style: ResolvedRunStyle
 }
 
 export type PositionedTextRun = PositionedGlyphRun | PositionedIconRun | PositionedImageRun

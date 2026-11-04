@@ -6,8 +6,6 @@ export type OcThemeId = 'dark' | 'light'
 
 export const OC_THEME_TOKEN_KEYS = [
   // 壳层固定几何
-  '--oc-shell-titlebar-height',
-  '--oc-shell-page-header-height',
 
   // 滚动条
   '--oc-scrollbar-size',
@@ -64,7 +62,6 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-diff-removed-border',
   '--oc-diff-changed-border',
   '--oc-diff-divider',
-  '--oc-diff-version-label-max-width',
 
   // 强调色
   '--oc-accent',
@@ -101,10 +98,6 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-icon-size-display',
 
   // 数字角标
-  '--oc-number-badge-size',
-  '--oc-number-badge-padding-inline',
-  '--oc-number-badge-font-size',
-  '--oc-number-badge-line-height',
 
   // 内联标记
   '--oc-inline-key-height',
@@ -138,6 +131,7 @@ export const OC_THEME_TOKEN_KEYS = [
   // 字体
   '--oc-font-sans',
   '--oc-font-mono',
+  '--oc-font-numeric',
 
   // 字号
   '--oc-text-xs',
@@ -154,10 +148,6 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-space-md',
   '--oc-space-lg',
   '--oc-indent-step',
-  '--oc-page-editor-row-min-height',
-  '--oc-page-editor-title-min-width',
-  '--oc-page-editor-content-min-width',
-  '--oc-page-editor-value-width',
 
   // 控件高度
   '--oc-size-sm',
@@ -176,35 +166,18 @@ export const OC_THEME_TOKEN_KEYS = [
 
   // 列表高度上限
   '--oc-list-max-height-sm',
-  '--oc-list-max-height-md',
-  '--oc-list-max-height-lg',
 
   // 需要自持滚动的列表（虚拟滚动）的固定高度
-  '--oc-list-height-md',
 
   // 页面内容宽度
   '--oc-content-width-md',
   '--oc-settings-preview-height-lg',
   '--oc-settings-preview-height-md',
   '--oc-settings-preview-shrink-distance',
-  '--oc-settings-preview-sticky-offset',
   '--oc-settings-preview-glass-opacity-min',
   '--oc-settings-preview-glass-opacity-max',
   '--oc-z-settings-preview',
-  '--oc-project-outline-width',
-  '--oc-shell-sidebar-collapse-threshold',
-  '--oc-project-font-list-min-width',
-  '--oc-project-font-list-width',
-  '--oc-project-icon-sets-width',
-  '--oc-project-icon-inspector-width',
-  '--oc-project-icon-preview-size',
-  '--oc-project-icon-preview-height',
-  '--oc-cover-preview-width',
-  '--oc-cover-preview-height',
-  '--oc-cover-banner-height',
   '--oc-album-card-min-width',
-  '--oc-album-card-aspect-ratio',
-  '--oc-album-cover-zoom',
   '--oc-welcome-cover-tile-width',
   '--oc-welcome-cover-tile-aspect-ratio',
   '--oc-welcome-cover-wall-perspective',
@@ -218,21 +191,11 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-welcome-cover-tile-emphasis-opacity',
   '--oc-welcome-cover-tile-emphasis-scale',
   '--oc-welcome-cover-wall-duration',
-  '--oc-card-editor-dock-min-width',
-  '--oc-card-editor-dock-max-width',
-  '--oc-card-editor-dock-expand-threshold',
-  '--oc-card-editor-dock-collapse-threshold',
-  '--oc-card-editor-dock-top-min-height',
-  '--oc-card-editor-dock-bottom-min-height',
-  '--oc-card-editor-dock-responsive-width',
   '--oc-z-shell-floating-control',
   '--oc-z-shell-resize-preview',
   '--oc-z-popover',
   '--oc-z-file-drop',
   '--oc-z-tooltip',
-  '--oc-autocomplete-popover-min-width',
-  '--oc-json-editor-min-height',
-  '--oc-json-editor-array-min-height',
   '--oc-dialog-width-sm',
   '--oc-dialog-width-md',
   '--oc-dialog-width-lg',
@@ -244,8 +207,6 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-dialog-max-height',
   '--oc-dialog-sidebar-width',
   '--oc-dialog-sidebar-handle-width',
-  '--oc-dialog-sidebar-expand-threshold',
-  '--oc-dialog-sidebar-collapse-threshold',
   '--oc-action-padding',
   '--oc-z-modal',
   '--oc-z-overlay-toolbar',

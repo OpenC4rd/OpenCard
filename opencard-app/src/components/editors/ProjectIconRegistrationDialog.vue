@@ -248,7 +248,7 @@ function fileStem(path: string): string {
 .project-icon-registration-dialog__preview {
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-control);
-  background: var(--oc-bg-inset);
+  background: var(--oc-bg-block);
   display: grid;
   gap: var(--oc-space-xs);
   padding: var(--oc-space-sm);

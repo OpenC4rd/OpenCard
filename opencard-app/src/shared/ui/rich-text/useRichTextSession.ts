@@ -51,14 +51,9 @@ export function useRichTextSession(
     open.value = true
     await nextTick()
     if (!open.value) return
-    const current = editor.value
-    if (current) {
-      if (current.setContent) current.setContent(value)
-      else current.applyHtml(value)
-      current.focus()
-    } else {
-      sourceInput.value?.focus()
-    }
+    // 编辑器随打开挂载，内容已由 initialHtml 给定；再写一次只会多出一条空的撤销记录。
+    if (editor.value) editor.value.focus()
+    else sourceInput.value?.focus()
   }
 
   async function switchMode(next: string) {

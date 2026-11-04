@@ -374,6 +374,7 @@ describe('CardDesignEditor issue navigation', () => {
     expect(sessionView(wrapper)).toEqual({
       activeFace: 'front',
       clipToFace: true,
+      previewBackground: 'checker',
       alignmentSnappingEnabled: true,
       selectedInstanceId: null,
       selectedBlockIdsByFace: { front: [], back: [] },

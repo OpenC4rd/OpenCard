@@ -6,6 +6,7 @@ import type {
   CardMarkupParagraphNode,
   InlineStyleSpec,
 } from '../markup'
+import { evaluateRenderLength } from '../geometry/lengthMath'
 import { CJK_CHAR_CLASS, isCjkChar } from './textMeasure'
 import type {
   PositionedGlyphRun,
@@ -80,12 +81,16 @@ function applySpan(parent: ResolvedRunStyle, spec: InlineStyleSpec, baseSize: nu
     const size = resolveSize(spec.fontSize, parent.fontSize, parent.fontSize, baseSize)
     if (size !== undefined && size > 0) style.fontSize = size
   }
-  if (spec.strokeColor !== undefined) style.strokeColor = spec.strokeColor
-  if (spec.strokeWidth !== undefined) style.strokeWidth = spec.strokeWidth
-  if (spec.shadowColor !== undefined) style.shadowColor = spec.shadowColor
-  if (spec.shadowOffsetX !== undefined) style.shadowOffsetX = spec.shadowOffsetX
-  if (spec.shadowOffsetY !== undefined) style.shadowOffsetY = spec.shadowOffsetY
-  if (spec.shadowBlur !== undefined) style.shadowBlur = spec.shadowBlur
+  if (spec.stroke) {
+    style.strokeColor = spec.stroke.color
+    style.strokeWidth = evaluateRenderLength(spec.stroke.width, 0)
+  }
+  if (spec.shadow) {
+    style.shadowColor = spec.shadow.color
+    style.shadowOffsetX = evaluateRenderLength(spec.shadow.offsetX, 0)
+    style.shadowOffsetY = evaluateRenderLength(spec.shadow.offsetY, 0)
+    style.shadowBlur = evaluateRenderLength(spec.shadow.blur, 0)
+  }
   if (spec.fillSource !== undefined) style.fillSource = spec.fillSource
   return style
 }
@@ -320,7 +325,7 @@ function placeHorizontal(ctx: Ctx, lines: LogicalLine[]): TextLayoutResult {
       } else if (unit.kind === 'icon') {
         runs.push({ kind: 'icon', icon: unit.icon!, x: offset, y: baseline - unit.ascent, width: unit.objW, height: unit.objH, angleRad: 0, style: unit.style })
       } else if (unit.kind === 'img') {
-        runs.push({ kind: 'img', image: unit.image!, x: offset, y: baseline - unit.ascent, width: unit.objW, height: unit.objH, angleRad: 0 })
+        runs.push({ kind: 'img', image: unit.image!, x: offset, y: baseline - unit.ascent, width: unit.objW, height: unit.objH, angleRad: 0, style: unit.style })
       }
     }
     const result = { index, x: line.start, y: top, width: line.length, height: line.cross, baselineY: baseline, runs: mergeGlyphRuns(runs) }
@@ -357,7 +362,7 @@ function placeVertical(ctx: Ctx, lines: LogicalLine[]): TextLayoutResult {
       } else if (unit.kind === 'icon') {
         runs.push({ kind: 'icon', icon: unit.icon!, x: colX + (line.cross - unit.objW) / 2, y: offset, width: unit.objW, height: unit.objH, angleRad: 0, style: unit.style })
       } else if (unit.kind === 'img') {
-        runs.push({ kind: 'img', image: unit.image!, x: colX + (line.cross - unit.objW) / 2, y: offset, width: unit.objW, height: unit.objH, angleRad: 0 })
+        runs.push({ kind: 'img', image: unit.image!, x: colX + (line.cross - unit.objW) / 2, y: offset, width: unit.objW, height: unit.objH, angleRad: 0, style: unit.style })
       }
     }
     return { index, x: colX, y: line.start, width: line.cross, height: line.length, baselineY: colX + line.cross / 2, runs }

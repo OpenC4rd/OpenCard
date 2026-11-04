@@ -4,8 +4,18 @@ import { Plugin, PluginKey, type SelectionBookmark, type Transaction } from '@ti
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { closeHistory } from '@tiptap/pm/history'
 
-type Preview = { from: number; to: number; style: string }
-const previewKey = new PluginKey<Preview | null>('richTextFormatPreview')
+type Range = { from: number; to: number }
+/** 文档之外的瞬态：颜色预览，以及焦点离开编辑区后仍要看得见的选区。 */
+type Transient = { preview: (Range & { style: string }) | null; retained: Range | null }
+const transientKey = new PluginKey<Transient>('richTextTransient')
+
+function mapRange<T extends Range>(range: T | null, transaction: Transaction): T | null {
+  if (!range) return null
+  const from = transaction.mapping.mapResult(range.from, 1)
+  const to = transaction.mapping.mapResult(range.to, -1)
+  return from.deletedAcross || to.deletedAcross || from.pos >= to.pos
+    ? null : { ...range, from: from.pos, to: to.pos }
+}
 
 /** Selection ownership and transient formatting share the editor transaction lifecycle. */
 export function createRichTextInteraction(
@@ -14,18 +24,15 @@ export function createRichTextInteraction(
 ) {
   let target: SelectionBookmark | null = null
   let applying = false
-  const plugin = new Plugin<Preview | null>({
-    key: previewKey,
+  const plugin = new Plugin<Transient>({
+    key: transientKey,
     state: {
-      init: () => null,
-      apply(transaction, preview) {
-        if (transaction.getMeta(previewKey) !== undefined) return transaction.getMeta(previewKey)
-        if (!preview) return null
-        const from = transaction.mapping.mapResult(preview.from, 1)
-        const to = transaction.mapping.mapResult(preview.to, -1)
-        return from.deletedAcross || to.deletedAcross || from.pos >= to.pos
-          ? null : { ...preview, from: from.pos, to: to.pos }
-      },
+      init: () => ({ preview: null, retained: null }),
+      apply: (transaction, transient) => ({
+        preview: mapRange(transient.preview, transaction),
+        retained: mapRange(transient.retained, transaction),
+        ...transaction.getMeta(transientKey) as Partial<Transient> | undefined,
+      }),
     },
     props: {
       // Background is painted with glyph fill in decorations; serialization stays native.
@@ -36,8 +43,9 @@ export function createRichTextInteraction(
         return { dom }
       } },
       decorations(state) {
-        const preview = previewKey.getState(state)
-        const decorations: Decoration[] = []
+        const { preview, retained } = transientKey.getState(state)!
+        const decorations: Decoration[] = retained
+          ? [Decoration.inline(retained.from, retained.to, { class: 'oc-rich-text-editor__retained-selection' })] : []
         state.doc.descendants((node, position) => {
           if (!node.isInline) return
           const hasStyle = node.marks.some(mark => mark.type.name === 'textStyle' || mark.type.name === 'highlight')
@@ -57,17 +65,26 @@ export function createRichTextInteraction(
     },
   })
 
+  function patchTransient(editor: Editor, patch: Partial<Transient>) {
+    editor.view.dispatch(editor.state.tr.setMeta(transientKey, patch).setMeta('addToHistory', false))
+  }
   function capture() {
     const editor = getEditor()
-    if (editor && !target) target = editor.state.selection.getBookmark()
+    if (!editor || target) return
+    const { selection } = editor.state
+    target = selection.getBookmark()
+    if (!selection.empty) patchTransient(editor, { retained: { from: selection.from, to: selection.to } })
   }
   function clearPreview() {
     const editor = getEditor()
-    if (editor && previewKey.getState(editor.state)) {
-      editor.view.dispatch(editor.state.tr.setMeta(previewKey, null).setMeta('addToHistory', false))
-    }
+    if (editor && transientKey.getState(editor.state)?.preview) patchTransient(editor, { preview: null })
   }
-  function release() { target = null; clearPreview() }
+  function release() {
+    target = null
+    const editor = getEditor()
+    const transient = editor && transientKey.getState(editor.state)
+    if (transient?.preview || transient?.retained) patchTransient(editor!, { preview: null, retained: null })
+  }
   function update(transaction: Transaction) {
     if (!applying && transaction.selectionSet) release()
     else if (target && transaction.docChanged) {
@@ -98,9 +115,7 @@ export function createRichTextInteraction(
     if (!editor) return
     capture()
     const selection = target?.resolve(editor.state.doc) ?? editor.state.selection
-    editor.view.dispatch(editor.state.tr.setMeta(previewKey, {
-      from: selection.from, to: selection.to, style,
-    }).setMeta('addToHistory', false))
+    patchTransient(editor, { preview: { from: selection.from, to: selection.to, style } })
   }
   return { plugin, capture, release, update, run, preview, clearPreview }
 }

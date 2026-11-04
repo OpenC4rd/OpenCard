@@ -8,8 +8,10 @@ import type {
   CardMarkupParagraphNode,
   CardMarkupSpanNode,
   InlineStyleSpec,
+  TextShadow,
+  TextStroke,
 } from './cardMarkup.types'
-import { parseCardMarkup } from './cardMarkupParser'
+import { isAbsoluteLength, parseCardMarkup } from './cardMarkupParser'
 import { serializeCardMarkup } from './cardMarkupSerializer'
 
 export type TiptapBridgeMark = {
@@ -39,12 +41,28 @@ const ALIGNMENT_MAP: Record<string, AlignmentPosition> = {
   justify: 'justify',
 }
 
-function parseLength(val: unknown): number | undefined {
-  if (val === undefined || val === null) return undefined
-  if (typeof val === 'number') return Number.isFinite(val) ? val : undefined
-  const str = String(val).trim()
-  const match = /^(-?(?:\d+\.?\d*|\.\d+))/.exec(str)
-  return match ? Number(match[1]) : undefined
+function absoluteLength(val: unknown): string | undefined {
+  return typeof val === 'string' && isAbsoluteLength(val) ? val.trim() : undefined
+}
+
+function validColor(val: unknown): string | undefined {
+  return typeof val === 'string' && val ? val : undefined
+}
+
+function validStroke(val: unknown): TextStroke | undefined {
+  const stroke = (val ?? {}) as Partial<TextStroke>
+  const color = validColor(stroke.color)
+  const width = absoluteLength(stroke.width)
+  return color && width ? { color, width } : undefined
+}
+
+function validShadow(val: unknown): TextShadow | undefined {
+  const shadow = (val ?? {}) as Partial<TextShadow>
+  const color = validColor(shadow.color)
+  const offsetX = absoluteLength(shadow.offsetX)
+  const offsetY = absoluteLength(shadow.offsetY)
+  const blur = absoluteLength(shadow.blur)
+  return color && offsetX && offsetY && blur ? { color, offsetX, offsetY, blur } : undefined
 }
 
 function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
@@ -63,12 +81,8 @@ function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   if (style.color !== undefined) textStyleAttrs.color = style.color
   if (style.fontSize !== undefined) textStyleAttrs.fontSize = style.fontSize
   if (style.fontFamily !== undefined) textStyleAttrs.fontFamily = style.fontFamily
-  if (style.strokeColor !== undefined) textStyleAttrs.textStrokeColor = style.strokeColor
-  if (style.strokeWidth !== undefined) textStyleAttrs.textStrokeWidth = `${style.strokeWidth}mm`
-  if (style.shadowColor !== undefined) textStyleAttrs.textShadowColor = style.shadowColor
-  if (style.shadowOffsetX !== undefined) textStyleAttrs.textShadowOffsetX = `${style.shadowOffsetX}mm`
-  if (style.shadowOffsetY !== undefined) textStyleAttrs.textShadowOffsetY = `${style.shadowOffsetY}mm`
-  if (style.shadowBlur !== undefined) textStyleAttrs.textShadowBlur = `${style.shadowBlur}mm`
+  if (style.stroke) textStyleAttrs.textStroke = style.stroke
+  if (style.shadow) textStyleAttrs.textShadow = style.shadow
   if (style.fillSource !== undefined) {
     textStyleAttrs.textFillType = 'image'
     textStyleAttrs.textFillSource = style.fillSource
@@ -111,20 +125,10 @@ function marksToStyle(marks?: readonly TiptapBridgeMark[]): InlineStyleSpec {
         if (typeof attrs.color === 'string' && attrs.color) style.color = attrs.color
         if (typeof attrs.fontSize === 'string' && attrs.fontSize) style.fontSize = attrs.fontSize
         if (typeof attrs.fontFamily === 'string' && attrs.fontFamily) style.fontFamily = attrs.fontFamily
-        if (typeof attrs.textStrokeColor === 'string' && attrs.textStrokeColor) {
-          style.strokeColor = attrs.textStrokeColor
-        }
-        const strokeWidth = parseLength(attrs.textStrokeWidth)
-        if (strokeWidth !== undefined) style.strokeWidth = strokeWidth
-        if (typeof attrs.textShadowColor === 'string' && attrs.textShadowColor) {
-          style.shadowColor = attrs.textShadowColor
-        }
-        const sx = parseLength(attrs.textShadowOffsetX)
-        if (sx !== undefined) style.shadowOffsetX = sx
-        const sy = parseLength(attrs.textShadowOffsetY)
-        if (sy !== undefined) style.shadowOffsetY = sy
-        const sb = parseLength(attrs.textShadowBlur)
-        if (sb !== undefined) style.shadowBlur = sb
+        const stroke = validStroke(attrs.textStroke)
+        if (stroke) style.stroke = stroke
+        const shadow = validShadow(attrs.textShadow)
+        if (shadow) style.shadow = shadow
         if (attrs.textFillType === 'image' && typeof attrs.textFillSource === 'string' && attrs.textFillSource) {
           style.fillSource = attrs.textFillSource
         }
@@ -349,17 +353,22 @@ function tiptapInlineToItems(node: TiptapBridgeNode): StyledInlineItem[] {
   }
 }
 
+/** 描边与阴影是对象，键序由 validStroke/validShadow 固定，可以按序列化结果比较。 */
+function sameStyleValue(a: unknown, b: unknown): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b)
+}
+
 function isEquivalentStyle(a: InlineStyleSpec, b: InlineStyleSpec): boolean {
   const definedA = (Object.keys(a) as (keyof InlineStyleSpec)[]).filter((k) => a[k] !== undefined)
   const definedB = (Object.keys(b) as (keyof InlineStyleSpec)[]).filter((k) => b[k] !== undefined)
   if (definedA.length !== definedB.length) return false
-  return definedA.every((k) => a[k] === b[k])
+  return definedA.every((k) => sameStyleValue(a[k], b[k]))
 }
 
 function intersectStyles(a: InlineStyleSpec, b: InlineStyleSpec): InlineStyleSpec {
   const result: InlineStyleSpec = {}
   for (const key of Object.keys(a) as (keyof InlineStyleSpec)[]) {
-    if (a[key] !== undefined && a[key] === b[key]) {
+    if (a[key] !== undefined && sameStyleValue(a[key], b[key])) {
       ;(result as Record<string, unknown>)[key] = a[key]
     }
   }
@@ -369,7 +378,7 @@ function intersectStyles(a: InlineStyleSpec, b: InlineStyleSpec): InlineStyleSpe
 function subtractStyle(source: InlineStyleSpec, toRemove: InlineStyleSpec): InlineStyleSpec {
   const result: InlineStyleSpec = { ...source }
   for (const key of Object.keys(toRemove) as (keyof InlineStyleSpec)[]) {
-    if (toRemove[key] !== undefined && result[key] === toRemove[key]) {
+    if (toRemove[key] !== undefined && sameStyleValue(result[key], toRemove[key])) {
       delete result[key]
     }
   }

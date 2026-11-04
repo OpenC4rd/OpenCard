@@ -1,5 +1,10 @@
 import type { AlignmentPosition } from '../../../entities/card/model'
 
+/** 描边与阴影在标记里是不可分割的元组：要么完整存在，要么不存在。 */
+export type TextStroke = { color: string; width: string }
+export type TextShadow = { color: string; offsetX: string; offsetY: string; blur: string }
+
+/** 长度保留作者写下的原文（含单位），只在排版时求值，源码与编辑器之间才能无损往返。 */
 export type InlineStyleSpec = {
   bold?: boolean
   italic?: boolean
@@ -9,12 +14,8 @@ export type InlineStyleSpec = {
   backgroundColor?: string
   fontSize?: string
   fontFamily?: string
-  strokeColor?: string
-  strokeWidth?: number
-  shadowColor?: string
-  shadowOffsetX?: number
-  shadowOffsetY?: number
-  shadowBlur?: number
+  stroke?: TextStroke
+  shadow?: TextShadow
   fillSource?: string
 }
 

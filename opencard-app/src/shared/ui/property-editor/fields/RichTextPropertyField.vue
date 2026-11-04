@@ -32,7 +32,6 @@
       :scrollable="false"
       height-mode="fixed"
       height="workspace"
-      close-on-backdrop
       @request-close="cancelEditor"
     >
       <div class="rich-text-popover__editor" tabindex="-1" autofocus>
@@ -110,7 +109,7 @@
             :categories="richTextEditor.properties.categories"
             :capabilities="capabilities"
             sort-mode="category"
-            allow-raw-string-editor
+            :field-action-labels="{ reset: tr('propertyEditor.richText.resetToInherited', '恢复继承') }"
             @update-property="richTextEditor.properties.update"
             @reset-property="richTextEditor.properties.reset"
             @preview-property="richTextEditor.properties.preview"
@@ -250,6 +249,11 @@ defineExpose({ activate: openEditor })
 
 .rich-text-field__empty {
   color: var(--oc-fg-muted);
+}
+
+/* 重置按钮随值出现；预留它的列，输入框才不会在编辑中途变窄。 */
+.oc-rich-text-editor__properties {
+  --property-action-column: var(--oc-size-sm);
 }
 
 .rich-text-popover__editor {

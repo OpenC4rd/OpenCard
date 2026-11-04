@@ -80,6 +80,7 @@
       @block-click="handleBlockClick"
       @z-index-step="emit('z-index-step', $event)"
     />
+    <OcScaleBar v-if="!effectiveLayerViewActive" :pixels-per-mm="scale" :insets="props.viewportInsets" />
     <div
       v-if="statusFlash"
       :key="statusFlash.sequence"
@@ -347,6 +348,7 @@ import {
 } from './cardFaceView'
 import { createCardVisualReadiness, type CardVisualReadinessState } from './cardRenderReadiness'
 import CardLayerView from './CardLayerView.vue'
+import OcScaleBar from '../../../components/standard/OcScaleBar.vue'
 import { buildCardLayerGroups } from './cardLayerModel'
 import type { RenderReadyCardFace } from '../render.types'
 import type { CardRenderResourceContext } from '../cardRenderResources'
@@ -1169,9 +1171,14 @@ const moveGuide = computed(() => {
   }
 })
 
-function formatGeometryValue(value: number): string {
+/** 实时读数固定一位小数并左补不换行空格：配合等宽字体，小数点位置不随数值跳动。 */
+function formatFixedReadout(value: number): string {
   const rounded = Math.round(value * 10) / 10
-  return `${Object.is(rounded, -0) ? 0 : rounded} mm`
+  return (Object.is(rounded, -0) ? 0 : rounded).toFixed(1).padStart(6, '\u00a0')
+}
+
+function formatGeometryValue(value: number): string {
+  return `${formatFixedReadout(value)} mm`
 }
 
 /** 归一化到 [-180, 180)：刻度盘只认朝向，存进文档的角度保持可读的连续区间。 */
@@ -1181,8 +1188,7 @@ function normalizeRotation(value: number): number {
 }
 
 function formatRotationLabel(angle: number): string {
-  const rounded = Math.round(angle * 10) / 10
-  return `${Object.is(rounded, -0) ? 0 : rounded}°`
+  return `${formatFixedReadout(angle)}°`
 }
 
 /** 指针相对圆心的极角：0 在正上方，顺时针为正，与刻度盘的读数一致。 */
@@ -2806,7 +2812,7 @@ watch(
   position: absolute;
   top: var(--oc-space-xs);
   display: block;
-  max-width: var(--oc-diff-version-label-max-width);
+  max-width: min(38cqw, 280px);
   overflow: hidden;
   color: var(--oc-fg-muted);
   font-family: var(--oc-font-sans);
@@ -3048,7 +3054,7 @@ watch(
   padding: 0 5px;
   background: var(--oc-bg-raised);
   opacity: 0.34;
-  border-radius: var(--oc-radius-xs);
+  border-radius: var(--oc-radius-control);
   transition: opacity 140ms ease-out;
 }
 
@@ -3112,8 +3118,10 @@ watch(
   stroke: var(--oc-bg-raised);
   stroke-width: 5px;
   paint-order: stroke fill;
+  font-family: var(--oc-font-numeric);
   font-size: var(--oc-text-xs);
   font-variant-numeric: tabular-nums;
+  white-space: pre;
   text-anchor: middle;
   dominant-baseline: central;
 }
@@ -3240,9 +3248,11 @@ watch(
   background: color-mix(in srgb, var(--oc-bg-raised) 94%, transparent);
   box-shadow: 0 0 0 2px var(--oc-accent-glow);
   color: var(--oc-fg-accent);
+  font-family: var(--oc-font-numeric);
   font-size: var(--oc-text-xs);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  white-space: pre;
   pointer-events: none;
 }
 
@@ -3293,7 +3303,7 @@ watch(
   border: 1px solid var(--oc-accent-fg);
   border-radius: 2px;
   background: color-mix(in srgb, var(--oc-accent) 55%, transparent);
-  box-shadow: 0 0 0 1px var(--oc-handle-shadow);
+  box-shadow: var(--oc-color-channel-handle-shadow);
   transform: translate(-50%, -50%);
   transition:
     transform 120ms cubic-bezier(.2, .8, .2, 1),
@@ -3516,7 +3526,7 @@ watch(
   border: 1px solid var(--oc-accent-fg);
   border-radius: 3px;
   background: color-mix(in srgb, var(--oc-accent) 55%, transparent);
-  box-shadow: 0 0 0 1px var(--oc-handle-shadow);
+  box-shadow: var(--oc-color-channel-handle-shadow);
   transform: translate(-50%, -50%);
   transition: background-color 100ms ease-out, box-shadow 100ms ease-out;
 }

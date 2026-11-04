@@ -127,7 +127,7 @@ describe('useCdePropertyEditorProjection', () => {
     const fields = state.propertyEditorInputs.value[0]!.fields
     expect(fields.content).toMatchObject({
       fieldType: 'richText',
-      richTextBaseStyle: {
+      baseStyle: {
         fontFamily: '"OpenCardProjectFont-body", Arial, sans-serif',
         fontSize: '4mm',
       },

@@ -19,6 +19,7 @@ import {
   createMockTextMeasurer,
   layoutTextBlock,
   type PositionedIconRun,
+  type PositionedTextRun,
   type PositionedImageRun,
 } from '../text-layout'
 import { parsePaintStyle, roundRectPath } from './paintStyle'
@@ -26,11 +27,11 @@ import type { CanvasAssetStore, LoadedAsset } from './canvasAssetStore'
 import { formatProjectIconPath } from '../../../shared/rich-text/projectIconReference'
 import { createDeviceBuffer } from './deviceBuffer'
 import {
-  hasBufferedGlyphShadow,
-  hasDirectGlyphShadow,
   hasGlyphOutline,
-  paintBufferedGlyphShadow,
+  paintGlyphDecorations,
   paintGlyphPass,
+  paintGlyphShape,
+  paintRunShadow,
   resolveBlockFontFamily,
 } from './paintGlyphRun'
 
@@ -518,46 +519,31 @@ function paintTextBlock(
 
   const glyphPaint = { blockId: block.id, baseFontFamily, assets, resourceContext: options.resourceContext }
 
-  // 2. 通道二：阴影与文字圆角外描边
+  const paintRunContent = (target: CanvasRenderingContext2D, run: PositionedTextRun): void => {
+    if (run.kind === 'icon') paintInlineIcon(target, run, block.id, assets, options.resourceContext)
+    else if (run.kind === 'img') paintInlineImage(target, run, block.id, assets, options.resourceContext)
+  }
+
+  // 2. 通道二：投影与文字圆角外描边
   for (const run of textLayout.runs) {
-    if (run.kind !== 'glyph') continue
-    if (hasBufferedGlyphShadow(run.style)) paintBufferedGlyphShadow(ctx, run, glyphPaint)
-    if (hasGlyphOutline(run.style) || hasDirectGlyphShadow(run.style)) paintGlyphPass(ctx, run, 'stroke', glyphPaint)
+    if (run.style.shadowColor) {
+      paintRunShadow(ctx, run, target => {
+        if (run.kind === 'glyph') paintGlyphShape(target, run, glyphPaint)
+        else paintRunContent(target, run)
+      })
+    }
+    if (run.kind === 'glyph' && hasGlyphOutline(run.style)) paintGlyphPass(ctx, run, 'stroke', glyphPaint)
   }
 
   // 3. 通道三：文字主填充 / 图片填充 / 内联图标 / 内联图片
   for (const run of textLayout.runs) {
-    if (run.kind === 'glyph') {
-      paintGlyphPass(ctx, run, 'fill', glyphPaint)
-    } else if (run.kind === 'icon') {
-      paintInlineIcon(ctx, run, block.id, assets, options.resourceContext)
-    } else if (run.kind === 'img') {
-      paintInlineImage(ctx, run, block.id, assets, options.resourceContext)
-    }
+    if (run.kind === 'glyph') paintGlyphPass(ctx, run, 'fill', glyphPaint)
+    else paintRunContent(ctx, run)
   }
 
   // 4. 通道四：下划线与删除线
   for (const run of textLayout.runs) {
-    if (run.kind === 'glyph' && (run.style.underline || run.style.strikethrough)) {
-      ctx.save()
-      ctx.strokeStyle = run.style.color || '#000'
-      ctx.lineWidth = Math.max(0.1, run.style.fontSize * 0.07)
-      if (run.style.underline) {
-        const lineY = run.baselineY + ctx.lineWidth * 1.5
-        ctx.beginPath()
-        ctx.moveTo(run.x, lineY)
-        ctx.lineTo(run.x + run.width, lineY)
-        ctx.stroke()
-      }
-      if (run.style.strikethrough) {
-        const lineY = run.y + run.height / 2
-        ctx.beginPath()
-        ctx.moveTo(run.x, lineY)
-        ctx.lineTo(run.x + run.width, lineY)
-        ctx.stroke()
-      }
-      ctx.restore()
-    }
+    if (run.kind === 'glyph') paintGlyphDecorations(ctx, run, run.style.color || '#000')
   }
 
   // Debug：展示基线

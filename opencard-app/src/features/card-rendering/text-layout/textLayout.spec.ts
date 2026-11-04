@@ -78,6 +78,9 @@ describe('layoutTextBlock runs', () => {
   it('resolves nested span styles and relative font sizes against the enclosing span', () => {
     const [run] = layout('@style(size=20mm){@style(size=0.5em){x}}').runs
     expect(run).toMatchObject({ style: { fontSize: 10 } })
+    const [physical] = layout('@style(stroke=#000 72pt,shadow=#111 1cm -1in 0mm){x}').runs
+    expect(physical!.style.strokeWidth).toBeCloseTo(25.4)
+    expect(physical).toMatchObject({ style: { shadowOffsetX: 10, shadowOffsetY: -25.4, shadowBlur: 0 } })
     const [colored] = layout('@style(b,color=red,stroke=#000 2mm){x}').runs
     expect(colored).toMatchObject({ style: { fontWeight: 'bold', color: 'red', strokeColor: '#000', strokeWidth: 2 } })
   })

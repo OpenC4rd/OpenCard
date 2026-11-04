@@ -17,12 +17,6 @@ function quoteMarkupArg(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&')}"`
 }
 
-/** AST 里的描边宽度与阴影偏移都以毫米数值保存，写出时补上单位。 */
-function formatMm(value: number): string {
-  const rounded = Number.isFinite(value) ? Number(value.toFixed(4)) : 0
-  return `${rounded}mm`
-}
-
 const FLAG_TAGS: readonly (readonly [keyof InlineStyleSpec, string])[] = [
   ['bold', 'bold'],
   ['italic', 'italic'],
@@ -48,14 +42,10 @@ function styleArgs(style: InlineStyleSpec): string[] {
   text('size', style.fontSize)
   text('font', style.fontFamily)
   text('fill', style.fillSource)
-  if (style.strokeColor !== undefined || style.strokeWidth !== undefined) {
-    text('stroke', `${style.strokeColor ?? 'currentColor'} ${formatMm(style.strokeWidth ?? 1)}`)
-  }
-  if (
-    style.shadowColor !== undefined || style.shadowOffsetX !== undefined ||
-    style.shadowOffsetY !== undefined || style.shadowBlur !== undefined
-  ) {
-    text('shadow', `${style.shadowColor ?? 'currentColor'} ${formatMm(style.shadowOffsetX ?? 0)} ${formatMm(style.shadowOffsetY ?? 0)} ${formatMm(style.shadowBlur ?? 0)}`)
+  if (style.stroke) text('stroke', `${style.stroke.color} ${style.stroke.width}`)
+  if (style.shadow) {
+    const { color, offsetX, offsetY, blur } = style.shadow
+    text('shadow', `${color} ${offsetX} ${offsetY} ${blur}`)
   }
   return args
 }

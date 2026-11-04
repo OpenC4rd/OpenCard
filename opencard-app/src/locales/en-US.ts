@@ -1090,10 +1090,17 @@ export default {
       selectField: 'Expose field',
       deselectField: 'Stop exposing field',
     },
+    fieldActions: {
+      resetToBlueprint: 'Reset to blueprint value',
+      deleteToDefault: 'Delete and use default value',
+    },
     selectionSummary: {
       multipleBlocks: '{count} blocks selected',
     },
     view: {
+      previewBackgroundWhite: 'Switch to white background',
+      previewBackgroundBlack: 'Switch to black background',
+      previewBackgroundChecker: 'Switch to checkerboard background',
       enableClip: 'Clip content to face',
       disableClip: 'Show content beyond face',
       enableAlignmentSnapping: 'Enable alignment snapping',
@@ -1277,7 +1284,8 @@ export default {
       selectedCells: 'Selected cells',
       selectedNode: 'Selected node',
       mixed: 'Mixed',
-      inherited: 'Inherited',
+      inherited: 'Inherited', effectEnabled: 'Enabled',
+      resetToInherited: 'Reset to inherited',
       fill: 'Type',
       fillSolid: 'Solid',
       fillImage: 'Picture',
@@ -1381,8 +1389,8 @@ export default {
       ancestor: 'Ancestor container {depth}',
     },
     actions: {
-      delete: 'Delete and use default value',
-      reset: 'Reset to blueprint value',
+      delete: 'Delete',
+      reset: 'Reset',
       addField: 'Add field',
       switchToAlphabetical: 'Sort fields alphabetically',
       switchToCategory: 'Group fields by category',

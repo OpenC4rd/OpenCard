@@ -47,7 +47,7 @@ const { t } = useI18n()
 <style scoped>
 /* 提示类浮层不带宿主统一的浮层外观，边框、圆角与阴影由这一层自己给出。 */
 .project-font-registry-workbench__font-info {
-  max-width: var(--oc-content-width-sm);
+  max-width: var(--oc-content-width-md);
   padding: var(--oc-space-sm);
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-control);

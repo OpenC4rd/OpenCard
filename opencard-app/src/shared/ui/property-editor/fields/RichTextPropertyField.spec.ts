@@ -1,5 +1,6 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
 import type { Editor } from '@tiptap/core'
+import { undoDepth } from '@tiptap/pm/history'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { disposeGroup, overlayGroups } from '../../../../composables/overlayGroups'
@@ -7,7 +8,7 @@ import { i18n, setAppLocale } from '../../../../i18n'
 import OcRichTextEditor from '../../rich-text/OcRichTextEditor.vue'
 import PropertyEditor from '../PropertyEditor.vue'
 import RichTextPropertyField from './RichTextPropertyField.vue'
-import type { PropertyCompletionResult } from '../propertyEditor.types'
+import type { PropertyCompletionResult, PropertyEditorInput } from '../propertyEditor.types'
 
 const SAVE = '[aria-label="保存富文本编辑"]'
 const CANCEL = '[aria-label="取消富文本编辑"]'
@@ -130,25 +131,100 @@ describe('RichTextPropertyField', () => {
     } finally { wrapper.unmount() }
   })
 
-  it('preserves independent shadow settings through reset and the sanitized handoff', async () => {
-    const wrapper = mountField('@style(shadow="red 1mm 2mm 0mm"){A}')
+  it('shows the block base size and opens with nothing to undo', async () => {
+    const wrapper = mountField('Hello', { baseStyle: { fontSize: '5mm' } })
+    try {
+      const vm = await openEditor(wrapper)
+      await nextTick()
+      expect((panel(wrapper).get('[data-field-key="fontSize"] input').element as HTMLInputElement).value).toBe('5mm')
+      expect(undoDepth(vm.editor.state)).toBe(0)
+    } finally { wrapper.unmount() }
+  })
+
+  it('offers no raw string editor and keeps the selection painted while the sidebar has focus', async () => {
+    const wrapper = mountField('Hello')
+    try {
+      const vm = await openEditor(wrapper)
+      vm.editor.commands.setTextSelection({ from: 1, to: 3 })
+      await nextTick()
+      expect(panel(wrapper).find('[data-action-key="field-editor.use-raw-string"]').exists()).toBe(false)
+      const field = panel(wrapper).get('[data-field-key="fontSize"] input')
+      await field.trigger('pointerdown')
+      const retained = () => vm.editor.view.dom.querySelector('.oc-rich-text-editor__retained-selection')
+      expect(retained()?.textContent).toBe('He')
+      vm.editor.commands.setTextSelection(4)
+      await nextTick()
+      expect(retained()).toBeNull()
+    } finally { wrapper.unmount() }
+  })
+
+  it('keeps the unit between sidebar and source, and rejects what markup cannot store', async () => {
+    const wrapper = mountField('@style(shadow=#000000 2pt 1cm 0mm){A}')
     try {
       const vm = await openEditor(wrapper)
       vm.editor.commands.setTextSelection({ from: 1, to: 2 })
       await nextTick()
-      await panel(wrapper).get('[data-field-key="foregroundColor"] [data-action-key="field-editor.use-raw-string"] button').trigger('click')
-      const raw = panel(wrapper).get('[data-field-key="foregroundColor"] input')
-      await raw.setValue('red')
-      await raw.trigger('keydown', { key: 'Enter' })
-      expect(vm.editor.getAttributes('textStyle').color).toBe('red')
-      await panel(wrapper).get('[data-field-key="foregroundColor"] [data-action-key="field-editor.use-field"] button').trigger('click')
-      await resetField(wrapper, 'shadowOffsetX')
-      expect(vm.getHtml()).toContain('shadow')
-      await resetField(wrapper, 'shadowColor')
+      const value = (fieldKey: string) => (panel(wrapper).get(`[data-field-key="${fieldKey}"] input`).element as HTMLInputElement).value
+      expect([value('shadowOffsetX'), value('shadowOffsetY')]).toEqual(['2pt', '1cm'])
+      const update = (fieldKey: string, next: string) => panel(wrapper)
+        .vm.$emit('update-property', { key: 'rich-text-selection', fieldKey, value: next })
+      update('shadowBlur', '3pt')
+      update('strokeWidth', '1em')
+      await nextTick()
+      expect(vm.getHtml()).toBe('@style(shadow=#000000 2pt 1cm 3pt){A}')
+    } finally { wrapper.unmount() }
+  })
+
+  it('names the reset after what it does here, not after blueprints', async () => {
+    const wrapper = mountField('@style(size=6mm){A}')
+    try {
+      const vm = await openEditor(wrapper)
+      vm.editor.commands.setTextSelection({ from: 1, to: 2 })
+      await nextTick()
+      expect(panel(wrapper).get('[data-field-key="fontSize"] [data-action-key="reset-property"] button').attributes('aria-label')).toBe('恢复继承')
+    } finally { wrapper.unmount() }
+  })
+
+  it('treats stroke and shadow as whole effects that survive a source round-trip', async () => {
+    const wrapper = mountField('Hello')
+    try {
+      const vm = await openEditor(wrapper)
+      vm.editor.commands.setTextSelection({ from: 1, to: 6 })
+      await nextTick()
+      const editor = wrapper.getComponent(PropertyEditor)
+      const update = (fieldKey: string, value: string) => editor.vm.$emit('update-property', { key: 'rich-text-selection', fieldKey, value })
+      const fields = () => (editor.props('inputs') as PropertyEditorInput[])[0]!.fields
+      expect(fields().shadowColor).toBeUndefined()
+
+      update('shadowEnabled', 'true')
+      await nextTick()
+      expect(vm.getHtml()).toBe('@style(shadow=#00000080 0.3mm 0.3mm 0mm){Hello}')
+      const { shadowColor, shadowOffsetX, shadowBlur } = fields()
+      for (const field of [shadowColor, shadowOffsetX, shadowBlur]) expect(field).toMatchObject({ resettable: false, placeholder: undefined })
+
       const saved = vm.getHtml()
-      expect(saved).toContain('shadow')
       expect(vm.applyHtml(saved)).toBe(true)
-      expect(vm.editor.getAttributes('textStyle').textShadowOffsetY).toBe('2mm')
+      vm.editor.commands.setTextSelection({ from: 1, to: 6 })
+      await nextTick()
+      expect(vm.getHtml()).toBe(saved)
+      expect(fields().shadowBlur!.resettable).toBe(false)
+
+      update('shadowEnabled', 'false')
+      await nextTick()
+      expect(vm.getHtml()).toBe('Hello')
+      expect(fields().shadowColor).toBeUndefined()
+    } finally { wrapper.unmount() }
+  })
+
+  it('edits one effect part per run without flattening the others', async () => {
+    const wrapper = mountField('@style(shadow=#111111 1mm 1mm 0mm){A}@style(shadow=#222222 2mm 2mm 0mm){B}')
+    try {
+      const vm = await openEditor(wrapper)
+      vm.editor.commands.setTextSelection({ from: 1, to: 3 })
+      await nextTick()
+      wrapper.getComponent(PropertyEditor).vm.$emit('update-property', { key: 'rich-text-selection', fieldKey: 'shadowBlur', value: '1pt' })
+      await nextTick()
+      expect(vm.getHtml()).toBe('@style(shadow=#111111 1mm 1mm 1pt){A}@style(shadow=#222222 2mm 2mm 1pt){B}')
     } finally { wrapper.unmount() }
   })
 
@@ -196,6 +272,8 @@ describe('RichTextPropertyField', () => {
       vm.applyHtml('@style(size="3mm",color=red){A}@style(size="6mm",color=blue){B}')
       editor.commands.setTextSelection({ from: 1, to: 3 })
       await nextTick()
+      wrapper.getComponent(PropertyEditor).vm.$emit('update-property', { key: 'rich-text-selection', fieldKey: 'strokeEnabled', value: 'true' })
+      await nextTick()
       const input = panel(wrapper).get('[data-field-key="strokeWidth"] input')
       await input.trigger('pointerdown')
       await input.setValue('0.5mm')
@@ -203,7 +281,7 @@ describe('RichTextPropertyField', () => {
       const marks = editor.state.doc.firstChild!.content.content.map(node => node.marks.find(mark => mark.type.name === 'textStyle')!.attrs)
       expect(marks.map(attrs => attrs.fontSize)).toEqual(['3mm', '6mm'])
       expect(marks.map(attrs => attrs.color)).toEqual(['red', 'blue'])
-      expect(marks.map(attrs => attrs.textStrokeWidth)).toEqual(['0.5mm', '0.5mm'])
+      expect(marks.map(attrs => attrs.textStroke?.width)).toEqual(['0.5mm', '0.5mm'])
     } finally { wrapper.unmount() }
   })
 

@@ -107,7 +107,7 @@ export function enrichCardPropertyFieldDefinition(options: {
     && options.definition.fieldType !== 'object'
     ? createReferenceCompletionProvider(options.referenceContext)
     : undefined
-  const richTextBaseStyle = options.definition.fieldType === 'richText'
+  const baseStyle = options.definition.fieldType === 'richText'
     ? {
         ...(typeof options.record.fontSize === 'string' && options.record.fontSize
           ? { fontSize: options.record.fontSize }
@@ -122,10 +122,10 @@ export function enrichCardPropertyFieldDefinition(options: {
       }
     : undefined
 
-  if (!bindingProvider && !richTextBaseStyle) return options.definition
+  if (!bindingProvider && !baseStyle) return options.definition
   return {
     ...options.definition,
-    ...(richTextBaseStyle ? { richTextBaseStyle } : {}),
+    ...(baseStyle ? { baseStyle } : {}),
     ...(bindingProvider
       ? {
           autoPairs: [{ open: '{{', close: '}}' }],

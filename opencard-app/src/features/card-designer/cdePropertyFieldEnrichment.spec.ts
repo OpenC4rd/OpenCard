@@ -29,7 +29,7 @@ describe('card property field enrichment', () => {
 
     expect(definition).toMatchObject({
       fieldType: 'richText',
-      richTextBaseStyle: {
+      baseStyle: {
         fontFamily: '"OpenCardResource-project-body"',
         fontSize: '4mm',
       },

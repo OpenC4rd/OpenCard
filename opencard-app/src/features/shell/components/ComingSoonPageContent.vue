@@ -35,7 +35,7 @@ const { t } = useI18n()
 
 .coming-soon-content__title {
   margin: 0;
-  font-size: var(--oc-font-size-xl);
+  font-size: var(--oc-text-xl);
   font-weight: 600;
 }
 </style>

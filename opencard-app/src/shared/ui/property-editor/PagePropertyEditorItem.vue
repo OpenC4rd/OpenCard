@@ -144,9 +144,9 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
 .page-property-editor-item {
   box-sizing: border-box;
   display: grid;
-  min-height: var(--oc-page-editor-row-min-height);
-  grid-template-columns: minmax(var(--oc-page-editor-title-min-width), 1fr)
-    minmax(var(--oc-page-editor-content-min-width), 1fr);
+  min-height: 54px;
+  grid-template-columns: minmax(180px, 1fr)
+    minmax(220px, 1fr);
   align-items: center;
   gap: var(--oc-space-lg);
 }
@@ -183,15 +183,15 @@ function handleCommit(part: EditorItemEditorPart, value: unknown): void {
 /* 只读用量条：撑满值区，宽度上限与其他编辑器一致。 */
 .page-property-editor-item__meter {
   flex: 1 1 0;
-  max-width: var(--oc-page-editor-value-width);
+  max-width: 220px;
 }
 
-/* 所有编辑器统一占满同一个宽度：值区宽度由 --oc-page-editor-value-width 决定，
+/* 所有编辑器统一占满同一个宽度：值区宽度固定为 220px，
    不再按字段类型各撑各的（枚举贴标签、滑块占满整列）。同一行里的操作按钮优先占位。 */
 .page-property-editor-item__editor {
   min-width: 0;
   flex: 1 1 0;
-  max-width: var(--oc-page-editor-value-width);
+  max-width: 220px;
 }
 
 /* 开关没有"宽度"可言：保持自身尺寸，靠值区的右对齐贴着行的右边。 */

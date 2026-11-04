@@ -1090,10 +1090,17 @@ export default {
       selectField: '公开属性',
       deselectField: '取消公开',
     },
+    fieldActions: {
+      resetToBlueprint: '重置为蓝图值',
+      deleteToDefault: '删除并使用默认值',
+    },
     selectionSummary: {
       multipleBlocks: '{count} 个被选中的块',
     },
     view: {
+      previewBackgroundWhite: '切换到纯白背景',
+      previewBackgroundBlack: '切换到纯黑背景',
+      previewBackgroundChecker: '切换到棋盘格背景',
       enableClip: '开启卡面边缘裁切',
       disableClip: '关闭卡面边缘裁切',
       enableAlignmentSnapping: '开启自动吸附',
@@ -1277,7 +1284,8 @@ export default {
       selectedCells: '选中单元格',
       selectedNode: '选中节点',
       mixed: '混合',
-      inherited: '继承',
+      inherited: '继承', effectEnabled: '启用',
+      resetToInherited: '恢复继承',
       fill: '类型',
       fillSolid: '纯色',
       fillImage: '图片',
@@ -1381,8 +1389,8 @@ export default {
       ancestor: '上级容器 {depth}',
     },
     actions: {
-      delete: '删除并使用默认值',
-      reset: '重置为蓝图值',
+      delete: '删除',
+      reset: '重置',
       addField: '添加属性',
       switchToAlphabetical: '按字母顺序排列属性',
       switchToCategory: '按分类分组属性',

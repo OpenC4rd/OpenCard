@@ -280,6 +280,20 @@ describe('CardViewport', () => {
     wrapper.unmount()
   })
 
+  it('shows the scale bar in the safe region, except in layer view where lengths have no scale', async () => {
+    const layerFace: RenderReadyCardFace = { ...face, children: [textChild('layer-block', '0mm', '0mm')] }
+    const wrapper = mount(CardViewport, {
+      props: { resourceContext, face: layerFace, viewportInsets: { left: 200 } },
+      global: { stubs: { CardFaceRenderer: true } },
+    })
+    const bar = () => wrapper.find('.oc-scale-bar')
+    expect(bar().text()).toBe('20mm')
+    expect(bar().attributes('style')).toContain('200px')
+    await wrapper.setProps({ layerViewActive: true })
+    expect(bar().exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('pauses viewport zoom while layer view is active and restores it on exit', async () => {
     const layerFace: RenderReadyCardFace = { ...face, children: [textChild('layer-block', '0mm', '0mm')] }
     const wrapper = mount(CardViewport, {

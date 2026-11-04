@@ -5,12 +5,14 @@ import Highlight from '@tiptap/extension-highlight'
 import TextStyle from '@tiptap/extension-text-style'
 import { fromCssFontFamily, toCssFontFamily } from '../../../features/workspace/model/projectFonts'
 export const fontVariable = (value: string) => `--oc-rich-font-${Array.from(value, char => char.codePointAt(0)!.toString(16)).join('-')}`
+function effectAttribute(element: HTMLElement, name: string): unknown {
+  try { return JSON.parse(element.getAttribute(name) ?? 'null') } catch { return null }
+}
 const ProjectTextStyle = TextStyle.extend({
   parseHTML() {
     return [{
       tag: 'span:not([data-oc-binding]):not([data-oc-icon-path])',
-      getAttrs: element => element.hasAttribute('style') || element.getAttribute('data-oc-fill-type') === 'image'
-        || Array.from(element.attributes).some(attribute => /^data-oc-shadow-/.test(attribute.name)) ? {} : false,
+      getAttrs: element => element.hasAttribute('style') || element.getAttribute('data-oc-fill-type') === 'image' ? {} : false,
     }]
   },
 })
@@ -27,19 +29,13 @@ const TextStyleAttributes = Extension.create({
             ? { style: `font-size: ${attributes.fontSize}` }
             : {},
         },
-        textStrokeColor: {
+        textStroke: {
           default: null,
-          parseHTML: element => element.style.webkitTextStrokeColor || null,
-          renderHTML: attributes => attributes.textStrokeColor
-            ? { style: `-webkit-text-stroke-color: ${attributes.textStrokeColor}` }
-            : {},
-        },
-        textStrokeWidth: {
-          default: null,
-          parseHTML: element => element.style.webkitTextStrokeWidth || null,
-          renderHTML: attributes => attributes.textStrokeWidth
-            ? { style: `-webkit-text-stroke-width: ${attributes.textStrokeWidth}` }
-            : {},
+          parseHTML: element => effectAttribute(element, 'data-oc-text-stroke'),
+          renderHTML: ({ textStroke: stroke }) => stroke ? {
+            'data-oc-text-stroke': JSON.stringify(stroke),
+            style: `-webkit-text-stroke: ${stroke.width} ${stroke.color}`,
+          } : {},
         },
         textFillType: {
           default: null,
@@ -57,36 +53,13 @@ const TextStyleAttributes = Extension.create({
               }
             : {},
         },
-        textShadowColor: {
+        textShadow: {
           default: null,
-          parseHTML: element => element.getAttribute('data-oc-shadow-color') || null,
-          renderHTML: attributes => attributes.textShadowColor
-            ? {
-                'data-oc-shadow-color': attributes.textShadowColor,
-                style: `text-shadow: ${attributes.textShadowOffsetX || '0mm'} ${attributes.textShadowOffsetY || '0mm'} ${attributes.textShadowBlur || '0mm'} ${attributes.textShadowColor}`,
-              }
-            : {},
-        },
-        textShadowOffsetX: {
-          default: null,
-          parseHTML: element => element.getAttribute('data-oc-shadow-offset-x') || null,
-          renderHTML: attributes => attributes.textShadowOffsetX
-            ? { 'data-oc-shadow-offset-x': attributes.textShadowOffsetX }
-            : {},
-        },
-        textShadowOffsetY: {
-          default: null,
-          parseHTML: element => element.getAttribute('data-oc-shadow-offset-y') || null,
-          renderHTML: attributes => attributes.textShadowOffsetY
-            ? { 'data-oc-shadow-offset-y': attributes.textShadowOffsetY }
-            : {},
-        },
-        textShadowBlur: {
-          default: null,
-          parseHTML: element => element.getAttribute('data-oc-shadow-blur') || null,
-          renderHTML: attributes => attributes.textShadowBlur
-            ? { 'data-oc-shadow-blur': attributes.textShadowBlur }
-            : {},
+          parseHTML: element => effectAttribute(element, 'data-oc-text-shadow'),
+          renderHTML: ({ textShadow: shadow }) => shadow ? {
+            'data-oc-text-shadow': JSON.stringify(shadow),
+            style: `text-shadow: ${shadow.offsetX} ${shadow.offsetY} ${shadow.blur} ${shadow.color}`,
+          } : {},
         },
       },
     }]

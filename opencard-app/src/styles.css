@@ -1,3 +1,10 @@
+/* 实时读数专用数字字体：JetBrains Mono 的数字与单位子集（OFL，许可证见 assets/fonts），保证各平台数字宽度一致。 */
+@font-face {
+  font-family: 'OpenCard Numeric';
+  src: url('./assets/fonts/JetBrainsMono-numeric.woff2') format('woff2');
+  font-display: block;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -242,17 +249,17 @@ textarea,
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  min-width: var(--oc-number-badge-size);
-  height: var(--oc-number-badge-size);
+  min-width: 11px;
+  height: 11px;
   box-sizing: border-box;
-  padding: 0 var(--oc-number-badge-padding-inline);
+  padding: 0 2px;
   border: var(--oc-border-width) solid var(--oc-border-accent);
   border-radius: var(--oc-radius-pill);
   background: var(--oc-bg-accent);
   color: var(--oc-accent-fg);
-  font-size: var(--oc-number-badge-font-size);
+  font-size: 7px;
   font-weight: 600;
-  line-height: var(--oc-number-badge-line-height);
+  line-height: 9px;
   letter-spacing: 0;
   pointer-events: none;
 }

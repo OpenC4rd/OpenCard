@@ -1,5 +1,4 @@
 import type { AlignmentPosition } from '../../../entities/card/model'
-import { evaluateRenderLength } from '../geometry/lengthMath'
 import type {
   CardMarkupBlockNode,
   CardMarkupDiagnostic,
@@ -38,17 +37,12 @@ const ALIGNMENTS: Record<string, AlignmentPosition> = {
 const LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:mm|cm|in|pt|em|rem|%)$/i
 const ABSOLUTE_LENGTH = /^-?(?:\d+\.?\d*|\.\d+)(?:mm|cm|in|pt)$/i
 
-function isLength(value: string): boolean {
+export function isLength(value: string): boolean {
   return LENGTH.test(value.trim())
 }
 
-function isAbsoluteLength(value: string): boolean {
+export function isAbsoluteLength(value: string): boolean {
   return ABSOLUTE_LENGTH.test(value.trim())
-}
-
-/** 绝对长度换算成毫米；stroke / shadow 在 AST 里以毫米数值保存。 */
-function toMm(value: string): number {
-  return evaluateRenderLength(value.trim(), 0)
 }
 
 export function parseCardMarkup(source: string): CardMarkupParseResult {
@@ -316,8 +310,7 @@ class MarkupParser {
           this.report('invalid-argument', tag.offset, `stroke 长度需要绝对单位（mm/cm/in/pt）：${width}`)
           return
         }
-        style.strokeColor = color
-        style.strokeWidth = toMm(width)
+        style.stroke = { color, width }
         return
       }
       case 'shadow': {
@@ -330,10 +323,7 @@ class MarkupParser {
           this.report('invalid-argument', tag.offset, 'shadow 偏移与模糊需要绝对单位（mm/cm/in/pt）')
           return
         }
-        style.shadowColor = color
-        style.shadowOffsetX = toMm(x)
-        style.shadowOffsetY = toMm(y)
-        style.shadowBlur = toMm(blur)
+        style.shadow = { color, offsetX: x, offsetY: y, blur }
         return
       }
       default:

@@ -83,7 +83,10 @@
       </div>
     </div>
 
-    <EditorContent :editor="editor" class="oc-rich-text-editor__surface" :style="baseStyle" />
+    <div class="oc-rich-text-editor__canvas">
+      <EditorContent :editor="editor" class="oc-rich-text-editor__surface" :style="baseStyle" />
+      <OcScaleBar :pixels-per-mm="SCREEN_PIXELS_PER_MM" />
+    </div>
 
     <OcOverlayMarker
       group="rich-text-node-edit"
@@ -104,11 +107,13 @@ import { computed, ref, watch } from 'vue'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcColorPicker from '../../../components/standard/OcColorPicker.vue'
+import OcScaleBar from '../../../components/standard/OcScaleBar.vue'
 import OcActionButton from '../../../components/standard/OcActionButton.vue'
 import OcOverlayMarker from '../../../components/standard/OcOverlayMarker.vue'
 import FontFamilyPropertyField from '../property-editor/fields/FontFamilyPropertyField.vue'
 import StringPropertyField from '../property-editor/fields/StringPropertyField.vue'
 import type { OverlayAnchor } from '../../../composables/overlayGroups'
+import { SCREEN_PIXELS_PER_MM } from '../viewport/viewportNavigation'
 import RichTextNodeEditLayer from './RichTextNodeEditLayer.vue'
 import { useRichTextEditor, type RichTextEditorProps } from './useRichTextEditor'
 
@@ -229,6 +234,16 @@ defineExpose({ editor, focus, getHtml, applyHtml, getContent, setContent, flushP
   border-radius: 1px;
 }
 
+/* 滚动发生在 surface 内，比例尺定位在它外面才能固定在可见区域的左下角。 */
+.oc-rich-text-editor__canvas {
+  --oc-scale-bar-background: var(--oc-bg-input);
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 .oc-rich-text-editor__surface {
   min-height: 0;
   flex: 1 1 auto;
@@ -238,11 +253,21 @@ defineExpose({ editor, focus, getHtml, applyHtml, getContent, setContent, flushP
 .oc-rich-text-editor__surface :deep(.oc-rich-text-editor__content) {
   min-height: 100%;
   padding: var(--oc-space-md);
+  /* 文字滚到底时不压在比例尺上。 */
+  padding-block-end: calc(var(--oc-space-md) + var(--oc-space-lg));
   outline: none;
   color: var(--oc-fg-default);
   overflow-wrap: anywhere;
   paint-order: stroke fill;
   white-space: break-spaces;
+}
+
+/* 编辑区有焦点时由浏览器画选区；用背景图是为了叠在文字背景色之上。 */
+.oc-rich-text-editor__surface :deep(.oc-rich-text-editor__content:not(:focus) .oc-rich-text-editor__retained-selection) {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--oc-fg-accent) 28%, transparent),
+    color-mix(in srgb, var(--oc-fg-accent) 28%, transparent)
+  );
 }
 
 .oc-rich-text-editor__surface :deep(p) {

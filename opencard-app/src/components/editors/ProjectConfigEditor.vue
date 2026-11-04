@@ -417,9 +417,9 @@ defineExpose({ canSave, navigate, presentation })
 .project-profile-editor__layout {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, var(--oc-content-width-md)) var(--oc-project-outline-width);
+  grid-template-columns: minmax(0, var(--oc-content-width-md)) 168px;
   width: 100%;
-  max-width: calc(var(--oc-content-width-md) + var(--oc-project-outline-width) + var(--oc-space-lg));
+  max-width: calc(var(--oc-content-width-md) + 168px + var(--oc-space-lg));
   min-height: 100%;
   margin-inline: auto;
   gap: var(--oc-space-lg);

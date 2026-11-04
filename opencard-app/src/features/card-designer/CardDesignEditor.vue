@@ -138,10 +138,11 @@
             </OcCard>
           </template>
           <template #bottom>
-            <OcCard fill variant="glass" :padding="false" :title="t('cardDesigner.panels.preview')">
+            <OcCard fill variant="glass" :padding="false" :title="t('cardDesigner.panels.preview')"
+              :actions="previewBackgroundActions" @action="cyclePreviewBackground">
               <OcPanel align="stretch" fill radius="none" tone="transparent" border="none" shadow="lg" padding="none">
                 <div ref="transformPreviewHostRef" class="card-design-editor__transform-preview-host"
-                  @wheel.prevent.stop="handlePreviewViewportWheel">
+                  :style="previewBackgroundStyle" @wheel.prevent.stop="handlePreviewViewportWheel">
                   <div ref="transformPreviewViewportRef" class="card-design-editor__transform-preview-viewport"
                     :style="transformPreviewViewportStyle">
                     <CardFaceRenderer v-if="viewFace && renderResources" :face="viewFace" :clip-to-face="true"
@@ -203,11 +204,11 @@
                 <PropertyEditor v-else ref="propertyEditorRef"
                   :inputs="editorState.mode === 'diff' ? diffPropertyInputs : propertyEditorInputs"
                   :categories="propertyCategories" :sort-mode="propertySortMode"
-                  :allow-raw-string-editor="true"
+                  :allow-raw-string-editor="true" copyable-field-keys
                   :binding-interpreter="propertyBindingInterpreter"
                   :capabilities="propertyCapabilities"
                   :delete-mode="editorState.mode === 'diff' ? false : propertyDeleteMode"
-                  :field-warnings="propertyFieldWarnings" @update-property="updateBlockProp"
+                  :field-warnings="propertyFieldWarnings" :field-action-labels="propertyFieldActionLabels" @update-property="updateBlockProp"
                   @add-property="addBlockProp" @reset-property="resetBlockProp" @delete-property="deleteProperty" />
               </OcPanel>
             </OcCard>
@@ -267,6 +268,7 @@ import OcEmpty from '../../components/base/OcEmpty.vue'
 import OcTree from '../../components/standard/OcTree.vue'
 import type { OcActionBarItem, OcActionDefinition } from '../../shared/ui/action/action.types'
 import OcOverlayToolbar from '../../components/standard/OcOverlayToolbar.vue'
+import { useCdePreviewBackground } from './cdePreviewBackground'
 import { createViewportToolbarItems } from '../../components/standard/overlayToolbarItems'
 import CdeOverlayDock from './CdeOverlayDock.vue'
 import {
@@ -445,6 +447,8 @@ function handleRenderReadinessChange(state: { revision: number; status: 'pending
 const dataTableCustomFieldTargetBlockId = ref<string | null>(null)
 const activeFaceKey = ref<CardFaceKey>(sessionView.value.view?.activeFace ?? 'front')
 const clipToFace = ref(sessionView.value.view?.clipToFace ?? false)
+const { previewBackground, previewBackgroundStyle, previewBackgroundActions, cyclePreviewBackground } =
+  useCdePreviewBackground(sessionView.value.view?.previewBackground, t, () => commitViewState())
 const alignmentSnappingEnabled = ref(
   sessionView.value.view?.alignmentSnappingEnabled
   ?? settingsStore.settings.value.workspace.alignmentSnappingEnabledByDefault
@@ -487,6 +491,7 @@ function createViewState(): CardDesignerViewState {
   return {
     activeFace: activeFaceKey.value,
     clipToFace: clipToFace.value,
+    previewBackground: previewBackground.value,
     alignmentSnappingEnabled: alignmentSnappingEnabled.value,
     selectedInstanceId: selectedCardId.value === BLUEPRINT_CARD_ID
       ? null
@@ -640,6 +645,10 @@ const selectedBlockKeys = computed<string[]>({
 const effectiveSelectedBlockKeys = computed(() => editorState.value.mode === 'diff' ? diffSelectedBlockKeys.value : selectedBlockKeys.value)
 const isMultiBlockSelection = computed(() => effectiveSelectedBlockKeys.value.length > 1)
 const selectedCardKeys = ref<string[]>([])
+const propertyFieldActionLabels = computed(() => ({
+  reset: t('cardDesigner.fieldActions.resetToBlueprint'),
+  delete: t(`cardDesigner.fieldActions.${selectedCardId.value === BLUEPRINT_CARD_ID ? 'deleteToDefault' : 'resetToBlueprint'}`),
+}))
 const selectedCardId = ref<string | null>(
   sessionView.value.view?.selectedInstanceId ?? BLUEPRINT_CARD_ID,
 )

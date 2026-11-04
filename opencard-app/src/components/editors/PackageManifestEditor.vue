@@ -158,8 +158,8 @@ defineExpose({ presentation })
 
 /* 几何与边框归这个框所有；OcCover 只负责把封面铺满框内。 */
 .package-manifest-editor__cover {
-  width: var(--oc-cover-preview-width);
-  height: var(--oc-cover-preview-height);
+  width: 180px;
+  height: 100px;
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-control);

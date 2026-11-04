@@ -117,12 +117,12 @@ describe('OcRichTextEditor locale reactivity', () => {
       expect(undoDepth(editor.state)).toBe(depth)
       picker.vm.$emit('cancel')
       vm.properties.update({ key: 'rich-text-selection', fieldKey: 'backgroundColor', value: '#ff0000' })
-      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: 'image', textFillSource: 'assets/a.png', textStrokeWidth: '1mm' })
+      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: 'image', textFillSource: 'assets/a.png', textStroke: { color: 'blue', width: '1mm' } })
       expect(editor.getAttributes('highlight').color).toBe('#ff0000')
       editor.commands.undo()
       expect(editor.getJSON()).toEqual(before)
       picker.vm.$emit('commit', '#00ff00')
-      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: null, textFillSource: null, color: '#00ff00', textStrokeWidth: '1mm' })
+      expect(editor.getAttributes('textStyle')).toMatchObject({ textFillType: null, textFillSource: null, color: '#00ff00', textStroke: { color: 'blue', width: '1mm' } })
       expect(editor.getAttributes('highlight').color).toBe('yellow')
       const saved = vm.getHtml()
       expect(saved).not.toContain('example.test')
@@ -204,11 +204,23 @@ describe('OcRichTextEditor locale reactivity', () => {
     const update = (fieldKey: string, value: string) => vm.properties.update({ key: 'rich-text-selection', fieldKey, value })
     update('strokeWidth', '2')
     update('shadowOffsetX', '-3')
-    update('shadowBlur', '0.5em')
-    expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textStrokeWidth: '2mm', textShadowOffsetX: '-3mm', textShadowBlur: '0.5em' })
+    update('shadowBlur', '0.5pt')
+    const expected = {
+      textStroke: { color: '#000000', width: '2mm' },
+      textShadow: { color: '#00000080', offsetX: '-3mm', offsetY: '0.3mm', blur: '0.5pt' },
+    }
+    expect(vm.editor.getAttributes('textStyle')).toMatchObject(expected)
     update('shadowOffsetX', '-')
     update('shadowBlur', '-2mm')
-    expect(vm.editor.getAttributes('textStyle')).toMatchObject({ textShadowOffsetX: '-3mm', textShadowBlur: '0.5em' })
+    update('strokeWidth', '0.5em')
+    expect(vm.editor.getAttributes('textStyle')).toMatchObject(expected)
+    wrapper.unmount()
+  })
+
+  it('shows a scale bar at actual size inside the text area', async () => {
+    const wrapper = mountEditor()
+    await nextTick()
+    expect(wrapper.get('.oc-rich-text-editor__canvas .oc-scale-bar').text()).toBe('20mm')
     wrapper.unmount()
   })
 

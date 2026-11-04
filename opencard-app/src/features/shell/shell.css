@@ -9,7 +9,7 @@
 
   height: 100vh;
   display: grid;
-  grid-template-rows: var(--oc-shell-titlebar-height) minmax(0, 1fr);
+  grid-template-rows: 40px minmax(0, 1fr);
   background: var(--oc-bg-window, var(--oc-bg-base));
   color: var(--oc-fg-default);
   font-family: var(--oc-font-sans);
@@ -677,7 +677,7 @@
 }
 
 .page-header {
-  min-height: var(--oc-shell-page-header-height);
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;

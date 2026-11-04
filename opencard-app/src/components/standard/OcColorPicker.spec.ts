@@ -53,6 +53,17 @@ describe('OcColorPicker', () => {
     expect(wrapper.emitted('commit')).toBeUndefined()
   })
 
+  it('does not commit when the inline field is left without editing', async () => {
+    const wrapper = mount(OcColorPicker, {
+      props: { modelValue: '#00000000', variant: 'field' },
+    })
+
+    await wrapper.get('.oc-color-picker__field-input').trigger('blur')
+
+    expect(wrapper.emitted('commit')).toBeUndefined()
+    expect(wrapper.get('.oc-color-picker__field').attributes('style') ?? '').not.toMatch(/(^|;\s*)color:/)
+  })
+
   it('previews valid hex input and commits it explicitly', async () => {
     const wrapper = mount(OcColorPicker, {
       props: { modelValue: '#112233' },

@@ -98,7 +98,7 @@ function handleChange(event: Event): void {
   height: 18px;
   border: 1px solid var(--oc-border-default);
   border-radius: 999px;
-  background: var(--oc-bg-subtle);
+  background: var(--oc-bg-input);
   transition:
     background-color var(--oc-duration-quick) var(--oc-ease),
     border-color var(--oc-duration-quick) var(--oc-ease);

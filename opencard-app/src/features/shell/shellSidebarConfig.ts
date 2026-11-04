@@ -1,7 +1,5 @@
-import { readThemePixels } from '../../shared/ui/foundation/themeTokenPixels'
-
-/** Shell Sidebar 的结构 token 投影；数值来源仍是 foundation shared tokens。 */
-export const SHELL_SIDEBAR_COLLAPSE_THRESHOLD = readThemePixels('--oc-shell-sidebar-collapse-threshold')
+/** Shell Sidebar 拖到多窄时收起；只有 TS 读取，不进主题 token。 */
+export const SHELL_SIDEBAR_COLLAPSE_THRESHOLD = 168
 
 /** 侧栏列表键；侧栏描述符与列表动作分发共用同一份定义。 */
 export const PROJECT_FILES_LIST_KEY = 'project-files'

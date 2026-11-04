@@ -347,6 +347,6 @@ function buildTask(): ProjectExportTask {
 .project-export-task-editor__picker,
 .project-export-task-editor__resolution-controls { display: flex; align-items: stretch; gap: var(--oc-space-xs); min-width: 0; }
 .project-export-task-editor__picker > :first-child { flex: 1 1 auto; }
-.project-export-task-editor__scale-field { flex: 0 0 var(--oc-size-xl); }
+.project-export-task-editor__scale-field { flex: 0 0 calc(var(--oc-size-lg) * 2); }
 .project-export-task-editor__documents { max-height: var(--oc-list-max-height-sm); overflow-y: auto; }
 </style>

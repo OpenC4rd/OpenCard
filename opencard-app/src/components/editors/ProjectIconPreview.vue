@@ -46,7 +46,7 @@ const lastPointerY = ref(0)
  * rendering path: a context-tinted or pixelated icon looks here exactly as it does on a card.
  */
 const iconStyle = computed<CSSProperties>(() => ({
-  fontSize: `calc(var(--oc-project-icon-preview-size) * ${scale.value})`,
+  fontSize: `calc(128px * ${scale.value})`,
   transform: `translate(${panX.value}px, ${panY.value}px)`,
 }))
 const scaleLabel = computed(() => `${Math.round(scale.value * 100)}%`)
@@ -131,7 +131,7 @@ function handleKeydown(event: KeyboardEvent): void {
 .project-icon-preview {
   position: relative;
   display: grid;
-  height: var(--oc-project-icon-preview-height);
+  height: 240px;
   min-width: 0;
   overflow: hidden;
   place-items: center;

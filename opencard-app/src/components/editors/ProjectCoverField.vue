@@ -139,7 +139,7 @@ function clear(): void {
 .project-cover-field__banner {
   display: flex;
   width: 100%;
-  height: var(--oc-cover-banner-height);
+  height: 180px;
   align-items: center;
   justify-content: center;
   padding: 0;

@@ -112,6 +112,7 @@ import {
   hsvaToRgba,
   normalizeHexColor,
   rgbaToHex,
+  ALPHA_CHECKER,
   rgbaToHsva,
   type HsvaColor,
 } from './colorModel'
@@ -119,8 +120,6 @@ import {
 defineOptions({ name: 'OcColorPicker', inheritAttrs: false })
 
 const PRESETS: readonly string[] = ['#FFFFFF', '#B8B8B8', '#1F2430', '#000000', '#F14C4C', '#F59E0B', '#3FB950', '#58A6FF', '#7C6CFF', '#A855F7']
-/** 半透明色的棋盘格：8px 一格、实显 4px 方块，28px 的字段和 12px 的滑轨都是它的整数倍。 */
-const ALPHA_CHECKER = 'repeating-conic-gradient(color-mix(in srgb, var(--oc-fg-default) 14%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 8px 8px'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -252,7 +251,8 @@ const fieldStyle = computed<CSSProperties>(() => {
   if (props.mixed && !open.value && !inlineEditing.value) return {}
   return {
     ...alphaPreviewStyle(fieldBackground.value),
-    color: getReadableForegroundColor(fieldBackground.value.slice(0, 7)),
+    // 大半透明时字落在字段表面上，按颜色本身算对比度会看不见。
+    ...(hexToRgba(fieldBackground.value)?.alpha ?? 1) < 0.5 ? {} : { color: getReadableForegroundColor(fieldBackground.value.slice(0, 7)) },
   }
 })
 
@@ -420,7 +420,7 @@ function handleHexInput(event: Event): void {
 }
 
 function commitInlineDraft(): void {
-  if (props.mixed && !inlineEditing.value) return
+  if (!inlineEditing.value) return
   inlineEditing.value = false
   if (normalizedDraft.value) commitColor(normalizedDraft.value)
   else restoreInlineDraft()

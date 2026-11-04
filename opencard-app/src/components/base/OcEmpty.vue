@@ -48,7 +48,7 @@ const emptyClass = computed(() => [
 }
 
 .oc-empty.oc-empty--tone-dim {
-  color: var(--oc-text-dim);
+  color: var(--oc-fg-muted);
 }
 
 .oc-empty.oc-empty--tone-muted {

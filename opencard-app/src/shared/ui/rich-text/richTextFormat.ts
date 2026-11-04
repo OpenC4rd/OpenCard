@@ -34,6 +34,9 @@ export function createRichTextFormatInput(options: {
   const record = Object.fromEntries(Object.entries(state).map(([key, entry]) => [key, entry.value]))
   const format = options.fields
   const foregroundType = record.foregroundType
+  const effectToggle = (category: string): PropertyEditorFieldDefinition => ({
+    title: labels('propertyEditor.richText.effectEnabled', '启用'), fieldType: 'boolean', category,
+  })
   const fields: Record<string, PropertyEditorFieldDefinition> = {
     fontFamily: { ...format.fontField, title: labels('propertyEditor.richText.family', '名称'), category: 'typography' },
     fontSize: { ...format.fontSizeField, title: labels('propertyEditor.richText.size', '大小'), category: 'typography' },
@@ -46,7 +49,7 @@ export function createRichTextFormatInput(options: {
         image: labels('propertyEditor.richText.fillImage', '图片'),
       },
     },
-    ...foregroundType === 'solid' ? {
+    ...foregroundType !== 'image' ? {
       foregroundColor: {
         title: labels('propertyEditor.richText.color', '颜色'),
         fieldType: 'color', category: 'foreground', allowAlpha: true,
@@ -62,30 +65,36 @@ export function createRichTextFormatInput(options: {
         fieldType: 'imageSource', category: 'foreground',
       } satisfies PropertyEditorFieldDefinition,
     } : {},
-    strokeWidth: { ...format.strokeWidthField, title: labels('propertyEditor.richText.width', '宽度'), category: 'outline' },
-    strokeColor: {
-      title: labels('propertyEditor.richText.color', '颜色'),
-      fieldType: 'color', category: 'outline', allowAlpha: true,
-    },
-    shadowColor: {
-      title: labels('propertyEditor.richText.color', '颜色'),
-      fieldType: 'color', category: 'shadow', allowAlpha: true,
-    },
-    shadowOffsetX: {
-      title: labels('propertyEditor.richText.shadowOffsetX', '水平偏移'),
-      fieldType: 'string', category: 'shadow', commitMode: 'blur',
-      completion: { provider: format.lengthCompletionProvider },
-    },
-    shadowOffsetY: {
-      title: labels('propertyEditor.richText.shadowOffsetY', '垂直偏移'),
-      fieldType: 'string', category: 'shadow', commitMode: 'blur',
-      completion: { provider: format.lengthCompletionProvider },
-    },
-    shadowBlur: {
-      title: labels('propertyEditor.richText.shadowBlur', '模糊'),
-      fieldType: 'string', category: 'shadow', commitMode: 'blur',
-      completion: { provider: format.lengthCompletionProvider },
-    },
+    strokeEnabled: effectToggle('outline'),
+    ...record.strokeEnabled !== 'false' ? {
+      strokeWidth: { ...format.strokeWidthField, title: labels('propertyEditor.richText.width', '宽度'), category: 'outline' },
+      strokeColor: {
+        title: labels('propertyEditor.richText.color', '颜色'),
+        fieldType: 'color', category: 'outline', allowAlpha: true,
+      },
+    } satisfies Record<string, PropertyEditorFieldDefinition> : {},
+    shadowEnabled: effectToggle('shadow'),
+    ...record.shadowEnabled !== 'false' ? {
+      shadowColor: {
+        title: labels('propertyEditor.richText.color', '颜色'),
+        fieldType: 'color', category: 'shadow', allowAlpha: true,
+      },
+      shadowOffsetX: {
+        title: labels('propertyEditor.richText.shadowOffsetX', '水平偏移'),
+        fieldType: 'string', category: 'shadow', commitMode: 'blur',
+        completion: { provider: format.lengthCompletionProvider },
+      },
+      shadowOffsetY: {
+        title: labels('propertyEditor.richText.shadowOffsetY', '垂直偏移'),
+        fieldType: 'string', category: 'shadow', commitMode: 'blur',
+        completion: { provider: format.lengthCompletionProvider },
+      },
+      shadowBlur: {
+        title: labels('propertyEditor.richText.shadowBlur', '模糊'),
+        fieldType: 'string', category: 'shadow', commitMode: 'blur',
+        completion: { provider: format.lengthCompletionProvider },
+      },
+    } satisfies Record<string, PropertyEditorFieldDefinition> : {},
     textAlign: {
       title: labels('propertyEditor.richText.alignment', '对齐'),
       fieldType: 'string', category: 'paragraph', presentation: 'select',
@@ -110,7 +119,8 @@ export function createRichTextFormatInput(options: {
     ) {
       field.placeholder = state[key]?.kind === 'mixed'
         ? labels('propertyEditor.richText.mixed', '混合')
-        : state[key]?.kind === 'unset' ? labels('propertyEditor.richText.inherited', '继承') : undefined
+        : state[key]?.kind === 'unset' && key !== 'foregroundSource'
+          ? labels('propertyEditor.richText.inherited', '继承') : undefined
     }
   }
   return {

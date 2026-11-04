@@ -73,6 +73,7 @@ describe('PropertyEditor records protocol', () => {
       value: { writeText },
     })
     const wrapper = mountEditor({
+        copyableFieldKeys: true,
         deleteMode: false,
         inputs: [{
           key: 'block',
@@ -83,10 +84,18 @@ describe('PropertyEditor records protocol', () => {
         }],
     })
 
-    await wrapper.get('.property-editor__field-key-button').trigger('click')
+    await wrapper.get('.property-field-label__copy').trigger('click')
     await flushPromises()
 
     expect(writeText).toHaveBeenCalledWith('opacity')
+  })
+
+  it('shows a plain label unless the host opts into copying field keys', () => {
+    const wrapper = mountEditor({
+      inputs: [{ key: 'block', record: { opacity: 1 }, fields: { opacity: { title: 'Opacity', fieldType: 'number' } } }],
+    })
+    expect(wrapper.find('.property-field-label__copy').exists()).toBe(false)
+    expect(wrapper.get('.property-editor__row-label').text()).toContain('Opacity')
   })
 
   it('dispatches richText fields to the rich-text editor', async () => {
@@ -199,6 +208,18 @@ describe('PropertyEditor records protocol', () => {
     expect(wrapper.emitted('delete-property')).toEqual([[
       { key: 'block', fieldKey: 'score' },
     ]])
+  })
+
+  it('uses neutral action labels unless the host names where the value goes', async () => {
+    const wrapper = mountEditor({
+      deleteMode: true,
+      inputs: [{ key: 'target', record: { score: 1 }, fields: { score: { title: 'Score', fieldType: 'number', resettable: true } } }],
+    })
+    const label = (key: string) => wrapper.get(`[data-action-key="${key}"] button`).attributes('aria-label')
+    expect([label('reset-property'), label('delete-property')]).toEqual(['propertyEditor.actions.reset', 'propertyEditor.actions.delete'])
+    await wrapper.setProps({ fieldActionLabels: { reset: '恢复继承', delete: '移除' } })
+    expect([label('reset-property'), label('delete-property')]).toEqual(['恢复继承', '移除'])
+    wrapper.unmount()
   })
 
   it('withholds the delete action for unremovable or readonly fields', () => {

@@ -99,18 +99,22 @@ describe('tiptapBridge: Inline Marks', () => {
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
   })
 
+  it.each([
+    '@style(stroke=#000000 2pt){x}',
+    '@style(stroke=#000000 0.25in){x}',
+    '@style(shadow=#111111 2pt -0.5mm 1cm){x}',
+  ])('keeps authored length units through the editor: %s', (markup) => {
+    expect(serializeTiptapMarkup(cardMarkupToTiptap(markup))).toBe(markup)
+  })
+
   it('round-trips stroke, shadow, and image fill styles', () => {
     const markup = '@style(fill=art.png,stroke=#000000 2mm,shadow=#111111 1mm 2mm 3mm){styled}'
     const tiptap = cardMarkupToTiptap(markup)
     expect(tiptap.content![0]!.content![0]!.marks).toEqual([{
       type: 'textStyle',
       attrs: {
-        textStrokeColor: '#000000',
-        textStrokeWidth: '2mm',
-        textShadowColor: '#111111',
-        textShadowOffsetX: '1mm',
-        textShadowOffsetY: '2mm',
-        textShadowBlur: '3mm',
+        textStroke: { color: '#000000', width: '2mm' },
+        textShadow: { color: '#111111', offsetX: '1mm', offsetY: '2mm', blur: '3mm' },
         textFillType: 'image',
         textFillSource: 'art.png',
       },
@@ -118,8 +122,22 @@ describe('tiptapBridge: Inline Marks', () => {
     expect(serializeTiptapMarkup(tiptap)).toBe(markup)
     // Also parses when arguments are quoted
     expect(cardMarkupToTiptap('@style(stroke="#000000 2mm"){styled}').content![0]!.content![0]!.marks).toEqual([
-      { type: 'textStyle', attrs: { textStrokeColor: '#000000', textStrokeWidth: '2mm' } },
+      { type: 'textStyle', attrs: { textStroke: { color: '#000000', width: '2mm' } } },
     ])
+  })
+
+  it('never emits half an effect from a malformed mark', () => {
+    const text = (attrs: Record<string, unknown>) => ({ type: 'doc', content: [{ type: 'paragraph', content: [
+      { type: 'text', text: 'x', marks: [{ type: 'textStyle', attrs }] },
+    ] }] })
+    expect(serializeTiptapMarkup(text({ textStroke: { color: '#000' } }))).toBe('x')
+    expect(serializeTiptapMarkup(text({ textShadow: { color: '#000', offsetX: '1mm', offsetY: '1em', blur: '0mm' } }))).toBe('x')
+  })
+
+  it('hoists a shared effect across differently styled runs', () => {
+    const shadow = 'shadow=#111111 1mm 2mm 3mm'
+    const markup = `@style(${shadow}){@bold{a}b}`
+    expect(serializeTiptapMarkup(cardMarkupToTiptap(markup))).toBe(markup)
   })
 })
 
