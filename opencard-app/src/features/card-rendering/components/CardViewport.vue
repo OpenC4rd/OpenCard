@@ -16,7 +16,8 @@
           <div v-if="props.comparison.before.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.before.face)" />
           <CardFaceRenderer v-else :face="props.comparison.before.face"
             :clip-to-face="clipToFace"
-            :render-scale="renderedScale"
+            :render-scale="resolveFaceRasterScale(props.comparison.before.face)"
+            :view="comparisonBeforeView"
             :resource-context="props.comparison.before.resourceContext"
             :visual-readiness="visualReadiness"
             :diff-highlights="props.comparison.before.diffHighlights ?? []"
@@ -31,7 +32,8 @@
           <div v-if="props.comparison.after.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.after.face)" />
           <CardFaceRenderer v-else :face="props.comparison.after.face"
             :clip-to-face="clipToFace"
-            :render-scale="renderedScale"
+            :render-scale="resolveFaceRasterScale(props.comparison.after.face)"
+            :view="comparisonAfterView"
             :resource-context="props.comparison.after.resourceContext"
             :visual-readiness="visualReadiness"
             :diff-highlights="props.comparison.after.diffHighlights ?? []"
@@ -42,7 +44,7 @@
     </template>
     <div v-else ref="stageRef" data-oc-layout-anchor="center" class="card-viewport-stage" :style="stageStyle">
       <CardFaceRenderer :face="face"
-        :clip-to-face="clipToFace" :render-scale="renderedScale" :resource-context="resourceContext"
+        :clip-to-face="clipToFace" :render-scale="resolveFaceRasterScale(face)" :view="visibleView" :resource-context="resourceContext"
         :visual-readiness="visualReadiness"
         :diff-highlights="diffHighlights"
         @block-click="handleBlockClick"
@@ -338,6 +340,11 @@ import OcOverlayToolbar from '../../../components/standard/OcOverlayToolbar.vue'
 import type { OcShortcutPart } from '../../../components/standard/OcShortcut.vue'
 import { useContextMenu } from '../../../shared/ui/useContextMenu'
 import CardFaceRenderer from './CardFaceRenderer.vue'
+import {
+  resolveFullFaceRasterScale,
+  resolveVisibleCardFaceView,
+  type CardFaceView,
+} from './cardFaceView'
 import { createCardVisualReadiness, type CardVisualReadinessState } from './cardRenderReadiness'
 import CardLayerView from './CardLayerView.vue'
 import { buildCardLayerGroups } from './cardLayerModel'
@@ -598,8 +605,6 @@ const scale = ref(props.transform ? clamp(props.transform.scale, VIEWPORT_MIN_SC
 const targetPanX = ref(panX.value)
 const targetPanY = ref(panY.value)
 const targetScale = ref(scale.value)
-const renderedScale = ref(scale.value)
-let renderedScaleSettleTimer: ReturnType<typeof setTimeout> | null = null
 const isPanning = ref(false)
 const lastPointerX = ref(0)
 const lastPointerY = ref(0)
@@ -672,7 +677,6 @@ function applyViewportTransform(transform: ViewportTransform | undefined) {
   targetPanX.value = panX.value
   targetPanY.value = panY.value
   targetScale.value = scale.value
-  renderedScale.value = scale.value
 }
 
 function hasSameViewportTransform(left: ViewportTransform | null, right: ViewportTransform) {
@@ -726,20 +730,16 @@ const selectionFrame = computed<SelectionFrame | null>({
   },
 })
 
-const stageTransformScale = computed(() => scale.value / (renderedScale.value || 1))
-const stageStyle = computed(() => {
-  const s = stageTransformScale.value
-  const transform = Math.abs(s - 1) < 0.0001
-    ? `translate(${translateX.value}px, ${translateY.value}px)`
-    : `translate(${translateX.value}px, ${translateY.value}px) scale(${s})`
+function resolveStageStyle(face: { width: number; height: number }, x: number, y: number) {
   return {
-    transform,
+    transform: `translate(${x}px, ${y}px) scale(${scale.value})`,
     transformOrigin: '0 0',
-    width: `${props.face.width * renderedScale.value}px`,
-    height: `${props.face.height * renderedScale.value}px`,
+    width: `${face.width}px`,
+    height: `${face.height}px`,
     '--oc-viewport-inverse-scale': String(1 / scale.value),
   }
-})
+}
+const stageStyle = computed(() => resolveStageStyle(props.face, translateX.value, translateY.value))
 const comparisonDivider = computed(() => Math.min(1, Math.max(0, props.comparison?.divider ?? 0.5)))
 const comparisonTransitioning = ref(false)
 const comparisonDividerDragging = ref(false)
@@ -790,17 +790,7 @@ function resolveZoomOrigin(layer: CardViewportComparisonLayer | null, value: num
 function resolveComparisonStageStyle(layer: CardViewportComparisonLayer) {
   if (props.comparison?.viewMode !== 'side-by-side') return stageStyle.value
   const origin = resolveZoomOrigin(layer, scale.value)
-  const s = stageTransformScale.value
-  const transform = Math.abs(s - 1) < 0.0001
-    ? `translate(${origin.x + panX.value}px, ${origin.y + panY.value}px)`
-    : `translate(${origin.x + panX.value}px, ${origin.y + panY.value}px) scale(${s})`
-  return {
-    transform,
-    transformOrigin: '0 0',
-    width: `${layer.face.width * renderedScale.value}px`,
-    height: `${layer.face.height * renderedScale.value}px`,
-    '--oc-viewport-inverse-scale': String(1 / scale.value),
-  }
+  return resolveStageStyle(layer.face, origin.x + panX.value, origin.y + panY.value)
 }
 const comparisonBeforeStageStyle = computed(() => props.comparison
   ? resolveComparisonStageStyle(props.comparison.before)
@@ -809,11 +799,32 @@ const comparisonAfterStageStyle = computed(() => props.comparison
   ? resolveComparisonStageStyle(props.comparison.after)
   : stageStyle.value)
 function placeholderStyle(face: ComparisonCardFace): Record<string, string> {
-  return {
-    width: `${face.width * renderedScale.value}px`,
-    height: `${face.height * renderedScale.value}px`,
-  }
+  return { width: `${face.width}px`, height: `${face.height}px` }
 }
+function resolveFaceRasterScale(face: ComparisonCardFace): number {
+  return resolveFullFaceRasterScale(face, window.devicePixelRatio || 1)
+}
+function resolveVisibleView(
+  face: ComparisonCardFace,
+  layer: CardViewportComparisonLayer | null,
+): CardFaceView | null {
+  if (effectiveLayerViewActive.value) return null
+  const origin = resolveZoomOrigin(layer, scale.value)
+  return resolveVisibleCardFaceView(
+    face,
+    { x: origin.x + panX.value, y: origin.y + panY.value },
+    scale.value,
+    { width: viewportWidth.value, height: viewportHeight.value },
+    window.devicePixelRatio || 1,
+  )
+}
+const visibleView = computed(() => resolveVisibleView(props.face, null))
+const comparisonBeforeView = computed(() => (
+  props.comparison ? resolveVisibleView(props.comparison.before.face, props.comparison.before) : null
+))
+const comparisonAfterView = computed(() => (
+  props.comparison ? resolveVisibleView(props.comparison.after.face, props.comparison.after) : null
+))
 const comparisonBeforeLayerStyle = computed(() => ({
   clipPath: `inset(0 ${Math.max(0, viewportWidth.value - comparisonDividerPosition.value) / Math.max(1, viewportWidth.value) * 100}% 0 0)`,
 }))
@@ -1458,18 +1469,7 @@ function zoomAt(nextValue: number, viewportX: number, viewportY: number): void {
   targetScale.value = nextScale
   targetPanX.value = viewportX - nextOrigin.x - worldX * nextScale
   targetPanY.value = viewportY - nextOrigin.y - worldY * nextScale
-  scheduleRenderedScaleSettle()
   startZoomAnimation()
-}
-
-function scheduleRenderedScaleSettle(): void {
-  if (renderedScaleSettleTimer !== null) clearTimeout(renderedScaleSettleTimer)
-  renderedScaleSettleTimer = setTimeout(() => {
-    renderedScaleSettleTimer = null
-    if (renderedScale.value !== scale.value) {
-      renderedScale.value = scale.value
-    }
-  }, 120)
 }
 
 function resetView(): void {
@@ -1481,7 +1481,6 @@ function resetView(): void {
   targetPanX.value = 0
   targetPanY.value = 0
   targetScale.value = 96 / 25.4
-  renderedScale.value = 96 / 25.4
 }
 
 function fitView(targetRect?: { left: number; top: number; width: number; height: number }): void {
@@ -1532,7 +1531,6 @@ function fitContent(
   targetPanX.value = panX.value
   targetPanY.value = panY.value
   targetScale.value = nextScale
-  renderedScale.value = nextScale
 }
 
 function normalizeWheelDelta(deltaY: number, deltaMode: number): number {
@@ -1572,17 +1570,12 @@ function startZoomAnimation() {
       panX.value = targetPanX.value
       panY.value = targetPanY.value
       zoomAnimationFrame = null
-      renderedScale.value = scale.value
       return
     }
 
     scale.value += scaleDelta * VIEWPORT_ZOOM_ANIMATION_SMOOTHING
     panX.value += panXDelta * VIEWPORT_ZOOM_ANIMATION_SMOOTHING
     panY.value += panYDelta * VIEWPORT_ZOOM_ANIMATION_SMOOTHING
-
-    if (Math.abs(Math.log2(scale.value / (renderedScale.value || 1))) >= 1.0) {
-      renderedScale.value = scale.value
-    }
 
     zoomAnimationFrame = requestAnimationFrame(animate)
   }
@@ -1598,7 +1591,6 @@ function stopZoomAnimation() {
   targetScale.value = scale.value
   targetPanX.value = panX.value
   targetPanY.value = panY.value
-  renderedScale.value = scale.value
 }
 
 function handleBlockClick(blockId: string, event: MouseEvent) {
@@ -2603,10 +2595,6 @@ onBeforeUnmount(() => {
   stopRotate()
   stopFaceDimensionDrag()
   stopZoomAnimation()
-  if (renderedScaleSettleTimer !== null) {
-    clearTimeout(renderedScaleSettleTimer)
-    renderedScaleSettleTimer = null
-  }
   resizeObserver?.disconnect()
   resizeObserver = null
   document.fonts?.removeEventListener('loadingdone', requestSelectionFrameSync)
@@ -2922,13 +2910,11 @@ watch(
 }
 
 .card-viewport-stage :deep(.card-canvas) {
-  width: 100% !important;
-  height: 100% !important;
   pointer-events: auto;
 }
 
-.card-viewport--readonly .card-viewport-stage :deep(.card-canvas),
-.card-viewport--layer-view .card-viewport-stage :deep(.card-canvas) {
+.card-viewport--readonly .card-viewport-stage :deep(canvas),
+.card-viewport--layer-view .card-viewport-stage :deep(canvas) {
   pointer-events: none;
 }
 

@@ -10,6 +10,7 @@ import type { CardVisualReadinessRegistrar } from './cardRenderReadiness'
 import { createCanvasAssetStore } from '../painter/canvasAssetStore'
 import { paintCardScene } from '../painter/paintCardScene'
 import { computeSceneLayout, hitTestScene, type CardSceneGraph } from '../geometry'
+import type { CardFaceView } from './cardFaceView'
 
 const props = withDefaults(defineProps<{
   face: RenderReadyCardFace
@@ -19,7 +20,8 @@ const props = withDefaults(defineProps<{
   diffHighlights?: readonly { blockId: string; kind: 'added' | 'removed' | 'changed' }[]
   visualReadiness?: CardVisualReadinessRegistrar
   renderScale?: number
-}>(), { visibleRootBlockIds: () => [], clipToFace: false, diffHighlights: () => [], renderScale: 1 })
+  view?: CardFaceView | null
+}>(), { visibleRootBlockIds: () => [], clipToFace: false, diffHighlights: () => [], renderScale: 1, view: null })
 
 const emit = defineEmits<{
   (e: 'block-click', blockId: string, event: MouseEvent): void
@@ -37,16 +39,33 @@ const effectivePixelRatio = computed(() => {
   const maxSafeRatio = MAX_CANVAS_PHYSICAL_PIXELS / maxSide
   return Math.min(idealRatio, Math.max(0.1, maxSafeRatio))
 })
-const pixelWidth = computed(() => Math.max(1, Math.round(props.face.width * effectivePixelRatio.value)))
-const pixelHeight = computed(() => Math.max(1, Math.round(props.face.height * effectivePixelRatio.value)))
-const canvasStyle = computed(() => ({
-  // The viewport stage owns the visual scale. Keeping the canvas at logical
-  // face size avoids applying the preview scale twice and preserves pixels.
-  width: `${props.face.width}px`,
-  height: `${props.face.height}px`,
-  display: 'block',
-  background: props.face.background,
-}))
+const paintedView = computed<CardFaceView>(() => props.view ?? {
+  left: 0,
+  top: 0,
+  width: props.face.width,
+  height: props.face.height,
+  pixelScale: effectivePixelRatio.value,
+})
+const canvasStyle = computed(() => {
+  const view = props.view
+  // 舞台负责缩放；视图模式用 transform 抵消它，CSS 布局量化到 1/64px，放大后会偏出整像素
+  return {
+    display: 'block',
+    background: props.face.background,
+    ...(view ? {
+      position: 'absolute' as const,
+      left: 0,
+      top: 0,
+      width: `${view.width * view.pixelScale}px`,
+      height: `${view.height * view.pixelScale}px`,
+      transform: `translate(${view.left}px, ${view.top}px) scale(${1 / view.pixelScale})`,
+      transformOrigin: '0 0',
+    } : {
+      width: `${props.face.width}px`,
+      height: `${props.face.height}px`,
+    }),
+  }
+})
 
 const assets = createCanvasAssetStore()
 const renderFace = computed(() => props.visibleRootBlockIds.length
@@ -58,16 +77,16 @@ const sceneGraph = computed<CardSceneGraph>(() => computeSceneLayout(renderFace.
 function paint(): void {
   const canvas = canvasRef.value
   if (!canvas) return
-  if (canvas.width !== pixelWidth.value) {
-    canvas.width = pixelWidth.value
-  }
-  if (canvas.height !== pixelHeight.value) {
-    canvas.height = pixelHeight.value
-  }
+  const { left, top, width, height, pixelScale } = paintedView.value
+  const pixelWidth = Math.max(1, Math.round(width * pixelScale))
+  const pixelHeight = Math.max(1, Math.round(height * pixelScale))
+  if (canvas.width !== pixelWidth) canvas.width = pixelWidth
+  if (canvas.height !== pixelHeight) canvas.height = pixelHeight
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  const ratio = effectivePixelRatio.value
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.setTransform(pixelScale, 0, 0, pixelScale, -left * pixelScale, -top * pixelScale)
   paintCardScene(ctx, sceneGraph.value, assets, {
     diffHighlights: props.diffHighlights,
     resourceContext: props.resourceContext,
@@ -79,13 +98,9 @@ function handleClick(event: MouseEvent): void {
   const canvas = canvasRef.value
   if (!canvas) return
   const rect = canvas.getBoundingClientRect()
-  const canvasWidth = rect.width > 0 ? rect.width : props.face.width
-  const canvasHeight = rect.height > 0 ? rect.height : props.face.height
-  const canvasLeft = rect.width > 0 ? rect.left : 0
-  const canvasTop = rect.height > 0 ? rect.top : 0
-
-  const worldX = (event.clientX - canvasLeft) * props.face.width / canvasWidth
-  const worldY = (event.clientY - canvasTop) * props.face.height / canvasHeight
+  const view = paintedView.value
+  const worldX = view.left + (event.clientX - rect.left) * (rect.width > 0 ? view.width / rect.width : 1)
+  const worldY = view.top + (event.clientY - rect.top) * (rect.height > 0 ? view.height / rect.height : 1)
 
   const hitNode = hitTestScene(sceneGraph.value, { x: worldX, y: worldY })
   if (hitNode) {
@@ -122,9 +137,11 @@ watch(() => [props.face, props.resourceContext], () => {
   void assets.preloadSceneAssets(sceneGraph.value, props.resourceContext)
 }, { immediate: true })
 
-watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds, effectivePixelRatio.value], () => {
+watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds], () => {
   paint()
 }, { deep: true, flush: 'post' })
+
+watch(paintedView, paint, { flush: 'post' })
 
 defineExpose({
   getCanvasElement: () => canvasRef.value,

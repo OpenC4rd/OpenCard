@@ -25,6 +25,9 @@ import {
 import { parsePaintStyle, roundRectPath } from './paintStyle'
 import type { CanvasAssetStore, LoadedAsset } from './canvasAssetStore'
 import { formatProjectIconPath } from '../../../shared/rich-text/projectIconReference'
+import { createDeviceBuffer, readDeviceTransform } from './deviceBuffer'
+
+const GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS = 16
 
 export type PaintSceneOptions = {
   onlyBlockId?: string
@@ -348,33 +351,13 @@ function paintImageBlock(
   ctx.clip()
 
   if (maskImg) {
-    const transform = typeof ctx.getTransform === 'function' ? ctx.getTransform() : null
-    const scaleX = transform ? (Math.hypot(transform.a, transform.b) || 1) : 1
-    const scaleY = transform ? (Math.hypot(transform.c, transform.d) || 1) : 1
-    const bufferW = Math.max(1, Math.ceil(w * scaleX))
-    const bufferH = Math.max(1, Math.ceil(h * scaleY))
-
-    // 离屏合成遮罩：优先使用 OffscreenCanvas 支持无头导出/Worker，其次降级到 document.createElement
-    const offscreen = typeof OffscreenCanvas !== 'undefined'
-      ? new OffscreenCanvas(bufferW, bufferH)
-      : typeof document !== 'undefined'
-        ? (() => {
-            const c = document.createElement('canvas')
-            c.width = bufferW
-            c.height = bufferH
-            return c
-          })()
-        : null
-
-    const offCtx = offscreen ? (offscreen.getContext('2d') as CanvasRenderingContext2D | null) : null
-    if (offCtx) {
-      offCtx.imageSmoothingEnabled = true
-      if ('imageSmoothingQuality' in offCtx) offCtx.imageSmoothingQuality = 'high'
-      if (typeof offCtx.setTransform === 'function') offCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0)
+    const buffer = createDeviceBuffer(ctx, w, h)
+    if (buffer) {
+      const { offscreen, offCtx } = buffer
       drawImageFitted(offCtx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined)
       offCtx.globalCompositeOperation = 'destination-in'
       drawImageFitted(offCtx, maskImg, 0, 0, w, h, block.maskFit ?? 'cover')
-      ctx.drawImage(offscreen as CanvasImageSource, 0, 0, w, h)
+      ctx.drawImage(offscreen, 0, 0, w, h)
       ctx.restore()
       return
     }
@@ -419,33 +402,14 @@ function drawImageFitted(
 
   if (contextColor) {
     // context tint 着色：在独立离屏画布上以超采样高分辨率渲染并 source-in 着色
-    const transform = typeof ctx.getTransform === 'function' ? ctx.getTransform() : null
-    const scaleX = transform ? (Math.hypot(transform.a, transform.b) || 1) : 1
-    const scaleY = transform ? (Math.hypot(transform.c, transform.d) || 1) : 1
-    const bufferW = Math.max(1, Math.ceil(dw * scaleX))
-    const bufferH = Math.max(1, Math.ceil(dh * scaleY))
-
-    const offscreen = typeof OffscreenCanvas !== 'undefined'
-      ? new OffscreenCanvas(bufferW, bufferH)
-      : typeof document !== 'undefined'
-        ? (() => {
-            const c = document.createElement('canvas')
-            c.width = bufferW
-            c.height = bufferH
-            return c
-          })()
-        : null
-
-    const offCtx = offscreen ? (offscreen.getContext('2d') as CanvasRenderingContext2D | null) : null
-    if (offCtx) {
-      offCtx.imageSmoothingEnabled = true
-      if ('imageSmoothingQuality' in offCtx) offCtx.imageSmoothingQuality = 'high'
-      if (typeof offCtx.setTransform === 'function') offCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0)
+    const buffer = createDeviceBuffer(ctx, dw, dh)
+    if (buffer) {
+      const { offscreen, offCtx } = buffer
       offCtx.drawImage(img, 0, 0, dw, dh)
       offCtx.globalCompositeOperation = 'source-in'
       offCtx.fillStyle = contextColor
       offCtx.fillRect(0, 0, dw, dh)
-      ctx.drawImage(offscreen as CanvasImageSource, dx, dy, dw, dh)
+      ctx.drawImage(offscreen, dx, dy, dw, dh)
     } else {
       ctx.save()
       ctx.drawImage(img, dx, dy, dw, dh)
@@ -567,17 +531,22 @@ function paintTextBlock(
     }
   }
 
+  const glyphPaint = { blockId: block.id, baseFontFamily, assets, resourceContext: options.resourceContext }
+
   // 2. 通道二：阴影与文字圆角外描边
   for (const run of textLayout.runs) {
-    if (run.kind === 'glyph' && (run.style.strokeWidth > 0 || run.style.shadowColor)) {
-      paintGlyphPass(ctx, run, 'stroke', block.id, baseFontFamily, assets, options.resourceContext)
+    if (run.kind !== 'glyph') continue
+    const blurredShadow = Boolean(run.style.shadowColor && run.style.shadowBlur)
+    if (blurredShadow) paintBlurredGlyphShadow(ctx, run, glyphPaint)
+    if (hasGlyphOutline(run.style) || (run.style.shadowColor && !blurredShadow)) {
+      paintGlyphPass(ctx, run, 'stroke', glyphPaint)
     }
   }
 
   // 3. 通道三：文字主填充 / 图片填充 / 内联图标 / 内联图片
   for (const run of textLayout.runs) {
     if (run.kind === 'glyph') {
-      paintGlyphPass(ctx, run, 'fill', block.id, baseFontFamily, assets, options.resourceContext)
+      paintGlyphPass(ctx, run, 'fill', glyphPaint)
     } else if (run.kind === 'icon') {
       paintInlineIcon(ctx, run, block.id, assets, options.resourceContext)
     } else if (run.kind === 'img') {
@@ -650,14 +619,46 @@ function resolveGlyphFillStyle(
   return style.color || '#000000'
 }
 
+type GlyphPaintContext = {
+  blockId: string
+  baseFontFamily: string
+  assets: CanvasAssetStore
+  resourceContext?: CardRenderResourceContext
+}
+
+/**
+ * 模糊投影在固定精度的缓冲里生成再放大：WebKit 的大半径模糊会出现块状，
+ * 固定精度也让它在任意缩放和导出尺寸下保持同一观感。
+ */
+function paintBlurredGlyphShadow(ctx: CanvasRenderingContext2D, run: PositionedGlyphRun, paint: GlyphPaintContext): void {
+  const { shadowBlur, shadowOffsetX, shadowOffsetY, fontSize } = run.style
+  const padding = shadowBlur * 1.5 + fontSize / 2
+  const left = run.x + Math.min(shadowOffsetX, 0) - padding
+  const top = run.y + Math.min(shadowOffsetY, 0) - padding
+  const width = run.width + Math.abs(shadowOffsetX) + padding * 2
+  const height = run.height + Math.abs(shadowOffsetY) + padding * 2
+  const buffer = createDeviceBuffer(ctx, width, height, GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS / shadowBlur)
+  if (!buffer) {
+    paintGlyphPass(ctx, run, 'shadow', paint)
+    return
+  }
+  const { offscreen, offCtx } = buffer
+  const { a, d } = readDeviceTransform(offCtx)
+  offCtx.translate(-left, -top)
+  // 字形移出缓冲，只留下投影
+  paintGlyphPass(offCtx, run, 'shadow', paint, width)
+  ctx.save()
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(offscreen, left, top, offscreen.width / a, offscreen.height / d)
+  ctx.restore()
+}
+
 function paintGlyphPass(
   ctx: CanvasRenderingContext2D,
   run: PositionedGlyphRun,
-  pass: 'fill' | 'stroke',
-  blockId: string,
-  baseFontFamily: string,
-  assets: CanvasAssetStore,
-  resourceContext?: CardRenderResourceContext,
+  pass: 'fill' | 'stroke' | 'shadow',
+  { blockId, baseFontFamily, assets, resourceContext }: GlyphPaintContext,
+  glyphShift = 0,
 ): void {
   ctx.save()
   const style = run.style
@@ -668,52 +669,49 @@ function paintGlyphPass(
     : resolveBlockFontFamily(style.fontFamily, blockId, 'content', resourceContext)
   ctx.font = `${italic}${weight} ${style.fontSize}px ${resolvedFont}`
   ctx.textBaseline = 'alphabetic'
+  // 在竖排旋转之前换算：投影方向跟随文字块，不跟随单个字形
+  if (pass === 'shadow' || (pass === 'stroke' && !style.shadowBlur)) applyGlyphShadow(ctx, style)
+  if (glyphShift) {
+    ctx.shadowOffsetX += glyphShift * readDeviceTransform(ctx).a
+    ctx.translate(-glyphShift, 0)
+  }
 
+  let drawX = run.x
+  let drawY = run.baselineY
   if (run.angleRad !== 0) {
     // 竖排旋转西文：绕中心旋转 π/2
-    const cx = run.x + run.width / 2
-    const cy = run.y + run.height / 2
-    ctx.translate(cx, cy)
+    ctx.translate(run.x + run.width / 2, run.y + run.height / 2)
     ctx.rotate(run.angleRad)
-    const drawX = -run.height / 2
-    const drawY = -run.width / 2 + (run.baselineY - run.y)
+    drawX = -run.height / 2
+    drawY = -run.width / 2 + (run.baselineY - run.y)
+  }
 
-    if (pass === 'stroke') {
-      applyShadowAndStroke(ctx, style)
-      ctx.strokeText(run.text, drawX, drawY)
-    } else {
-      ctx.fillStyle = resolveGlyphFillStyle(ctx, style, blockId, assets, resourceContext)
-      ctx.fillText(run.text, drawX, drawY)
-    }
+  if (pass !== 'fill' && hasGlyphOutline(style)) {
+    ctx.lineJoin = 'round'
+    ctx.miterLimit = 2
+    ctx.lineWidth = style.strokeWidth * 2
+    ctx.strokeStyle = style.strokeColor!
+    ctx.strokeText(run.text, drawX, drawY)
   } else {
-    const drawX = run.x
-    const drawY = run.baselineY
-
-    if (pass === 'stroke') {
-      applyShadowAndStroke(ctx, style)
-      ctx.strokeText(run.text, drawX, drawY)
-    } else {
-      ctx.fillStyle = resolveGlyphFillStyle(ctx, style, blockId, assets, resourceContext)
-      ctx.fillText(run.text, drawX, drawY)
-    }
+    ctx.fillStyle = resolveGlyphFillStyle(ctx, style, blockId, assets, resourceContext)
+    ctx.fillText(run.text, drawX, drawY)
   }
 
   ctx.restore()
 }
 
-function applyShadowAndStroke(ctx: CanvasRenderingContext2D, style: PositionedGlyphRun['style']): void {
-  if (style.shadowColor) {
-    ctx.shadowColor = style.shadowColor
-    ctx.shadowOffsetX = style.shadowOffsetX
-    ctx.shadowOffsetY = style.shadowOffsetY
-    ctx.shadowBlur = style.shadowBlur
-  }
-  if (style.strokeWidth > 0 && style.strokeColor) {
-    ctx.lineJoin = 'round'
-    ctx.miterLimit = 2
-    ctx.lineWidth = style.strokeWidth * 2
-    ctx.strokeStyle = style.strokeColor
-  }
+function hasGlyphOutline(style: PositionedGlyphRun['style']): boolean {
+  return style.strokeWidth > 0 && Boolean(style.strokeColor)
+}
+
+/** Canvas 的 shadow* 以设备像素计且不受 CTM 影响，这里把卡片坐标换算到当前位图。 */
+function applyGlyphShadow(ctx: CanvasRenderingContext2D, style: PositionedGlyphRun['style']): void {
+  if (!style.shadowColor) return
+  const { a, b, c, d } = readDeviceTransform(ctx)
+  ctx.shadowColor = style.shadowColor
+  ctx.shadowOffsetX = a * style.shadowOffsetX + c * style.shadowOffsetY
+  ctx.shadowOffsetY = b * style.shadowOffsetX + d * style.shadowOffsetY
+  ctx.shadowBlur = style.shadowBlur * Math.sqrt(Math.abs(a * d - b * c))
 }
 
 function paintInlineIcon(

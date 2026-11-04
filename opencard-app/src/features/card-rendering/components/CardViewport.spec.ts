@@ -170,7 +170,7 @@ describe('CardViewport', () => {
     expect(zoomedWorldY).toBeCloseTo(initialWorldY, 4)
   })
 
-  it('updates rendered scale on the face renderer upon zoom animation completion', async () => {
+  it('repaints the visible view at the new zoom scale', async () => {
     const wrapper = mount(CardViewport, {
       props: { resourceContext, face },
       global: { stubs: { CardFaceRenderer: true } },
@@ -180,12 +180,12 @@ describe('CardViewport', () => {
       zoomByWheelAt(deltaY: number, deltaMode: number, viewportX: number, viewportY: number): void
     }
     const renderer = wrapper.findComponent({ name: 'CardFaceRenderer' })
-    const initialRenderScale = renderer.props('renderScale')
+    const initialPixelScale = renderer.props('view').pixelScale
 
     viewport.zoomByWheelAt(-120, WheelEvent.DOM_DELTA_PIXEL, 500, 400)
     await flushAnimation()
 
-    expect(renderer.props('renderScale')).toBeGreaterThan(initialRenderScale)
+    expect(renderer.props('view').pixelScale).toBeGreaterThan(initialPixelScale)
   })
 
   it('zooms around the pointer within the active side-by-side half', async () => {

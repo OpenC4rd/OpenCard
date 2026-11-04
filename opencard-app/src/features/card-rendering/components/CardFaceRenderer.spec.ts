@@ -61,4 +61,49 @@ describe('CardFaceRenderer resources', () => {
     expect(canvas.width).toBeGreaterThanOrEqual(1500)
     expect(canvas.height).toBeGreaterThanOrEqual(1500)
   })
+
+  it('paints only the view on a single canvas that stays 1:1 with device pixels', () => {
+    const face: RenderReadyCardFace = {
+      type: 'card-face', id: 'front', faceKey: 'front', width: 100, height: 100,
+      background: '#fff',
+      children: [],
+    }
+    const wrapper = mount(CardFaceRenderer, {
+      props: {
+        face,
+        resourceContext: createCardRenderResourceContext({}),
+        view: { left: 10, top: 20, width: 50, height: 40, pixelScale: 8 },
+      },
+    })
+
+    expect(wrapper.findAll('canvas')).toHaveLength(1)
+    const canvas = wrapper.find('canvas').element as HTMLCanvasElement
+    expect([canvas.width, canvas.height]).toEqual([400, 320])
+    expect(canvas.style.transform).toBe('translate(10px, 20px) scale(0.125)')
+  })
+
+  it('maps clicks through the view back to face coordinates', async () => {
+    const face: RenderReadyCardFace = {
+      type: 'card-face', id: 'front', faceKey: 'front', width: 100, height: 100,
+      background: '#fff',
+      children: [{
+        block: parseRenderReadyBlockForTest(createBlock('text-block', { id: 'hit', width: '20mm', height: '20mm' })),
+        location: { id: 'location', type: 'simple-container-location', anchor: 'lt', x: '55mm', y: '55mm' },
+      }],
+    }
+    const wrapper = mount(CardFaceRenderer, {
+      props: {
+        face,
+        resourceContext: createCardRenderResourceContext({}),
+        view: { left: 50, top: 50, width: 50, height: 50, pixelScale: 2 },
+      },
+    })
+    const canvas = wrapper.find('canvas').element
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 }) as DOMRect
+
+    await wrapper.find('canvas').trigger('click', { clientX: 20, clientY: 20 })
+    expect(wrapper.emitted('block-click')?.[0]?.[0]).toBe('hit')
+    await wrapper.find('canvas').trigger('click', { clientX: 90, clientY: 90 })
+    expect(wrapper.emitted('blank-click')).toHaveLength(1)
+  })
 })
