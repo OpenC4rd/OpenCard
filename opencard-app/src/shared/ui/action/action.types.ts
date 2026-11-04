@@ -19,6 +19,10 @@ export interface OcActionDefinition {
   disabled?: boolean
   disabledReason?: string
   children?: readonly OcActionMenuEntry[] | (() => readonly OcActionMenuEntry[])
+  /** 操作条空间不足时也不收进「更多」。 */
+  alwaysVisible?: boolean
+  /** 切换型操作的当前状态：给了就按切换按钮呈现（按下态与 aria-pressed）。 */
+  active?: boolean
 }
 
 export interface OcActionDivider {
@@ -27,6 +31,9 @@ export interface OcActionDivider {
 }
 
 export type OcActionMenuEntry = OcActionDefinition | OcActionDivider
+
+/** 操作条的一项：操作、分隔线，或一段只读文字（如缩放比例）。 */
+export type OcActionBarItem = OcActionMenuEntry | string
 
 export function actionChildren(action: OcActionDefinition): readonly OcActionMenuEntry[] {
   return typeof action.children === 'function' ? action.children() : action.children ?? []

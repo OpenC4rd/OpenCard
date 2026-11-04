@@ -5,7 +5,7 @@
       <div v-if="hasHeader" class="oc-card__header">
         <OcBar :icon="icon" :title="title">
           <template #append>
-            <OcActionRail :actions="actions" @select="handleActionSelect" />
+            <OcActionBar :items="actions" @select="handleActionSelect" />
           </template>
         </OcBar>
       </div>
@@ -25,7 +25,7 @@ export type OcCardAction = OcActionDefinition
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue'
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
-import OcActionRail from './OcActionRail.vue'
+import OcActionBar from './OcActionBar.vue'
 import OcBar from './OcBar.vue'
 
 interface OcCardProps {

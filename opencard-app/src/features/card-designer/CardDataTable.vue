@@ -136,9 +136,8 @@
                         :capabilities="capabilities"
                         :editor-id="resolveCellEditorState(block.key, field, cell).editorId"
                         @update:value="handleCellValueUpdate(block.key, field, cell, $event)" />
-                      <PropertyFieldActionRail
-                        :actions="resolveCellActions(block.key, field, cell)"
-                        @action="handleCellAction(block.key, field, cell, $event)" />
+                      <OcActionBar :items="resolveCellActions(block.key, field, cell)" overflow="none"
+                        @select="handleCellAction(block.key, field, cell, $event.key)" />
                     </div>
                   </template>
                 </template>
@@ -174,7 +173,7 @@ import type {
   PropertyEditorFieldDefinition,
   PropertyFieldCapabilities,
 } from '../../shared/ui/property-editor/propertyEditor.types'
-import PropertyFieldActionRail from '../../shared/ui/property-editor/PropertyFieldActionRail.vue'
+import OcActionBar from '../../components/standard/OcActionBar.vue'
 import PropertyFieldRenderer from '../../shared/ui/property-editor/PropertyFieldRenderer.vue'
 import OcDataGridColumnResizeHandle from '../../shared/ui/data-grid/OcDataGridColumnResizeHandle.vue'
 import { useDataGridColumnSizing } from '../../shared/ui/data-grid/useDataGridColumnSizing'

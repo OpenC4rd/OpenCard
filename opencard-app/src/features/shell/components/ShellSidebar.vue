@@ -4,7 +4,7 @@ import OcResizeHandle, { type OcResizeHandleChange } from '../../../components/s
 import OcResizeTrack from '../../../components/standard/OcResizeTrack.vue';
 import OcIcon from '../../../components/base/OcIcon.vue';
 import OcText from '../../../components/base/OcText.vue';
-import OcActionRail from '../../../components/standard/OcActionRail.vue';
+import OcActionBar from '../../../components/standard/OcActionBar.vue';
 import type { OcActionDefinition } from '../../../shared/ui/action/action.types';
 import type { ShellList, ShellListGroup } from '../shell.types';
 import type { ProjectWorkspaceSidebarState } from '../../app-state/model/appState';
@@ -159,7 +159,7 @@ function finishResize(): void {
           <section v-for="(list, index) in activeLists" :key="list.key" :data-oc-tutorial="list.tutorialKey" class="shell-sidebar-list" :class="{ collapsed: isListCollapsed(list.key) }" :style="listSectionStyle(list)">
             <div class="shell-sidebar-list-head">
               <button v-if="!collapsed" class="shell-sidebar-list-toggle" type="button" :data-tooltip="isListCollapsed(list.key) ? expandListTooltip || null : collapseListTooltip || null" @click.stop="toggleListCollapsed(list.key)"><OcText class="shell-sidebar-list-title" :truncate="true">{{ list.title }}</OcText><OcIcon class="shell-sidebar-list-chevron" name="mdiChevronDown" size="sm" :class="{ collapsed: isListCollapsed(list.key) }" /></button>
-              <OcActionRail :actions="actionDefinitionsByList.get(list.key) ?? []" @select="list.onAction?.($event.key)" />
+              <OcActionBar :items="actionDefinitionsByList.get(list.key) ?? []" @select="list.onAction?.($event.key)" />
             </div>
             <div class="shell-sidebar-list-content-wrap" :class="{ collapsed: isListCollapsed(list.key) }"><div class="shell-sidebar-list-content"><slot name="list-content" :list="list"><ShellSidebarContent :list="list" /></slot></div></div>
             <OcResizeHandle v-if="canResizeAfter(index)" class="shell-sidebar-list-resizer" appearance="invisible"

@@ -76,10 +76,8 @@
                   @preview:value="emit('preview-property', { key: row.category.inputKey, fieldKey: row.entry.fieldKey, value: $event })"
                   @cancel:value="emit('cancel-property', { key: row.category.inputKey, fieldKey: row.entry.fieldKey })"
                 />
-                <PropertyFieldActionRail v-if="!row.entry.readonly"
-                  :actions="resolveFieldActions(row.category.inputKey, row.entry)"
-                  @action="handleFieldAction(row.category.inputKey, row.entry, $event)"
-                />
+                <OcActionBar v-if="!row.entry.readonly" :items="resolveFieldActions(row.category.inputKey, row.entry)"
+                  overflow="none" @select="handleFieldAction(row.category.inputKey, row.entry, $event.key)" />
                 <span v-if="row.entry.tail" class="property-editor__tail">
                   <template v-for="(part, index) in normalizeNodeTail(row.entry.tail)"
                     :key="typeof part === 'string' ? `text:${index}` : `part:${index}`">
@@ -129,7 +127,7 @@ import type { OcActionDefinition } from '../action/action.types'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import OcText from '../../../components/base/OcText.vue'
 import OcPanel from '../../../components/base/OcPanel.vue'
-import PropertyFieldActionRail from './PropertyFieldActionRail.vue'
+import OcActionBar from '../../../components/standard/OcActionBar.vue'
 import PropertyFieldRenderer from './PropertyFieldRenderer.vue'
 import {
   createPropertyFieldEditorModeAction,

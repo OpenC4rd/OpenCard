@@ -19,10 +19,10 @@
       :size="size"
       :icon-size="iconSize"
       :active="active"
-      icon-only
+      :icon-only="appearance === 'icon'"
       :icon="action.icon"
       :icon-tone="action.iconTone"
-      :data-tooltip="isMenuOpen ? null : actionTitleText(action) || null"
+      :data-tooltip="isMenuOpen || appearance === 'text' ? null : actionTitleText(action) || null"
       :aria-label="actionAccessibleLabel(inlineMarkupToText(actionTitleText(action) ?? action.key), action.badgeLabel)"
       :aria-haspopup="hasActionChildren(action) ? 'menu' : undefined"
       :aria-expanded="hasActionChildren(action) ? isMenuOpen : undefined"
@@ -30,7 +30,7 @@
       :tabindex="props.buttonTabindex"
       :disabled="action.disabled === true"
       @click.stop="handleButtonClick"
-    />
+    >{{ appearance === 'text' ? inlineMarkupToText(actionTitleText(action) ?? action.key) : '' }}</OcButton>
     <span v-if="hasActionBadge(action.badge)" class="oc-number-badge oc-action-button__badge" aria-hidden="true">
       {{ formatActionBadge(action.badge) }}
     </span>
@@ -40,6 +40,7 @@
       抢先打开时旧菜单收到 close（真正关闭），这里只跟 marker 的结果。
     -->
     <OcOverlayMarker
+      v-if="hasActionChildren(action)"
       group="menu"
       :anchor="rootRef"
       :owner="rootRef"
@@ -102,12 +103,15 @@ const props = withDefaults(defineProps<{
   active?: boolean
   ariaPressed?: boolean
   buttonTabindex?: number
+  /** 图标按钮，或以标题为文字的按钮（菜单栏这类文字式操作条）。 */
+  appearance?: 'icon' | 'text'
 }>(), {
   size: 'md',
   iconSize: 'action',
   variant: 'ghost',
   active: false,
   ariaPressed: undefined,
+  appearance: 'icon',
 })
 
 const emit = defineEmits<{

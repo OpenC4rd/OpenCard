@@ -110,9 +110,9 @@
                       :value="cell.value" editor-id="field"
                       @update:value="updateCell(cell.columnKey, cell.recordKey, String($event ?? ''))" />
                     <span class="dictionary-editor__cell-action-slot">
-                      <PropertyFieldActionRail :actions="cell.overridden && cell.columnKey !== DICTIONARY_BASE_COLUMN_KEY
+                      <OcActionBar :items="cell.overridden && cell.columnKey !== DICTIONARY_BASE_COLUMN_KEY
                         ? [resetOverrideAction()]
-                        : []" @action="resetOverride(cell.columnKey, cell.recordKey)" />
+                        : []" overflow="none" @select="resetOverride(cell.columnKey, cell.recordKey)" />
                       </span>
                   </div>
                   <span v-else class="oc-data-grid__cell-preview">{{ cell.value }}</span>
@@ -197,7 +197,7 @@ import {
   type ProjectDictionaryWorkbookImportResult,
 } from '../../features/workspace/model/projectDictionaryWorkbook'
 import type { PropertyEditorFieldDefinition } from '../../shared/ui/property-editor/propertyEditor.types'
-import PropertyFieldActionRail from '../../shared/ui/property-editor/PropertyFieldActionRail.vue'
+import OcActionBar from '../standard/OcActionBar.vue'
 import PropertyFieldRenderer from '../../shared/ui/property-editor/PropertyFieldRenderer.vue'
 import MonacoEditor from './MonacoEditor.vue'
 import DictionaryWorkbookImportDialog from './DictionaryWorkbookImportDialog.vue'

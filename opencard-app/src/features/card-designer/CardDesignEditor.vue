@@ -265,8 +265,8 @@ import AdditionalFieldCreateDialog from '../../shared/ui/property-editor/Additio
 import ExportCustomBlockDialog from './ExportCustomBlockDialog.vue'
 import OcEmpty from '../../components/base/OcEmpty.vue'
 import OcTree from '../../components/standard/OcTree.vue'
-import type { OcActionDefinition } from '../../shared/ui/action/action.types'
-import OcOverlayToolbar, { type OcOverlayToolbarItem } from '../../components/standard/OcOverlayToolbar.vue'
+import type { OcActionBarItem, OcActionDefinition } from '../../shared/ui/action/action.types'
+import OcOverlayToolbar from '../../components/standard/OcOverlayToolbar.vue'
 import { createViewportToolbarItems } from '../../components/standard/overlayToolbarItems'
 import CdeOverlayDock from './CdeOverlayDock.vue'
 import {
@@ -525,35 +525,26 @@ const faceSwitchAction = computed<OcActionDefinition>(() => ({
     : t('cardDesigner.view.switchToFront')} ${formatCdeShortcutMarkup('view.switch-face')}`,
 }))
 
-const faceToolbarItems = computed<readonly OcOverlayToolbarItem[]>(() => [
+const faceToolbarItems = computed<readonly OcActionBarItem[]>(() => [
   ...createViewportToolbarItems(viewportScaleLabel.value, {
     zoomOut: `${t('cardDesigner.shortcuts.zoomOut')} ${formatCdeShortcutMarkup('viewport.zoom-out')}`,
     fit: `${t('cardDesigner.shortcuts.fitViewport')} ${formatCdeShortcutMarkup('viewport.fit')}`,
     zoomIn: `${t('cardDesigner.shortcuts.zoomIn')} ${formatCdeShortcutMarkup('viewport.zoom-in')}`,
   }),
   { type: 'divider', key: 'viewport-actions' },
-  {
-    ...alignmentSnappingAction.value,
-    active: alignmentSnappingEnabled.value,
-    variant: alignmentSnappingEnabled.value ? 'soft' : 'ghost',
-  },
-  {
-    ...clipAction.value,
-    active: clipToFace.value,
-    variant: clipToFace.value ? 'soft' : 'ghost',
-  },
+  { ...alignmentSnappingAction.value, active: alignmentSnappingEnabled.value },
+  { ...clipAction.value, active: clipToFace.value },
   faceSwitchAction.value,
 ])
-const diffViewModeAction = computed<OcOverlayToolbarItem>(() => ({
+const diffViewModeAction = computed<OcActionBarItem>(() => ({
   key: 'toggle-diff-view-mode',
   icon: 'mdiLandRowsVertical',
   title: diffViewMode.value === 'split'
     ? `${t('versionControl.diffViewer.switchToSideBySide')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`
     : `${t('versionControl.diffViewer.switchToSplit')} ${formatCdeShortcutMarkup('view.toggle-diff-mode')}`,
   active: diffViewMode.value === 'side-by-side',
-  variant: diffViewMode.value === 'side-by-side' ? 'soft' : 'ghost',
 }))
-const diffFaceToolbarItems = computed<readonly OcOverlayToolbarItem[]>(() => [
+const diffFaceToolbarItems = computed<readonly OcActionBarItem[]>(() => [
   diffViewModeAction.value,
   faceSwitchAction.value,
 ])
