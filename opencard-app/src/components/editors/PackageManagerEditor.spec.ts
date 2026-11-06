@@ -40,7 +40,7 @@ function packageEntry(options: {
 function mountEditor() {
   return mount(PackageManagerEditor, {
     props: { session: createTestSession({ path: 'D:/project/.opencard/packages' }), languageId: 'plaintext' },
-    global: { stubs: { ProjectRegistryEditorShell: { template: '<div><slot /></div>' } } },
+    global: { stubs: { ProjectRegistryEditorShell: { template: '<div><slot /></div>' }, PackageManifestContent: true } },
   })
 }
 
@@ -50,6 +50,18 @@ describe('PackageManagerEditor', () => {
     store.files = []
     store.unreadable = []
     store.revealEntryInFileManager.mockClear()
+  })
+
+  it('asks the shell to add a package from the empty state and from the page header', async () => {
+    const wrapper = mountEditor()
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.emitted('add-package')).toHaveLength(1)
+
+    store.files = [{ archivePath: 'D:/project/.opencard/packages/theme.ocpack', fingerprint: 'fp-theme' }]
+    const populated = mountEditor()
+    const editor = populated.vm as unknown as { headerActions: { key: string }[]; onHeaderAction: (key: string) => void }
+    editor.onHeaderAction(editor.headerActions[0]!.key)
+    expect(populated.emitted('add-package')).toHaveLength(1)
   })
 
   it('asks the shell to trash the archive only after the removal is confirmed', async () => {
@@ -95,6 +107,23 @@ describe('PackageManagerEditor', () => {
     album.vm.$emit('node-activate', { key: themePath })
 
     expect(wrapper.emitted('open-file')).toEqual([[themePath]])
+  })
+
+  it('selects the first archive and follows a click into the inspector', async () => {
+    const first = 'D:/project/.opencard/packages/a.ocpack'
+    const second = 'D:/project/.opencard/packages/b.ocpack'
+    store.files = [{ archivePath: first, fingerprint: 'a' }, { archivePath: second, fingerprint: 'b' }]
+
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    const album = wrapper.getComponent(OcAlbum)
+    expect(album.props('selectedKeys')).toEqual([first])
+    album.vm.$emit('selection-change', { triggerKey: second, selectedKeys: [second] })
+    await flushPromises()
+
+    expect(album.props('selectedKeys')).toEqual([second])
+    expect(wrapper.findComponent({ name: 'PackageManifestContent' }).attributes('path')).toBe(second)
   })
 
   it('lists the archives it cannot read instead of hiding them', async () => {

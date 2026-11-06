@@ -1,7 +1,7 @@
-import type { ViewportInsets } from '../../shared/ui/viewport/viewportNavigation'
-import { clamp } from '../../shared/model/number'
+import type { ViewportInsets } from '../viewport/viewportNavigation'
+import { clamp } from '../../model/number'
 
-export type CdeOverlayGeometryConfig = Readonly<{
+export type DockGeometryConfig = Readonly<{
   collapsedExtent: number
   minExtent: number
   maxExtent: number
@@ -10,10 +10,19 @@ export type CdeOverlayGeometryConfig = Readonly<{
   floatingGap: number
 }>
 
-export type CdeOverlaySide = 'left' | 'right'
+export type DockSide = 'left' | 'right'
 
-type CdeOverlayDockGeometry = Readonly<{
-  side: CdeOverlaySide
+export interface DockLayoutState {
+  leftTopHeight: number | null
+  rightTopHeight: number | null
+  leftDockExtent: number
+  rightDockExtent: number
+  leftExpandedDockExtent: number
+  rightExpandedDockExtent: number
+}
+
+type DockGeometry = Readonly<{
+  side: DockSide
   extent: number
   contentWidth: number
   expansionProgress: number
@@ -22,18 +31,18 @@ type CdeOverlayDockGeometry = Readonly<{
   viewportInset: number
 }>
 
-export function clampCdeOverlayExtent(extent: number, config: CdeOverlayGeometryConfig): number {
+export function clampDockExtent(extent: number, config: DockGeometryConfig): number {
   assertGeometryConfig(config)
   return clamp(Number.isFinite(extent) ? extent : config.collapsedExtent, config.collapsedExtent, config.maxExtent)
 }
 
-export function settleCdeOverlayExtent(
+export function resolveSettledDockExtent(
   extent: number,
   startExtent: number,
-  config: CdeOverlayGeometryConfig,
+  config: DockGeometryConfig,
 ): number {
-  const current = clampCdeOverlayExtent(extent, config)
-  const start = clampCdeOverlayExtent(startExtent, config)
+  const current = clampDockExtent(extent, config)
+  const start = clampDockExtent(startExtent, config)
   if (start <= config.collapsedExtent) {
     return current > config.collapsedExtent + config.expandDragThreshold
       ? clamp(current, config.minExtent, config.maxExtent)
@@ -44,12 +53,12 @@ export function settleCdeOverlayExtent(
     : clamp(current, config.minExtent, config.maxExtent)
 }
 
-export function resolveCdeOverlayDockGeometry(
-  side: CdeOverlaySide,
+export function resolveDockGeometry(
+  side: DockSide,
   extent: number,
-  config: CdeOverlayGeometryConfig,
-): CdeOverlayDockGeometry {
-  const resolvedExtent = clampCdeOverlayExtent(extent, config)
+  config: DockGeometryConfig,
+): DockGeometry {
+  const resolvedExtent = clampDockExtent(extent, config)
   const span = config.minExtent - config.collapsedExtent
   const expansionProgress = span === 0
     ? 1
@@ -70,18 +79,18 @@ export function resolveCdeOverlayDockGeometry(
   }
 }
 
-export function resolveCdeOverlayViewportInsets(
+export function resolveDockViewportInsets(
   leftExtent: number,
   rightExtent: number,
-  config: CdeOverlayGeometryConfig,
+  config: DockGeometryConfig,
 ): ViewportInsets {
   return {
-    left: resolveCdeOverlayDockGeometry('left', leftExtent, config).viewportInset,
-    right: resolveCdeOverlayDockGeometry('right', rightExtent, config).viewportInset,
+    left: resolveDockGeometry('left', leftExtent, config).viewportInset,
+    right: resolveDockGeometry('right', rightExtent, config).viewportInset,
   }
 }
 
-function assertGeometryConfig(config: CdeOverlayGeometryConfig): void {
+function assertGeometryConfig(config: DockGeometryConfig): void {
   const values = [
     config.collapsedExtent,
     config.minExtent,
@@ -90,12 +99,12 @@ function assertGeometryConfig(config: CdeOverlayGeometryConfig): void {
     config.collapseDragThreshold,
     config.floatingGap,
   ]
-  if (values.some(value => !Number.isFinite(value))) throw new RangeError('CDE overlay geometry must be finite')
+  if (values.some(value => !Number.isFinite(value))) throw new RangeError('Dock geometry must be finite')
   if (config.collapsedExtent < 0 || config.minExtent < config.collapsedExtent) {
-    throw new RangeError('CDE overlay extents are invalid')
+    throw new RangeError('Dock extents are invalid')
   }
-  if (config.maxExtent < config.minExtent) throw new RangeError('CDE overlay maximum extent is invalid')
+  if (config.maxExtent < config.minExtent) throw new RangeError('Dock maximum extent is invalid')
   if (config.expandDragThreshold < 0 || config.collapseDragThreshold < 0 || config.floatingGap < 0) {
-    throw new RangeError('CDE overlay thresholds are invalid')
+    throw new RangeError('Dock thresholds are invalid')
   }
 }

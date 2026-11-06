@@ -1,51 +1,56 @@
 <template>
-  <div class="project-icon-registry-workbench">
-    <section class="project-icon-registry-workbench__sets">
-      <OcTree v-if="series.length" class="project-icon-registry-workbench__sets-tree" fill
-        role="listbox" :data="seriesTreeData" :selected-keys="selectedSeriesKey ? [selectedSeriesKey] : []"
+  <ProjectResourceWorkbench :leading-title="t('projectConfig.icons.iconSets')" :leading-actions="leadingCardActions"
+    :inspector-title="t('cardDesigner.panels.preview')" :footer-title="t('cardDesigner.panels.properties')"
+    @action="handleCardAction">
+    <template #leading>
+      <OcTree v-if="series.length" fill role="listbox" :data="seriesTreeData"
+        :selected-keys="selectedSeriesKey ? [selectedSeriesKey] : []"
         selection-mode="single" scroll-to-selection
         :action-overflow-title="t('projectConfig.icons.iconSetActions')"
         @selection-change="handleSeriesSelection" @action="handleSeriesAction" />
-      <OcEmpty v-else tone="muted">{{ t('projectConfig.icons.empty') }}</OcEmpty>
-    </section>
+      <OcEmpty v-else tone="muted" fill>{{ t('projectConfig.icons.empty') }}</OcEmpty>
+    </template>
 
-    <section class="project-icon-registry-workbench__icons">
-      <ProjectIconSetWorkspace v-if="selectedSeries"
-        :series="selectedSeries" :entries="selectedSeriesEntries"
-        :selected-icon-indexes="selectedIconIndexesForSeries"
-        @update:series="updateSelectedSeries" @update:selected-icon-indexes="setSelectedIconIndexes" />
-      <div v-else class="project-icon-registry-workbench__placeholder">
-        <OcIcon name="mdiStickerEmoji" size="lg" tone="muted" />
-        <OcEmpty tone="muted" inset="none">{{ t('projectConfig.icons.noSeriesSelected') }}</OcEmpty>
-      </div>
-    </section>
+    <template v-if="selectedSeries?.icons.length" #append>
+      <OcFieldFrame class="project-icon-registry-workbench__filter">
+        <OcFieldInput variant="plain" full-width :value="filterQuery"
+          :placeholder="t('projectConfig.icons.filterPlaceholder')"
+          :aria-label="t('projectConfig.icons.filterPlaceholder')" @input="updateFilter" />
+        <template v-if="filterQuery" #suffix>
+          <OcButton icon-only size="sm" icon="mdiClose" variant="ghost"
+            :aria-label="t('projectConfig.icons.clearFilter')" @click="filterQuery = ''" />
+        </template>
+      </OcFieldFrame>
+      <OcSlider class="project-icon-registry-workbench__tile-size" v-model="tileSize"
+        :min="TILE_SIZE_MIN" :max="TILE_SIZE_MAX" :step="TILE_SIZE_STEP"
+        :value-text="`${tileSize} px`" :aria-label="t('projectConfig.icons.tileSize')" />
+    </template>
 
-    <section class="project-icon-registry-workbench__inspector">
-      <div v-if="selectedIconIndexesForSeries.length > 1"
-        class="project-icon-registry-workbench__placeholder">
-        <OcIcon name="mdiStickerEmoji" size="lg" tone="muted" />
-        <OcText tone="muted">
-          {{ t('projectConfig.icons.multiSelectionNote', { count: selectedIconIndexesForSeries.length }) }}
-        </OcText>
-      </div>
-      <template v-else-if="selectedIcon && selectedCatalogEntry">
-        <ProjectIconPreview :entry="selectedCatalogEntry" />
-        <div class="project-icon-registry-workbench__property-content">
-          <PropertyEditor ref="propertyEditorRef" :inputs="iconPropertyInputs"
-            :categories="iconPropertyCategories" sort-mode="category" @update-property="updateIconProperty" />
-        </div>
-      </template>
-      <div v-else class="project-icon-registry-workbench__placeholder">
-        <OcIcon name="mdiStickerEmoji" size="lg" tone="muted" />
-        <OcEmpty tone="muted" inset="none">{{ t('projectConfig.icons.noIconSelected') }}</OcEmpty>
-      </div>
-    </section>
+    <ProjectIconSetWorkspace v-if="selectedSeries"
+      :series="selectedSeries" :entries="selectedSeriesEntries" :filter-query="filterQuery" :tile-size="tileSize"
+      :selected-icon-indexes="selectedIconIndexesForSeries"
+      @update:series="updateSelectedSeries" @update:selected-icon-indexes="setSelectedIconIndexes" />
+    <OcEmpty v-else tone="muted" icon="mdiStickerEmoji" fill>{{ t('projectConfig.icons.noSeriesSelected') }}</OcEmpty>
 
-    <ProjectIconSetSettingsDialog :open="settingsSeriesIndex !== null" :name="settingsSeries?.name"
-      :series-key="settingsSeries?.key" :busy="settingsBusy"
-      :existing-keys="series.map(candidate => candidate.key)"
-      @close="settingsSeriesIndex = null" @submit="saveIconSetSettings" />
-  </div>
+    <template #inspector>
+      <OcEmpty v-if="selectedIconIndexesForSeries.length > 1" tone="muted" icon="mdiStickerEmoji" fill>
+        {{ t('projectConfig.icons.multiSelectionNote', { count: selectedIconIndexesForSeries.length }) }}
+      </OcEmpty>
+      <ProjectIconPreview v-else-if="selectedIcon && selectedCatalogEntry" :entry="selectedCatalogEntry" />
+      <OcEmpty v-else tone="muted" icon="mdiStickerEmoji" fill>{{ t('projectConfig.icons.noIconSelected') }}</OcEmpty>
+    </template>
+    <template v-if="selectedIconIndexesForSeries.length <= 1 && selectedIcon && selectedCatalogEntry" #footer>
+      <div class="project-icon-registry-workbench__property-content">
+        <PropertyEditor ref="propertyEditorRef" :inputs="iconPropertyInputs"
+          :categories="iconPropertyCategories" sort-mode="category" @update-property="updateIconProperty" />
+      </div>
+    </template>
+  </ProjectResourceWorkbench>
+
+  <ProjectIconSetSettingsDialog :open="settingsSeriesIndex !== null" :name="settingsSeries?.name"
+    :series-key="settingsSeries?.key" :busy="settingsBusy"
+    :existing-keys="series.map(candidate => candidate.key)"
+    @close="settingsSeriesIndex = null" @submit="saveIconSetSettings" />
 </template>
 
 <script setup lang="ts">
@@ -61,25 +66,34 @@ import {
 } from '../../features/workspace/model/projectIcons'
 import {
   buildProjectIconCatalog,
+  createProjectIconPreviewStyle,
   findProjectIcon,
   findProjectIconSeries,
   type ProjectIconCatalog,
   type ProjectIconCatalogEntry,
 } from '../../features/workspace/services/projectIconCatalog'
+import { readProjectIconSize } from '../../features/workspace/services/projectIconDimensionResolver'
 import type {
   PropertyEditorCategoryDefinition,
   PropertyEditorInput,
   PropertyEditorMutation,
 } from '../../shared/ui/property-editor/propertyEditor.types'
 import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
 import type { OcNode, OcNodeAction, OcNodeActionEvent, OcNodeCollection, OcNodeSelectionEvent } from '../../shared/ui/node/node.types'
+import type { OcVisual } from '../../shared/ui/visual/visual.types'
+import OcButton from '../base/OcButton.vue'
 import OcEmpty from '../base/OcEmpty.vue'
-import OcIcon from '../base/OcIcon.vue'
-import OcText from '../base/OcText.vue'
+import OcFieldFrame from '../base/OcFieldFrame.vue'
+import OcFieldInput from '../base/OcFieldInput.vue'
+import OcSlider from '../standard/OcSlider.vue'
 import OcTree from '../standard/OcTree.vue'
 import ProjectIconPreview from './ProjectIconPreview.vue'
 import ProjectIconSetSettingsDialog, { type ProjectIconSetSettingsRequest } from './ProjectIconSetSettingsDialog.vue'
 import ProjectIconSetWorkspace from './ProjectIconSetWorkspace.vue'
+import ProjectResourceWorkbench from './ProjectResourceWorkbench.vue'
+
+const ADD_ICONS_ACTION_KEY = 'project-icon-workbench.add-icons'
 
 const props = withDefaults(defineProps<{
   series?: readonly ProjectIconSeries[]
@@ -88,7 +102,9 @@ const props = withDefaults(defineProps<{
   projectIconCatalog?: ProjectIconCatalog
   /** An icon import owns the global progress bar; import commands stay disabled until it settles. */
   importBusy?: boolean
-}>(), { series: () => [], importBusy: false })
+  /** 左卡头部由所有者提供的命令，排在「添加图标」之前。 */
+  leadingActions?: OcActionDefinition[]
+}>(), { series: () => [], importBusy: false, leadingActions: () => [] })
 const emit = defineEmits<{
   'update:series': [series: ProjectIconSeries[]]
   'key-conflicts': [conflicts: readonly ProjectIconKeyConflict[]]
@@ -96,9 +112,23 @@ const emit = defineEmits<{
   'remove-series': [seriesKey: string]
   /** Asks the owner to copy new icons into an existing set. */
   'add-icons': [seriesKey: string]
+  /** A card command the owner supplied through `leadingActions`. */
+  'leading-action': [actionKey: string]
 }>()
 const { t } = useI18n()
 const selectedSeriesKey = ref<string | null>(null)
+const filterQuery = ref('')
+const TILE_SIZE_MIN = 72
+const TILE_SIZE_MAX = 168
+const TILE_SIZE_STEP = 8
+const tileSize = ref(96)
+const leadingCardActions = computed<OcActionDefinition[]>(() => [
+  ...props.leadingActions,
+  {
+    key: ADD_ICONS_ACTION_KEY, icon: 'mdiPlus', title: t('projectConfig.icons.addIcons'),
+    disabled: props.importBusy || !selectedSeries.value,
+  },
+])
 const selectedIconIndexes = ref<Record<string, number[]>>({})
 const settingsSeriesIndex = ref<number | null>(null)
 const settingsBusy = ref(false)
@@ -184,18 +214,29 @@ const seriesTreeData = computed<OcNodeCollection>(() => ({
   rootKeys: props.series.map(candidate => candidate.key),
   items: new Map(props.series.map((candidate): [string, OcNode] => [candidate.key, {
     label: candidate.name,
-    visual: { type: 'icon' as const, icon: 'mdiStickerEmoji' },
+    visual: seriesVisual(candidate),
     tail: [t('projectConfig.icons.iconCount', { count: candidate.icons.length }), ...seriesActions()],
   }])),
   children: new Map(),
 }))
 
+/** 集合行的图标就是集合里的第一个图标：一眼能认出是哪一套，空集才退回通用图标。 */
+function seriesVisual(candidate: ProjectIconSeries): OcVisual {
+  const first = candidate.icons[0]
+  const entry = first
+    ? findProjectIcon(localCatalog.value, candidate.key, first.iconKey)
+      ?? findProjectIcon(props.projectIconCatalog, candidate.key, first.iconKey)
+    : null
+  if (!entry) return { type: 'icon', icon: 'mdiStickerEmoji' }
+  return {
+    type: 'style',
+    style: { ...createProjectIconPreviewStyle(entry, readProjectIconSize), fontSize: 'var(--oc-icon-size-lg)' },
+    label: candidate.name,
+  }
+}
+
 function seriesActions(): OcNodeAction[] {
   return [
-    {
-      key: 'add-icons', title: t('projectConfig.icons.addIcons'), icon: 'mdiPlus',
-      disabled: Boolean(props.importBusy),
-    },
     { key: 'configure', title: t('projectConfig.icons.configureIconSet'), icon: 'mdiCogOutline' },
     {
       key: 'remove', title: t('projectConfig.icons.removeSeries'), icon: 'mdiTrashCanOutline', iconTone: 'danger',
@@ -219,25 +260,21 @@ watch(() => props.series, nextSeries => {
   }
   selectedIconIndexes.value = nextSelections
 }, { immediate: true })
-watch(() => seriesCatalogIdentity(selectedSeries.value),
-  identity => {
-    if (identity === null || !selectedSeries.value) {
-      localCatalog.value = { series: [], entries: [] }
-      return
-    }
-    // Assembling the catalog is pure data: an icon's size is resolved when it is painted.
-    localCatalog.value = buildProjectIconCatalog([selectedSeries.value], props.resolveAssetSrc)
-  }, { immediate: true })
+// Assembling the catalog is pure data: an icon's size is resolved when it is painted.
+watch(() => catalogIdentity(props.series), () => {
+  localCatalog.value = buildProjectIconCatalog(props.series, props.resolveAssetSrc)
+}, { immediate: true })
 watch(conflicts, value => emit('key-conflicts', value), { immediate: true })
 
 function sameIconSeries(left: string, right: string): boolean {
   return left.toLocaleLowerCase() === right.toLocaleLowerCase()
 }
 
-/** Identity of everything the local catalog reads for the selected set: every icon's own file. */
-function seriesCatalogIdentity(series: ProjectIconSeries | null): string | null {
-  if (!series) return null
-  return `${series.key}\u0000${series.icons.map(icon => `${icon.iconKey}:${icon.source}`).join('\u0001')}`
+/** Identity of everything the local catalog reads: every set's every icon file. */
+function catalogIdentity(series: readonly ProjectIconSeries[]): string {
+  return series.map(candidate => (
+    `${candidate.key}\u0000${candidate.icons.map(icon => `${icon.iconKey}:${icon.source}`).join('\u0001')}`
+  )).join('\u0002')
 }
 
 function selectSeriesByIndex(index: number): void {
@@ -254,12 +291,18 @@ function handleSeriesSelection(event: OcNodeSelectionEvent): void {
   if (index < 0) return
   selectSeriesByIndex(index)
 }
+function handleCardAction({ key }: { key: string }): void {
+  if (key !== ADD_ICONS_ACTION_KEY) emit('leading-action', key)
+  else if (selectedSeries.value) emit('add-icons', selectedSeries.value.key)
+}
 function handleSeriesAction(event: OcNodeActionEvent): void {
   const index = props.series.findIndex(candidate => candidate.key === event.key)
   if (index < 0) return
-  if (event.actionKey === 'add-icons') emit('add-icons', event.key)
-  else if (event.actionKey === 'configure') openSettingsDialog(index)
+  if (event.actionKey === 'configure') openSettingsDialog(index)
   else if (event.actionKey === 'remove') removeSeries(index)
+}
+function updateFilter(event: Event): void {
+  if (event.target instanceof HTMLInputElement) filterQuery.value = event.target.value
 }
 function setSelectedIconIndexes(indexes: number[]): void {
   if (selectedSeriesKey.value !== null) selectedIconIndexes.value[selectedSeriesKey.value] = [...indexes]
@@ -343,57 +386,14 @@ defineExpose({ selectSeries, navigateToKeyConflict, selectedRuntime })
 </script>
 
 <style scoped>
-.project-icon-registry-workbench {
-  display: grid;
-  grid-template-columns:
-    280px minmax(0, 1fr) 320px;
-  width: 100%;
-  height: 100%;
+.project-icon-registry-workbench__filter {
+  flex: 0 1 var(--oc-resource-control-width);
+  width: var(--oc-resource-control-width);
   min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--oc-bg-base);
 }
-.project-icon-registry-workbench__sets {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: var(--oc-space-xs) var(--oc-space-sm);
-  border-right: var(--oc-border-width) solid var(--oc-border-muted);
-}
-.project-icon-registry-workbench__sets-tree { min-height: 0; }
-.project-icon-registry-workbench__icons {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-.project-icon-registry-workbench__inspector {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-left: var(--oc-border-width) solid var(--oc-border-muted);
-}
+.project-icon-registry-workbench__tile-size { flex: 0 1 var(--oc-resource-control-width); width: var(--oc-resource-control-width); min-width: 0; }
 .project-icon-registry-workbench__property-content {
   min-width: 0;
-  min-height: 0;
-  overflow: auto;
   padding: var(--oc-space-sm);
-}
-.project-icon-registry-workbench__placeholder {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--oc-space-sm);
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  padding: var(--oc-space-lg);
-  text-align: center;
 }
 </style>

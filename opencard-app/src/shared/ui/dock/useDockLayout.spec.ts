@@ -1,10 +1,10 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import type { CardDesignerLayoutState } from './cardDesigner.types'
-import { CDE_OVERLAY_GEOMETRY_CONFIG } from './cdeOverlayConfig'
-import { useCdeOverlayLayout } from './useCdeOverlayLayout'
+import type { DockLayoutState } from './dockGeometry'
+import { DOCK_GEOMETRY_CONFIG } from './dockConfig'
+import { useDockLayout } from './useDockLayout'
 
-function createLayout(overrides: Partial<CardDesignerLayoutState> = {}): CardDesignerLayoutState {
+function createLayout(overrides: Partial<DockLayoutState> = {}): DockLayoutState {
   return {
     leftTopHeight: null,
     rightTopHeight: null,
@@ -17,18 +17,18 @@ function createLayout(overrides: Partial<CardDesignerLayoutState> = {}): CardDes
 }
 
 function createController(initialLayout = createLayout()) {
-  const layout = ref<CardDesignerLayoutState | undefined>(initialLayout)
-  const commits: CardDesignerLayoutState[] = []
-  const controller = useCdeOverlayLayout({
+  const layout = ref<DockLayoutState | undefined>(initialLayout)
+  const commits: DockLayoutState[] = []
+  const controller = useDockLayout({
     layout,
-    geometryConfig: CDE_OVERLAY_GEOMETRY_CONFIG,
+    geometryConfig: DOCK_GEOMETRY_CONFIG,
     topMinHeight: 160,
     commitLayout: value => commits.push(value),
   })
   return { commits, controller, layout }
 }
 
-describe('useCdeOverlayLayout', () => {
+describe('useDockLayout', () => {
   it('derives mirrored dock geometry and viewport insets from one extent per side', () => {
     const { controller } = createController()
 

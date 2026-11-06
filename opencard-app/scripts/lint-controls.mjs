@@ -16,6 +16,7 @@ const visibleTitleComponents = new Set([
   'OcBar',
   'OcCard',
   'OcDialog',
+  'ProjectResourceWorkbench',
   'ShellWorkspaceFrame',
 ])
 const stateBoundaryRoots = [

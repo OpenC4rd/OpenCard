@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectIconSeries } from '../../features/workspace/model/projectIcons'
 import type { ProjectIconCatalogEntry } from '../../features/workspace/services/projectIconCatalog'
+import type { OcNodeAction } from '../../shared/ui/node/node.types'
 import OcAlbum from '../standard/OcAlbum.vue'
 import ProjectIconSetWorkspace from './ProjectIconSetWorkspace.vue'
 
@@ -36,16 +37,25 @@ function mountWorkspace(
 describe('ProjectIconSetWorkspace', () => {
   it('filters by icon name or key while preserving original icon indexes', async () => {
     const wrapper = mountWorkspace()
-    const input = wrapper.get('input[placeholder="projectConfig.icons.filterPlaceholder"]')
 
-    await input.setValue('success')
+    await wrapper.setProps({ filterQuery: 'success' })
     expect(wrapper.getComponent(OcAlbum).props('data').rootKeys).toEqual(['icon:1'])
 
-    await input.setValue('warning')
+    await wrapper.setProps({ filterQuery: 'warning' })
     wrapper.getComponent(OcAlbum).vm.$emit('selection-change', {
       triggerKey: 'icon:0', selectedKeys: ['icon:0'],
     })
     expect(wrapper.emitted('update:selectedIconIndexes')).toEqual([[[0]]])
+  })
+
+  it('folds every card command into one overflow action', () => {
+    const wrapper = mountWorkspace()
+    const tail = wrapper.getComponent(OcAlbum).props('data').items.get('icon:0')?.tail as readonly OcNodeAction[]
+
+    expect(tail.map(action => action.key)).toEqual(['more'])
+    expect((tail[0]?.children as readonly OcNodeAction[]).map(action => action.key)).toEqual([
+      'duplicate', 'move-top', 'move-up', 'move-down', 'move-bottom', 'delete',
+    ])
   })
 
   it('emits the selection the icon grid reports', () => {

@@ -1,44 +1,59 @@
 <template>
   <ProjectRegistryEditorShell content-mode="workspace">
-    <OcEmpty v-if="treeData.rootKeys.length === 0" tone="muted" inset="comfortable">
-      {{ t('packageManager.empty') }}
-    </OcEmpty>
-    <div v-else class="package-manager-editor__view">
+    <ProjectResourceWorkbench :inspector-title="t('packageManifest.information')">
+      <OcEmpty v-if="treeData.rootKeys.length === 0" icon="mdiPackageVariantClosed" tone="muted" fill>
+        {{ t('packageManager.empty') }}
+        <OcButton size="sm" icon="mdiPlus" @click="emit('add-package')">{{ t('packageManager.add') }}</OcButton>
+      </OcEmpty>
       <!-- 相册卡片：封面由 OcAlbum 用 OcCover 画出来，动作都挂在节点尾部。 -->
       <OcAlbum
+        v-else
         fill
         :data="treeData"
         :aria-label="t('packageManager.title')"
-        selection-mode="none"
-        activation-mode="single-click"
+        :selected-keys="selectedPath ? [selectedPath] : []"
+        selection-mode="single"
+        @selection-change="selectedPath = $event.selectedKeys[0] ?? selectedPath"
         @node-activate="handleNodeActivate"
         @action="handleNodeAction"
       />
-    </div>
+      <template v-if="treeData.rootKeys.length" #inspector>
+        <div class="package-manager-editor__inspector">
+          <PackageManifestContent v-if="selectedPath" :path="selectedPath" compact />
+        </div>
+      </template>
+    </ProjectResourceWorkbench>
   </ProjectRegistryEditorShell>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/editorProtocol'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
 import type { EditorPresentation } from '../../shared/ui/editorPresentation.types'
 import type { OcNode, OcNodeAction, OcNodeActionEvent, OcNodeActivateEvent, OcNodeCollection } from '../../shared/ui/node/node.types'
 import { formatPackageCoordinate } from '../../features/workspace/model/packageCoordinate'
 import { getPathBasename } from '../../shared/model/filePath'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
 import OcAlbum from '../standard/OcAlbum.vue'
+import OcButton from '../base/OcButton.vue'
 import OcEmpty from '../base/OcEmpty.vue'
+import PackageManifestContent from './PackageManifestContent.vue'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
+import ProjectResourceWorkbench from './ProjectResourceWorkbench.vue'
 
 defineProps<EditorProps>()
 const emit = defineEmits<EditorEmits>()
 const { t } = useI18n()
 const projectStore = useProjectStore()
+const selectedPath = ref<string | null>(null)
 
 const REVEAL_ACTION_KEY = 'package-manager.reveal'
 const REMOVE_ACTION_KEY = 'package-manager.remove'
 const CONFIRM_REMOVE_ACTION_KEY = 'package-manager.confirm-remove'
+
+const ADD_ACTION: OcActionDefinition = { key: 'package-manager.add', icon: 'mdiPlus', title: t('packageManager.add') }
 
 const REVEAL_ACTION: OcNodeAction = {
   key: REVEAL_ACTION_KEY,
@@ -85,8 +100,10 @@ const treeData = computed<OcNodeCollection>(() => {
     items.set(file.archivePath, {
       label: title,
       visual: { type: 'icon', icon: 'mdiPackageVariantClosed', iconTone: 'file-opencard' },
-      // 封面是包解开之后的资源：没解开的包没有封面，媒体区留空。
-      ...(pkg?.cover ? { cover: { type: 'image' as const, src: pkg.cover.src, label: `${coordinate || title} ${t('packageManifest.coverAlt')}` } } : {}),
+      // 封面是包解开之后的资源：没解开的包没有封面，媒体区画包图标，不留一块空白。
+      cover: pkg?.cover
+        ? { type: 'image' as const, src: pkg.cover.src, label: `${coordinate || title} ${t('packageManifest.coverAlt')}` }
+        : { type: 'icon' as const, icon: 'mdiPackageVariantClosed' },
       tail: [...(coordinate ? [coordinate] : []), REVEAL_ACTION, removeAction(title)],
     })
   }
@@ -95,6 +112,7 @@ const treeData = computed<OcNodeCollection>(() => {
     items.set(broken.archivePath, {
       label: title,
       visual: { type: 'icon', icon: 'mdiPackageVariantClosed', iconTone: 'danger' },
+      cover: { type: 'icon', icon: 'mdiPackageVariantClosed', iconTone: 'danger' },
       // 读不出来的归档更要能从这里清掉：它当不了包，留在文件夹里只会每次打开都报一遍。
       tail: [t('packageManager.unreadable'), broken.reason, REVEAL_ACTION, removeAction(title)],
     })
@@ -102,7 +120,12 @@ const treeData = computed<OcNodeCollection>(() => {
   return { rootKeys: [...items.keys()], items, children: new Map() }
 })
 
-/** 点卡片就是打开那个归档：详情由包清单编辑器给出，和从文件树打开同一个文件是同一条路。 */
+/** 选中跟着文件走：被移除的包让位给第一张卡，新页面默认看第一个。 */
+watch(() => treeData.value.rootKeys, keys => {
+  if (!selectedPath.value || !keys.includes(selectedPath.value)) selectedPath.value = keys[0] ?? null
+}, { immediate: true })
+
+/** 单击在检视器里看详情，双击打开那个归档：和从文件树打开同一个文件是同一条路。 */
 function handleNodeActivate(event: OcNodeActivateEvent): void {
   emit('open-file', event.key)
 }
@@ -122,13 +145,21 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'mdiPackageVariantClosed',
 }))
 
-defineExpose({ presentation })
+const headerActions = computed<OcActionDefinition[]>(() => (treeData.value.rootKeys.length ? [ADD_ACTION] : []))
+function onHeaderAction(actionKey: string): void {
+  if (actionKey === ADD_ACTION.key) emit('add-package')
+}
+
+defineExpose({ presentation, headerActions, onHeaderAction })
 
 </script>
 
 <style scoped>
-.package-manager-editor__view {
-  height: 100%;
+.package-manager-editor__inspector {
+  grid-row: 1 / -1;
+  min-width: 0;
   min-height: 0;
+  overflow: auto;
+  padding: var(--oc-space-xs);
 }
 </style>

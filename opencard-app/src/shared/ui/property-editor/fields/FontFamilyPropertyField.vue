@@ -102,6 +102,9 @@
             {{ tr('propertyEditor.fontFamily.empty', '没有可用的字体') }}
           </OcEmpty>
         </div>
+        <OcButton v-if="capabilities?.manage?.fonts" size="sm" variant="ghost" icon="mdiOpenInNew" @click="manage('fonts')">
+          {{ tr('propertyEditor.manageFonts', '管理字体…') }}
+        </OcButton>
       </div>
     </OcOverlayMarker>
   </div>
@@ -151,6 +154,12 @@ const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
   | undefined
 const tr = (key: string, fallback: string, parameters?: Record<string, unknown>): string =>
   translate?.(key, parameters) ?? fallback
+
+/** 关掉浮层再跳到对应注册文件，避免浮层盖在新打开的编辑器上。 */
+function manage(kind: 'fonts' | 'icons' | 'customBlocks'): void {
+  closePopover()
+  props.capabilities?.manage?.[kind]?.()
+}
 
 const {
   rootRef,

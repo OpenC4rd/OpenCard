@@ -66,7 +66,7 @@
               :placeholder="t('projectConfig.fonts.characterInputPlaceholder')"
               @input="updateMemberCharacters(index, $event)" />
             <OcFieldInput full-width mono
-              :value="formatRanges(member.ranges)"
+              :value="formatUnicodeRanges(member.ranges)"
               :placeholder="t('projectConfig.fonts.rangePlaceholder')"
               :aria-invalid="invalidRangeIndexes.has(index)"
               @input="updateMemberRanges(index, $event)" />
@@ -93,7 +93,7 @@ import type {
   ProjectFont,
   UnicodeRange,
 } from '../../features/workspace/model/projectFontRegistry'
-import { normalizeUnicodeRanges } from '../../features/workspace/model/projectFontRegistry'
+import { formatUnicodeRanges, normalizeUnicodeRanges } from '../../features/workspace/model/projectFontRegistry'
 import { projectFontIdPattern } from '../../features/workspace/model/projectFonts'
 import { createAvailableKey } from '../../shared/model/keySlug'
 import OcButton from '../base/OcButton.vue'
@@ -298,12 +298,6 @@ function submit(): void {
       ...(member.ranges ? { ranges: member.ranges.map(range => ({ ...range })) } : {}),
     })),
   })
-}
-
-function formatRanges(ranges: readonly UnicodeRange[] | undefined): string {
-  return ranges?.map(range => range.start === range.end
-    ? `U+${range.start.toString(16).toUpperCase()}`
-    : `U+${range.start.toString(16).toUpperCase()}-${range.end.toString(16).toUpperCase()}`).join(', ') ?? ''
 }
 
 function parseRanges(value: string): UnicodeRange[] | null | undefined {

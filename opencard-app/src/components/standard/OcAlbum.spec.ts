@@ -20,6 +20,11 @@ describe('OcAlbum', () => {
     vi.restoreAllMocks()
   })
 
+  it('only marks the tile layout when asked for it', () => {
+    expect(mount(OcAlbum, { props: { data: createData() } }).classes()).not.toContain('is-tile')
+    expect(mount(OcAlbum, { props: { data: createData(), layout: 'tile' } }).classes()).toContain('is-tile')
+  })
+
   it('renders exactly the root level and no nested children', () => {
     const wrapper = mount(OcAlbum, {
       props: {

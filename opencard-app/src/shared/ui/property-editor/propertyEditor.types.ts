@@ -126,6 +126,8 @@ export type PropertyFieldCapabilities = {
   icons?: readonly PropertyIconScope[]
   customBlocks?: readonly PropertyCustomBlockScope[]
   resolveImagePreview?: (reference: string) => string | null
+  /** 选择器里的「管理…」入口：缺省则不显示。跳到对应的项目注册文件。 */
+  manage?: Partial<Record<'fonts' | 'icons' | 'customBlocks', () => void>>
 }
 
 type PropertyFieldConstraintMap = {

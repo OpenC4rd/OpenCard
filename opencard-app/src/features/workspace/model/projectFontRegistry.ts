@@ -112,6 +112,12 @@ function normalizeFont(value: unknown): ProjectFont | null {
   return key && name && files ? { key, name, files } : null
 }
 
+export function formatUnicodeRanges(ranges: readonly UnicodeRange[] | undefined): string {
+  return ranges?.map(range => range.start === range.end
+    ? `U+${range.start.toString(16).toUpperCase()}`
+    : `U+${range.start.toString(16).toUpperCase()}-${range.end.toString(16).toUpperCase()}`).join(', ') ?? ''
+}
+
 export function normalizeUnicodeRanges(value: unknown): UnicodeRange[] | null {
   if (!Array.isArray(value) || value.length === 0) return null
   const ranges: UnicodeRange[] = []

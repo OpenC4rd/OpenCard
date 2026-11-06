@@ -2,11 +2,10 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectIconSeries } from '../../features/workspace/model/projectIcons'
 import type { ProjectIconCatalogEntry } from '../../features/workspace/services/projectIconCatalog'
-import type { OcNodeAction } from '../../shared/ui/node/node.types'
-import { isNodeTailAction, normalizeNodeTail } from '../../shared/ui/node/node.types'
 import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
 import OcTree from '../standard/OcTree.vue'
 import ProjectIconPreview from './ProjectIconPreview.vue'
+import ProjectResourceWorkbench from './ProjectResourceWorkbench.vue'
 import ProjectIconRegistryWorkbench from './ProjectIconRegistryWorkbench.vue'
 import ProjectIconSetSettingsDialog from './ProjectIconSetSettingsDialog.vue'
 import ProjectIconSetWorkspace from './ProjectIconSetWorkspace.vue'
@@ -54,10 +53,6 @@ function iconsOf(candidate: ProjectIconSeries): ProjectIconSeries['icons'] {
     { iconKey: 'info', name: 'Info', source: '.opencard/icons/status/info.svg', tint: 'context' },
   ]
 }
-function seriesAction(wrapper: ReturnType<typeof mount>, key: string, actionKey: string): OcNodeAction | undefined {
-  const item = wrapper.getComponent(OcTree).props('data').items.get(key)
-  return normalizeNodeTail(item?.tail).filter(isNodeTailAction).find(action => action.key === actionKey)
-}
 async function selectSeries(wrapper: ReturnType<typeof mount>, key: string): Promise<void> {
   await (wrapper.vm as unknown as { selectSeries(key: string): Promise<boolean> }).selectSeries(key)
   await wrapper.vm.$nextTick()
@@ -83,7 +78,8 @@ describe('ProjectIconRegistryWorkbench', () => {
       props: { ...baseProps, projectIconCatalog, importBusy: true },
     })
 
-    expect(seriesAction(wrapper, 'status', 'add-icons')?.disabled).toBe(true)
+    const actions = wrapper.getComponent(ProjectResourceWorkbench).props('leadingActions') as { disabled?: boolean }[]
+    expect(actions[actions.length - 1]?.disabled).toBe(true)
   })
 
   it('replaces only the selected series when one set changes', async () => {
@@ -114,12 +110,24 @@ describe('ProjectIconRegistryWorkbench', () => {
     expect(wrapper.emitted('update:series')).toBeUndefined()
   })
 
-  it('asks the owner to copy new icons into the set the command names', async () => {
+  it('asks the owner to copy new icons into the selected set from the list card', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, { props: baseProps })
-    wrapper.getComponent(OcTree).vm.$emit('action', { key: 'actions', actionKey: 'add-icons', source: 'inline' })
+    await selectSeries(wrapper, 'actions')
+    const bench = wrapper.getComponent(ProjectResourceWorkbench)
+    const actions = bench.props('leadingActions') as { key: string }[]
+    bench.vm.$emit('action', { key: actions[actions.length - 1]!.key })
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('add-icons')).toEqual([['actions']])
+  })
+
+  it('hands card commands it does not own back to the owner', async () => {
+    const leadingActions = [{ key: 'create-set', icon: 'mdiPlus' as const, title: 'Create' }]
+    const wrapper = mount(ProjectIconRegistryWorkbench, { props: { ...baseProps, leadingActions } })
+    wrapper.getComponent(ProjectResourceWorkbench).vm.$emit('action', { key: 'create-set' })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('leading-action')).toEqual([['create-set']])
   })
 
   it('selects the target set and icon for issue navigation', async () => {

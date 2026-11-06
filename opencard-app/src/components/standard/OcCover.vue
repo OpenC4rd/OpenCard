@@ -1,6 +1,6 @@
 <!-- Standard 封面：把单个视觉铺满调用方给定的几何；图片加载失败时留空，源地址变化后自动重试。 -->
 <template>
-  <span class="oc-cover" :class="`oc-cover--${displayedVisual?.type ?? 'empty'}`">
+  <span class="oc-cover" :class="[`oc-cover--${displayedVisual?.type ?? 'empty'}`, { 'oc-cover--contain': displayedVisual?.type === 'image' && displayedVisual.fit === 'contain' }]">
     <OcVisual
       v-if="displayedVisual"
       class="oc-cover__visual"
@@ -66,5 +66,9 @@ function markBroken(): void {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.oc-cover--contain .oc-cover__visual {
+  object-fit: contain;
 }
 </style>

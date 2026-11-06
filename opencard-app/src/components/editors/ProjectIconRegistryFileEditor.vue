@@ -8,6 +8,7 @@
       :project-icon-catalog="projectStore.projectIconCatalog.value"
       @update:series="updateIconSeries" @key-conflicts="updateKeyConflicts"
       @remove-series="openSeriesRemovalDialog"
+      :leading-actions="collectionActions" @leading-action="onCollectionAction"
       @add-icons="openAddIconsDialog" />
 
     <ProjectRegistryRepairEditor v-else :model-value="editorState.draftContent ?? ''" :theme-id="themeId"
@@ -595,22 +596,18 @@ const presentation = computed<EditorPresentation>(() => ({
 
 const CREATE_COLLECTION_ACTION_KEY = 'project-icon-registry.create-collection'
 
-const headerActions = computed<OcActionDefinition[]>(() => [
+const collectionActions = computed<OcActionDefinition[]>(() => [
   {
     key: CREATE_COLLECTION_ACTION_KEY,
-    icon: 'mdiPlus',
+    icon: 'mdiFolderPlusOutline',
     title: t('projectConfig.icons.createCollection'),
     disabled: !document.value || importBusy.value,
   },
 ])
 
-async function onHeaderAction(actionKey: string): Promise<void> {
-  if (actionKey === CREATE_COLLECTION_ACTION_KEY) {
-    openCreateCollectionDialog()
-    return
-  }
-  return
+function onCollectionAction(actionKey: string): void {
+  if (actionKey === CREATE_COLLECTION_ACTION_KEY) openCreateCollectionDialog()
 }
 
-defineExpose({ canSave, navigate, headerActions, onHeaderAction, presentation })
+defineExpose({ canSave, navigate, collectionActions, onCollectionAction, presentation })
 </script>

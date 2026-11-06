@@ -1,85 +1,50 @@
 <template>
-  <div class="project-font-registry-workbench">
-    <component :is="'style'" v-if="previewFontCss" v-text="previewFontCss" />
-
-    <section class="project-font-registry-workbench__left">
-      <OcText v-if="error" class="project-font-registry-workbench__error" tone="danger" size="sm" role="alert">
-        {{ error }}
-      </OcText>
-
-      <div class="project-font-registry-workbench__list">
-        <OcTree fill role="listbox" selection-mode="single"
-          activation-mode="double-click" scroll-to-selection :data="treeData"
-          :expanded-keys="['families', 'compositions']"
-          :selected-keys="selectedTreeKeys" :action-overflow-title="t('projectConfig.fonts.entryActions')"
-          @selection-change="handleSelectionChange" @node-activate="handleNodeActivate" @action="handleNodeAction" />
-      </div>
-    </section>
-
-    <section class="project-font-registry-workbench__right">
-      <template v-if="selectedEntry">
-        <header class="project-font-registry-workbench__preview-toolbar">
-          <OcFieldInput full-width :value="previewText" :aria-label="t('projectConfig.fonts.previewText')"
-            @input="updatePreviewText" />
-          <div v-if="previewDiagnostics.length" class="project-font-registry-workbench__preview-diagnostics" role="status">
-            <OcText v-for="diagnostic in previewDiagnostics" :key="diagnostic" tone="danger" size="xs">
-              {{ diagnostic }}
-            </OcText>
-          </div>
-        </header>
-        <div class="project-font-registry-workbench__preview" :style="previewStyle">
-          <span class="project-font-registry-workbench__preview-content">
-            <span
-              v-for="(run, index) in previewRuns"
-              :key="`${index}:${run.faceKey ?? run.familyKey ?? 'fallback'}`"
-              class="project-font-registry-workbench__preview-run"
-              :data-font-key="run.familyKey ?? 'fallback'"
-              :data-face-key="run.faceKey ?? 'fallback'"
-              :style="runStyle(run.familyKey, run.faceKey)"
-              @pointerenter="showFontInfo(run.familyKey, run.faceKey, $event)"
-              @pointerleave="hideFontInfo"
-            >{{ run.text }}</span>
-          </span>
+  <ProjectResourceWorkbench :leading-title="t('projectConfig.fonts.panelTitle')" :leading-actions="leadingCardActions"
+    :inspector-title="t('projectConfig.fonts.details')" @action="handleCardAction">
+    <template #leading>
+      <div class="project-font-registry-workbench__left">
+        <component :is="'style'" v-if="previewFontCss" v-text="previewFontCss" />
+        <OcText v-if="error" tone="danger" size="sm" role="alert">{{ error }}</OcText>
+        <div class="project-font-registry-workbench__list">
+          <OcTree fill role="listbox" selection-mode="single"
+            activation-mode="double-click" scroll-to-selection :data="treeData"
+            :expanded-keys="['families', 'compositions']"
+            :selected-keys="selectedTreeKeys" :action-overflow-title="t('projectConfig.fonts.entryActions')"
+            @selection-change="handleSelectionChange" @node-activate="handleNodeActivate" @action="handleNodeAction" />
         </div>
-      </template>
-      <div v-else class="project-font-registry-workbench__placeholder">
-        <OcIcon :name="activePage === 'families' ? 'mdiFormatFont' : 'mdiLayersOutline'" size="lg" tone="muted" />
-        <OcEmpty tone="muted" inset="none">
-          {{ activePage === 'families' ? t('projectConfig.fonts.noFontSelected') : t('projectConfig.fonts.noSetSelected') }}
-        </OcEmpty>
       </div>
-    </section>
+    </template>
 
-    <OcOverlayMarker
-      group="font-info"
-      :anchor="fontInfoLayerAnchor"
-      :owner="fontInfoAnchor"
-      placement="top"
-      :open="fontInfoOpen"
-      @update:open="fontInfoOpen = $event"
-    >
-      <FontInfoLayer v-if="fontInfo" :font="fontInfo.font" :face="fontInfo.face"
-        :coverage-failed="fontInfo.coverageFailed" />
-    </OcOverlayMarker>
-  </div>
+    <template v-if="selectedEntry" #append>
+      <OcFieldInput class="project-font-registry-workbench__text" full-width :value="previewText"
+        :aria-label="t('projectConfig.fonts.previewText')" @input="updatePreviewText" />
+      <OcSlider class="project-font-registry-workbench__size" v-model="previewSize"
+        :min="PREVIEW_SIZE_MIN" :max="PREVIEW_SIZE_MAX" :step="PREVIEW_SIZE_STEP"
+        :value-text="`${previewSize} px`" :aria-label="t('projectConfig.fonts.previewSize')" />
+    </template>
+
+    <ProjectFontSpecimen v-if="selectedEntry" :families="families" :family="shownFamily" :composition="shownComposition"
+      :text="previewText" :size="previewSize" :read-font-bytes="readFontBytes"
+      :load-errors="loadErrors" />
+    <OcEmpty v-else tone="muted" inset="none" fill :icon="activePage === 'families' ? 'mdiFormatFont' : 'mdiLayersOutline'">
+      {{ activePage === 'families' ? t('projectConfig.fonts.noFontSelected') : t('projectConfig.fonts.noSetSelected') }}
+    </OcEmpty>
+
+    <template v-if="selectedEntry" #inspector>
+      <ProjectFontInspector :families="families" :family="shownFamily" :composition="shownComposition"
+        @configure="configureEntry(activePage, selectedEntry!.key)" />
+    </template>
+  </ProjectResourceWorkbench>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { OverlayAnchor } from '../../composables/overlayGroups'
 import type { ProjectFont, ProjectFontComposition } from '../../features/workspace/model/projectFontRegistry'
 import { createProjectFontCssFamily } from '../../features/workspace/model/projectFonts'
 import { projectFontFileEntries, projectFontWeightValues } from '../../features/workspace/model/projectFontRegistry'
 import type { ProjectFontLoadError } from '../../features/workspace/services/projectFontLoader'
-import {
-  characterSetToUnicodeRanges,
-  createProjectFontPreviewRuns,
-  mergeUnicodeRanges,
-  readProjectFontCharacterSet,
-  subtractUnicodeRanges,
-  type ProjectFontPreviewCandidate,
-} from '../../features/workspace/services/projectFontCoverage'
+import type { OcActionDefinition } from '../../shared/ui/action/action.types'
 import type {
   OcNode,
   OcNodeAction,
@@ -90,11 +55,12 @@ import type {
 } from '../../shared/ui/node/node.types'
 import OcEmpty from '../base/OcEmpty.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
-import OcIcon from '../base/OcIcon.vue'
-import OcOverlayMarker from '../standard/OcOverlayMarker.vue'
 import OcText from '../base/OcText.vue'
+import OcSlider from '../standard/OcSlider.vue'
 import OcTree from '../standard/OcTree.vue'
-import FontInfoLayer from './FontInfoLayer.vue'
+import ProjectFontInspector from './ProjectFontInspector.vue'
+import ProjectFontSpecimen from './ProjectFontSpecimen.vue'
+import ProjectResourceWorkbench from './ProjectResourceWorkbench.vue'
 
 const props = withDefaults(defineProps<{
   families: readonly ProjectFont[]
@@ -114,30 +80,20 @@ const emit = defineEmits<{
   'configure-composition': [compositionKey: string]
 }>()
 const { t } = useI18n()
+const PREVIEW_SIZE_MIN = 24
+const PREVIEW_SIZE_MAX = 120
+const PREVIEW_SIZE_STEP = 4
+const PREVIEW_SIZE_DEFAULT = 48
 const activePage = ref<'families' | 'compositions'>('families')
 const selectedFamilyKey = ref<string | null>(null)
 const selectedCompositionKey = ref<string | null>(null)
 const previewText = ref(t('projectConfig.fonts.previewSample'))
-const characterSets = ref<ReadonlyMap<string, ReadonlySet<number>>>(new Map())
-const failedCoverageKeys = ref<ReadonlySet<string>>(new Set())
-/** 悬停信息层的内容快照：只描述被悬停的那一段预览。 */
-type FontInfoContent = {
-  font: ProjectFont | null
-  face: ReturnType<typeof projectFontFileEntries>[number] | null
-  coverageFailed: boolean
-}
-const fontInfoAnchor = ref<HTMLElement | null>(null)
-const fontInfo = ref<FontInfoContent | null>(null)
-const fontInfoOpen = ref(false)
-/** 锚点是「被悬停的那一段预览」；每次换片段都返回一个新函数，marker 才会把新锚点推进组里。 */
-const fontInfoLayerAnchor = computed<OverlayAnchor>(() => {
-  const anchor = fontInfoAnchor.value
-  return () => anchor?.getBoundingClientRect() ?? null
-})
-let coverageGeneration = 0
+const previewSize = ref(PREVIEW_SIZE_DEFAULT)
 const selectedFamily = computed(() => props.families.find(family => family.key === selectedFamilyKey.value) ?? null)
 const selectedComposition = computed(() => props.compositions.find(entry => entry.key === selectedCompositionKey.value) ?? null)
-const selectedEntry = computed(() => activePage.value === 'families' ? selectedFamily.value : selectedComposition.value)
+const shownFamily = computed(() => activePage.value === 'families' ? selectedFamily.value : null)
+const shownComposition = computed(() => activePage.value === 'compositions' ? selectedComposition.value : null)
+const selectedEntry = computed(() => shownFamily.value ?? shownComposition.value)
 const selectedTreeKeys = computed(() => {
   const key = activePage.value === 'families' ? selectedFamilyKey.value : selectedCompositionKey.value
   return key ? [treeKey(activePage.value, key)] : []
@@ -145,6 +101,10 @@ const selectedTreeKeys = computed(() => {
 const referencedFamilyKeys = computed(() => new Set(
   props.compositions.flatMap(composition => composition.members.map(member => member.fontKey.toLocaleLowerCase())),
 ))
+const leadingCardActions = computed<OcActionDefinition[]>(() => [
+  { key: 'add-family', icon: 'mdiPlus', title: t('projectConfig.fonts.addFont') },
+  { key: 'add-composition', icon: 'mdiFolderPlusOutline', title: t('projectConfig.fonts.addSet') },
+])
 const treeData = computed<OcNodeCollection>(() => {
   const addFamilyAction: OcNodeAction = {
     key: 'add-family', title: t('projectConfig.fonts.addFont'), icon: 'mdiPlus',
@@ -174,13 +134,11 @@ const treeData = computed<OcNodeCollection>(() => {
     ['families', {
       label: t('projectConfig.fonts.projectFonts'),
       visual: { type: 'icon', icon: 'mdiFormatFont' },
-      tail: [addFamilyAction],
       contextActions: [addFamilyAction],
     }],
     ['compositions', {
       label: t('projectConfig.fonts.compositions'),
       visual: { type: 'icon', icon: 'mdiLayersOutline' },
-      tail: [addCompositionAction],
       contextActions: [addCompositionAction],
     }],
     ...props.families.map((entry): [string, OcNode] => {
@@ -189,7 +147,10 @@ const treeData = computed<OcNodeCollection>(() => {
         label: entry.name,
         labelFont: JSON.stringify(createProjectFontCssFamily(entry.key)),
         visual: { type: 'icon', icon: 'mdiFormatFont' },
-        tail: referenced ? [configureFamilyAction] : [configureFamilyAction, removeFamilyAction],
+        tail: [
+          t('projectConfig.fonts.faceCount', { count: projectFontFileEntries(entry).length }),
+          ...(referenced ? [configureFamilyAction] : [configureFamilyAction, removeFamilyAction]),
+        ],
         contextActions: referenced ? [configureFamilyAction] : [
           configureFamilyAction,
           { type: 'divider', key: 'font-delete-divider' },
@@ -222,77 +183,9 @@ const treeData = computed<OcNodeCollection>(() => {
     children: new Map([['families', familyKeys], ['compositions', compositionKeys]]),
   }
 })
-const previewStyle = computed<CSSProperties>(() => ({
-  fontFamily: activePage.value === 'families' && selectedFamily.value
-    ? JSON.stringify(createProjectFontCssFamily(selectedFamily.value.key))
-    : '',
-}))
 const previewFontCss = computed(() => props.families.flatMap(font => projectFontFileEntries(font).map(slot => (
   `@font-face { font-family: ${JSON.stringify(createProjectFontCssFamily(font.key))}; src: url(${JSON.stringify(props.resolveAssetSrc(slot.source))}); font-weight: ${projectFontWeightValues[slot.weight]}; font-style: ${slot.style === 'upright' ? 'normal' : 'italic'}; }`
 ))).join('\n'))
-const previewFamilies = computed(() => activePage.value === 'families'
-  ? selectedFamily.value ? [selectedFamily.value] : []
-  : (selectedComposition.value?.members ?? [])
-      .map(member => props.families.find(font => font.key.toLocaleLowerCase() === member.fontKey.toLocaleLowerCase()))
-      .filter((font): font is ProjectFont => Boolean(font)))
-const previewCandidates = computed<ProjectFontPreviewCandidate[]>(() => activePage.value === 'families'
-  ? selectedFamily.value ? projectFontFileEntries(selectedFamily.value).map(slot => ({
-      familyKey: selectedFamily.value!.key,
-      faceKey: previewFaceKey(selectedFamily.value!.key, slot.source),
-    })) : []
-  : (selectedComposition.value?.members ?? []).flatMap(member => {
-      const family = props.families.find(candidate => (
-        candidate.key.toLocaleLowerCase() === member.fontKey.toLocaleLowerCase()
-      ))
-      return projectFontFileEntries(family ?? { files: {} }).map(slot => ({
-        familyKey: member.fontKey,
-        faceKey: previewFaceKey(member.fontKey, slot.source),
-        ...(member.ranges ? { ranges: member.ranges } : {}),
-      }))
-    }))
-const previewRuns = computed(() => createProjectFontPreviewRuns(
-  previewText.value,
-  previewCandidates.value,
-  characterSets.value,
-))
-const coverageFailed = computed(() => previewFamilies.value.some(family => failedCoverageKeys.value.has(family.key)))
-const shadowedMemberKeys = computed(() => {
-  if (activePage.value !== 'compositions' || !selectedComposition.value) return []
-  const claimedByDescriptor = new Map<string, { start: number; end: number }[]>()
-  const shadowed: string[] = []
-  for (const member of selectedComposition.value.members) {
-    const family = props.families.find(candidate => candidate.key.toLocaleLowerCase() === member.fontKey.toLocaleLowerCase())
-    let readable = false
-    let contributes = false
-    for (const slot of projectFontFileEntries(family ?? { files: {} })) {
-      const coverage = characterSets.value.get(previewFaceKey(member.fontKey, slot.source))
-      if (!coverage) continue
-      readable = true
-      const descriptorKey = `${slot.weight}:${slot.style}`
-      const claimed = claimedByDescriptor.get(descriptorKey) ?? []
-      const effective = subtractUnicodeRanges(characterSetToUnicodeRanges(coverage, member.ranges), claimed)
-      if (effective.length) contributes = true
-      claimedByDescriptor.set(descriptorKey, mergeUnicodeRanges([
-        ...claimed,
-        ...effective,
-      ]))
-    }
-    if (readable && !contributes) shadowed.push(member.fontKey)
-  }
-  return shadowed
-})
-const previewDiagnostics = computed(() => {
-  const selectedKeys = new Set(previewFamilies.value.map(family => family.key.toLocaleLowerCase()))
-  return [
-    ...props.loadErrors
-      .filter(error => selectedKeys.has(error.fontKey.toLocaleLowerCase()))
-      .map(error => t('projectConfig.fonts.previewLoadFailed', { key: error.fontKey, source: error.source })),
-    ...[...failedCoverageKeys.value]
-      .filter(key => selectedKeys.has(key.toLocaleLowerCase()))
-      .map(key => t('projectConfig.fonts.previewCoverageFailed', { key })),
-    ...shadowedMemberKeys.value.map(key => t('projectConfig.fonts.previewMemberShadowed', { key })),
-  ]
-})
 
 watch(() => props.families, families => {
   if (!families.some(family => family.key === selectedFamilyKey.value)) selectedFamilyKey.value = families[0]?.key ?? null
@@ -300,31 +193,6 @@ watch(() => props.families, families => {
 watch(() => props.compositions, compositions => {
   if (!compositions.some(entry => entry.key === selectedCompositionKey.value)) selectedCompositionKey.value = compositions[0]?.key ?? null
 }, { immediate: true })
-watch(
-  () => previewFamilies.value.map(family => `${family.key}\0${projectFontFileEntries(family).map(slot => slot.source).join('\0')}`),
-  async () => {
-    const generation = ++coverageGeneration
-    const nextCharacterSets = new Map<string, ReadonlySet<number>>()
-    const nextFailedKeys = new Set<string>()
-    await Promise.all(previewFamilies.value.map(async family => {
-      let loaded = false
-      for (const slot of projectFontFileEntries(family)) {
-        try {
-          const characterSet = await readProjectFontCharacterSet(await props.readFontBytes(slot.source))
-          nextCharacterSets.set(previewFaceKey(family.key, slot.source), characterSet)
-          loaded = true
-        } catch {
-          // A family remains previewable when at least one of its faces is readable.
-        }
-      }
-      if (!loaded) nextFailedKeys.add(family.key)
-    }))
-    if (generation !== coverageGeneration) return
-    characterSets.value = nextCharacterSets
-    failedCoverageKeys.value = nextFailedKeys
-  },
-  { immediate: true },
-)
 
 function treeKey(page: 'families' | 'compositions', key: string): string { return `${page}:${key}` }
 /** 空分组的占位子项键：不参与选中与动作，只说明这一组现在是空的。 */
@@ -370,6 +238,10 @@ function handleNodeActivate(event: OcNodeActivateEvent): void {
   const page = entryPage(event.key)
   if (page) configureEntry(page, entryKey(event.key))
 }
+function handleCardAction({ key }: { key: string }): void {
+  if (key === 'add-family') emit('register-family')
+  else if (key === 'add-composition') emit('add-composition')
+}
 function handleNodeAction(event: OcNodeActionEvent): void {
   const key = entryKey(event.key)
   if (event.actionKey === 'add-family') emit('register-family')
@@ -399,41 +271,6 @@ function removeComposition(index: number): void {
   emit('update:compositions', next)
 }
 function updatePreviewText(event: Event): void { if (event.target instanceof HTMLInputElement) previewText.value = event.target.value }
-function previewFaceKey(familyKey: string, source: string): string {
-  return `${familyKey.toLocaleLowerCase()}\0${source}`
-}
-function runStyle(familyKey: string | null, faceKey: string | null): CSSProperties | undefined {
-  if (!familyKey) return undefined
-  const family = props.families.find(candidate => candidate.key.toLocaleLowerCase() === familyKey.toLocaleLowerCase())
-  const face = projectFontFileEntries(family ?? { files: {} }).find(candidate => previewFaceKey(familyKey, candidate.source) === faceKey)
-  return {
-    fontFamily: JSON.stringify(createProjectFontCssFamily(familyKey)),
-    ...(face ? {
-      fontWeight: projectFontWeightValues[face.weight],
-      fontStyle: face.style === 'italic' ? 'italic' : 'normal',
-    } : {}),
-  }
-}
-function showFontInfo(familyKey: string | null, faceKey: string | null, event: PointerEvent): void {
-  const anchor = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
-  if (!anchor) return
-  const lookupKey = familyKey?.toLocaleLowerCase() ?? null
-  const font = lookupKey
-    ? props.families.find(candidate => candidate.key.toLocaleLowerCase() === lookupKey) ?? null
-    : null
-  const face = font
-    ? projectFontFileEntries(font).find(slot => previewFaceKey(font.key, slot.source) === faceKey) ?? null
-    : null
-  // 被悬停的那一段文字就是锚点：提示跟着它走，离开即收起。
-  fontInfoAnchor.value = anchor
-  fontInfo.value = { font, face, coverageFailed: coverageFailed.value }
-  fontInfoOpen.value = true
-}
-function hideFontInfo(): void {
-  fontInfoOpen.value = false
-}
-/** 提示描述的是预览里的片段：预览换条目或消失时不再保留，免得停在一个已经被替换掉的锚点上。 */
-watch(selectedEntry, () => { fontInfoOpen.value = false })
 async function navigateToFont(kind: 'family' | 'composition', key: string): Promise<boolean> {
   if (kind === 'family') {
     if (!props.families.some(family => family.key === key)) return false
@@ -450,36 +287,8 @@ defineExpose({ navigateToFont })
 </script>
 
 <style scoped>
-.project-font-registry-workbench {
-  display: grid;
-  grid-template-columns: minmax(280px, 48%) minmax(0, 1fr);
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--oc-bg-block);
-}
-.project-font-registry-workbench__left,
-.project-font-registry-workbench__right { min-width: 0; min-height: 0; overflow: hidden; }
-.project-font-registry-workbench__left {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  border-right: var(--oc-border-width) solid var(--oc-border-muted);
-  background: var(--oc-bg-base);
-}
-.project-font-registry-workbench__error { grid-row: 1; padding: var(--oc-space-xs); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
+.project-font-registry-workbench__left { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
 .project-font-registry-workbench__list { position: relative; grid-row: 2; min-height: 0; overflow: hidden; }
 .project-font-registry-workbench__list > .oc-tree { position: absolute; inset: 0; }
-.project-font-registry-workbench__right { display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--oc-bg-base); }
-.project-font-registry-workbench__preview-toolbar { display: grid; gap: var(--oc-space-xs); padding: var(--oc-action-padding); border-bottom: var(--oc-border-width) solid var(--oc-border-muted); }
-.project-font-registry-workbench__preview-diagnostics { display: grid; gap: var(--oc-space-2xs); }
-.project-font-registry-workbench__preview { display: grid; place-items: center; min-width: 0; min-height: 0; padding: var(--oc-space-lg); overflow: auto; overflow-wrap: anywhere; font-size: var(--oc-font-preview-size); text-align: center; }
-.project-font-registry-workbench__preview-content { white-space: pre-wrap; }
-.project-font-registry-workbench__preview-run {
-  border-radius: var(--oc-radius-control);
-  transition: background-color var(--oc-duration-quick) var(--oc-ease);
-}
-.project-font-registry-workbench__preview-run:hover { background-image: var(--oc-overlay-hover); }
-.project-font-registry-workbench__placeholder { display: grid; grid-row: 1 / -1; place-content: center; justify-items: center; gap: var(--oc-space-sm); min-width: 0; min-height: 0; }
+.project-font-registry-workbench__text, .project-font-registry-workbench__size { flex: 0 1 var(--oc-resource-control-width); width: var(--oc-resource-control-width); min-width: 0; }
 </style>

@@ -6,6 +6,9 @@ import OcButton from '../base/OcButton.vue'
 const mocks = vi.hoisted(() => ({
   pickFiles: vi.fn(), pickDirectory: vi.fn(), readDirectory: vi.fn(),
 }))
+const sourceOption = (wrapper: { findAll: (selector: string) => Array<{ text: () => string; trigger: (event: string) => Promise<void> }> }, title: string) => (
+  wrapper.findAll('.project-import-source-choice__option').find(option => option.text().includes(title))!
+)
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../../features/workspace/services/fileSystemService', () => ({
@@ -13,6 +16,7 @@ vi.mock('../../features/workspace/services/fileSystemService', () => ({
     pickFiles: mocks.pickFiles,
     pickDirectory: mocks.pickDirectory,
     readDirectory: mocks.readDirectory,
+    toAssetSrc: (path: string) => `asset://${path}`,
   },
 }))
 
@@ -24,7 +28,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
 }
 
 function chooseFiles(wrapper: ReturnType<typeof mountDialog>) {
-  return wrapper.findAllComponents(OcButton).find(b => b.text() === 'projectConfig.icons.chooseFiles')!.trigger('click')
+  return sourceOption(wrapper, 'projectConfig.icons.chooseFiles').trigger('click')
 }
 
 describe('ProjectIconRegistrationDialog', () => {
@@ -83,7 +87,7 @@ describe('ProjectIconRegistrationDialog', () => {
     ])
     const wrapper = mountDialog()
 
-    await wrapper.findAllComponents(OcButton).find(b => b.text() === 'projectConfig.icons.chooseFolder')!.trigger('click')
+    await sourceOption(wrapper, 'projectConfig.icons.chooseFolder').trigger('click')
     await flushPromises()
 
     expect(mocks.readDirectory).toHaveBeenCalledWith('D:\\Pictures\\Memory Icons')
@@ -103,11 +107,12 @@ describe('ProjectIconRegistrationDialog', () => {
     mocks.readDirectory.mockResolvedValue([{ name: 'readme.md', isFile: true, isDirectory: false }])
     const wrapper = mountDialog()
 
-    await wrapper.findAllComponents(OcButton).find(b => b.text() === 'projectConfig.icons.chooseFolder')!.trigger('click')
+    await sourceOption(wrapper, 'projectConfig.icons.chooseFolder').trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('projectConfig.icons.noIconsInFolder')
-    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.project-import-source-choice').exists()).toBe(true)
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
   })
 
   it('blocks a set Key that another set already uses', async () => {
@@ -139,6 +144,20 @@ describe('ProjectIconRegistrationDialog', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ name: 'Renamed', key: 'my-icons' })
   })
 
+  it('starts on the source choice and returns to it when choosing again', async () => {
+    mocks.pickFiles.mockResolvedValue(['D:/Icons/warn.svg'])
+    const wrapper = mountDialog()
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
+
+    await chooseFiles(wrapper)
+    await flushPromises()
+    expect(wrapper.find('.project-import-source-choice').exists()).toBe(false)
+    expect(wrapper.get('.oc-album img').attributes('src')).toBe('asset://D:/Icons/warn.svg')
+
+    await wrapper.findAllComponents(OcButton).find(b => b.text() === 'projectConfig.icons.chooseAgain')!.trigger('click')
+    expect(wrapper.find('.project-import-source-choice').exists()).toBe(true)
+  })
+
   it('resets the selection every time it opens', async () => {
     mocks.pickFiles.mockResolvedValue(['D:/Icons/warn.svg'])
     const wrapper = mountDialog()
@@ -148,7 +167,7 @@ describe('ProjectIconRegistrationDialog', () => {
 
     await wrapper.setProps({ open: false })
     await wrapper.setProps({ open: true })
-    expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
   })
 
   it('adds to an existing set without asking for its name or Key, and avoids the Keys it holds', async () => {

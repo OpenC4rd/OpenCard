@@ -14,7 +14,7 @@
 -->
 <template>
   <div ref="editorRootRef" class="card-design-editor" :class="{ 'is-content-pending': editorContentPending }"
-    :style="editorShellStyle" tabindex="-1" @keydown="handleRootKeydown">
+    tabindex="-1" @keydown="handleRootKeydown">
     <div class="card-design-editor__stage"
       :class="{ 'is-layer-view-active': layerViewActive }">
       <div class="card-design-editor__mode-view">
@@ -36,13 +36,13 @@
               <template v-else>
                 <CardViewport ref="cardViewportRef" v-if="viewFace && renderResources"
                   class="card-design-editor__viewport" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }"
-                  :face="viewFace" :clip-to-face="clipToFace" :resource-context="renderResources" :readonly="workspaceMode !== 'design'"
+                  :face="viewFace" :resource-context="renderResources" :readonly="workspaceMode !== 'design'"
                   :restore-key="filePath" :transform="viewportTransform"
                   :selected-block-id="workspaceMode !== 'design' ? null : selectedBlock?.id ?? null"
                   :selected-location-type="workspaceMode !== 'design' ? null : selectedLocationType"
                   :selected-anchor="selectedAnchor" :selected-parent-block-id="selectedParentBlockId"
                   :selected-parent-flow-direction="selectedParentFlowDirection" :selected-flow-align="selectedFlowAlign"
-                  :viewport-insets="viewportInsets"
+                  :viewport-insets="viewportInsets" :scale-bar-insets="workspaceMode === 'data-table' ? NO_INSETS : undefined"
                   :selection-info="workspaceMode !== 'design' ? null : selectionInfo"
                   :selection-action-labels="selectionActionLabels" :selection-command-actions="selectionCommandActions"
                   :layer-view-active="layerViewActive"
@@ -51,7 +51,7 @@
                   :layer-view-shortcut-legend-label="t('cardDesigner.layerView.shortcutLegend')"
                   :layer-view-shortcut-hints="layerViewShortcutHints"
                   :layer-view-atomic-block-ids="layerViewAtomicBlockIds"
-                  :show-info="workspaceMode === 'design' && !selectedBlock"
+                  :show-info="workspaceMode !== 'design' || !selectedBlock"
                   :show-position-on-move="workspaceMode === 'design' && (settingsStore.settings.value.workspace.showSelectionPositionOnMove ?? true)"
                   :show-size-on-resize="workspaceMode === 'design' && (settingsStore.settings.value.workspace.showSelectionSizeOnResize ?? true)"
                   :alignment-snapping-enabled="workspaceMode === 'design' && alignmentSnappingEnabled"
@@ -66,7 +66,8 @@
                   @viewport-size-change="handleViewportSizeChange"
                   @render-readiness-change="handleRenderReadinessChange">
                   <template #info>
-                    <section class="card-design-editor__card-info" :aria-label="t('cardDesigner.info.title')">
+                    <CdeTablePreviewInfo v-if="workspaceMode === 'data-table'" :card-name="tablePreviewTitle" />
+                    <section v-else class="card-design-editor__card-info" :aria-label="t('cardDesigner.info.title')">
                       <span v-for="item in viewportCardInfo" :key="item.key" :class="{
                         'is-highlighted': highlightedInfoKeys.has(item.key),
                         'is-group-separated': item.separated,
@@ -111,7 +112,7 @@
       </div>
 
       <div class="card-design-editor__stage-layer" :class="{ 'is-data-table-mode': workspaceMode === 'data-table' }">
-        <CdeOverlayDock side="left" :extent="leftDockExtent" :collapsed-extent="overlayGeometryConfig.collapsedExtent"
+        <OcDock side="left" :extent="leftDockExtent" :collapsed-extent="overlayGeometryConfig.collapsedExtent"
           :min-extent="overlayGeometryConfig.minExtent" :max-extent="overlayGeometryConfig.maxExtent"
           :expand-drag-threshold="overlayGeometryConfig.expandDragThreshold"
           :collapse-drag-threshold="overlayGeometryConfig.collapseDragThreshold"
@@ -145,7 +146,7 @@
                   :style="previewBackgroundStyle" @wheel.prevent.stop="handlePreviewViewportWheel">
                   <div ref="transformPreviewViewportRef" class="card-design-editor__transform-preview-viewport"
                     :style="transformPreviewViewportStyle">
-                    <CardFaceRenderer v-if="viewFace && renderResources" :face="viewFace" :clip-to-face="true"
+                    <CardFaceRenderer v-if="viewFace && renderResources" :face="viewFace"
                       :resource-context="renderResources" :render-scale="transformPreviewScale"
                       :style="transformPreviewRendererStyle" />
                     <button v-if="transformPreviewFrameStyle" type="button"
@@ -161,9 +162,9 @@
               </OcPanel>
             </OcCard>
           </template>
-        </CdeOverlayDock>
+        </OcDock>
 
-        <CdeOverlayDock side="right" :extent="rightDockExtent" :collapsed-extent="overlayGeometryConfig.collapsedExtent"
+        <OcDock side="right" :extent="rightDockExtent" :collapsed-extent="overlayGeometryConfig.collapsedExtent"
           :min-extent="overlayGeometryConfig.minExtent" :max-extent="overlayGeometryConfig.maxExtent"
           :expand-drag-threshold="overlayGeometryConfig.expandDragThreshold"
           :collapse-drag-threshold="overlayGeometryConfig.collapseDragThreshold"
@@ -213,7 +214,7 @@
               </OcPanel>
             </OcCard>
           </template>
-        </CdeOverlayDock>
+        </OcDock>
 
         <OcOverlayToolbar v-if="viewFace" data-oc-layout-anchor="bottom" class="card-design-editor__face-tools"
           :class="{ 'is-resizing': isDockResizing }" orientation="vertical" :style="faceToolsStyle" :label="t('cardDesigner.canvas.controls')"
@@ -264,23 +265,24 @@ import { buildCardLayerGroups } from '../card-rendering/components/cardLayerMode
 import PropertyEditor from '../../shared/ui/property-editor/PropertyEditor.vue'
 import AdditionalFieldCreateDialog from '../../shared/ui/property-editor/AdditionalFieldCreateDialog.vue'
 import ExportCustomBlockDialog from './ExportCustomBlockDialog.vue'
+import CdeTablePreviewInfo from './CdeTablePreviewInfo.vue'
 import OcEmpty from '../../components/base/OcEmpty.vue'
 import OcTree from '../../components/standard/OcTree.vue'
 import type { OcActionBarItem, OcActionDefinition } from '../../shared/ui/action/action.types'
 import OcOverlayToolbar from '../../components/standard/OcOverlayToolbar.vue'
 import { useCdePreviewBackground } from './cdePreviewBackground'
 import { createViewportToolbarItems } from '../../components/standard/overlayToolbarItems'
-import CdeOverlayDock from './CdeOverlayDock.vue'
+import OcDock from '../../components/standard/OcDock.vue'
 import {
-  CDE_OVERLAY_BOTTOM_MIN_HEIGHT,
-  CDE_OVERLAY_GEOMETRY_CONFIG,
-  CDE_OVERLAY_RESPONSIVE_WIDTH,
-  CDE_OVERLAY_SPLIT_GAP,
-  CDE_OVERLAY_TOP_MIN_HEIGHT,
-} from './cdeOverlayConfig'
+  DOCK_BOTTOM_MIN_HEIGHT,
+  DOCK_GEOMETRY_CONFIG,
+  DOCK_RESPONSIVE_WIDTH,
+  DOCK_SPLIT_GAP,
+  DOCK_TOP_MIN_HEIGHT,
+} from '../../shared/ui/dock/dockConfig'
 import { useCdeDocumentState } from './useCdeDocumentState'
 import { useCdeInstanceOps } from './useCdeInstanceOps'
-import { useCdeOverlayLayout } from './useCdeOverlayLayout'
+import { useDockLayout } from '../../shared/ui/dock/useDockLayout'
 import { useCdeDiffView } from './useCdeDiffView'
 import { useCdePropertyEditorProjection } from './useCdePropertyEditorProjection'
 import { useCdeDataTableCellProjection } from './useCdeDataTableCellProjection'
@@ -352,6 +354,7 @@ import {
 
 // 蓝图实例固定 ID
 const BLUEPRINT_CARD_ID = '__blueprint__'
+const NO_INSETS = {}
 const EDIT_RICH_TEXT_ACTION_KEY = 'content.edit-rich-text'
 const FLOW_DIRECTION_ACTIONS = [
   { key: 'flow.direction.left', direction: 'rl', icon: 'mdiArrowLeft', titleKey: 'flowLeft' },
@@ -377,13 +380,12 @@ const settingsStore = useAppSettingsStore()
 const propertyBindingInterpreter = { isExpression: isBindingExpression }
 
 const editorRootRef = ref<HTMLElement | null>(null)
-const overlayGeometryConfig = CDE_OVERLAY_GEOMETRY_CONFIG
-const overlayTopMinHeight = CDE_OVERLAY_TOP_MIN_HEIGHT
-const overlayBottomMinHeight = CDE_OVERLAY_BOTTOM_MIN_HEIGHT
-const overlayResponsiveWidth = CDE_OVERLAY_RESPONSIVE_WIDTH
-const overlaySplitGap = CDE_OVERLAY_SPLIT_GAP
+const overlayGeometryConfig = DOCK_GEOMETRY_CONFIG
+const overlayTopMinHeight = DOCK_TOP_MIN_HEIGHT
+const overlayBottomMinHeight = DOCK_BOTTOM_MIN_HEIGHT
+const overlayResponsiveWidth = DOCK_RESPONSIVE_WIDTH
+const overlaySplitGap = DOCK_SPLIT_GAP
 const {
-  editorShellStyle,
   commitDockExtent,
   commitLayout: commitOverlayLayout,
   leftDockExtent,
@@ -394,7 +396,7 @@ const {
   updateDockExtent,
   updateDockTopSize,
   viewportInsets,
-} = useCdeOverlayLayout({
+} = useDockLayout({
   layout: computed(() => sessionView.value.layout),
   geometryConfig: overlayGeometryConfig,
   topMinHeight: overlayTopMinHeight,
@@ -446,7 +448,6 @@ function handleRenderReadinessChange(state: { revision: number; status: 'pending
 
 const dataTableCustomFieldTargetBlockId = ref<string | null>(null)
 const activeFaceKey = ref<CardFaceKey>(sessionView.value.view?.activeFace ?? 'front')
-const clipToFace = ref(sessionView.value.view?.clipToFace ?? false)
 const { previewBackground, previewBackgroundStyle, previewBackgroundActions, cyclePreviewBackground } =
   useCdePreviewBackground(sessionView.value.view?.previewBackground, t, () => commitViewState())
 const alignmentSnappingEnabled = ref(
@@ -490,7 +491,6 @@ const {
 function createViewState(): CardDesignerViewState {
   return {
     activeFace: activeFaceKey.value,
-    clipToFace: clipToFace.value,
     previewBackground: previewBackground.value,
     alignmentSnappingEnabled: alignmentSnappingEnabled.value,
     selectedInstanceId: selectedCardId.value === BLUEPRINT_CARD_ID
@@ -503,14 +503,6 @@ function createViewState(): CardDesignerViewState {
 function commitViewState(): void {
   props.session.updateViewState('card-designer', { view: createViewState() })
 }
-
-const clipAction = computed<OcActionDefinition>(() => ({
-  key: 'toggle-face-clip',
-  icon: clipToFace.value ? 'mdiBoxCutter' : 'mdiBoxCutterOff',
-  title: `${clipToFace.value
-    ? t('cardDesigner.view.disableClip')
-    : t('cardDesigner.view.enableClip')} ${formatCdeShortcutMarkup('view.toggle-clip')}`,
-}))
 
 const alignmentSnappingAction = computed<OcActionDefinition>(() => ({
   key: 'toggle-alignment-snapping',
@@ -538,7 +530,6 @@ const faceToolbarItems = computed<readonly OcActionBarItem[]>(() => [
   }),
   { type: 'divider', key: 'viewport-actions' },
   { ...alignmentSnappingAction.value, active: alignmentSnappingEnabled.value },
-  { ...clipAction.value, active: clipToFace.value },
   faceSwitchAction.value,
 ])
 const diffViewModeAction = computed<OcActionBarItem>(() => ({
@@ -559,20 +550,8 @@ function handleFaceToolbarSelect({ key }: { key: string }): void {
   else if (key === 'viewport.fit') fitViewport()
   else if (key === 'viewport.zoom-in') zoomViewportIn()
   else if (key === 'toggle-alignment-snapping') toggleAlignmentSnapping()
-  else if (key === 'toggle-face-clip') toggleFaceClip()
   else if (key === 'toggle-diff-view-mode') toggleDiffViewMode()
   else if (key === 'switch-face') toggleActiveFace()
-}
-
-function toggleFaceClip(): void {
-  clipToFace.value = !clipToFace.value
-  commitViewState()
-  cardViewportRef.value?.flashStatus?.({
-    icon: clipToFace.value ? 'mdiBoxCutter' : 'mdiBoxCutterOff',
-    message: clipToFace.value
-      ? t('cardDesigner.viewportStatus.clipEnabled')
-      : t('cardDesigner.viewportStatus.clipDisabled'),
-  })
 }
 
 function toggleAlignmentSnapping(): void {
@@ -756,6 +735,9 @@ const {
   translate: messageKey => t(messageKey),
   hasMessage: messageKey => te(messageKey),
 })
+
+const tablePreviewTitle = computed(() =>
+  dataTableColumns.value.find(column => column.key === selectedCardId.value)?.title ?? t('cardDesigner.dataTable.blueprint'))
 
 const appSettingsStore = useAppSettingsStore()
 
@@ -1119,6 +1101,7 @@ const propertyCapabilities = computed<PropertyFieldCapabilities>(() =>
     fs: fileSystemService,
     resourceEnvironment: props.resourceEnvironment?.state.value,
     projectIconCatalog: environment.value.projectIconCatalog,
+    openFile: path => emit('open-file', path),
   }),
 )
 const { propertyEditorInputs } = useCdePropertyEditorProjection({
@@ -1340,6 +1323,7 @@ const viewportFaceSize = computed(() => {
 const {
   completeFileLoad,
   fitBottomRightHalfViewport,
+  fitViewportAnimated,
   fitViewport,
   handlePreviewViewportDrag,
   handlePreviewViewportKeydown,
@@ -1371,7 +1355,7 @@ const {
 watch(workspaceMode, async mode => {
   await nextTick()
   if (mode === 'data-table') fitBottomRightHalfViewport()
-  else if (mode === 'design') fitViewport()
+  else if (mode === 'design') fitViewportAnimated()
 })
 
 
@@ -1528,12 +1512,6 @@ const cdeShortcutCommands = [
     scopes: ['canvas'],
     canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
     run: toggleAlignmentSnapping,
-  },
-  {
-    key: 'view.toggle-clip',
-    scopes: ['canvas'],
-    canRun: () => workspaceMode.value === 'design' && hasRenderableFace.value,
-    run: toggleFaceClip,
   },
   {
     key: 'view.switch-face',
@@ -1810,7 +1788,6 @@ watch(
         back: [...nextBackSelection],
       }
     }
-    clipToFace.value = view?.clipToFace ?? false
     alignmentSnappingEnabled.value = view?.alignmentSnappingEnabled
       ?? alignmentSnappingEnabledByDefault
       ?? true
@@ -1925,7 +1902,7 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 <style scoped>
 .card-design-editor {
-  position: relative;
+  position: relative; display: flex; flex: 1 1 auto; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden;
   isolation: isolate;
   opacity: 1;
   transition: opacity var(--oc-duration) var(--oc-ease);
@@ -2089,12 +2066,15 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+  /* 淡出结束后才隐藏，避免 visibility 瞬切打断过渡。 */
+  transition: opacity var(--oc-duration) var(--oc-ease), visibility 0s linear var(--oc-duration);
 }
 
 .card-design-editor__data-table-view.is-active {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
+  transition: opacity var(--oc-duration) var(--oc-ease);
 }
 
 .card-design-editor__viewport.is-data-table-mode {
@@ -2103,10 +2083,16 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
   pointer-events: none;
 }
 
+/* 视口本体不拦截表格操作，只有卡面响应中键平移。 */
+.card-design-editor__viewport.is-data-table-mode :deep(.card-viewport-stage) {
+  pointer-events: auto;
+}
+
 .card-design-editor__stage-layer.is-data-table-mode {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+  transition: opacity var(--oc-duration) var(--oc-ease), visibility 0s linear var(--oc-duration);
 }
 
 .card-design-editor__stage.is-layer-view-active .card-design-editor__stage-base {

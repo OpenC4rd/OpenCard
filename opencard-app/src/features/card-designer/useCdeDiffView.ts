@@ -41,7 +41,7 @@ import type {
 import type { OcNode, OcNodeCollection } from '../../shared/ui/node/node.types'
 import type { ViewportInsets } from '../../shared/ui/viewport/viewportNavigation'
 import { getBlockPresentation } from './blockPresentation'
-import { CDE_OVERLAY_SPLIT_GAP } from './cdeOverlayConfig'
+import { DOCK_SPLIT_GAP } from '../../shared/ui/dock/dockConfig'
 
 type CdeDiffSide = 'before' | 'after'
 
@@ -212,8 +212,8 @@ export function useCdeDiffView(options: UseCdeDiffViewOptions) {
 
   const diffViewportInsets = computed(() => ({
     ...options.viewportInsets.value,
-    left: (options.viewportInsets.value.left ?? 0) + CDE_OVERLAY_SPLIT_GAP,
-    right: (options.viewportInsets.value.right ?? 0) + CDE_OVERLAY_SPLIT_GAP,
+    left: (options.viewportInsets.value.left ?? 0) + DOCK_SPLIT_GAP,
+    right: (options.viewportInsets.value.right ?? 0) + DOCK_SPLIT_GAP,
   }))
 
   const diffInstanceTreeData = computed<OcNodeCollection>(() => {

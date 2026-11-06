@@ -1,19 +1,19 @@
 /**
- * Card Designer overlay layout state.
+ * Floating dock layout state.
  *
  * Dock components own pointer/keyboard resize lifecycles. This controller owns
  * only session layout state, transient resize updates, and the shared viewport
  * inset projection.
  */
-import { computed, ref, watch, type CSSProperties, type Ref } from 'vue'
-import type { CardDesignerLayoutState } from './cardDesigner.types'
+import { computed, ref, watch, type Ref } from 'vue'
+import type { DockLayoutState } from './dockGeometry'
 import {
-  clampCdeOverlayExtent,
-  resolveCdeOverlayViewportInsets,
-  settleCdeOverlayExtent,
-  type CdeOverlayGeometryConfig,
-  type CdeOverlaySide,
-} from './cdeOverlayGeometry'
+  clampDockExtent,
+  resolveDockViewportInsets,
+  resolveSettledDockExtent,
+  type DockGeometryConfig,
+  type DockSide,
+} from './dockGeometry'
 
 type CommittedDockLayout = {
   leftExtent: number
@@ -21,14 +21,14 @@ type CommittedDockLayout = {
   leftExpandedExtent: number
   rightExpandedExtent: number
 }
-type UseCdeOverlayLayoutOptions = {
-  layout: Readonly<Ref<CardDesignerLayoutState | undefined>>
-  geometryConfig: Readonly<CdeOverlayGeometryConfig>
+type UseDockLayoutOptions = {
+  layout: Readonly<Ref<DockLayoutState | undefined>>
+  geometryConfig: Readonly<DockGeometryConfig>
   topMinHeight: number
-  commitLayout: (layout: CardDesignerLayoutState) => void
+  commitLayout: (layout: DockLayoutState) => void
 }
 
-export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
+export function useDockLayout(options: UseDockLayoutOptions) {
   const leftDockExtent = ref(options.geometryConfig.minExtent)
   const rightDockExtent = ref(options.geometryConfig.minExtent)
   const leftExpandedDockExtent = ref(options.geometryConfig.minExtent)
@@ -41,23 +41,13 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
   }
   const leftSidebarTopHeight = ref<number | null>(null)
   const rightSidebarTopHeight = ref<number | null>(null)
-  const viewportInsets = computed(() => resolveCdeOverlayViewportInsets(
+  const viewportInsets = computed(() => resolveDockViewportInsets(
     leftDockExtent.value,
     rightDockExtent.value,
     options.geometryConfig,
   ))
-  const editorShellStyle = computed<CSSProperties>(() => ({
-    display: 'flex',
-    flex: '1 1 auto',
-    width: '100%',
-    height: '100%',
-    minWidth: '0',
-    minHeight: '0',
-    position: 'relative',
-    overflow: 'hidden',
-  }))
 
-  function createLayoutState(): CardDesignerLayoutState {
+  function createLayoutState(): DockLayoutState {
     return {
       leftTopHeight: leftSidebarTopHeight.value,
       rightTopHeight: rightSidebarTopHeight.value,
@@ -72,7 +62,7 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
     options.commitLayout(createLayoutState())
   }
 
-  function commitDockExtent(side: CdeOverlaySide): void {
+  function commitDockExtent(side: DockSide): void {
     if (side === 'left') {
       if (leftDockExtent.value >= options.geometryConfig.minExtent) {
         leftExpandedDockExtent.value = leftDockExtent.value
@@ -95,8 +85,8 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
     commitLayoutState()
   }
 
-  function updateDockExtent(side: CdeOverlaySide, extent: number): void {
-    const next = clampCdeOverlayExtent(extent, options.geometryConfig)
+  function updateDockExtent(side: DockSide, extent: number): void {
+    const next = clampDockExtent(extent, options.geometryConfig)
     if (side === 'left') {
       leftDockExtent.value = next
     } else {
@@ -104,24 +94,24 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
     }
   }
 
-  function settleDockExtent(side: CdeOverlaySide, extent: number, startExtent: number): void {
-    const next = settleCdeOverlayExtent(extent, startExtent, options.geometryConfig)
+  function settleDockExtent(side: DockSide, extent: number, startExtent: number): void {
+    const next = resolveSettledDockExtent(extent, startExtent, options.geometryConfig)
     updateDockExtent(side, next)
     commitDockExtent(side)
   }
 
-  function toggleDockCollapsed(side: CdeOverlaySide): void {
+  function toggleDockCollapsed(side: DockSide): void {
     const current = side === 'left' ? leftDockExtent.value : rightDockExtent.value
     const expanded = side === 'left' ? leftExpandedDockExtent.value : rightExpandedDockExtent.value
     const next = current > options.geometryConfig.collapsedExtent
       ? options.geometryConfig.collapsedExtent
-      : clampCdeOverlayExtent(expanded, options.geometryConfig)
+      : clampDockExtent(expanded, options.geometryConfig)
     if (side === 'left') leftDockExtent.value = next
     else rightDockExtent.value = next
     commitDockExtent(side)
   }
 
-  function updateDockTopSize(side: CdeOverlaySide, value: number | null): void {
+  function updateDockTopSize(side: DockSide, value: number | null): void {
     const next = normalizeStoredTopHeight(value, options.topMinHeight)
     if (side === 'left') {
       if (leftSidebarTopHeight.value !== next) leftSidebarTopHeight.value = next
@@ -160,7 +150,6 @@ export function useCdeOverlayLayout(options: UseCdeOverlayLayoutOptions) {
   )
 
   return {
-    editorShellStyle,
     commitDockExtent,
     commitLayout: commitLayoutState,
     leftDockExtent,
@@ -181,19 +170,19 @@ function normalizeStoredTopHeight(value: number | null | undefined, minimum: num
 
 function normalizeStoredDockExtent(
   value: number | undefined,
-  config: Readonly<CdeOverlayGeometryConfig>,
+  config: Readonly<DockGeometryConfig>,
 ): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return config.minExtent
-  const extent = clampCdeOverlayExtent(value, config)
+  const extent = clampDockExtent(value, config)
   return extent <= config.collapsedExtent ? config.collapsedExtent : Math.max(config.minExtent, extent)
 }
 
 function normalizeStoredExpandedDockExtent(
   value: number | undefined,
-  config: Readonly<CdeOverlayGeometryConfig>,
+  config: Readonly<DockGeometryConfig>,
   currentExtent: number,
 ): number {
   const fallback = currentExtent >= config.minExtent ? currentExtent : config.minExtent
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
-  return Math.max(config.minExtent, clampCdeOverlayExtent(value, config))
+  return Math.max(config.minExtent, clampDockExtent(value, config))
 }

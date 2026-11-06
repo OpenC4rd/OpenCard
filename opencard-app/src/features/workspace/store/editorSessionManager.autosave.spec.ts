@@ -45,7 +45,7 @@ describe('editorSessionManager project profile manual save', () => {
     const session = await store.open('D:/project/.opencard/blocks/blocks.json')
     const host = useWorkbenchEditorHost({
       activeSession: store.activeSession, comparison: ref(null), cardProps: ref({}),
-      reportIssues: () => {}, openFile: () => {}, trashFile: () => {}, translate: key => key,
+      reportIssues: () => {}, openFile: () => {}, trashFile: () => {}, addPackage: () => {}, translate: key => key,
     })
     const wrapper = mount(defineComponent({ setup: () => () => h(host.mount.value!.component, { ...host.mount.value!.props, ref: host.mount.value!.capture }) }), {
       global: { plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })] },

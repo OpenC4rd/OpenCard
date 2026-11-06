@@ -6,7 +6,7 @@
   }"
   :style="viewportDotGridStyle"
     @pointerdown.self="handleViewportPointerDown" @mousedown="handleMouseDown" @mousemove="handleMouseMove"
-    @mouseup="handleMouseUp" @mouseleave="handleMouseLeave" @mouseover="handleComparisonMouseOver"
+    @mouseleave="handleMouseLeave" @mouseover="handleComparisonMouseOver"
     @wheel.prevent="handleWheel">
     <template v-if="props.comparison">
       <div class="card-viewport-comparison-layer" :class="{ 'is-transitioning': comparisonTransitioning }"
@@ -15,7 +15,6 @@
           :style="comparisonBeforeStageStyle" @transitionend="finishComparisonTransition">
           <div v-if="props.comparison.before.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.before.face)" />
           <CardFaceRenderer v-else :face="props.comparison.before.face"
-            :clip-to-face="clipToFace"
             :render-scale="resolveFaceRasterScale(props.comparison.before.face)"
             :view="comparisonBeforeView"
             :resource-context="props.comparison.before.resourceContext"
@@ -31,7 +30,6 @@
           :style="comparisonAfterStageStyle">
           <div v-if="props.comparison.after.placeholder" class="card-comparison-placeholder" :style="placeholderStyle(props.comparison.after.face)" />
           <CardFaceRenderer v-else :face="props.comparison.after.face"
-            :clip-to-face="clipToFace"
             :render-scale="resolveFaceRasterScale(props.comparison.after.face)"
             :view="comparisonAfterView"
             :resource-context="props.comparison.after.resourceContext"
@@ -44,7 +42,7 @@
     </template>
     <div v-else ref="stageRef" data-oc-layout-anchor="center" class="card-viewport-stage" :style="stageStyle">
       <CardFaceRenderer :face="face"
-        :clip-to-face="clipToFace" :render-scale="resolveFaceRasterScale(face)" :view="visibleView" :resource-context="resourceContext"
+        :render-scale="resolveFaceRasterScale(face)" :view="visibleView" :resource-context="resourceContext"
         :visual-readiness="visualReadiness"
         :diff-highlights="diffHighlights"
         @block-click="handleBlockClick"
@@ -80,7 +78,7 @@
       @block-click="handleBlockClick"
       @z-index-step="emit('z-index-step', $event)"
     />
-    <OcScaleBar v-if="!effectiveLayerViewActive" :pixels-per-mm="scale" :insets="props.viewportInsets" />
+    <OcScaleBar v-if="!effectiveLayerViewActive" :pixels-per-mm="scale" :insets="props.scaleBarInsets ?? props.viewportInsets" />
     <div
       v-if="statusFlash"
       :key="statusFlash.sequence"
@@ -94,7 +92,7 @@
     </div>
     <div v-if="hasHudContent" class="card-viewport-hud">
       <Transition name="card-info-fade">
-        <aside v-if="$slots.info && isHudVisible" class="card-viewport-info" :style="viewportInfoStyle">
+        <aside v-if="$slots.info && isInfoVisible" class="card-viewport-info" :style="viewportInfoStyle">
           <slot name="info" />
         </aside>
       </Transition>
@@ -334,6 +332,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, useSlots, w
 import type { AnchorPosition, FlowDirection } from '../../../entities/card/model'
 import { clamp } from '../../../shared/model/number'
 import { taskScheduler } from '../../../utils/taskScheduler'
+import { trackPointerDrag } from '../../../shared/ui/pointerDrag'
 import OcIcon from '../../../components/base/OcIcon.vue'
 import type { OcActionDefinition, OcActionMenuEntry } from '../../../shared/ui/action/action.types'
 import OcContextMenu from '../../../components/standard/OcContextMenu.vue'
@@ -509,7 +508,6 @@ const emit = defineEmits<{
 
 const props = withDefaults(defineProps<{
   face: RenderReadyCardFace
-  clipToFace?: boolean
   restoreKey?: string
   selectedBlockId?: string | null
   selectedLocationType?: 'simple-container-location' | 'flow-container-location' | null
@@ -538,6 +536,8 @@ const props = withDefaults(defineProps<{
   heightLocked?: boolean
   resourceContext: CardRenderResourceContext
   viewportInsets?: ViewportInsets
+  /** 比例尺单独的避让边距；缺省跟随 viewportInsets（例如数据表页没有浮层，贴回视口左下角）。 */
+  scaleBarInsets?: ViewportInsets
   readonly?: boolean
   diffHighlights?: readonly CardDiffHighlight[]
   comparison?: CardViewportComparison
@@ -575,7 +575,6 @@ const props = withDefaults(defineProps<{
   layerViewAtomicBlockIds: () => [],
   widthLocked: false,
   heightLocked: false,
-  clipToFace: false,
   viewportInsets: () => ({}),
   readonly: false,
   diffHighlights: () => [],
@@ -881,14 +880,13 @@ const fitScale = computed(() => {
 
 const maxHudScale = computed(() => fitScale.value * 1.25)
 
-const isHudVisible = computed(() => {
-  if (faceDimensionDrag.value !== null) return true
-  return Boolean(props.showInfo)
-    && !props.comparison
-    && !effectiveLayerViewActive.value
-    && !props.readonly
-    && scale.value <= maxHudScale.value
-})
+/** 卡面信息只读也能显示（数据表页）；尺寸线可拖，仍只在可编辑时出现。 */
+const isInfoVisible = computed(() => Boolean(props.showInfo)
+  && !props.comparison
+  && !effectiveLayerViewActive.value
+  && scale.value <= maxHudScale.value)
+
+const isHudVisible = computed(() => faceDimensionDrag.value !== null || (isInfoVisible.value && !props.readonly))
 
 const hasHudContent = computed(() => !props.comparison && Boolean(slots.info || slots['left-info'] || slots['bottom-info']))
 
@@ -1362,12 +1360,19 @@ function handleMouseDown(event: MouseEvent) {
   isPanning.value = true
   lastPointerX.value = event.clientX
   lastPointerY.value = event.clientY
+  stopPan?.()
+  stopPan = trackPointerDrag(event, {
+    onMove: move => panInput.schedule({ x: move.clientX, y: move.clientY }),
+    onEnd: () => {
+      stopPan = null
+      panInput.flush()
+      isPanning.value = false
+    },
+  })
 }
 
 function handleMouseMove(event: MouseEvent) {
   updateHoveredComparisonBlock(event.target)
-  if (!isPanning.value) return
-  panInput.schedule({ x: event.clientX, y: event.clientY })
 }
 
 function applyPan(point: { x: number; y: number }): void {
@@ -1384,10 +1389,7 @@ function applyPan(point: { x: number; y: number }): void {
   lastPointerY.value = point.y
 }
 
-function handleMouseUp() {
-  panInput.flush()
-  isPanning.value = false
-}
+let stopPan: (() => void) | null = null
 
 function handleComparisonMouseOver(event: MouseEvent): void {
   updateHoveredComparisonBlock(event.target)
@@ -1415,7 +1417,6 @@ function updateHoveredComparisonBlock(target: EventTarget | null): void {
 }
 
 function handleMouseLeave(): void {
-  handleMouseUp()
   hoveredComparisonBlockId.value = null
 }
 
@@ -1489,8 +1490,8 @@ function resetView(): void {
   targetScale.value = 96 / 25.4
 }
 
-function fitView(targetRect?: { left: number; top: number; width: number; height: number }): void {
-  fitContent({ left: 0, top: 0, width: props.face.width, height: props.face.height }, targetRect)
+function fitView(targetRect?: { left: number; top: number; width: number; height: number }, animated = false): void {
+  fitContent({ left: 0, top: 0, width: props.face.width, height: props.face.height }, targetRect, animated)
 }
 
 function fitBottomRightHalfView(): void {
@@ -1507,6 +1508,7 @@ function fitBottomRightHalfView(): void {
 function fitContent(
   contentRect: { left: number; top: number; width: number; height: number },
   targetRect?: { left: number; top: number; width: number; height: number },
+  animated = false,
 ): void {
   if (effectiveLayerViewActive.value) return
   const viewport = viewportRef.value
@@ -1529,14 +1531,15 @@ function fitContent(
   )
 
   stopZoomAnimation()
-  panX.value = regionLeft + regionWidth / 2
+  targetPanX.value = regionLeft + regionWidth / 2
     - getBaseOffsetXForScale(nextScale) - (contentRect.left + contentRect.width / 2) * nextScale
-  panY.value = regionTop + regionHeight / 2
+  targetPanY.value = regionTop + regionHeight / 2
     - getBaseOffsetYForScale(nextScale) - (contentRect.top + contentRect.height / 2) * nextScale
-  scale.value = nextScale
-  targetPanX.value = panX.value
-  targetPanY.value = panY.value
   targetScale.value = nextScale
+  if (animated) { startZoomAnimation(); return }
+  panX.value = targetPanX.value
+  panY.value = targetPanY.value
+  scale.value = nextScale
 }
 
 function normalizeWheelDelta(deltaY: number, deltaMode: number): number {
@@ -2592,6 +2595,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopPan?.()
   panInput.cancel()
   transformInput.cancel()
   faceDimensionInput.cancel()

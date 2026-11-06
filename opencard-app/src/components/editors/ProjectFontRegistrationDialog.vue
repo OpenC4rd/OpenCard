@@ -1,25 +1,27 @@
 <template>
   <OcDialog class="project-font-dialog" :open="open" :title="dialogTitle" as="form"
     close-on-backdrop :dismissible="!busy" @request-close="close" @submit="submit">
-    <OcOptionGroup v-if="!editing" v-model="importMode" :options="importModeOptions" :disabled="busy" fill
-      appearance="sliding-outline" />
+    <ProjectImportSourceChoice v-if="importMode === 'choose'" :options="sourceOptions" glyph="Aa" :disabled="busy"
+      @select="pickSource" />
 
     <section v-if="importMode === 'files'" class="project-font-dialog__summary">
-      <template v-if="selectedSourceCount">
-        <OcText as="strong">{{ t('projectConfig.fonts.selectedFiles', { count: selectedSourceCount }) }}</OcText>
-        <OcText tone="muted" size="sm">{{ draft.name || t('projectConfig.fonts.unnamedFamily') }}</OcText>
-      </template>
-      <OcText v-else tone="muted" size="sm">{{ t('projectConfig.fonts.chooseFilesHint') }}</OcText>
+      <OcText as="strong">{{ t('projectConfig.fonts.selectedFiles', { count: selectedSourceCount }) }}</OcText>
+      <OcText tone="muted" size="sm">{{ draft.name || t('projectConfig.fonts.unnamedFamily') }}</OcText>
       <div class="project-font-dialog__summary-actions">
-        <OcButton type="button" icon="mdiFileMultipleOutline" variant="outline" :disabled="busy" @click="pickFiles(true)">
-          {{ selectedSourceCount ? t('projectConfig.fonts.chooseAgain') : t('projectConfig.fonts.chooseFiles') }}
+        <OcButton v-if="!editing" type="button" size="sm" variant="ghost" icon="mdiArrowLeft" :disabled="busy" @click="chooseAgain">
+          {{ t('projectConfig.fonts.chooseAgain') }}
         </OcButton>
-        <OcButton v-if="selectedSourceCount" type="button" variant="ghost" icon="mdiCogOutline"
+        <OcButton v-if="editing" type="button" icon="mdiFileMultipleOutline" variant="outline" :disabled="busy" @click="pickFiles(true)">
+          {{ t('projectConfig.fonts.chooseFiles') }}
+        </OcButton>
+        <OcButton v-if="selectedSourceCount" type="button" size="sm" variant="ghost" icon="mdiCogOutline"
           @click="advancedOpen = !advancedOpen">
           {{ advancedOpen ? t('projectConfig.fonts.simpleSettings') : t('projectConfig.fonts.advancedFace') }}
         </OcButton>
       </div>
     </section>
+    <OcButton v-if="importMode === 'system'" class="project-font-dialog__back" type="button" size="sm" variant="ghost"
+      icon="mdiArrowLeft" :disabled="busy" @click="chooseAgain">{{ t('projectConfig.fonts.chooseAgain') }}</OcButton>
 
     <template v-if="importMode === 'files' && advancedOpen">
       <label class="project-font-dialog__field"><span>{{ t('projectConfig.fonts.name') }}</span>
@@ -70,7 +72,7 @@
 
     <template #footer>
       <OcButton type="button" :disabled="busy" @click="close">{{ t('projectConfig.fonts.cancel') }}</OcButton>
-      <OcButton type="submit" variant="solid" :disabled="!canSubmit || busy">
+      <OcButton v-if="importMode !== 'choose'" type="submit" variant="solid" :disabled="!canSubmit || busy">
         {{ editing ? t('projectConfig.fonts.save') : t('projectConfig.fonts.confirmRegister') }}
       </OcButton>
     </template>
@@ -115,14 +117,14 @@ import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
 import OcDialog from '../standard/OcDialog.vue'
-import OcOptionGroup, { type OcOption } from '../standard/OcOptionGroup.vue'
 import ProjectFontSystemPicker from './ProjectFontSystemPicker.vue'
+import ProjectImportSourceChoice, { type ProjectImportSourceOption } from './ProjectImportSourceChoice.vue'
 import '../../shared/ui/data-grid/dataGrid.css'
 
 type SlotDraft = ProjectFontSlotRequest & { faceName: string; copyRequired: boolean; conflict?: ProjectAssetImportConflict | null; pending?: boolean }
 type FamilyDraft = { originalKey?: string; key: string; name: string; slots: Partial<Record<ProjectFontSlotKey, SlotDraft>> }
-/** 添加字体的来源：从文件选取走原来的字体文件流程，从系统导入按字系批量登记。 */
-type ProjectFontImportMode = 'files' | 'system'
+/** 添加字体先选来源：从文件选取走字体文件流程，从系统导入按字系批量登记。 */
+type ProjectFontImportMode = 'choose' | 'files' | 'system'
 const props = withDefaults(defineProps<{
   open: boolean; registry?: ProjectFontRegistry; reservedKeys?: readonly string[]; originalKey?: string
   defaultOpenPath?: string; busy?: boolean; error?: string
@@ -131,7 +133,7 @@ const props = withDefaults(defineProps<{
 }>(), { registry: () => ({}), reservedKeys: () => [], busy: false, error: '' })
 const emit = defineEmits<{ close: []; submit: [request: ProjectFontFamilyRegistrationRequest] }>()
 const { t } = useI18n()
-const importMode = ref<ProjectFontImportMode>('files')
+const importMode = ref<ProjectFontImportMode>('choose')
 const draft = ref<FamilyDraft>({ key: '', name: '', slots: {} })
 const advancedOpen = ref(false)
 const metadataError = ref('')
@@ -140,9 +142,9 @@ const systemFontsLoading = ref(false)
 const systemFontsError = ref('')
 const selectedFamilies = ref<readonly SystemFontFamily[]>([])
 const editing = computed(() => Boolean(props.originalKey))
-const importModeOptions = computed<OcOption[]>(() => [
-  { value: 'files', label: t('projectConfig.fonts.importFiles'), icon: 'mdiFileMultipleOutline' },
-  { value: 'system', label: t('projectConfig.fonts.importSystem'), icon: 'mdiImport' },
+const sourceOptions = computed<ProjectImportSourceOption[]>(() => [
+  { key: 'files', art: 'files', title: t('projectConfig.fonts.importFiles'), description: t('projectConfig.fonts.chooseFilesHint') },
+  { key: 'system', art: 'system', title: t('projectConfig.fonts.importSystem'), description: t('projectConfig.fonts.importSystemHint') },
 ])
 const selectedSourceCount = computed(() => new Set(Object.values(draft.value.slots).map(slot => slot?.sourcePath)).size)
 const generatedKey = computed(() => createAvailableKey(draft.value.name, [...Object.keys(props.registry), ...props.reservedKeys], 'font'))
@@ -176,7 +178,7 @@ watch([() => props.open, () => props.originalKey], ([open]) => {
     if (source) slots[`${weight}.${style}` as ProjectFontSlotKey] = { sourcePath: source, originalSource: source, faceName: projectAssetName(source), copyRequired: false }
   }
   draft.value = { ...(font?.key ? { originalKey: font.key } : {}), key: font?.key ?? '', name: font?.name ?? '', slots }
-  importMode.value = 'files'
+  importMode.value = editing.value ? 'files' : 'choose'
   advancedOpen.value = editing.value
   metadataError.value = ''
   selectedFamilies.value = []
@@ -223,11 +225,23 @@ function systemFamilySlots(family: SystemFontFamily): FamilyDraft['slots'] {
 }
 
 /** 文件来源沿用原来的流程：挑选文件后重新识别整套字体，系统来源只按字系批量登记。 */
+function pickSource(key: string): void {
+  if (key === 'system') importMode.value = 'system'
+  else void pickFiles(true)
+}
+function chooseAgain(): void {
+  draft.value = { key: '', name: '', slots: {} }
+  selectedFamilies.value = []
+  metadataError.value = ''
+  advancedOpen.value = false
+  importMode.value = 'choose'
+}
 async function pickFiles(replaceAll = false): Promise<void> {
   const paths = fileSystemService.pickFiles
     ? await fileSystemService.pickFiles({ title: t('projectConfig.fonts.pickTitle'), fileTypeName: t('projectConfig.fonts.fileType'), extensions: ['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc'], defaultPath: props.defaultOpenPath })
     : [await fileSystemService.pickFile({ title: t('projectConfig.fonts.pickTitle'), fileTypeName: t('projectConfig.fonts.fileType'), extensions: ['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc'], defaultPath: props.defaultOpenPath })].filter((value): value is string => Boolean(value))
   if (!paths.length) return
+  importMode.value = 'files'
   if (replaceAll) {
     draft.value = { key: '', name: '', slots: {} }
     metadataError.value = ''
@@ -355,7 +369,8 @@ function fontNameFromPath(path: string): string { return projectAssetName(path).
 </script>
 
 <style scoped>
-.project-font-dialog__summary-actions { display: flex; gap: var(--oc-space-xs); margin-top: var(--oc-space-sm); }
+.project-font-dialog__summary-actions { display: flex; gap: var(--oc-space-xs); margin-top: var(--oc-space-xs); }
+.project-font-dialog__back { align-self: flex-start; justify-self: start; }
 .project-font-dialog__field { display: grid; gap: var(--oc-space-2xs); margin-top: var(--oc-space-sm); }
 .project-font-dialog__slot-table-wrap { width: 100%; max-width: var(--oc-content-width-md); height: auto; margin-top: var(--oc-space-md); overflow: hidden; }
 .project-font-dialog__slot-table { width: 100%; }

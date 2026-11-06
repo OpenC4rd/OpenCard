@@ -20,6 +20,7 @@ export function useWorkbenchEditorHost(options: {
   reportIssues: (id: string, snapshot: EditorIssueSnapshot) => void
   openFile: (path: string) => unknown
   trashFile: (path: string) => unknown
+  addPackage: () => unknown
   translate: (key: string, params?: Record<string, unknown>) => string
 }) {
   const editorRef = shallowRef<EditorInstance | null>(null)
@@ -70,6 +71,7 @@ export function useWorkbenchEditorHost(options: {
         onUpdateDiffUiState: (value: EditorDiffUiState) => { if (current()) session.updateDiffUiState(value) },
         onOpenFile: (path: string) => { if (current()) return options.openFile(path) },
         onTrashFile: (path: string) => { if (current()) return options.trashFile(path) },
+        onAddPackage: () => { if (current()) return options.addPackage() },
       },
     }
   })

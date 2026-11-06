@@ -3,6 +3,7 @@
 `components/standard` 保存由 base primitive 组合出的通用交互协议。
 
 - `OcActionButton`：定义式 action 渲染与意图输出。
+- `OcDock`：贴在舞台边缘的悬浮面板坞，可拖宽、双击收起，给 `bottom` 时上下可拖。
 - `OcBar`、`OcCard`：结构化 section；`OcCard` 直接绘制表面，不嵌套 Surface/Stack。
 - `OcColorField`：复用 `OcColorPicker` 的完整颜色字段变体，统一色值输入、取色弹层与提交语义，并按领域需要选择是否开放 Alpha。
 - `OcFilePicker`：基于 `OcTree` 与搜索框的多作用域文件/文件夹选择器，支持通配符与正则过滤。

@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import CdeOverlayDock from './CdeOverlayDock.vue'
+import OcDock from './OcDock.vue'
 
 const props = {
   side: 'left' as const,
@@ -45,9 +45,9 @@ function pointer(element: HTMLElement, type: string, init: PointerEventInit): vo
   element.dispatchEvent(new PointerEvent(type, { bubbles: true, ...init }))
 }
 
-describe('CdeOverlayDock', () => {
+describe('OcDock', () => {
   it('settles width drag through the shared extent contract', async () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props,
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
@@ -70,7 +70,7 @@ describe('CdeOverlayDock', () => {
   })
 
   it('emits a collapse toggle intent on width handle double click', () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props: { ...props, extent: props.minExtent },
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
@@ -81,7 +81,7 @@ describe('CdeOverlayDock', () => {
   })
 
   it('uses vertical split semantics and emits an absolute top size', () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props,
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
@@ -94,12 +94,12 @@ describe('CdeOverlayDock', () => {
   })
 
   it('keeps the measured split origin when the first pointer move arrives', async () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props,
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
-    const stack = wrapper.get('.cde-overlay-dock__stack').element as HTMLElement
-    const topPanel = wrapper.get('.cde-overlay-dock__panel--top').element as HTMLElement
+    const stack = wrapper.get('.oc-dock__stack').element as HTMLElement
+    const topPanel = wrapper.get('.oc-dock__panel--top').element as HTMLElement
     stack.getBoundingClientRect = () => ({ height: 700 } as DOMRect)
     topPanel.getBoundingClientRect = () => ({ height: 240 } as DOMRect)
     await nextTick()
@@ -118,12 +118,12 @@ describe('CdeOverlayDock', () => {
   })
 
   it('uses the measured split origin when no persisted top size exists', async () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props: { ...props, topSize: null },
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
-    const stack = wrapper.get('.cde-overlay-dock__stack').element as HTMLElement
-    const topPanel = wrapper.get('.cde-overlay-dock__panel--top').element as HTMLElement
+    const stack = wrapper.get('.oc-dock__stack').element as HTMLElement
+    const topPanel = wrapper.get('.oc-dock__panel--top').element as HTMLElement
     stack.getBoundingClientRect = () => ({ height: 700 } as DOMRect)
     topPanel.getBoundingClientRect = () => ({ height: 240 } as DOMRect)
     await nextTick()
@@ -143,7 +143,7 @@ describe('CdeOverlayDock', () => {
 
 
   it('auto-collapses in a narrow stage without hiding the resize entry point', () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props,
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
@@ -158,17 +158,25 @@ describe('CdeOverlayDock', () => {
   })
 
   it('does not echo an unchanged persisted top size from resize observation', () => {
-    const wrapper = mount(CdeOverlayDock, {
+    const wrapper = mount(OcDock, {
       props,
       slots: { top: '<section>top</section>', bottom: '<section>bottom</section>' },
     })
 
-    const stack = wrapper.get('.cde-overlay-dock__stack').element as HTMLElement
-    const topPanel = wrapper.get('.cde-overlay-dock__panel--top').element as HTMLElement
+    const stack = wrapper.get('.oc-dock__stack').element as HTMLElement
+    const topPanel = wrapper.get('.oc-dock__panel--top').element as HTMLElement
     stack.getBoundingClientRect = () => ({ height: 700 } as DOMRect)
     topPanel.getBoundingClientRect = () => ({ height: 240 } as DOMRect)
     resizeCallback?.([{ target: stack, contentRect: { height: 700 } as DOMRectReadOnly } as unknown as ResizeObserverEntry], {} as ResizeObserver)
 
     expect(wrapper.emitted('update:top-size') ?? []).toHaveLength(0)
+  })
+
+  it('renders one panel and no split handle when only the top slot is given', () => {
+    const wrapper = mount(OcDock, { props, slots: { top: '<div class="only" />' } })
+
+    expect(wrapper.find('.only').exists()).toBe(true)
+    expect(wrapper.find('.oc-dock__panel--bottom').exists()).toBe(false)
+    expect(wrapper.find('.oc-dock__split-handle').exists()).toBe(false)
   })
 })

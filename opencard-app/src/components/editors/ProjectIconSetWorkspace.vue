@@ -1,29 +1,16 @@
 <template>
-  <div class="project-icon-set-workspace" :class="{ 'is-empty': series.icons.length === 0 }">
-    <div v-if="series.icons.length === 0" class="project-icon-set-workspace__empty">
-      <OcIcon name="mdiFileImageOutline" size="lg" tone="muted" />
-      <OcText as="strong">{{ t('projectConfig.icons.emptyIconList') }}</OcText>
-    </div>
-    <div v-else class="project-icon-set-workspace__grid-pane">
-      <OcFieldFrame class="project-icon-set-workspace__filter" full-width>
-        <OcFieldInput variant="plain" full-width :value="filterQuery"
-          :placeholder="t('projectConfig.icons.filterPlaceholder')"
-          :aria-label="t('projectConfig.icons.filterPlaceholder')" @input="updateFilter" />
-        <template v-if="filterQuery" #suffix>
-          <OcButton icon-only size="sm" icon="mdiClose" variant="ghost"
-            :aria-label="t('projectConfig.icons.clearFilter')" @click="filterQuery = ''" />
-        </template>
-      </OcFieldFrame>
-      <OcAlbum v-if="filteredIconIndexes.length" class="project-icon-set-workspace__icon-album" fill
-        :data="iconAlbumData" :selected-keys="selectedIconKeys"
-        selection-mode="multiple" @selection-change="handleSelectionChange" @action="handleNodeAction" />
-      <OcEmpty v-else tone="muted">{{ t('projectConfig.icons.noMatchingIcons') }}</OcEmpty>
-    </div>
-  </div>
+  <OcEmpty v-if="series.icons.length === 0" tone="muted" icon="mdiFileImageOutline" fill>
+    {{ t('projectConfig.icons.emptyIconList') }}
+  </OcEmpty>
+  <OcAlbum v-else-if="filteredIconIndexes.length" layout="tile" fill
+    :style="{ '--oc-album-tile-min-width': `${tileSize}px` }"
+    :data="iconAlbumData" :selected-keys="selectedIconKeys"
+    selection-mode="multiple" @selection-change="handleSelectionChange" @action="handleNodeAction" />
+  <OcEmpty v-else tone="muted" fill>{{ t('projectConfig.icons.noMatchingIcons') }}</OcEmpty>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   duplicateProjectIcon,
@@ -43,24 +30,22 @@ import type {
   OcNodeSelectionEvent,
 } from '../../shared/ui/node/node.types'
 import OcAlbum from '../standard/OcAlbum.vue'
-import OcButton from '../base/OcButton.vue'
 import OcEmpty from '../base/OcEmpty.vue'
-import OcFieldFrame from '../base/OcFieldFrame.vue'
-import OcFieldInput from '../base/OcFieldInput.vue'
-import OcIcon from '../base/OcIcon.vue'
-import OcText from '../base/OcText.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   series: ProjectIconSeries
   entries: readonly ProjectIconCatalogEntry[]
   selectedIconIndexes: readonly number[]
-}>()
+  /** 按名称或引用 Key 筛选；筛选框归工作台头部所有。 */
+  filterQuery?: string
+  /** 图标格的最小边长，由舞台控制条调节。 */
+  tileSize?: number
+}>(), { filterQuery: '', tileSize: 96 })
 const emit = defineEmits<{
   'update:series': [series: ProjectIconSeries]
   'update:selectedIconIndexes': [indexes: number[]]
 }>()
 const { t } = useI18n()
-const filterQuery = ref('')
 
 const selectedIconIndexes = computed(() => props.selectedIconIndexes.filter(index => (
   Number.isInteger(index) && index >= 0 && index < props.series.icons.length
@@ -93,7 +78,10 @@ function iconActions(index: number): readonly OcNodeAction[] {
   const remove: OcNodeAction = {
     key: 'delete', title: t('projectConfig.icons.removeIcon'), icon: 'mdiTrashCanOutline', iconTone: 'danger',
   }
-  return [duplicate, moveTop, moveUp, moveDown, moveBottom, remove]
+  return [{
+    key: 'more', title: t('projectConfig.icons.iconActions'), icon: 'mdiDotsHorizontal',
+    children: [duplicate, moveTop, moveUp, moveDown, moveBottom, remove],
+  }]
 }
 
 const entriesByIdentity = computed(() => new Map(props.entries.map(entry => (
@@ -108,7 +96,7 @@ function catalogEntry(index: number): ProjectIconCatalogEntry | null {
 }
 
 const filteredIconIndexes = computed(() => {
-  const query = filterQuery.value.trim().toLocaleLowerCase()
+  const query = props.filterQuery.trim().toLocaleLowerCase()
   if (!query) return props.series.icons.map((_, index) => index)
   return props.series.icons.flatMap((icon, index) => (
     icon.name.toLocaleLowerCase().includes(query) || icon.iconKey.toLocaleLowerCase().includes(query)
@@ -124,8 +112,7 @@ const iconAlbumData = computed<OcNodeCollection>(() => ({
     const entry = catalogEntry(index)
     return [key, {
       label: icon.name,
-      // 卡片正面就是这个图标本身。字号用封面框的尺寸表达（媒体盒是尺寸容器），按自身比例缩放，
-      // 于是图标铺满封面框、信息条压在它的下半部分上——和图片封面卡同一种结构。
+      // 方格正面就是这个图标本身。字号用封面框的尺寸表达（媒体盒是尺寸容器），按自身比例缩放。
       cover: entry
         ? {
             type: 'style' as const,
@@ -147,10 +134,6 @@ function albumIndex(key: string | null): number | null {
   if (!key?.startsWith('icon:')) return null
   const index = Number(key.slice('icon:'.length))
   return Number.isInteger(index) ? index : null
-}
-
-function updateFilter(event: Event): void {
-  if (event.target instanceof HTMLInputElement) filterQuery.value = event.target.value
 }
 
 function handleSelectionChange(event: OcNodeSelectionEvent): void {
@@ -236,48 +219,3 @@ function moveIcons(indexes: readonly number[], direction: 'top' | 'up' | 'down' 
   emit('update:series', { ...props.series, icons })
 }
 </script>
-
-<style scoped>
-.project-icon-set-workspace {
-  display: grid;
-  /* 一格有界的行：高度由调用方给定，图标网格再高也只在相册里滚动，不会把整页撑破。 */
-  grid-template-rows: minmax(0, 1fr);
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.project-icon-set-workspace.is-empty { border: var(--oc-border-width) dashed var(--oc-border-muted); border-radius: var(--oc-radius-control); }
-
-.project-icon-set-workspace__empty {
-  display: grid;
-  min-width: 0;
-  place-content: center;
-  justify-items: center;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-lg);
-  text-align: center;
-}
-
-.project-icon-set-workspace__grid-pane {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.project-icon-set-workspace__filter {
-  margin: var(--oc-space-xs);
-  width: auto;
-}
-
-/*
- * 图标格是固定高的：卡片的高度不再由宽度按封面比例推出（那个竖版比例是给书封式封面卡用的），
- * 于是同一屏的节奏稳定。这个固定值是相册的公开旋钮，不是页面去改它的内部规则。
- */
-.project-icon-set-workspace__icon-album {
-  --oc-album-cell-block-size: var(--oc-album-card-min-width);
-}
-</style>

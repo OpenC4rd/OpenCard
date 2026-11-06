@@ -21,6 +21,7 @@
     :src="visual.src"
     :alt="visual.label ?? label"
     draggable="false"
+    loading="lazy"
     @error="emit('image-error')"
   />
 </template>

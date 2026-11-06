@@ -10,7 +10,7 @@
  * - `Teleport`.
  *
  * Everything else renders for real unless a test asks for a stub: `OcTree`, `CardDataTable`,
- * `PropertyEditor`, `OcOverlayToolbar`, `CdeOverlayDock`, `OcEmpty`, `CardFaceRenderer`. Tests that
+ * `PropertyEditor`, `OcOverlayToolbar`, `OcDock`, `OcEmpty`, `CardFaceRenderer`. Tests that
  * deliberately render a default-stubbed child for real say so with `Child: false`
  * (`PropertyEditor: false`, `CardViewport: false`), and tests that need their own double pass their
  * own component. No test's real/stub posture is decided by this helper beyond that shared set.
@@ -77,7 +77,6 @@ const CdeCardViewportStub = defineComponent({
     selectedBlockId: String,
     showInfo: Boolean,
     face: Object,
-    clipToFace: Boolean,
     alignmentSnappingEnabled: Boolean,
     selectionCommandActions: Array,
     selectionActionLabels: Object,

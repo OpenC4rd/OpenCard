@@ -20,7 +20,7 @@ import {
   type DirEntry,
   type FileInfo,
 } from '@tauri-apps/plugin-fs'
-import { invoke } from '@tauri-apps/api/core'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { taskScheduler } from '../../../utils/taskScheduler'
 
 /**
@@ -84,6 +84,8 @@ export interface FileSystemService {
   renameFile(oldPath: string, newPath: string): Promise<void>
   revealInFileManager(path: string): Promise<void>
   openWithDefaultApp(path: string): Promise<void>
+  /** 本地文件的可显示地址：只拼地址，不读文件。 */
+  toAssetSrc(path: string): string
   fileExists(path: string): Promise<boolean>
   getFileInfo(path: string): Promise<FileInfo>
   readDirectory(path: string, recursive?: boolean): Promise<DirEntry[]>
@@ -184,6 +186,10 @@ class FileSystemServiceImpl implements FileSystemService {
 
   async deleteFile(path: string): Promise<void> {
     await remove(path, { recursive: true })
+  }
+
+  toAssetSrc(path: string): string {
+    return convertFileSrc(path)
   }
 
   async trashFile(path: string): Promise<void> {

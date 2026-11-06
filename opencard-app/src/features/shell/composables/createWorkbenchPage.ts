@@ -200,7 +200,7 @@ export function createWorkbenchPage(options: {
     cardProps: computed(() => ({ renderCardImages, imageExportBusy: isProjectExportRunning.value,
     })),
     reportIssues: (id, snapshot) => reportSessionIssueSnapshot(id, snapshot),
-    openFile: path => handleOpenFile(path), trashFile: path => handleEditorTrashFile(path), translate: t,
+    openFile: path => handleOpenFile(path), trashFile: path => handleEditorTrashFile(path), addPackage: () => pickAndAddResourcePackage(), translate: t,
   })
   const isDiffMode = computed(() => isWorkbenchMode.value && activeSession.value?.state.mode === 'diff')
   const {

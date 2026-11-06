@@ -23,7 +23,7 @@ export type CdeViewportPort = {
     viewportX: number,
     viewportY: number,
   ) => void
-  fitView: (targetRect?: { left: number; top: number; width: number; height: number }) => void
+  fitView: (targetRect?: { left: number; top: number; width: number; height: number }, animated?: boolean) => void
 }
 
 type UseCdeViewportControllerOptions = {
@@ -44,6 +44,8 @@ const DEFAULT_VIEWPORT_TRANSFORM: EditorViewportTransform = { x: 0, y: 0, scale:
 const VIEWPORT_ZOOM_STEP = 1.25
 const TRANSFORM_PREVIEW_MAX_SIDE = 220
 const TRANSFORM_PREVIEW_VISIBILITY_COVERAGE = 0.7
+
+const TABLE_INFO_RESERVE = 244
 
 export function useCdeViewportController(options: UseCdeViewportControllerOptions) {
   const transformPreviewHostRef = ref<HTMLElement | null>(null)
@@ -188,15 +190,21 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
     options.viewportPort.value?.fitView()
   }
 
+  /** 模式切换时的适配：目标变了但画面渐进过去，不跳变。 */
+  function fitViewportAnimated(): void {
+    options.viewportPort.value?.fitView(undefined, true)
+  }
+
   function fitBottomRightHalfViewport(): void {
     const { width, height } = viewportSize.value
     if (width <= 0 || height <= 0) return
+    // 右侧留出卡面信息（228px + 间距），免得信息被挤出视口。
     options.viewportPort.value?.fitView({
       left: width / 2,
       top: height / 2,
-      width: width / 2,
+      width: Math.max(width / 2 - TABLE_INFO_RESERVE, width / 8),
       height: height / 2,
-    })
+    }, true)
   }
 
   function scheduleInitialViewportFit(): void {
@@ -329,6 +337,7 @@ export function useCdeViewportController(options: UseCdeViewportControllerOption
     completeFileLoad,
     fitBottomRightHalfViewport,
     fitViewport,
+    fitViewportAnimated,
     handlePreviewViewportDrag,
     handlePreviewViewportKeydown,
     handlePreviewViewportWheel,

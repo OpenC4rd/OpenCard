@@ -124,14 +124,15 @@ describe('CardViewport', () => {
       selectedBlockId: 'selected',
       selectedLocationType: 'simple-container-location',
       selectedAnchor: 'lt',
-    } })
+    }, attachTo: document.body })
     await flushPromises()
     await flushAnimation()
 
     await wrapper.get('.card-viewport').trigger('mousedown', { button: 1, clientX: 400, clientY: 300 })
     const before = wrapper.emitted('viewport-transform-change')?.length ?? 0
+    // 中键拖动挂在 window 上：指针划出视口（浮层 / 窗口外）也不中断。
     for (let index = 1; index <= 20; index++) {
-      await wrapper.get('.card-viewport').trigger('mousemove', { clientX: 400 + index * 5, clientY: 300 })
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 400 + index * 5, clientY: 300 }))
     }
     expect(wrapper.emitted('viewport-transform-change')?.length ?? 0).toBe(before)
     await flushAnimation()
@@ -142,7 +143,7 @@ describe('CardViewport', () => {
     expect(lastTransform.x).toBeDefined()
     expect(lastTransform.scale).toBe(1)
 
-    await wrapper.get('.card-viewport').trigger('mouseup', { button: 1 })
+    window.dispatchEvent(new MouseEvent('pointerup', { button: 1 }))
     wrapper.unmount()
   })
 

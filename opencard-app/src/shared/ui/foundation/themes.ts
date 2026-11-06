@@ -75,6 +75,8 @@ export const OC_SHARED_THEME_TOKENS = {
   '--oc-settings-preview-glass-opacity-max': '1',
   '--oc-z-settings-preview': '2',
   '--oc-album-card-min-width': '168px',
+  '--oc-album-tile-min-width': '96px',
+  '--oc-resource-control-width': '200px',
   '--oc-welcome-cover-tile-width': '168px',
   '--oc-welcome-cover-tile-aspect-ratio': '1 / 1.4142',
   '--oc-welcome-cover-wall-perspective': '900px',

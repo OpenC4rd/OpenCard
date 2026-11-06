@@ -22,7 +22,6 @@ export type CdeShortcutCommandKey =
   | 'viewport.zoom-in'
   | 'viewport.zoom-out'
   | 'view.toggle-snapping'
-  | 'view.toggle-clip'
   | 'view.switch-face'
   | 'view.toggle-diff-mode'
   | 'view.diff-divider-left'
@@ -76,7 +75,6 @@ const commandBindings: Readonly<Record<CdeShortcutCommandKey, readonly CdeShortc
   'viewport.zoom-in': [{ key: '+', mod: true }, { key: '=', mod: true }],
   'viewport.zoom-out': [{ key: '-', mod: true }],
   'view.toggle-snapping': [{ key: 's' }],
-  'view.toggle-clip': [{ key: 'x' }],
   'view.switch-face': [{ key: 'b' }],
   'view.toggle-diff-mode': [{ key: 'v' }],
   'view.diff-divider-left': [{ key: 'a' }],

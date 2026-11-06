@@ -23,6 +23,8 @@ type OcStyledVisual = {
 type OcImageVisual = {
   type: 'image'
   src: string
+  /** 图片在封面框里的适配方式：`cover` 铺满裁切，`contain` 完整显示。缺省 `cover`。 */
+  fit?: 'cover' | 'contain'
   /** 无障碍名称；缺省时由宿主元素回退到条目自身名称。 */
   label?: string
 }

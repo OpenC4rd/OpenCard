@@ -174,14 +174,14 @@ describe('ProjectIconRegistryFileEditor', () => {
     expect(wrapper.vm.canSave).toBe(false)
   })
 
-  it('opens pack creation from the workspace header', async () => {
+  it('opens pack creation from the set list card', async () => {
     const wrapper = mount(ProjectIconRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({ iconSeries: [{ name: 'Status icons', key: 'status', source: 'status.png', icons: [] }] }) }),  },
     })
 
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(false)
 
-    await wrapper.vm.onHeaderAction('project-icon-registry.create-collection')
+    await wrapper.vm.onCollectionAction('project-icon-registry.create-collection')
     expect(wrapper.getComponent(ProjectIconRegistrationDialog).props('open')).toBe(true)
   })
 })

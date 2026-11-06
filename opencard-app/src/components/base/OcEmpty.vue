@@ -1,12 +1,15 @@
 <!-- Base 空状态提示：独立实现文案尺寸、色调与对齐策略，不依赖 shared primitives。 -->
 <template>
   <p class="oc-empty" :class="emptyClass">
+    <OcIcon v-if="icon" :name="icon" size="lg" tone="muted" />
     <slot />
   </p>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { IconToken } from '../../shared/ui/icon/iconRegistry'
+import OcIcon from './OcIcon.vue'
 
 type OcEmptyTone = 'dim' | 'muted'
 type OcEmptySize = 'label' | 'body'
@@ -22,6 +25,10 @@ interface OcEmptyProps {
   align?: OcEmptyAlign
   /** 内边距语义。 */
   inset?: OcEmptyInset
+  /** 文案上方的说明图标。 */
+  icon?: IconToken
+  /** 占满所在区域并在其中居中，用于整块面板的空状态。 */
+  fill?: boolean
 }
 
 defineOptions({ name: 'OcEmpty' })
@@ -31,6 +38,8 @@ const props = withDefaults(defineProps<OcEmptyProps>(), {
   size: 'body',
   align: 'center',
   inset: 'comfortable',
+  icon: undefined,
+  fill: false,
 })
 
 const emptyClass = computed(() => [
@@ -38,6 +47,7 @@ const emptyClass = computed(() => [
   `oc-empty--size-${props.size}`,
   `oc-empty--align-${props.align}`,
   `oc-empty--inset-${props.inset}`,
+  { 'oc-empty--fill': props.fill },
 ])
 </script>
 
@@ -45,6 +55,16 @@ const emptyClass = computed(() => [
 .oc-empty {
   margin: 0;
   width: 100%;
+}
+
+.oc-empty--fill {
+  box-sizing: border-box;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--oc-space-sm);
+  height: 100%;
+  min-height: 0;
 }
 
 .oc-empty.oc-empty--tone-dim {

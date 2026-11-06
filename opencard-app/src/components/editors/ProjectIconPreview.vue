@@ -131,8 +131,9 @@ function handleKeydown(event: KeyboardEvent): void {
 .project-icon-preview {
   position: relative;
   display: grid;
-  height: 240px;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   place-items: center;
   outline: none;

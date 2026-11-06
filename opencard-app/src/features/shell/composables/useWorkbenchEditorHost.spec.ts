@@ -12,7 +12,7 @@ function createHost(session = createTestSession()) {
   const reportIssues = vi.fn()
   const host = useWorkbenchEditorHost({
     activeSession, comparison: ref(null), cardProps: ref({}), reportIssues,
-    openFile: vi.fn(), trashFile: vi.fn(), translate: key => key,
+    openFile: vi.fn(), trashFile: vi.fn(), addPackage: vi.fn(), translate: key => key,
   })
   return { host, activeSession, session, reportIssues }
 }

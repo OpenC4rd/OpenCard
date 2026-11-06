@@ -1,20 +1,22 @@
+<!-- Standard 悬浮面板坞：贴在舞台左右边缘，可拖宽、双击收起；给 `bottom` 时上下两块，分界线可拖。 -->
 <template>
   <aside
     ref="dockRef"
-    class="cde-overlay-dock"
+    class="oc-dock"
     :class="[
-      `cde-overlay-dock--${props.side}`,
+      `oc-dock--${props.side}`,
       { 'is-resizing': isResizing },
     ]"
     :style="dockStyle"
   >
-    <div ref="stackRef" class="cde-overlay-dock__stack" :style="stackStyle">
-      <div ref="topPanelRef" class="cde-overlay-dock__panel cde-overlay-dock__panel--top">
+    <div ref="stackRef" class="oc-dock__stack" :style="stackStyle">
+      <div ref="topPanelRef" class="oc-dock__panel oc-dock__panel--top">
         <slot name="top" />
       </div>
 
       <div
-        class="cde-overlay-dock__split-handle"
+        v-if="$slots.bottom"
+        class="oc-dock__split-handle"
         :style="splitHandleStyle"
       >
         <OcResizeTrack
@@ -31,13 +33,13 @@
         />
       </div>
 
-      <div class="cde-overlay-dock__panel cde-overlay-dock__panel--bottom">
+      <div v-if="$slots.bottom" class="oc-dock__panel oc-dock__panel--bottom">
         <slot name="bottom" />
       </div>
     </div>
 
     <OcResizeTrack
-      class="cde-overlay-dock__width-handle"
+      class="oc-dock__width-handle"
       :minimum="props.collapsedExtent"
       :maximum="props.maxExtent"
       :value="props.extent"
@@ -57,21 +59,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useSlots, watch, type CSSProperties } from 'vue'
 import { clamp } from '../../shared/model/number'
-import OcResizeTrack from '../../components/standard/OcResizeTrack.vue'
+import OcResizeTrack from './OcResizeTrack.vue'
 import {
-  resolveCdeOverlayDockGeometry,
-  settleCdeOverlayExtent,
-  type CdeOverlayGeometryConfig,
-  type CdeOverlaySide,
-} from './cdeOverlayGeometry'
-import type { OcResizeHandleChange } from '../../components/standard/OcResizeHandle.vue'
+  resolveDockGeometry,
+  resolveSettledDockExtent,
+  type DockGeometryConfig,
+  type DockSide,
+} from '../../shared/ui/dock/dockGeometry'
+import type { OcResizeHandleChange } from './OcResizeHandle.vue'
 
-defineOptions({ name: 'CdeOverlayDock' })
+defineOptions({ name: 'OcDock' })
 
 const props = withDefaults(defineProps<{
-  side: CdeOverlaySide
+  side: DockSide
   extent: number
   collapsedExtent: number
   minExtent: number
@@ -100,6 +102,7 @@ const emit = defineEmits<{
   'resize-end': [axis: 'width' | 'split']
 }>()
 
+const slots = useSlots()
 const dockRef = ref<HTMLElement | null>(null)
 const stackRef = ref<HTMLElement | null>(null)
 const topPanelRef = ref<HTMLElement | null>(null)
@@ -112,7 +115,7 @@ const splitValue = ref(props.topSize ?? props.topMinHeight)
 const splitStartValue = ref(props.topSize ?? props.topMinHeight)
 let resizeObserver: ResizeObserver | null = null
 
-const geometryConfig = computed<CdeOverlayGeometryConfig>(() => ({
+const geometryConfig = computed<DockGeometryConfig>(() => ({
   collapsedExtent: props.collapsedExtent,
   minExtent: props.minExtent,
   maxExtent: props.maxExtent,
@@ -120,7 +123,7 @@ const geometryConfig = computed<CdeOverlayGeometryConfig>(() => ({
   collapseDragThreshold: props.collapseDragThreshold,
   floatingGap: props.floatingGap,
 }))
-const geometry = computed(() => resolveCdeOverlayDockGeometry(
+const geometry = computed(() => resolveDockGeometry(
   props.side,
   props.extent,
   geometryConfig.value,
@@ -150,6 +153,7 @@ const dockStyle = computed<CSSProperties>(() => ({
 }))
 const stackStyle = computed<CSSProperties>(() => {
   const style: CSSProperties = { gap: `${props.splitGap}px` }
+  if (!slots.bottom) return { gridTemplateRows: 'minmax(0, 1fr)' }
   if (props.topSize === null) {
     return { ...style, gridTemplateRows: `minmax(${props.topMinHeight}px, 1fr) minmax(0, 1fr)` }
   }
@@ -179,7 +183,7 @@ function handleWidthResize(change: OcResizeHandleChange): void {
 }
 
 function handleWidthResizeEnd(): void {
-  const settled = settleCdeOverlayExtent(
+  const settled = resolveSettledDockExtent(
     widthCurrentExtent.value,
     widthStartExtent.value,
     geometryConfig.value,
@@ -264,7 +268,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.cde-overlay-dock {
+.oc-dock {
   position: absolute;
   z-index: var(--oc-z-overlay-toolbar);
   min-width: 0;
@@ -273,14 +277,14 @@ onBeforeUnmount(() => {
   transition: transform var(--oc-duration) var(--oc-ease);
 }
 
-.cde-overlay-dock.is-resizing {
+.oc-dock.is-resizing {
   transition: none;
 }
 
-.cde-overlay-dock--left { left: 0; }
-.cde-overlay-dock--right { right: 0; }
+.oc-dock--left { left: 0; }
+.oc-dock--right { right: 0; }
 
-.cde-overlay-dock__stack {
+.oc-dock__stack {
   display: grid;
   width: 100%;
   height: 100%;
@@ -290,19 +294,19 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.cde-overlay-dock__panel {
+.oc-dock__panel {
   display: flex;
   min-width: 0;
   min-height: 0;
   pointer-events: auto;
 }
 
-.cde-overlay-dock__panel > :deep(*) {
+.oc-dock__panel > :deep(*) {
   min-width: 0;
   min-height: 0;
 }
 
-.cde-overlay-dock__split-handle {
+.oc-dock__split-handle {
   position: absolute;
   right: 0;
   left: 0;
@@ -310,7 +314,7 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-.cde-overlay-dock :deep(.cde-overlay-dock__width-handle) {
+.oc-dock :deep(.oc-dock__width-handle) {
   z-index: 3;
 }
 </style>

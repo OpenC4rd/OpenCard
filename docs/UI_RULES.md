@@ -7,7 +7,7 @@ API 要对 agent 可预测：只看 props 名字与取值就知道会画出什�
 - Props 即文档：名字和取值自解释，取值是封闭字面量联合（`icon` 例外，直接是 `@mdi/js` 导出名）。需要猜的名字就是设计问题。
 - 签名稳定：已有 prop 名与取值不改；新增 prop 必须有默认值。
 - Props 上限：base ≤ 12、standard ≤ 18，超了拆。
-- Slot 用名词，从 `default`/`content`/`icon`/`title`/`subtitle`/`leading`/`append`/`append-hover`/`footer` 里选，新造先在本文登记。
+- Slot 用名词，从 `default`/`content`/`icon`/`title`/`subtitle`/`leading`/`append`/`append-hover`/`footer`/`inspector`/`top`/`bottom` 里选，新造先在本文登记。
 - Emit 传结构化 payload（`{ key: 'delete' }`）；只有纯透传的原生交互才传 `MouseEvent`。
 - 每个 prop 写 JSDoc，说清影响什么。
 

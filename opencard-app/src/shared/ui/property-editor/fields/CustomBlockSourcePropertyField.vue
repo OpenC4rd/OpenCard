@@ -41,6 +41,9 @@
               {{ tr('propertyEditor.customBlockSource.emptyRegistry', '没有已注册的自定义块') }}
             </OcEmpty>
           </div>
+          <OcButton v-if="capabilities?.manage?.customBlocks" size="sm" variant="ghost" icon="mdiOpenInNew" @click="manage('customBlocks')">
+            {{ tr('propertyEditor.manageCustomBlocks', '管理自定义块…') }}
+          </OcButton>
         </div>
 
         <OcFilePicker v-else class="custom-block-source-field__file-picker"
@@ -109,6 +112,12 @@ const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
   | undefined
 const tr = (key: string, fallback: string, parameters?: Record<string, unknown>): string =>
   translate?.(key, parameters) ?? fallback
+
+/** 关掉浮层再跳到对应注册文件，避免浮层盖在新打开的编辑器上。 */
+function manage(kind: 'fonts' | 'icons' | 'customBlocks'): void {
+  closePopover()
+  props.capabilities?.manage?.[kind]?.()
+}
 
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)).replace(/\\/g, '/'))
 const isBlockReference = computed(() => /(?:^|#)block:/i.test(stringValue.value))

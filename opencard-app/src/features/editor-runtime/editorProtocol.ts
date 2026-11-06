@@ -51,4 +51,5 @@ export interface EditorEmits {
   (e: 'issue-snapshot', snapshot: EditorIssueSnapshot): void
   (e: 'open-file', path: string): void
   (e: 'trash-file', path: string): void
+  (e: 'add-package'): void
 }

@@ -1,21 +1,13 @@
 import type { CardFaceKey } from '../../entities/card/model'
+import type { DockLayoutState } from '../../shared/ui/dock/dockGeometry'
 import type { PreparedCardRender } from '../card-rendering/renderPipeline'
 import type { EditorProps } from '../editor-runtime/editorProtocol'
 import type { EditorViewportTransform } from '../editor-runtime/model/editorUiState'
 import type { CdePreviewBackground } from './cdePreviewBackground'
 
-export interface CardDesignerLayoutState {
-  leftTopHeight: number | null
-  rightTopHeight: number | null
-  leftDockExtent: number
-  rightDockExtent: number
-  leftExpandedDockExtent: number
-  rightExpandedDockExtent: number
-}
 type CardDesignerMode = 'design' | 'data-table'
 export interface CardDesignerViewState {
   activeFace: CardFaceKey
-  clipToFace: boolean
   previewBackground?: CdePreviewBackground
   alignmentSnappingEnabled?: boolean
   selectedInstanceId: string | null
@@ -24,7 +16,7 @@ export interface CardDesignerViewState {
 export interface CardDesignerSessionView {
   mode?: CardDesignerMode
   viewportTransform?: EditorViewportTransform
-  layout?: CardDesignerLayoutState
+  layout?: DockLayoutState
   view?: CardDesignerViewState
 }
 export interface CardDesignerProps extends EditorProps {

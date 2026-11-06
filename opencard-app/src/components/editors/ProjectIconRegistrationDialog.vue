@@ -3,58 +3,40 @@
     :title="appendMode ? t('projectConfig.icons.addIconsToSet', { name: targetSeries?.name ?? '' })
       : t('projectConfig.icons.createCollection')"
     as="form" size="md" close-on-backdrop @request-close="close" @submit="submit">
-    <section class="project-icon-registration-dialog__summary">
-      <template v-if="hasSelection">
+    <ProjectImportSourceChoice v-if="!hasSelection" :options="sourceOptions" glyph="★" @select="pickSource" />
+    <template v-else>
+      <section class="project-icon-registration-dialog__summary">
         <OcText as="strong">{{ t('projectConfig.icons.selectedIconsCount', { count: icons.length }) }}</OcText>
-        <OcText tone="muted" size="sm">{{ summaryTarget }}</OcText>
-      </template>
-      <OcText v-else tone="muted" size="sm">{{ t('projectConfig.icons.chooseFileHint') }}</OcText>
-      <div class="project-icon-registration-dialog__summary-actions">
-        <OcButton type="button" icon="mdiFileMultipleOutline" variant="outline" @click="pickFiles">
-          {{ hasSelection ? t('projectConfig.icons.chooseAgain') : t('projectConfig.icons.chooseFiles') }}
+        <OcButton type="button" size="sm" variant="ghost" icon="mdiArrowLeft" @click="chooseAgain">
+          {{ t('projectConfig.icons.chooseAgain') }}
         </OcButton>
-        <OcButton type="button" icon="mdiFolderOpen" variant="outline" @click="pickFolder">
-          {{ t('projectConfig.icons.chooseFolder') }}
-        </OcButton>
-        <OcButton v-if="!appendMode" type="button" variant="ghost" icon="mdiCogOutline"
+        <OcButton v-if="!appendMode" type="button" size="sm" variant="ghost" icon="mdiCogOutline"
           @click="advancedOpen = !advancedOpen">
           {{ advancedOpen ? t('projectConfig.icons.simpleSettings') : t('projectConfig.icons.advancedSettings') }}
         </OcButton>
-      </div>
-    </section>
+      </section>
 
-    <template v-if="advancedOpen && !appendMode">
-      <label class="project-icon-registration-dialog__field">
+      <label v-if="!appendMode" class="project-icon-registration-dialog__field">
         <span>{{ t('projectConfig.icons.packName') }}</span>
-        <OcFieldInput full-width autofocus :value="iconSetName"
-          :aria-invalid="hasSelection && !validName" @input="updateText('name', $event)" />
+        <OcFieldInput full-width autofocus :value="iconSetName" :aria-invalid="!validName"
+          @input="updateText('name', $event)" />
       </label>
-      <label class="project-icon-registration-dialog__field">
+      <label v-if="advancedOpen && !appendMode" class="project-icon-registration-dialog__field">
         <span>{{ t('projectConfig.icons.packKey') }}</span>
         <OcFieldInput full-width mono :value="iconSetKey" :placeholder="generatedKey"
           :aria-invalid="Boolean(iconSetKey) && (!validKey || !uniqueKey)" @input="updateText('key', $event)" />
       </label>
-    </template>
 
-    <section v-if="icons.length" class="project-icon-registration-dialog__preview" aria-live="polite">
-      <div class="project-icon-registration-dialog__preview-heading">
-        <OcText as="strong">{{ t('projectConfig.icons.previewTitle') }}</OcText>
-        <OcText tone="muted" size="sm">{{ t('projectConfig.icons.previewHint') }}</OcText>
-      </div>
-      <ul class="project-icon-registration-dialog__icon-list">
-        <li v-for="icon in icons" :key="icon.iconKey" class="project-icon-registration-dialog__icon-row">
-          <OcText as="span" size="sm" mono>{{ icon.iconKey }}</OcText>
-          <OcText as="span" tone="muted" size="sm">{{ icon.name }}</OcText>
-        </li>
-      </ul>
-    </section>
+      <OcAlbum class="project-icon-registration-dialog__preview" layout="tile" selection-mode="none"
+        activation-mode="none" :data="previewData" />
+    </template>
 
     <OcText v-if="localError" tone="danger" size="sm" role="alert">{{ localError }}</OcText>
     <OcText v-if="validationMessage" tone="danger" size="sm" role="alert">{{ validationMessage }}</OcText>
 
     <template #footer>
       <OcButton type="button" @click="close">{{ t('projectConfig.icons.cancel') }}</OcButton>
-      <OcButton type="submit" variant="solid" :disabled="!canSubmit">
+      <OcButton v-if="hasSelection" type="submit" variant="solid" :disabled="!canSubmit">
         {{ appendMode ? t('projectConfig.icons.addIcons') : t('projectConfig.icons.createCollection') }}
       </OcButton>
     </template>
@@ -95,7 +77,10 @@ import { fileSystemService } from '../../features/workspace/services/fileSystemS
 import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
+import OcAlbum from '../standard/OcAlbum.vue'
 import OcDialog from '../standard/OcDialog.vue'
+import type { OcNode, OcNodeCollection } from '../../shared/ui/node/node.types'
+import ProjectImportSourceChoice, { type ProjectImportSourceOption } from './ProjectImportSourceChoice.vue'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -146,9 +131,19 @@ const validKey = computed(() => appendMode.value || projectIconKeyPattern.test(e
 const uniqueKey = computed(() => appendMode.value || !props.series.some(series => (
   series.key.toLocaleLowerCase() === effectiveKey.value.toLocaleLowerCase()
 )))
-const summaryTarget = computed(() => appendMode.value
-  ? `${props.targetSeries!.name} / ${props.targetSeries!.key}`
-  : `${iconSetName.value} / ${effectiveKey.value}`)
+const sourceOptions = computed<ProjectImportSourceOption[]>(() => [
+  { key: 'files', art: 'files', title: t('projectConfig.icons.chooseFiles'), description: t('projectConfig.icons.chooseFilesHint') },
+  { key: 'folder', art: 'folder', title: t('projectConfig.icons.chooseFolder'), description: t('projectConfig.icons.chooseFolderHint') },
+])
+/** 缩略图由浏览器按需加载，选文件这一步依然不读文件；图标比例各异，所以完整显示不裁切。 */
+const previewData = computed<OcNodeCollection>(() => ({
+  rootKeys: icons.value.map(icon => icon.iconKey),
+  items: new Map(icons.value.map((icon): [string, OcNode] => [icon.iconKey, {
+    label: icon.name,
+    cover: { type: 'image', src: fileSystemService.toAssetSrc(icon.sourcePath), fit: 'contain', label: icon.name },
+  }])),
+  children: new Map(),
+}))
 const canSubmit = computed(() => hasSelection.value && validName.value && validKey.value && uniqueKey.value)
 const validationMessage = computed(() => {
   if (!hasSelection.value) return ''
@@ -165,6 +160,16 @@ watch(() => props.open, open => {
   selectedPaths.value = []
   localError.value = ''
 }, { immediate: true })
+
+function pickSource(key: string): void {
+  void (key === 'folder' ? pickFolder() : pickFiles())
+}
+
+function chooseAgain(): void {
+  selectedPaths.value = []
+  localError.value = ''
+  advancedOpen.value = false
+}
 
 async function pickFiles(): Promise<void> {
   if (!fileSystemService.pickFiles) return
@@ -243,30 +248,13 @@ function fileStem(path: string): string {
 </script>
 
 <style scoped>
-.project-icon-registration-dialog__summary { display: grid; gap: var(--oc-space-2xs); }
-.project-icon-registration-dialog__summary-actions { display: flex; flex-wrap: wrap; gap: var(--oc-space-xs); margin-top: var(--oc-space-xs); }
+.project-icon-registration-dialog__summary { display: flex; align-items: center; gap: var(--oc-space-xs); }
+.project-icon-registration-dialog__summary > :first-child { flex: 1 1 auto; min-width: 0; }
 .project-icon-registration-dialog__preview {
+  max-height: var(--oc-settings-preview-height-md);
+  padding: var(--oc-space-xs);
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-control);
-  background: var(--oc-bg-block);
-  display: grid;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-sm);
-}
-.project-icon-registration-dialog__preview-heading { display: flex; justify-content: space-between; gap: var(--oc-space-xs); }
-.project-icon-registration-dialog__icon-list {
-  max-height: var(--oc-list-max-height-sm);
-  margin: 0;
-  padding-left: var(--oc-space-md);
-  overflow: auto;
-  color: var(--oc-fg-subtle);
-  font-size: var(--oc-text-xs);
-}
-.project-icon-registration-dialog__icon-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--oc-space-xs);
 }
 
 .project-icon-registration-dialog__field {

@@ -49,6 +49,9 @@
               {{ tr('propertyEditor.imageSource.emptyIcons', '没有可用的项目图标') }}
             </OcEmpty>
           </div>
+          <OcButton v-if="capabilities?.manage?.icons" size="sm" variant="ghost" icon="mdiOpenInNew" @click="manage('icons')">
+            {{ tr('propertyEditor.manageIcons', '管理图标…') }}
+          </OcButton>
         </div>
       </div>
     </OcOverlayMarker>
@@ -108,6 +111,12 @@ const translate = getCurrentInstance()?.appContext.config.globalProperties.$t as
   | undefined
 const tr = (key: string, fallback: string, parameters?: Record<string, unknown>): string =>
   translate?.(key, parameters) ?? fallback
+
+/** 关掉浮层再跳到对应注册文件，避免浮层盖在新打开的编辑器上。 */
+function manage(kind: 'fonts' | 'icons' | 'customBlocks'): void {
+  closePopover()
+  props.capabilities?.manage?.[kind]?.()
+}
 
 const stringValue = computed(() => (props.value == null ? '' : String(props.value)).replace(/\\/g, '/'))
 const isIconReference = computed(() => /(?:^|#)icon:/i.test(stringValue.value))

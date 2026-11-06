@@ -40,7 +40,7 @@ const heroFilePath = 'D:/Project/cards/hero.ocdocument'
 const heroFileName = 'hero.ocdocument'
 const flowFilePath = 'D:/Project/cards/flow.ocdocument'
 const flowFileName = 'flow.ocdocument'
-const neutralView = () => ({ activeFace: 'front' as const, clipToFace: false, selectedInstanceId: null })
+const neutralView = () => ({ activeFace: 'front' as const, selectedInstanceId: null })
 const sessionView = (wrapper: Parameters<typeof getTestSession>[0]) => (getTestSession(wrapper).state.viewState['card-designer'] as CardDesignerSessionView).view as CardDesignerViewState
 
 type FaceBlockShape = {
@@ -360,20 +360,17 @@ describe('CardDesignEditor issue navigation', () => {
 
     const viewport = editorViewport(wrapper)
     expect(viewport.props('face')).toEqual(expect.objectContaining({ faceKey: 'back' }))
-    expect(viewport.props('clipToFace')).toBe(false)
     expect(viewport.props('alignmentSnappingEnabled')).toBe(false)
 
     const action = (key: string) => wrapper.findAllComponents({ name: 'OcActionButton' })
       .find(candidate => candidate.props('action').key === key)!
     action('switch-face').vm.$emit('select', { key: 'switch-face' })
-    action('toggle-face-clip').vm.$emit('select', { key: 'toggle-face-clip' })
     action('toggle-alignment-snapping').vm.$emit('select', { key: 'toggle-alignment-snapping' })
     await nextTick()
 
     expect(viewport.props('alignmentSnappingEnabled')).toBe(true)
     expect(sessionView(wrapper)).toEqual({
       activeFace: 'front',
-      clipToFace: true,
       previewBackground: 'checker',
       alignmentSnappingEnabled: true,
       selectedInstanceId: null,
@@ -722,10 +719,9 @@ describe('CardDesignEditor issue navigation', () => {
     await root.trigger('keydown', { key: 's' })
     const snapping = sessionView(wrapper) as { alignmentSnappingEnabled: boolean }
     await root.trigger('keydown', { key: 's' })
-    await root.trigger('keydown', { key: 'x' })
     await root.trigger('keydown', { key: 'b' })
     expect(sessionView(wrapper)).toMatchObject({
-      alignmentSnappingEnabled: !snapping.alignmentSnappingEnabled, clipToFace: true, activeFace: 'back',
+      alignmentSnappingEnabled: !snapping.alignmentSnappingEnabled, activeFace: 'back',
     })
 
     await wrapper.get('.shortcut-input').trigger('keydown', { key: 'ArrowLeft' })
@@ -739,7 +735,7 @@ describe('CardDesignEditor issue navigation', () => {
     })
     await nextTick()
 
-    const docks = wrapper.findAllComponents({ name: 'CdeOverlayDock' })
+    const docks = wrapper.findAllComponents({ name: 'OcDock' })
     docks[0]?.vm.$emit('update:extent', 420)
     await nextTick()
     expect((getTestSession(wrapper).state.viewState['card-designer'] as CardDesignerSessionView).layout).toBeUndefined()

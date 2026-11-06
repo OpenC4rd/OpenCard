@@ -1,3 +1,4 @@
+import type { DockLayoutState } from '../../../shared/ui/dock/dockGeometry'
 /** 自动记忆的长期应用状态；独立于用户设置，不属于可清理缓存。 */
 import { isRecord } from '../../../shared/model/record'
 
@@ -34,7 +35,7 @@ export type ProjectWorkspaceState = {
   packageBuilder?: ProjectPackageBuilderState
 }
 export interface AppState {
-  layout: { sidebarWidth: number; sidebarCollapsed: boolean }
+  layout: { sidebarWidth: number; sidebarCollapsed: boolean; resourceDock?: DockLayoutState }
   projects: { lastParentPath: string; recent: string[]; workspaces: Record<string, ProjectWorkspaceState> }
 }
 
@@ -54,6 +55,7 @@ export function normalizeAppState(value: unknown): AppState {
       sidebarWidth: typeof layout.sidebarWidth === 'number' && Number.isFinite(layout.sidebarWidth)
         ? Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(layout.sidebarWidth))) : 292,
       sidebarCollapsed: layout.sidebarCollapsed === true,
+      ...(isRecord(layout.resourceDock) ? { resourceDock: layout.resourceDock as unknown as DockLayoutState } : {}),
     },
     projects: {
       lastParentPath: typeof projects.lastParentPath === 'string' ? projects.lastParentPath : '',

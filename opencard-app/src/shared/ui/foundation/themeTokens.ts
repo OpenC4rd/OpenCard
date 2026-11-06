@@ -178,6 +178,8 @@ export const OC_THEME_TOKEN_KEYS = [
   '--oc-settings-preview-glass-opacity-max',
   '--oc-z-settings-preview',
   '--oc-album-card-min-width',
+  '--oc-album-tile-min-width',
+  '--oc-resource-control-width',
   '--oc-welcome-cover-tile-width',
   '--oc-welcome-cover-tile-aspect-ratio',
   '--oc-welcome-cover-wall-perspective',

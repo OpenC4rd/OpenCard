@@ -5,6 +5,8 @@ import { createTestSession } from '../../features/editor-runtime/editorTestSessi
 import { parseCustomBlockRegistryText } from '../../features/workspace/model/customBlockRegistry'
 import ProjectCustomBlockRegistryFileEditor from './ProjectCustomBlockRegistryFileEditor.vue'
 import ProjectCustomBlockCollectionSettingsDialog from './ProjectCustomBlockCollectionSettingsDialog.vue'
+import ProjectImportSourceChoice from './ProjectImportSourceChoice.vue'
+import OcFieldInput from '../base/OcFieldInput.vue'
 import OcButton from '../base/OcButton.vue'
 
 const fs = vi.hoisted(() => ({
@@ -28,11 +30,24 @@ beforeEach(() => {
 function openEditor() {
   const session = createTestSession({ path: '/project/.opencard/blocks/blocks.json', draftContent: '{}' })
   const wrapper = mount(ProjectCustomBlockRegistryFileEditor, { props: { session } })
-  wrapper.vm.onHeaderAction('custom-block-registry.add-collection')
+  wrapper.vm.onCollectionAction('custom-block-registry.add-collection')
   return { wrapper, session }
 }
 
 describe('custom block collection import', () => {
+  it('shows only the source choice until a source is decided', async () => {
+    const { wrapper } = openEditor()
+    await flushPromises()
+    const dialog = wrapper.getComponent(ProjectCustomBlockCollectionSettingsDialog)
+    expect(dialog.findComponent(ProjectImportSourceChoice).exists()).toBe(true)
+    expect(dialog.findAllComponents(OcFieldInput)).toHaveLength(0)
+    dialog.getComponent(ProjectImportSourceChoice).vm.$emit('select', 'empty')
+    await flushPromises()
+    expect(dialog.findComponent(ProjectImportSourceChoice).exists()).toBe(false)
+    expect(dialog.findAllComponents(OcFieldInput)).toHaveLength(2)
+    wrapper.unmount()
+  })
+
   it('creates a collection from a folder and registers its supported files', async () => {
     fs.pickDirectory.mockResolvedValue('/imports/layout')
     fs.readDirectory.mockResolvedValue([
@@ -43,7 +58,7 @@ describe('custom block collection import', () => {
     try {
       await flushPromises()
       const dialog = wrapper.getComponent(ProjectCustomBlockCollectionSettingsDialog)
-      await dialog.findAllComponents(OcButton)[1]!.get('button').trigger('click')
+      dialog.getComponent(ProjectImportSourceChoice).vm.$emit('select', 'folder')
       await flushPromises()
       const buttons = dialog.findAllComponents(OcButton)
       await buttons[buttons.length - 1]!.get('button').trigger('submit')

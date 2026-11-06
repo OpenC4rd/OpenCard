@@ -15,13 +15,12 @@ import type { CardFaceView } from './cardFaceView'
 const props = withDefaults(defineProps<{
   face: RenderReadyCardFace
   visibleRootBlockIds?: string[]
-  clipToFace?: boolean
   resourceContext: CardRenderResourceContext
   diffHighlights?: readonly { blockId: string; kind: 'added' | 'removed' | 'changed' }[]
   visualReadiness?: CardVisualReadinessRegistrar
   renderScale?: number
   view?: CardFaceView | null
-}>(), { visibleRootBlockIds: () => [], clipToFace: false, diffHighlights: () => [], renderScale: 1, view: null })
+}>(), { visibleRootBlockIds: () => [], diffHighlights: () => [], renderScale: 1, view: null })
 
 const emit = defineEmits<{
   (e: 'block-click', blockId: string, event: MouseEvent): void

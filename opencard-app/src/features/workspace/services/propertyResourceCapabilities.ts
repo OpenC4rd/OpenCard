@@ -22,6 +22,11 @@ import {
   resolveProjectResourcePackage,
   type ProjectResourceEnvironment,
 } from './projectResourceEnvironment'
+import {
+  PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME,
+  PROJECT_FONT_REGISTRY_FILE_NAME,
+  PROJECT_ICON_REGISTRY_FILE_NAME,
+} from '../model/projectStructure'
 import { createResourceFilePathScopes, createScopeDirectoryProvider } from './resourceDirectoryProvider'
 
 type CreateResourcePropertyCapabilitiesOptions = {
@@ -32,6 +37,8 @@ type CreateResourcePropertyCapabilitiesOptions = {
   fontCatalog?: readonly FontCatalogEntry[]
   projectIconCatalog?: ProjectIconCatalog | null
   readIconDimensions?: ProjectIconDimensionReader
+  /** 打开项目文件（绝对路径）；缺省则选择器不显示「管理…」。 */
+  openFile?: (path: string) => unknown
 }
 
 function buildIconScope(
@@ -237,7 +244,16 @@ export function createResourcePropertyCapabilities(
       }
     : undefined
 
+  const { openFile, rootPath } = options
+  const openRegistry = (name: string) => openFile && rootPath ? () => { void openFile(`${rootPath.replace(/[\\/]+$/, '')}/${name}`) } : undefined
+  const manage = {
+    fonts: openRegistry(PROJECT_FONT_REGISTRY_FILE_NAME),
+    icons: openRegistry(PROJECT_ICON_REGISTRY_FILE_NAME),
+    customBlocks: openRegistry(PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME),
+  }
+
   return {
+    ...(openFile && rootPath ? { manage } : {}),
     ...(files ? { files } : {}),
     ...(fonts.length ? { fonts } : {}),
     ...(icons.length ? { icons } : {}),

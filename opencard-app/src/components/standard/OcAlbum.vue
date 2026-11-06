@@ -5,6 +5,7 @@
     class="oc-album"
     :class="{
       'is-fill': props.fill,
+      'is-tile': props.layout === 'tile',
       'is-empty': entries.length === 0,
     }"
     :role="props.selectionMode === 'none' ? 'list' : 'listbox'"
@@ -105,6 +106,8 @@ interface OcAlbumProps {
   activationMode?: OcAlbumActivationMode
   /** Card actions stay hidden until the card is hovered or focused unless set to `always`. */
   actionVisibility?: 'on-interaction' | 'always'
+  /** `cover` 是书封式竖卡，信息条压在封面上；`tile` 是紧凑方格，标题排在视觉下方，不遮挡内容。 */
+  layout?: 'cover' | 'tile'
   fill?: boolean
   placeholder?: string
 }
@@ -121,6 +124,7 @@ const props = withDefaults(defineProps<OcAlbumProps>(), {
   selectionMode: 'single',
   activationMode: 'double-click',
   actionVisibility: 'on-interaction',
+  layout: 'cover',
   fill: false,
   placeholder: '',
 })
@@ -257,9 +261,6 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 .oc-album__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--oc-album-card-min-width), 1fr));
-  /* 调用方给 `--oc-album-cell-block-size` 时格子是固定高的：行高不再由卡宽按封面比例推出。
-     图标格那种"小字形 + 大留白"的内容需要它，封面卡不需要，所以默认不设、留 auto。 */
-  grid-auto-rows: var(--oc-album-cell-block-size, auto);
   gap: var(--oc-space-sm);
 }
 
@@ -275,8 +276,6 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
   display: block;
   min-width: 0;
   aspect-ratio: 1 / 1.4142;
-  /* 固定格高时把按比例算出的高度夹回行高；不设 token 时是 `none`，封面卡的行为一点不变。 */
-  max-block-size: var(--oc-album-cell-block-size, none);
   overflow: hidden;
   border: var(--oc-border-width) solid var(--oc-border-muted);
   border-radius: var(--oc-radius-control);
@@ -407,5 +406,64 @@ function emitActionIntent(key: OcNodeKey, actionKey: string): void {
 .oc-album__card:focus-within,
 .oc-album__card.is-selected {
   --oc-node-tail-action-display: inline-flex;
+}
+
+/* 方格：视觉占满上方正方形，标题在它下面，命令浮在右上角，于是什么都不会盖住内容本身。 */
+.is-tile .oc-album__grid {
+  grid-template-columns: repeat(auto-fill, minmax(var(--oc-album-tile-min-width), 1fr));
+  gap: var(--oc-space-xs);
+}
+
+.is-tile .oc-album__card {
+  aspect-ratio: auto;
+}
+
+.is-tile .oc-album__clip {
+  position: relative;
+  display: block;
+}
+
+.is-tile .oc-album__media {
+  position: relative;
+  inset: auto;
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  padding: var(--oc-space-md);
+}
+
+.is-tile .oc-album__info {
+  position: static;
+  align-items: center;
+  border-radius: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.is-tile .oc-album__card.is-selected .oc-album__clip {
+  background-image: var(--oc-overlay-selected);
+}
+
+.is-tile .oc-album__card.is-selected .oc-album__info {
+  background-image: none;
+}
+
+.is-tile .oc-album__title {
+  max-width: 100%;
+}
+
+.is-tile .oc-album__meta {
+  position: absolute;
+  inset-block-start: var(--oc-space-2xs);
+  inset-inline-end: var(--oc-space-2xs);
+  min-height: 0;
+  border-radius: var(--oc-radius-control);
+  background: var(--oc-bg-glass);
+  -webkit-backdrop-filter: var(--oc-bg-glass-filter);
+  backdrop-filter: var(--oc-bg-glass-filter);
+}
+
+.is-tile .oc-album__meta:not(:has(.oc-node-tail__action)) {
+  display: none;
 }
 </style>

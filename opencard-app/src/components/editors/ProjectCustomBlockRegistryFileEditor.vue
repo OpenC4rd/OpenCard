@@ -5,6 +5,7 @@
     <template v-if="document">
       <ProjectCustomBlockRegistryWorkbench :resource-environment="props.resourceEnvironment" :collections="document.collections ?? []"
         @update:collections="updateCollections" @add-collection="addCollection"
+:leading-actions="collectionActions" @leading-action="onCollectionAction"
         @add-block="addBlock" @configure-collection="configureCollection"
         @remove-collection="removeCollection" @remove-block="removeBlock" />
       <ProjectCustomBlockCollectionSettingsDialog :open="settingsCollectionKey !== null"
@@ -222,20 +223,20 @@ const presentation = computed<EditorPresentation>(() => ({
 }))
 
 const WORKSPACE_ADD_COLLECTION_ACTION_KEY = 'custom-block-registry.add-collection'
-const headerActions = computed<OcActionDefinition[]>(() => [{
+const collectionActions = computed<OcActionDefinition[]>(() => [{
   key: WORKSPACE_ADD_COLLECTION_ACTION_KEY,
-  icon: 'mdiPlus',
+  icon: 'mdiFolderPlusOutline',
   title: t('customBlockRegistry.addCollection'),
   disabled: !document.value || importing.value,
 }])
 
-function onHeaderAction(actionKey: string): void {
+function onCollectionAction(actionKey: string): void {
   if (actionKey !== WORKSPACE_ADD_COLLECTION_ACTION_KEY || !document.value) return
   addCollection()
   return
 }
 
-defineExpose({ canSave, presentation, headerActions, onHeaderAction })
+defineExpose({ canSave, presentation, collectionActions, onCollectionAction })
 </script>
 
 <style scoped>
