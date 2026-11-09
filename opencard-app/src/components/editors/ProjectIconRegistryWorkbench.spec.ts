@@ -10,6 +10,7 @@ import ProjectIconRegistryWorkbench from './ProjectIconRegistryWorkbench.vue'
 import ProjectIconSetSettingsDialog from './ProjectIconSetSettingsDialog.vue'
 import ProjectIconSetWorkspace from './ProjectIconSetWorkspace.vue'
 
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../../features/workspace/services/projectIconCatalog', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../features/workspace/services/projectIconCatalog')>()
@@ -59,6 +60,40 @@ async function selectSeries(wrapper: ReturnType<typeof mount>, key: string): Pro
 }
 
 describe('ProjectIconRegistryWorkbench', () => {
+  it('rebuilds its catalog on every edit, so a changed display option reaches the preview', async () => {
+    const { buildProjectIconCatalog } = await import('../../features/workspace/services/projectIconCatalog')
+    const wrapper = mount(ProjectIconRegistryWorkbench, { props: baseProps })
+    vi.mocked(buildProjectIconCatalog).mockClear()
+    const changed = [{ ...series[0]!, icons: [{ ...series[0]!.icons[0]!, tint: 'original' as const }] }, series[1]!]
+    await wrapper.setProps({ series: changed })
+    expect(vi.mocked(buildProjectIconCatalog)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(buildProjectIconCatalog).mock.calls[0]?.[0]).toEqual(changed)
+  })
+
+  it('keeps the property panel for a multiple selection and applies an edit to every selected icon', async () => {
+    const raster = (iconKey: string, pixelated: boolean) => ({ iconKey, name: iconKey, source: `.opencard/icons/status/${iconKey}.png`, tint: 'original' as const, pixelated })
+    const sheet = [{ name: 'Status icons', key: 'status', icons: [raster('a', true), raster('b', false), raster('c', false)] }]
+    const wrapper = mount(ProjectIconRegistryWorkbench, { props: { ...baseProps, series: sheet } })
+    await selectSeries(wrapper, 'status')
+    wrapper.getComponent(ProjectIconSetWorkspace).vm.$emit('update:selectedIconIndexes', [0, 1])
+    await wrapper.vm.$nextTick()
+
+    const input = wrapper.getComponent(PropertyEditor).props('inputs')[0]!
+    expect(input.fields.pixelated?.valueState).toBe('mixed')
+    wrapper.getComponent(PropertyEditor).vm.$emit('update-property', { key: input.key, fieldKey: 'pixelated', value: 'true' })
+    await wrapper.vm.$nextTick()
+    const updates = wrapper.emitted('update:series') ?? []
+    const icons = (updates[updates.length - 1]?.[0] as ProjectIconSeries[])[0]!.icons
+    expect(icons.map(icon => icon.pixelated)).toEqual([true, true, false])
+  })
+
+  it('gives its catalog a size reader, which is what cuts a sprite out of its sheet', async () => {
+    const { buildProjectIconCatalog } = await import('../../features/workspace/services/projectIconCatalog')
+    vi.mocked(buildProjectIconCatalog).mockClear()
+    mount(ProjectIconRegistryWorkbench, { props: baseProps })
+    expect(vi.mocked(buildProjectIconCatalog).mock.calls[0]?.[2]).toBeTypeOf('function')
+  })
+
   it('opens the first set with its first icon selected', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, {
       props: { ...baseProps, projectIconCatalog },
@@ -212,19 +247,19 @@ describe('ProjectIconRegistryWorkbench', () => {
     expect(wrapper.getComponent(PropertyEditor).props('inputs')[0]?.record.name).toBe('Info')
   })
 
-  it('renames a set through its settings without touching icon files', async () => {
+  it('renames a set through its settings without touching its Key or icon files', async () => {
     const wrapper = mount(ProjectIconRegistryWorkbench, { props: baseProps })
     await selectSeries(wrapper, 'status')
     wrapper.getComponent(OcTree).vm.$emit('action', { key: 'status', actionKey: 'configure', source: 'inline' })
     await wrapper.vm.$nextTick()
 
     const dialog = wrapper.getComponent(ProjectIconSetSettingsDialog)
-    dialog.vm.$emit('submit', { name: 'Renamed', key: 'renamed' })
+    dialog.vm.$emit('submit', { name: 'Renamed' })
     await wrapper.vm.$nextTick()
 
     const updates = wrapper.emitted('update:series') ?? []
     expect(updates[updates.length - 1]?.[0]).toEqual([
-      { ...series[0], name: 'Renamed', key: 'renamed' },
+      { ...series[0], name: 'Renamed' },
       series[1],
     ])
   })

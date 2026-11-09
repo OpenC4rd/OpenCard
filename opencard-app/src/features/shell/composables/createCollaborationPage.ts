@@ -68,6 +68,7 @@ export function createCollaborationPage(options: {
       graph: {
         data: version.timelineProjectTreeData, expandedKeys: version.versionGraphExpandedKeys,
         onExpansionChange: version.handleVersionGraphExpansionChange, onExpansionSync: version.handleVersionGraphExpansionSync,
+        onAction: version.handleVersionHistoryAction,
       },
     },
   })
@@ -75,7 +76,7 @@ export function createCollaborationPage(options: {
     key: 'collaboration',
     navigation: {
       key: 'collaboration', icon: 'mdiAccountGroup', labelKey: 'app.shell.space.collaboration',
-      available: computed(() => Boolean(project.projectPath.value)), unavailableHintKey: 'app.shell.space.needsProject',
+      available: computed(() => Boolean(project.projectPath.value)),
     },
     ...options.workbench,
     contentKey: 'workbench', sidebar,

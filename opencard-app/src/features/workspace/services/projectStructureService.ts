@@ -1,7 +1,4 @@
 import type { FileSystemService } from './fileSystemService'
-import {
-  PROJECT_INTERNAL_FILE_DEFAULTS,
-} from '../model/projectStructure'
 
 function joinPath(root: string, relativePath: string): string {
   return `${root.replace(/[\\/]+$/, '')}/${relativePath}`
@@ -21,7 +18,7 @@ async function assertExistingPathKind(
 export async function writeProjectManagementFile(
   fs: FileSystemService,
   projectRoot: string,
-  relativePath: keyof typeof PROJECT_INTERNAL_FILE_DEFAULTS,
+  relativePath: string,
   content: string,
 ): Promise<void> {
   const segments = relativePath.split('/')

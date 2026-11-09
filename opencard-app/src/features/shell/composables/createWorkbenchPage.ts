@@ -422,7 +422,8 @@ export function createWorkbenchPage(options: {
         filePath: timelineFilePath,
         loading: timelineLoading,
         data: timelineTreeData,
-        onAction: handleTimelineAction,
+        // 文件时间线上既有"与磁盘比较"，也有"把这个文件恢复到此版本"。
+        onAction: async (event: Parameters<typeof handleTimelineAction>[0]) => { if (!await versionControl.handleVersionHistoryAction(event)) await handleTimelineAction(event) },
       },
     },
   })

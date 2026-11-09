@@ -21,9 +21,9 @@
             :aria-label="t('projectConfig.icons.clearFilter')" @click="filterQuery = ''" />
         </template>
       </OcFieldFrame>
-      <OcSlider class="project-icon-registry-workbench__tile-size" v-model="tileSize"
-        :min="TILE_SIZE_MIN" :max="TILE_SIZE_MAX" :step="TILE_SIZE_STEP"
-        :value-text="`${tileSize} px`" :aria-label="t('projectConfig.icons.tileSize')" />
+      <OcOptionGroup class="project-icon-registry-workbench__tile-size" :model-value="String(tileSize)"
+        :options="tileSizeOptions" appearance="sliding-outline" fill :aria-label="t('projectConfig.icons.tileSize')"
+        @update:model-value="tileSize = Number($event)" />
     </template>
 
     <ProjectIconSetWorkspace v-if="selectedSeries"
@@ -39,7 +39,7 @@
       <ProjectIconPreview v-else-if="selectedIcon && selectedCatalogEntry" :entry="selectedCatalogEntry" />
       <OcEmpty v-else tone="muted" icon="mdiStickerEmoji" fill>{{ t('projectConfig.icons.noIconSelected') }}</OcEmpty>
     </template>
-    <template v-if="selectedIconIndexesForSeries.length <= 1 && selectedIcon && selectedCatalogEntry" #footer>
+    <template v-if="iconPropertyInputs.length" #footer>
       <div class="project-icon-registry-workbench__property-content">
         <PropertyEditor ref="propertyEditorRef" :inputs="iconPropertyInputs"
           :categories="iconPropertyCategories" sort-mode="category" @update-property="updateIconProperty" />
@@ -49,7 +49,6 @@
 
   <ProjectIconSetSettingsDialog :open="settingsSeriesIndex !== null" :name="settingsSeries?.name"
     :series-key="settingsSeries?.key" :busy="settingsBusy"
-    :existing-keys="series.map(candidate => candidate.key)"
     @close="settingsSeriesIndex = null" @submit="saveIconSetSettings" />
 </template>
 
@@ -58,8 +57,6 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   findProjectIconKeyConflicts,
-  isRasterProjectIconSource,
-  PROJECT_ICON_TINTS,
   type ProjectIcon,
   type ProjectIconKeyConflict,
   type ProjectIconSeries,
@@ -72,7 +69,7 @@ import {
   type ProjectIconCatalog,
   type ProjectIconCatalogEntry,
 } from '../../features/workspace/services/projectIconCatalog'
-import { readProjectIconSize } from '../../features/workspace/services/projectIconDimensionResolver'
+import { createIconDimensionReader, readProjectIconSize } from '../../features/workspace/services/projectIconDimensionResolver'
 import type {
   PropertyEditorCategoryDefinition,
   PropertyEditorInput,
@@ -86,9 +83,10 @@ import OcButton from '../base/OcButton.vue'
 import OcEmpty from '../base/OcEmpty.vue'
 import OcFieldFrame from '../base/OcFieldFrame.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
-import OcSlider from '../standard/OcSlider.vue'
+import OcOptionGroup, { type OcOption } from '../standard/OcOptionGroup.vue'
 import OcTree from '../standard/OcTree.vue'
 import ProjectIconPreview from './ProjectIconPreview.vue'
+import { applyProjectIconProperty, createProjectIconPropertyInput } from './projectIconProperties'
 import ProjectIconSetSettingsDialog, { type ProjectIconSetSettingsRequest } from './ProjectIconSetSettingsDialog.vue'
 import ProjectIconSetWorkspace from './ProjectIconSetWorkspace.vue'
 import ProjectResourceWorkbench from './ProjectResourceWorkbench.vue'
@@ -118,10 +116,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const selectedSeriesKey = ref<string | null>(null)
 const filterQuery = ref('')
-const TILE_SIZE_MIN = 72
-const TILE_SIZE_MAX = 168
-const TILE_SIZE_STEP = 8
-const tileSize = ref(96)
+/** A few tile sizes to pick from instead of a continuous slider: the grid is browsed, not measured. */
+const TILE_SIZES = { small: 72, medium: 104, large: 152 } as const
+const tileSize = ref<number>(TILE_SIZES.medium)
+const tileSizeOptions = computed<OcOption[]>(() => Object.entries(TILE_SIZES).map(([size, value]) => ({
+  value: String(value), label: t(`projectConfig.icons.tileSizes.${size}`),
+})))
 const leadingCardActions = computed<OcActionDefinition[]>(() => [
   ...props.leadingActions,
   {
@@ -176,39 +176,23 @@ const selectedCatalogEntry = computed<ProjectIconCatalogEntry | null>(() => {
 const conflicts = computed(() => findProjectIconKeyConflicts(props.series))
 const iconPropertyCategories = computed<ReadonlyMap<string, PropertyEditorCategoryDefinition>>(() => new Map([
   ['identity', { title: t('projectConfig.icons.identity'), icon: 'mdiCodeBraces' }],
+  ['file', { title: t('projectConfig.icons.file'), icon: 'mdiFileOutline' }],
   ['appearance', { title: t('projectConfig.icons.appearance'), icon: 'mdiFileImageOutline' }],
+  ['crop', { title: t('projectConfig.icons.cropTitle'), icon: 'mdiViewGridOutline' }],
 ]))
+const selectedIcons = computed(() => selectedIconIndexesForSeries.value
+  .map(index => selectedSeries.value?.icons[index])
+  .filter((icon): icon is ProjectIcon => Boolean(icon)))
 const iconPropertyInputs = computed<PropertyEditorInput[]>(() => {
-  const index = selectedIconIndex.value
-  const icon = selectedIcon.value
-  if (index === null || !icon) return []
-  return [{
-    key: `icon:${index}`,
-    title: icon.name,
-    record: {
-      iconKey: icon.iconKey,
-      name: icon.name,
-      tint: icon.tint,
-      pixelated: String(icon.pixelated ?? false),
+  const series = selectedSeries.value
+  const input = series && createProjectIconPropertyInput(selectedIcons.value, {
+    t,
+    readSize: (icon) => {
+      const entry = findProjectIcon(localCatalog.value, series.key, icon.iconKey)
+      return entry ? readProjectIconSize(entry) : undefined
     },
-    fields: {
-      iconKey: { title: t('projectConfig.icons.referenceName'), fieldType: 'string', category: 'identity', order: 1, unremovable: true, commitMode: 'blur' },
-      name: { title: t('projectConfig.icons.iconName'), fieldType: 'string', category: 'identity', order: 2, commitMode: 'blur' },
-      tint: {
-        title: t('projectConfig.icons.tint'), fieldType: 'string', category: 'appearance', order: 1,
-        options: [...PROJECT_ICON_TINTS],
-        optionLabels: {
-          context: t('projectConfig.icons.tintContext'),
-          original: t('projectConfig.icons.tintOriginal'),
-        },
-        presentation: 'select',
-      },
-      // 像素化只对位图有意义：矢量图标缩放到多大都是清晰的，摆一个按不动的开关只会让人猜。
-      ...(isRasterProjectIconSource(icon.source)
-        ? { pixelated: { title: t('projectConfig.icons.pixelated'), fieldType: 'boolean' as const, category: 'appearance', order: 2 } }
-        : {}),
-    },
-  }]
+  })
+  return input ? [input] : []
 })
 const seriesTreeData = computed<OcNodeCollection>(() => ({
   rootKeys: props.series.map(candidate => candidate.key),
@@ -260,21 +244,16 @@ watch(() => props.series, nextSeries => {
   }
   selectedIconIndexes.value = nextSelections
 }, { immediate: true })
-// Assembling the catalog is pure data: an icon's size is resolved when it is painted.
-watch(() => catalogIdentity(props.series), () => {
-  localCatalog.value = buildProjectIconCatalog(props.series, props.resolveAssetSrc)
+// Assembling the catalog is pure data and cheap, so it follows every edit: a tint or a crop changes how
+// an icon paints just as a new file does. Sizes are measured per file and survive the rebuild.
+const iconDimensions = createIconDimensionReader()
+watch(() => props.series, (series) => {
+  localCatalog.value = buildProjectIconCatalog(series, props.resolveAssetSrc, iconDimensions.read)
 }, { immediate: true })
 watch(conflicts, value => emit('key-conflicts', value), { immediate: true })
 
 function sameIconSeries(left: string, right: string): boolean {
   return left.toLocaleLowerCase() === right.toLocaleLowerCase()
-}
-
-/** Identity of everything the local catalog reads: every set's every icon file. */
-function catalogIdentity(series: readonly ProjectIconSeries[]): string {
-  return series.map(candidate => (
-    `${candidate.key}\u0000${candidate.icons.map(icon => `${icon.iconKey}:${icon.source}`).join('\u0001')}`
-  )).join('\u0002')
 }
 
 function selectSeriesByIndex(index: number): void {
@@ -314,24 +293,19 @@ function updateSelectedSeries(nextSeries: ProjectIconSeries): void {
   next[index] = nextSeries
   emit('update:series', next)
 }
-function updateIcon(index: number, patch: Partial<ProjectIcon>): void {
-  const current = selectedSeries.value
-  const icon = current?.icons[index]
-  if (!current || !icon) return
-  const icons = [...current.icons]
-  icons[index] = { ...icon, ...patch }
-  updateSelectedSeries({ ...current, icons })
-}
+/** An edit in the panel lands on every selected icon, the way the panel showed them as one. */
 function updateIconProperty(mutation: PropertyEditorMutation): void {
-  const index = selectedIconIndex.value
-  if (index === null) return
-  if (mutation.fieldKey === 'iconKey') updateIcon(index, { iconKey: String(mutation.value) })
-  else if (mutation.fieldKey === 'name') updateIcon(index, { name: String(mutation.value) })
-  else if (mutation.fieldKey === 'tint') {
-    updateIcon(index, { tint: mutation.value === 'original' ? 'original' : 'context' })
-  } else if (mutation.fieldKey === 'pixelated') {
-    updateIcon(index, { pixelated: mutation.value === true || mutation.value === 'true' })
+  const current = selectedSeries.value
+  if (!current) return
+  const targets = new Set(selectedIconIndexesForSeries.value)
+  const fileSize = (icon: ProjectIcon) => {
+    const entry = findProjectIcon(localCatalog.value, current.key, icon.iconKey)
+    return entry ? readProjectIconSize(entry) : undefined
   }
+  const icons = current.icons.map((icon, index) => (
+    targets.has(index) ? applyProjectIconProperty(icon, mutation.fieldKey, mutation.value, fileSize(icon)) : icon
+  ))
+  if (icons.some((icon, index) => icon !== current.icons[index])) updateSelectedSeries({ ...current, icons })
 }
 function openSettingsDialog(index: number): void {
   if (props.series[index]) settingsSeriesIndex.value = index
@@ -343,12 +317,7 @@ async function saveIconSetSettings(request: ProjectIconSetSettingsRequest): Prom
   settingsBusy.value = true
   try {
     const next = [...props.series]
-    next[index] = { ...current, name: request.name, key: request.key }
-    if (selectedSeriesKey.value === current.key) {
-      selectedSeriesKey.value = request.key
-      selectedIconIndexes.value[request.key] = selectedIconIndexes.value[current.key] ?? []
-      delete selectedIconIndexes.value[current.key]
-    }
+    next[index] = { ...current, name: request.name }
     settingsSeriesIndex.value = null
     emit('update:series', next)
   } finally {

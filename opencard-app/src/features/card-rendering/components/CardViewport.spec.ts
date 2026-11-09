@@ -513,9 +513,7 @@ describe('CardViewport', () => {
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
       width: 25,
-      height: 80,
       x: 50,
-      y: 50,
     })
   })
 
@@ -659,9 +657,7 @@ describe('CardViewport', () => {
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
       width: 108,
-      height: 80,
       x: 50,
-      y: 50,
     })
 
     await wrapper.get('.selection-frame').trigger('pointerdown')
@@ -724,9 +720,7 @@ describe('CardViewport', () => {
     expect(wrapper.emitted('resize-selection')?.[0]?.[0]).toEqual({
       blockId: 'selected',
       width: 116,
-      height: 80,
       x: 42,
-      y: 50,
     })
   })
 

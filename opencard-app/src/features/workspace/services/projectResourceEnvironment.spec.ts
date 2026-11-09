@@ -22,6 +22,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 import { EMPTY_PROJECT_ICON_CATALOG } from './projectIconCatalog'
+import { PROJECT_ICON_REGISTRY_FILE_NAME } from '../model/projectStructure'
 import { parsePackageQualifier } from '../model/packageCoordinate'
 import {
   createProjectResourceNamespace,
@@ -52,7 +53,7 @@ function packageEnvironment(packageId: string): ProjectResourceEnvironment {
 /** 包发现要按目录列举，所以这份内存文件系统也要能从已登记路径前缀推出目录条目。 */
 function memoryFileSystem(files: Map<string, string>) {
   return {
-    fileExists: async (path: string) => files.has(path),
+    fileExists: async (path: string) => files.has(path) || [...files.keys()].some(candidate => candidate.startsWith(`${path}/`)),
     readFile: async (path: string) => files.get(path) ?? '',
     readDirectory: async (path: string) => {
       const prefix = `${path}/`
@@ -116,13 +117,8 @@ describe('ProjectResourceEnvironment', () => {
 
   it('assembles the project icon catalog without reading any icon file or measuring it', async () => {
     const files = new Map<string, string>([[
-      '/project/.opencard/icons/icons.json',
-      JSON.stringify({
-        iconSeries: [{
-          name: 'Outline', key: 'outline',
-          icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }],
-        }],
-      }),
+      '/project/.opencard/icons/outline/icon-set.json',
+      JSON.stringify({ name: 'Outline', icons: [{ key: 'warn', name: 'Warn', source: 'warn.svg', tint: 'context' }] }),
     ]])
     const environment = await load(files)
 
@@ -145,7 +141,7 @@ describe('ProjectResourceEnvironment', () => {
       }],
     }
 
-    const environment = await load(new Map([['/project/.opencard/icons/icons.json', '{}']]), { iconCatalog: providedCatalog })
+    const environment = await load(new Map(), { iconCatalog: providedCatalog })
 
     expect(environment.iconCatalog).toBe(providedCatalog)
   })
@@ -240,8 +236,8 @@ describe('ProjectResourceEnvironment', () => {
     const bobRoot = `${SNAPSHOTS_ROOT}/fp-bob`
     const files = projectFiles(`${PACKAGES_ROOT}/bob.ocpack`)
     unpacked(files, 'fp-bob')
-    files.set(`${bobRoot}/.opencard/icons/icons.json`, JSON.stringify({
-      iconSeries: [{ name: 'Outline', key: 'outline', icons: [{ iconKey: 'gone', name: 'Gone', source: 'icons/gone.svg', tint: 'context' }] }],
+    files.set(`${bobRoot}/.opencard/icons/outline/icon-set.json`, JSON.stringify({
+      name: 'Outline', icons: [{ key: 'gone', name: 'Gone', source: 'gone.svg', tint: 'context' }],
     }))
 
     const environment = await load(files)
@@ -374,9 +370,9 @@ describe('resource environment lifecycle', () => {
   })
 
   it('keeps diagnostics for broken definitions without making the environment unusable', async () => {
-    const fs = memoryFileSystem(new Map([['/one/.opencard/icons/icons.json', '{broken']])) as unknown as FileSystemService
+    const fs = memoryFileSystem(new Map([['/one/.opencard/icons/broken/icon-set.json', '{broken']])) as unknown as FileSystemService
     const environment = await createResourceEnvironment('/one', { watch: false, fs, snapshotsRoot: SNAPSHOTS_ROOT })
-    expect(environment.state.value.diagnostics?.['.opencard/icons/icons.json']).toBeTruthy()
+    expect(environment.state.value.diagnostics?.[PROJECT_ICON_REGISTRY_FILE_NAME]).toContain('.opencard/icons/broken/icon-set.json')
     expect(environment.state.value.iconCatalog.entries).toEqual([])
     await environment.dispose()
   })

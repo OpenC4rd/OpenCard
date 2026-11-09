@@ -1,4 +1,4 @@
-<!-- 业务 项目封面字段：整幅封面横幅，点击选择项目内图片；路径与移除收在底部信息条（路径为标题、移除为尾部操作），与相册卡片同一套语言。操作失败通过标题栏即时消息反馈。 -->
+<!-- 业务 项目封面字段：整幅封面横幅，点击打开目录选取器选择图片（可从电脑导入进项目）；路径与移除收在底部信息条（路径为标题、移除为尾部操作），与相册卡片同一套语言。操作失败通过标题栏即时消息反馈。 -->
 <template>
   <div class="project-cover-field">
     <div class="project-cover-field__stage" data-tooltip-group>
@@ -39,12 +39,14 @@ import { notifyError } from '../../features/notifications/titlebarNotices'
 import {
   COVER_IMAGE_EXTENSIONS,
   coverImageExtension,
-  projectRelativePathFromAbsolute,
   type ProjectCover,
 } from '../../features/workspace/model/projectCover'
 import { resolveProjectCover } from '../../features/workspace/services/projectCoverService'
+import { copyEntriesIntoDirectory } from '../../features/workspace/services/copyIntoDirectory'
 import { fileSystemService } from '../../features/workspace/services/fileSystemService'
+import { createScopeDirectoryProvider } from '../../features/workspace/services/resourceDirectoryProvider'
 import { useProjectStore } from '../../features/workspace/store/projectStore'
+import { openDirectorySelector } from '../../shared/ui/directorySelectorService'
 import type { OcVisual } from '../../shared/ui/visual/visual.types'
 
 defineOptions({ name: 'ProjectCoverField' })
@@ -102,18 +104,30 @@ watch(
 )
 
 async function chooseProjectFile(): Promise<void> {
-  const picked = await fileSystemService.pickFile({
+  const root = props.projectRootPath
+  const extensions = [...COVER_IMAGE_EXTENSIONS]
+  const [relative] = await openDirectorySelector({
     title: t('projectConfig.cover.choose'),
-    fileTypeName: t('projectConfig.cover.fileTypeName'),
-    extensions: [...COVER_IMAGE_EXTENSIONS],
-    defaultPath: props.projectRootPath,
-  })
-  if (!picked) return
-  const relative = projectRelativePathFromAbsolute(props.projectRootPath, picked)
-  if (!relative) {
-    notifyError(t('projectConfig.cover.outsideProject'))
-    return
-  }
+    scope: {
+      key: 'project',
+      label: '',
+      prefix: '',
+      readDirectory: createScopeDirectoryProvider(root, fileSystemService, { hideDotFiles: true }),
+    },
+    filter: { target: 'file', pattern: `*.{${extensions.join(',')}}` },
+    resolveThumbnailSrc: path => fileSystemService.toAssetSrc(`${root}/${path}`),
+    importInto: async (directory) => {
+      const picked = await fileSystemService.pickFiles?.({
+        title: t('projectConfig.cover.choose'),
+        fileTypeName: t('projectConfig.cover.fileTypeName'),
+        extensions,
+        defaultPath: root,
+      }) ?? []
+      const copied = await copyEntriesIntoDirectory(fileSystemService, picked, directory ? `${root}/${directory}` : root)
+      return copied.added.length > 0
+    },
+  }) ?? []
+  if (!relative) return
   if (!coverImageExtension(relative)) {
     notifyError(t('projectConfig.cover.unsupported', { path: relative }))
     return

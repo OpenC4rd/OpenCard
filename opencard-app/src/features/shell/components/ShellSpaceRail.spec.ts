@@ -12,7 +12,7 @@ function mountRail(available: boolean) {
       translate: key => key,
       spaces: [
         { key: 'welcome', labelKey: 'welcome', icon: 'mdiHumanGreeting' },
-        { key: 'export', labelKey: 'export', icon: 'mdiPrinter', available: availability, unavailableHintKey: 'needs-project' },
+        { key: 'export', labelKey: 'export', icon: 'mdiPrinter', available: availability },
       ],
     },
   })
@@ -20,25 +20,21 @@ function mountRail(available: boolean) {
 }
 
 describe('ShellSpaceRail', () => {
-  it('keeps an unavailable space visible but does not enter it', async () => {
-    const { wrapper, button } = mountRail(false)
+  it('hides an unavailable space', () => {
+    const { wrapper } = mountRail(false)
 
-    await button().trigger('click')
-
-    expect(wrapper.emitted('select')).toBeUndefined()
-    expect(button().attributes('aria-disabled')).toBe('true')
-    expect(button().attributes('data-tooltip')).toBe('needs-project')
+    expect(wrapper.findAll('button')).toHaveLength(1)
   })
 
-  it('reacts when a space becomes available', async () => {
+  it('shows a space when it becomes available', async () => {
     const { wrapper, availability, button } = mountRail(false)
 
     availability.value = true
     await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('button')).toHaveLength(2)
     await button().trigger('click')
 
     expect(wrapper.emitted('select')).toEqual([['export']])
-    expect(button().attributes('aria-disabled')).toBeUndefined()
     expect(button().attributes('data-tooltip')).toBe('export')
   })
 })

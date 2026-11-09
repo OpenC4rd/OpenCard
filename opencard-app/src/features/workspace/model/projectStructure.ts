@@ -2,7 +2,13 @@ export const PROJECT_INTERNAL_DIRECTORY_NAME = '.opencard'
 
 export const PROJECT_PROFILE_FILE_NAME = `${PROJECT_INTERNAL_DIRECTORY_NAME}/project.json`
 export const PROJECT_FONT_REGISTRY_FILE_NAME = `${PROJECT_INTERNAL_DIRECTORY_NAME}/fonts/fonts.json`
+/**
+ * 图标集合的**地址**，不是磁盘上的文件：每套图标是 `.opencard/icons/<集>/` 一个文件夹，清单
+ * `icon-set.json` 与图标文件同夹，复制文件夹就是分享。图标页编辑的是把所有集拼起来的整体，
+ * 这个路径让它像普通文件一样被打开、保存、撤销；读写由 projectIconUnits 在文件夹与整体之间转换。
+ */
 export const PROJECT_ICON_REGISTRY_FILE_NAME = `${PROJECT_INTERNAL_DIRECTORY_NAME}/icons/icons.json`
+export const PROJECT_ICON_SET_FILE_NAME = 'icon-set.json'
 export const PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME = `${PROJECT_INTERNAL_DIRECTORY_NAME}/blocks/blocks.json`
 export const PROJECT_DICTIONARY_FILE_NAME = `${PROJECT_INTERNAL_DIRECTORY_NAME}/locale.json`
 
@@ -17,10 +23,14 @@ export const PROJECT_PACKAGE_DIRECTORY = 'packages'
 export const PROJECT_INTERNAL_FILE_DEFAULTS = Object.freeze({
   [PROJECT_PROFILE_FILE_NAME]: '{}\n',
   [PROJECT_FONT_REGISTRY_FILE_NAME]: '{}\n',
-  [PROJECT_ICON_REGISTRY_FILE_NAME]: '{}\n',
   [PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME]: '{}\n',
   [PROJECT_DICTIONARY_FILE_NAME]: '{}\n',
 })
+
+/** 一套图标所在的文件夹（相对作用域根）；文件夹名就是集的 key。 */
+export function projectIconSetDirectory(seriesKey: string): string {
+  return `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_ICON_DIRECTORY}/${seriesKey}`
+}
 
 export function resolveProjectInternalRelativePath(path = ''): string {
   const normalized = path.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')

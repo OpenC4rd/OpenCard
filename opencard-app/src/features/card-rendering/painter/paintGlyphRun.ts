@@ -1,6 +1,7 @@
 import { resolveCardResource, type CardRenderResourceContext } from '../cardRenderResources'
 import type { PositionedGlyphRun, PositionedTextRun } from '../text-layout'
-import type { CanvasAssetStore } from './canvasAssetStore'
+import type { CanvasAssetStore, LoadedAsset } from './canvasAssetStore'
+import type { IconShape } from '../../../shared/model/iconGeometry'
 import { createDeviceBuffer, readDeviceTransform } from './deviceBuffer'
 
 const GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS = 16
@@ -44,12 +45,26 @@ function resolveGlyphFillStyle(
       : undefined
     const src = res?.kind === 'url' ? res.src : res?.kind === 'icon' ? res.entry.src : (!resourceContext ? style.fillSource : '')
     const img = src ? assets.getImage(src) : null
-    if (img && typeof ctx.createPattern === 'function') {
-      const pattern = ctx.createPattern(img, 'repeat')
+    const tile = img && res?.kind === 'icon' ? iconTile(img, res.entry) : img
+    if (tile && typeof ctx.createPattern === 'function') {
+      const pattern = ctx.createPattern(tile, 'repeat')
       if (pattern) return pattern
     }
   }
   return style.color || '#000000'
+}
+
+/** A pattern repeats the icon, so a cropped icon repeats its crop, never the whole file around it. */
+function iconTile(img: LoadedAsset, icon: IconShape): CanvasImageSource | null {
+  if (!icon.crop) return img
+  const { x, y, w, h } = icon.crop
+  const canvas = typeof OffscreenCanvas === 'function'
+    ? new OffscreenCanvas(w, h)
+    : typeof document === 'undefined' ? null : Object.assign(document.createElement('canvas'), { width: w, height: h })
+  const tileCtx = canvas?.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined
+  if (!canvas || !tileCtx) return null
+  tileCtx.drawImage(img, x, y, w, h, 0, 0, w, h)
+  return canvas
 }
 
 export type GlyphPaintContext = {

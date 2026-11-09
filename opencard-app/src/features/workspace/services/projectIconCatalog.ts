@@ -5,6 +5,7 @@
  * - 只做纯数据组装与样式计算 不访问文件系统、不测量图标尺寸
  */
 import type { ProjectIcon, ProjectIconSeries } from '../model/projectIcons'
+import { iconSize, iconSourceRect, type IconSize } from '../../../shared/model/iconGeometry'
 import type { ProjectIconRenderer } from '../../../shared/ui/visual/projectIconStyle'
 
 /**
@@ -108,36 +109,57 @@ export function findProjectIcon(
     ?? null
 }
 
+
+function knownSize(measured: IconSize | undefined): IconSize | undefined {
+  return measured !== undefined
+    && Number.isInteger(measured.width) && Number.isInteger(measured.height)
+    && measured.width > 0 && measured.height > 0
+    ? measured
+    : undefined
+}
+
 /**
- * The size to paint with: whatever the reader knows, or a square box for an icon nobody has measured
- * yet. A square is also what a square icon resolves to, so an unmeasured square icon is already right.
+ * The size to paint with: the crop's own size for a sprite, otherwise whatever the reader knows, or a
+ * square box for an icon nobody has measured yet (which is also what a square icon resolves to).
+ * `sheet` is the whole file a crop is cut from; reading it is what asks for the file's size.
  */
 function displayDimensions(
   entry: ProjectIconCatalogEntry,
   readDimensions?: ProjectIconDimensionReader,
-): { width: number, height: number } {
-  const measured = readDimensions?.(entry)
-  const known = measured !== undefined
-    && Number.isInteger(measured.width) && Number.isInteger(measured.height)
-    && measured.width > 0 && measured.height > 0
-  const width = known ? measured!.width : 1
-  const height = known ? measured!.height : 1
-  return { width, height }
+): { width: number, height: number, sheet?: IconSize } {
+  const file = knownSize(readDimensions?.(entry))
+  const size = iconSize(entry, file) ?? { width: 1, height: 1 }
+  return { ...size, ...(file ? { sheet: file } : {}) }
 }
 
-function createProjectIconPaint(entry: ProjectIconCatalogEntry): Record<string, string> {
+/**
+ * Where a crop sits inside its sheet, as the background sizing that shows exactly that rectangle in the
+ * icon's box. Until the sheet's size is known the whole file is shown, which a measured sheet replaces.
+ */
+function cropPlacement(entry: ProjectIconCatalogEntry, sheet?: IconSize): { size: string, position: string } {
+  if (!entry.crop || !sheet) return { size: '100% 100%', position: 'center' }
+  const crop = iconSourceRect(entry, sheet)
+  const percent = (offset: number, extent: number, whole: number) => whole === extent ? 0 : (offset / (whole - extent)) * 100
+  return {
+    size: `${(sheet.width / crop.w) * 100}% ${(sheet.height / crop.h) * 100}%`,
+    position: `${percent(crop.x, crop.w, sheet.width)}% ${percent(crop.y, crop.h, sheet.height)}%`,
+  }
+}
+
+function createProjectIconPaint(entry: ProjectIconCatalogEntry, sheet?: IconSize): Record<string, string> {
   const image = `url(${JSON.stringify(entry.src)})`
+  const placement = cropPlacement(entry, sheet)
   return entry.tint === 'context'
     ? {
         '--oc-project-icon-mask-image': image,
-        '--oc-project-icon-mask-size': '100% 100%',
-        '--oc-project-icon-mask-position': 'center',
+        '--oc-project-icon-mask-size': placement.size,
+        '--oc-project-icon-mask-position': placement.position,
         '--oc-project-icon-background-color': 'currentColor',
       }
     : {
         '--oc-project-icon-background-image': image,
-        '--oc-project-icon-background-size': '100% 100%',
-        '--oc-project-icon-background-position': 'center',
+        '--oc-project-icon-background-size': placement.size,
+        '--oc-project-icon-background-position': placement.position,
       }
 }
 
@@ -153,7 +175,7 @@ function rendererOf(entry: ProjectIconCatalogEntry): ProjectIconRenderer {
 function createProjectIconRenderStyle(
   entry: ProjectIconCatalogEntry,
   unit: number,
-  dimensions: { width: number, height: number },
+  dimensions: { width: number, height: number, sheet?: IconSize },
 ): Record<string, string> {
   return {
     backgroundImage: 'none',
@@ -162,7 +184,7 @@ function createProjectIconRenderStyle(
     '--oc-project-icon-source-width': `${dimensions.width / unit}em`,
     '--oc-project-icon-source-height': `${dimensions.height / unit}em`,
     '--oc-project-icon-image-rendering': entry.pixelated === true ? 'pixelated' : 'auto',
-    ...createProjectIconPaint(entry),
+    ...createProjectIconPaint(entry, dimensions.sheet),
   }
 }
 

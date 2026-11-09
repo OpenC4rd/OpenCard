@@ -287,8 +287,7 @@ pub struct CreateBranchRequest {
     pub force: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg(test)]
 pub struct CheckoutRequest {
     pub revision: String,
     pub force: bool,
@@ -1260,6 +1259,7 @@ pub fn create_branch(
     })
 }
 
+#[cfg(test)]
 pub fn checkout_revision(
     project_root: &str,
     request: &CheckoutRequest,
@@ -1527,6 +1527,25 @@ pub fn revert_commit(
         .revert(&commit, None)
         .map_err(GitServiceError::from_git)?;
     operation_state(&root, &repository, "revert")
+}
+
+/// Puts one path back as it was at a revision, in the working tree and the index, leaving every other
+/// path as it is. A path the revision does not have is left alone rather than deleted.
+pub fn restore_path_at_revision(
+    project_root: &str,
+    request: &RevisionFileRequest,
+) -> GitServiceResult<RepositorySummary> {
+    let path = validate_relative_path(&request.path)?.to_path_buf();
+    let (root, repository) = open_exact_repository(project_root)?;
+    let object = repository
+        .revparse_single(request.revision.trim())
+        .map_err(GitServiceError::from_git)?;
+    let mut checkout = CheckoutBuilder::new();
+    checkout.force().path(&path);
+    repository
+        .checkout_tree(&object, Some(&mut checkout))
+        .map_err(GitServiceError::from_git)?;
+    repository_summary(&root, &repository)
 }
 
 pub fn cleanup_operation_state(project_root: &str) -> GitServiceResult<RepositorySummary> {
@@ -2346,14 +2365,6 @@ pub fn git_create_branch(
 }
 
 #[tauri::command(async)]
-pub fn git_checkout(
-    project_root: String,
-    request: CheckoutRequest,
-) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| checkout_revision(&project_root, &request)).into()
-}
-
-#[tauri::command(async)]
 pub fn git_delete_branch(
     project_root: String,
     request: NamedRequest,
@@ -2447,6 +2458,14 @@ pub fn git_revert(
         run_exclusive(|| revert_commit(&project_root, &request)),
         |value| value.repository.has_conflicts,
     )
+}
+
+#[tauri::command(async)]
+pub fn git_restore_path(
+    project_root: String,
+    request: RevisionFileRequest,
+) -> GitCommandResult<RepositorySummary> {
+    run_exclusive(|| restore_path_at_revision(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -3101,6 +3120,30 @@ mod tests {
                 .replace("\r\n", "\n"),
             "first\n"
         );
+    }
+
+    #[test]
+    fn restoring_one_path_leaves_every_other_path_alone() {
+        let directory = initialized_repository();
+        let root = directory.path().to_str().unwrap();
+        let first = inspect_repository(root).unwrap().head.unwrap();
+        std::fs::write(directory.path().join("card.txt"), "second\n").unwrap();
+        std::fs::write(directory.path().join("other.txt"), "kept\n").unwrap();
+        restore_path_at_revision(
+            root,
+            &RevisionFileRequest {
+                revision: first,
+                path: "card.txt".into(),
+            },
+        )
+        .unwrap();
+        let read = |name: &str| {
+            std::fs::read_to_string(directory.path().join(name))
+                .unwrap()
+                .replace("\r\n", "\n")
+        };
+        assert_eq!(read("card.txt"), "first\n");
+        assert_eq!(read("other.txt"), "kept\n");
     }
 
     #[test]

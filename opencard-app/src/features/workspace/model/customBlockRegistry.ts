@@ -48,13 +48,6 @@ export function parseCustomBlockRegistry(value: unknown): CustomBlockRegistryDoc
     })
     return collections.length > 0 ? { collections } : {}
   }
-  if (Array.isArray(value.blocks)) {
-    const blocks = value.blocks.map(candidate => {
-      if (!isRecord(candidate)) return null
-      return normalizeEntry({ key: candidate.key, source: candidate.source })
-    }).filter((entry): entry is CustomBlockRegistryEntry => Boolean(entry))
-    return blocks.length > 0 ? { collections: [{ key: 'default', name: 'Custom Blocks', blocks }] } : {}
-  }
   return {}
 }
 

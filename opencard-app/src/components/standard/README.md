@@ -6,6 +6,7 @@
 - `OcDock`：贴在舞台边缘的悬浮面板坞，可拖宽、双击收起，给 `bottom` 时上下可拖。
 - `OcBar`、`OcCard`：结构化 section；`OcCard` 直接绘制表面，不嵌套 Surface/Stack。
 - `OcColorField`：复用 `OcColorPicker` 的完整颜色字段变体，统一色值输入、取色弹层与提交语义，并按领域需要选择是否开放 Alpha。
+- `OcDirectorySelector`：限定在一个根目录内逐层浏览的选取器（面包屑、缩略图网格/列表、多选、过滤、导入入口）；全局弹窗用 `openDirectorySelector()` 打开。
 - `OcFilePicker`：基于 `OcTree` 与搜索框的多作用域文件/文件夹选择器，支持通配符与正则过滤。
 - `OcOptionGroup`：互斥选择、radiogroup 语义与 roving tabindex。
 - `OcTree`：key-only tree view model 与统一 intent；可选择接收外部文件拖放并上报落点。

@@ -78,8 +78,6 @@
     "src/features/shell/composables/createWorkbenchPage.ts": 754,
     "src/features/workspace/services/projectResourceEnvironment.ts": 720,
     "src/features/workspace/store/projectStore.ts": 1209,
-    "src/locales/en-US.ts": 1551,
-    "src/locales/zh-CN.ts": 1551,
     "src/shared/ui/property-editor/PropertyEditor.vue": 630
   }
 }

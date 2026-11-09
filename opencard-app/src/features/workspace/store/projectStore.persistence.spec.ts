@@ -17,6 +17,7 @@ vi.mock('@tauri-apps/plugin-fs', async () => {
     })),
     lstat: async (path: string) => { const info = await fs.lstat(path); return { isFile: info.isFile(), isDirectory: info.isDirectory(), isSymlink: info.isSymbolicLink() } },
     mkdir: (path: string, options: { recursive: boolean }) => fs.mkdir(path, options),
+    remove: (path: string, options?: { recursive?: boolean }) => fs.rm(path, { recursive: options?.recursive, force: true }),
   }
 })
 vi.mock('@tauri-apps/api/core', () => ({
@@ -42,7 +43,7 @@ vi.mock('../services/projectIndexWorker', async () => {
 
 import { useProjectStore } from './projectStore'
 import { createEditorSessionManager } from './editorSessionManager'
-import { PROJECT_INTERNAL_FILE_DEFAULTS } from '../model/projectStructure'
+import { PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_INTERNAL_FILE_DEFAULTS } from '../model/projectStructure'
 
 describe('project files on disk', () => {
   const project = useProjectStore()
@@ -117,5 +118,39 @@ describe('project files on disk', () => {
     await project.setProjectPath(root)
     expect(project.resourceEnvironment.value?.state.value.rootPath).toBe(root)
     expect(project.isWatching.value).toBe(true)
+  })
+
+  it('stores each icon set as its own folder and reads them back as one document', async () => {
+    temporaryRoot = (await disk.mkdtemp(join(tmpdir(), 'opencard-icons-'))).replace(/\\/g, '/')
+    native.home = `${temporaryRoot}/user`
+    const root = `${temporaryRoot}/project`
+    await disk.mkdir(root)
+    await project.setProjectPath(root)
+
+    // Nothing on disk yet: the icon page opens on an empty collection, not on a missing file.
+    expect(JSON.parse(await project.readFile(PROJECT_ICON_REGISTRY_FILE_NAME))).toEqual({})
+
+    const save = (iconSeries: unknown[]) => project.saveProjectIconRegistry(PROJECT_ICON_REGISTRY_FILE_NAME, JSON.stringify({ iconSeries }))
+    const outline = { name: 'Outline', key: 'outline', icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }] }
+    const pixel = { name: 'Pixel', key: 'pixel', icons: [{ iconKey: 'sword', name: 'Sword', source: '.opencard/icons/pixel/sheet.png', tint: 'original', pixelated: true, crop: { x: 0, y: 0, w: 16, h: 16 } }] }
+    await disk.mkdir(`${root}/.opencard/icons/outline`, { recursive: true })
+    await disk.writeFile(`${root}/.opencard/icons/outline/warn.svg`, '<svg/>')
+    await save([outline, pixel])
+
+    // The whole collection is never a file: each set is a folder holding its own manifest.
+    expect((await disk.readdir(`${root}/.opencard/icons`)).sort()).toEqual(['outline', 'pixel'])
+    expect(JSON.parse(await disk.readFile(`${root}/.opencard/icons/pixel/icon-set.json`, 'utf8'))).toEqual({
+      name: 'Pixel',
+      icons: [{ key: 'sword', name: 'Sword', source: 'sheet.png', pixelated: true, crop: { x: 0, y: 0, w: 16, h: 16 } }],
+    })
+    expect(JSON.parse(await project.readFile(PROJECT_ICON_REGISTRY_FILE_NAME)).iconSeries.map((item: { key: string }) => item.key)).toEqual(['outline', 'pixel'])
+
+    // Dropping a set removes its manifest only; the files in its folder are the removal flow's to handle.
+    await save([pixel])
+    expect(await disk.readdir(`${root}/.opencard/icons/outline`)).toEqual(['warn.svg'])
+    expect(JSON.parse(await project.readFile(PROJECT_ICON_REGISTRY_FILE_NAME)).iconSeries.map((item: { key: string }) => item.key)).toEqual(['pixel'])
+
+    // An icon file outside its own set folder cannot be stored, so the save fails instead of half-writing.
+    await expect(save([{ ...pixel, icons: [{ ...pixel.icons[0], source: '.opencard/icons/outline/warn.svg' }] }])).rejects.toThrow('outside its set folder')
   })
 })

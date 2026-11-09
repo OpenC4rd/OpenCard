@@ -158,7 +158,7 @@ export function createExportTemplateTreeData(
   const items = new Map<string, OcNode>()
   for (const [key, item] of projectTree.items) {
     const path = relativePath(key)
-    const isProjectFile = ['project.json', 'locale.json', 'fonts/fonts.json', 'icons/icons.json'].includes(path)
+    const isProjectFile = ['project.json', 'locale.json', 'fonts/fonts.json'].includes(path)
     const isRuntimeCache = path === '.opencard-cache' || path.startsWith('.opencard-cache/')
     const isExcluded = isRuntimeCache
       || selection.excludedPaths.some(excluded => path === excluded || path.startsWith(`${excluded}/`))

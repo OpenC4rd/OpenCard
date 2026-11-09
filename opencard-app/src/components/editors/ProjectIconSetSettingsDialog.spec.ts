@@ -5,34 +5,28 @@ import ProjectIconSetSettingsDialog from './ProjectIconSetSettingsDialog.vue'
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 
 describe('ProjectIconSetSettingsDialog', () => {
-  it('saves a trimmed display name and Key', async () => {
-    const wrapper = mount(ProjectIconSetSettingsDialog, {
-      props: {
-        open: true, name: 'Status icons', seriesKey: 'status', existingKeys: ['status'],
-      },
-      global: { stubs: { Teleport: true } },
-    })
-    const inputs = wrapper.findAll('input')
-    await inputs[0]!.setValue(' 状态图标 ')
-    await inputs[1]!.setValue(' status-new ')
-    await wrapper.get('form').trigger('submit')
-
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ name: '状态图标', key: 'status-new' })
+  const mountDialog = (name = 'Status icons') => mount(ProjectIconSetSettingsDialog, {
+    props: { open: true, name, seriesKey: 'status' },
+    global: { stubs: { Teleport: true } },
   })
 
-  it('refuses an invalid and a case-insensitively duplicated Key', async () => {
-    const wrapper = mount(ProjectIconSetSettingsDialog, {
-      props: { open: true, name: 'Status icons', seriesKey: 'status', existingKeys: ['status', 'Actions'] },
-      global: { stubs: { Teleport: true } },
-    })
-    const keyInput = () => wrapper.findAll('input')[1]!
+  it('saves a trimmed display name', async () => {
+    const wrapper = mountDialog()
+    await wrapper.findAll('input')[0]!.setValue(' 状态图标 ')
+    await wrapper.get('form').trigger('submit')
 
-    await keyInput().setValue('has space')
-    expect(keyInput().attributes('aria-invalid')).toBe('true')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ name: '状态图标' })
+  })
 
-    await keyInput().setValue('ACTIONS')
-    expect(keyInput().attributes('aria-invalid')).toBe('true')
+  it('shows the Key as the folder name and never edits it', () => {
+    const keyInput = mountDialog().findAll('input')[1]!
+    expect(keyInput.element.value).toBe('status')
+    expect(keyInput.attributes('disabled')).toBeDefined()
+  })
 
+  it('refuses a blank display name', async () => {
+    const wrapper = mountDialog()
+    await wrapper.findAll('input')[0]!.setValue('   ')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')).toBeUndefined()
   })

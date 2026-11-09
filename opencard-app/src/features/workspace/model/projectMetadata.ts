@@ -1,6 +1,7 @@
 import type { EditorPropertyDefinition } from '../../../entities/card/schema'
 import { isRecord } from '../../../shared/model/record'
 import { normalizeProjectRelativeCoverPath } from './projectCover'
+import { normalizePackageVersion } from './packageCoordinate'
 export { PROJECT_PROFILE_FILE_NAME } from './projectStructure'
 
 export type ProjectRemoteResourcePolicy =
@@ -19,6 +20,11 @@ export type ProjectProfile = {
   remoteResources?: ProjectRemoteResourcePolicy
   /** 默认渲染与导出 DPI，未配置时默认为 300 */
   defaultDpi?: number
+  /**
+   * 这个项目的文件按哪个 OpenCard 版本的结构写成。新建项目写入当时的版本；适配器据此判断要跑哪些适配脚本，
+   * 读取代码从不看它 —— 读取永远只认当前结构。缺失表示不知道，交给适配器尝试强行适配。
+   */
+  openCardVersion?: string
 }
 
 export type ProjectInformation = {
@@ -72,6 +78,8 @@ export function parseProjectMetadata(value: unknown): ProjectProfile | null {
   if (typeof value.author === 'string' && value.author !== '') profile.author = value.author
   const cover = normalizeProjectRelativeCoverPath(value.cover)
   if (cover) profile.cover = cover
+  const openCardVersion = normalizePackageVersion(value.openCardVersion)
+  if (openCardVersion) profile.openCardVersion = openCardVersion
   if (value.remoteResources !== undefined) {
     const remoteResources = parseRemoteResourcePolicy(value.remoteResources)
     if (!remoteResources) return null

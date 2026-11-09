@@ -278,7 +278,7 @@ export type SettingsIntent =
   | {
       type: 'project-workspace.reset'
     }
-  | { type: 'cache.clear' }
+  | { type: 'cache.clear' | 'project.adapt' }
 
 const DEFAULT_PUBLISHER_KEY = createPublisherKey()
 export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({

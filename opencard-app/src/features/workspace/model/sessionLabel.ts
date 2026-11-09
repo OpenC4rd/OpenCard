@@ -10,6 +10,7 @@ type SessionLabelSource = {
   name: string
   presentation?: { title: string } | null
   isDirty: boolean
+  autoSavePending?: boolean
   resourceKind: 'workspace' | 'external' | 'draft'
 }
 
@@ -24,12 +25,13 @@ type SessionScopeTexts = {
  * - `undefined`：还没有编辑器声明过（会话刚打开、编辑器正在挂载），**留空**。
  *   先显示身份名再被声明替换，等于让用户看一次改名；空到有观感更好。
  * - `null`：编辑器声明了"我没有呈现"（纯文本这类），显示身份名。
- * - 对象：显示它声明的标题。未保存的标记与作用域前缀叠在名字上。
+ * - 对象：显示它声明的标题。未保存的标记与作用域前缀叠在名字上；立即保存正在进行时不标，
+ *   那时没有需要用户做的事。
  */
 export function resolveSessionLabel(session: SessionLabelSource, scopeTexts: SessionScopeTexts): string {
   if (session.presentation === undefined) return ''
   const title = session.presentation ? session.presentation.title : session.name
-  const name = `${title}${session.isDirty ? ' *' : ''}`
+  const name = `${title}${session.isDirty && !session.autoSavePending ? ' *' : ''}`
   if (session.resourceKind === 'external') return scopeTexts.external(name)
   if (session.resourceKind === 'draft') return scopeTexts.draft(name)
   return name

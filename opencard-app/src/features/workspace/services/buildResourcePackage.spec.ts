@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_PROFILE_FILE_NAME } from '../model/projectStructure'
+import { PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_PROFILE_FILE_NAME } from '../model/projectStructure'
 import type { FileSystemService } from './fileSystemService'
 import { buildResourcePackageFromProject, type ResourcePackageBuildRequest } from './buildResourcePackage'
 
@@ -10,7 +10,7 @@ const invoke = vi.hoisted(() => vi.fn(async (_command: string, args: { request: 
 vi.mock('@tauri-apps/api/core', () => ({ invoke }))
 
 class MemoryFileSystem implements Pick<FileSystemService,
-  'readFile' | 'fileExists'
+  'readFile' | 'fileExists' | 'readDirectory'
 > {
   private readonly values = new Map<string, string>()
 
@@ -21,6 +21,19 @@ class MemoryFileSystem implements Pick<FileSystemService,
   async fileExists(path: string): Promise<boolean> {
     const prefix = `${path}/`
     return this.values.has(path) || [...this.values.keys()].some(value => value.startsWith(prefix))
+  }
+  async readDirectory(path: string): ReturnType<FileSystemService['readDirectory']> {
+    const prefix = `${path}/`
+    const names = new Set<string>()
+    for (const candidate of this.values.keys()) {
+      if (candidate.startsWith(prefix)) names.add(candidate.slice(prefix.length).split('/')[0]!)
+    }
+    return [...names].map(name => ({
+      name,
+      isFile: this.values.has(`${prefix}${name}`),
+      isDirectory: !this.values.has(`${prefix}${name}`),
+      isSymlink: false,
+    }))
   }
   async readFile(path: string): Promise<string> {
     const value = this.values.get(path)
@@ -45,21 +58,22 @@ function createFileSystem(): MemoryFileSystem {
     ],
     compositions: [{ key: 'body', name: 'Body', members: [{ fontKey: 'latin' }, { fontKey: 'cjk' }] }],
   })
-  fs.putText(`/project/${PROJECT_ICON_REGISTRY_FILE_NAME}`, {
-    iconSeries: [
-      { key: 'status', name: 'Status', icons: [{ iconKey: 'ok', name: 'OK', source: 'alice/support@1.2.0#icons/ok.svg', tint: 'context' }] },
-      { key: 'unused', name: 'Unused', icons: [{ iconKey: 'idle', name: 'Idle', source: '.opencard/icons/idle.svg', tint: 'context' }] },
-    ],
+  // 每套图标一个文件夹：清单与图标文件同夹，清单里的路径相对这个文件夹。
+  fs.putText('/project/.opencard/icons/status/icon-set.json', {
+    name: 'Status', icons: [{ key: 'ok', name: 'OK', source: 'ok.svg', tint: 'context' }],
+  })
+  fs.putText('/project/.opencard/icons/unused/icon-set.json', {
+    name: 'Unused', icons: [{ key: 'idle', name: 'Idle', source: 'idle.svg', tint: 'context' }],
   })
   fs.putText(`/project/${PROJECT_PROFILE_FILE_NAME}`, { name: 'Demo', cover: 'images/cover.png' })
   fs.putText('/project/.opencard/fonts/cjk-bold.otf', 'bold')
   fs.putText('/project/.opencard/fonts/unused.ttf', 'unused')
-  fs.putText('/project/.opencard/icons/idle.svg', 'idle')
+  fs.putText('/project/.opencard/icons/status/ok.svg', 'ok')
+  fs.putText('/project/.opencard/icons/unused/idle.svg', 'idle')
   fs.putText('/project/.opencard/locale.json', '{"entries":[]}')
   fs.putText('/project/images/cover.png', 'cover')
   fs.putText('/project/images/card.png', 'card')
   fs.putText(`${SUPPORT_ROOT}/fonts/shared.ttf`, 'shared')
-  fs.putText(`${SUPPORT_ROOT}/icons/ok.svg`, 'ok')
   return fs
 }
 
@@ -95,9 +109,13 @@ describe('buildResourcePackageFromProject', () => {
     expect(request.files.find(file => file.sourcePath === `${SUPPORT_ROOT}/fonts/shared.ttf`))
       .toMatchObject({ archivePath: 'fonts/shared.ttf' })
     expect(request.cover).toBe('images/cover.png')
+    // 选中的图标集整套进包，没选的集不进。
+    expect(request.files.find(file => file.sourcePath === '/project/.opencard/icons/status/ok.svg'))
+      .toMatchObject({ archivePath: '.opencard/icons/status/ok.svg' })
+    expect(request.files.some(file => file.sourcePath.includes('/icons/unused/'))).toBe(false)
   })
 
-  it('inlines a resource that lives in another package as a plain in-package file', async () => {
+  it('inlines a font that lives in another package and writes each icon set as its own folder', async () => {
     invoke.mockClear()
     await buildResourcePackageFromProject({
       fs: createFileSystem(),
@@ -111,8 +129,10 @@ describe('buildResourcePackageFromProject', () => {
     // 内化：注册表里的引用换成包内相对路径，包里不留任何对别的包的引用。
     const fonts = request.texts.find(text => text.archivePath === PROJECT_FONT_REGISTRY_FILE_NAME)
     expect(JSON.parse(fonts!.text).families[0].files.normal.upright).toBe('fonts/shared.ttf')
-    const icons = request.texts.find(text => text.archivePath === PROJECT_ICON_REGISTRY_FILE_NAME)
-    expect(JSON.parse(icons!.text).iconSeries[0].icons[0].source).toBe('icons/ok.svg')
+    // 图标集在包里仍是同一个布局：每套一个文件夹，清单里的路径相对它。
+    const icons = request.texts.find(text => text.archivePath === '.opencard/icons/status/icon-set.json')
+    expect(JSON.parse(icons!.text)).toEqual({ name: 'Status', icons: [{ key: 'ok', name: 'OK', source: 'ok.svg', tint: 'context' }] })
+    expect(request.texts.some(text => text.archivePath.includes('/icons/unused/'))).toBe(false)
     expect(request.texts.map(text => text.archivePath)).toContain('.opencard/locale.json')
     // 包里没有依赖清单 —— 用到的别人的资源已经是包内的普通文件了。
     expect(request.texts.some(text => text.archivePath.endsWith('packages.json'))).toBe(false)

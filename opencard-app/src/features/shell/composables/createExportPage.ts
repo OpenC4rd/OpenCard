@@ -32,6 +32,7 @@ export function createExportPage(options: ExportPageOptions) {
   const preview = useExportPreview({
     profile: space.activeProfile,
     active: navigation.isExport,
+    switched: space.switched,
     spread: computed(() => appState.state.value.layout.exportSpread),
     plan: options.planPreview,
     renderPage: options.renderPreviewPage,
@@ -57,8 +58,8 @@ export function createExportPage(options: ExportPageOptions) {
     ]
     const profiles = space.profiles.value
     return {
-      rootKeys: profiles.map(profile => profile.id),
-      items: new Map(profiles.map((profile): [string, OcNode] => [profile.id, {
+      rootKeys: profiles.map(profile => profile.name),
+      items: new Map(profiles.map((profile): [string, OcNode] => [profile.name, {
         label: profile.name || t('projectExport.newProfile'),
         tail: space.busy.value ? [] : [...actions],
         visual: { type: 'icon', icon: profile.rule.kind === 'pdf' ? 'mdiFileImageOutline' : 'mdiImageOutline' },
@@ -77,7 +78,7 @@ export function createExportPage(options: ExportPageOptions) {
     key: 'export',
     navigation: {
       key: 'export', icon: 'mdiPrinter', labelKey: 'app.shell.space.export',
-      available: computed(() => Boolean(project.projectPath.value)), unavailableHintKey: 'app.shell.space.needsProject',
+      available: computed(() => Boolean(project.projectPath.value)),
     },
     content: ExportPageContent,
     contentProps: computed(() => ({
@@ -107,7 +108,7 @@ export function createExportPage(options: ExportPageOptions) {
         content: {
           type: 'tree',
           data: treeData.value,
-          selectedKeys: space.activeProfile.value ? [space.activeProfile.value.id] : [],
+          selectedKeys: space.activeProfile.value ? [space.activeProfile.value.name] : [],
           role: 'tree',
           selectionMode: 'single',
           onSelectionChange: (event: OcNodeSelectionEvent) => {

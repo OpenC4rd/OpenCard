@@ -2,18 +2,24 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectIconRegistrationDialog from './ProjectIconRegistrationDialog.vue'
 import OcButton from '../base/OcButton.vue'
+import OcSelect from '../standard/OcSelect.vue'
+import OcOptionGroup from '../standard/OcOptionGroup.vue'
+import OcAlbum from '../standard/OcAlbum.vue'
 
 const mocks = vi.hoisted(() => ({
-  pickFiles: vi.fn(), pickDirectory: vi.fn(), readDirectory: vi.fn(),
+  pickFiles: vi.fn(), pickFile: vi.fn(), pickDirectory: vi.fn(), readDirectory: vi.fn(), readBinaryFile: vi.fn(), loadRasterDimensions: vi.fn(),
 }))
 const sourceOption = (wrapper: { findAll: (selector: string) => Array<{ text: () => string; trigger: (event: string) => Promise<void> }> }, title: string) => (
   wrapper.findAll('.project-import-source-choice__option').find(option => option.text().includes(title))!
 )
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('../../features/workspace/services/projectIconFileFacts', () => ({ loadRasterDimensions: mocks.loadRasterDimensions, PIXEL_ART_SHORT_SIDE: 32 }))
 vi.mock('../../features/workspace/services/fileSystemService', () => ({
   fileSystemService: {
     pickFiles: mocks.pickFiles,
+    pickFile: mocks.pickFile,
+    readBinaryFile: mocks.readBinaryFile,
     pickDirectory: mocks.pickDirectory,
     readDirectory: mocks.readDirectory,
     toAssetSrc: (path: string) => `asset://${path}`,
@@ -189,6 +195,111 @@ describe('ProjectIconRegistrationDialog', () => {
         { sourcePath: 'D:/Icons/Warn.svg', iconKey: 'warn-2', name: 'Warn' },
         { sourcePath: 'D:/Icons/Gem.svg', iconKey: 'gem', name: 'Gem' },
       ],
+    })
+  })
+
+  describe('sprite sheet', () => {
+    async function pickSheet(size: { width: number, height: number } | null = { width: 64, height: 32 }) {
+      mocks.pickFile.mockResolvedValue('D:/Art/Pixel Hero.png')
+      mocks.readBinaryFile.mockResolvedValue(new Uint8Array([1]))
+      mocks.loadRasterDimensions.mockResolvedValue(size)
+      const wrapper = mountDialog()
+      await sourceOption(wrapper, 'projectConfig.icons.chooseSprite').trigger('click')
+      await flushPromises()
+      return wrapper
+    }
+    const selects = (wrapper: ReturnType<typeof mountDialog>) => wrapper.findAllComponents(OcSelect)
+    const setCell = async (wrapper: ReturnType<typeof mountDialog>, width: string, height: string) => {
+      selects(wrapper)[0]!.vm.$emit('update:modelValue', width)
+      selects(wrapper)[1]!.vm.$emit('update:modelValue', height)
+      await wrapper.vm.$nextTick()
+    }
+
+    it('picks only raster files and starts on the cell size the sheet most likely holds', async () => {
+      const wrapper = await pickSheet({ width: 128, height: 64 })
+      expect(mocks.pickFile).toHaveBeenCalledWith(expect.objectContaining({ extensions: ['png', 'jpg', 'jpeg', 'webp'] }))
+
+      // 128×64 is evenly cut by 32, the most common icon cell, so that is already selected.
+      expect(selects(wrapper).map(select => select.props('modelValue'))).toEqual(['32', '32'])
+      expect(wrapper.text()).toContain('projectConfig.icons.spriteGrid')
+      await wrapper.get('form').trigger('submit')
+      const icons = (wrapper.emitted('submit')?.[0]?.[0] as { icons: unknown[] }).icons
+      expect(icons).toHaveLength(8)
+      expect(icons[0]).toEqual({ sourcePath: 'D:/Art/Pixel Hero.png', iconKey: 'pixel-hero-1', name: 'Pixel Hero 1', crop: { x: 0, y: 0, w: 32, h: 32 } })
+    })
+
+    it('offers only sizes that cut each side evenly, so no choice can be wrong', async () => {
+      const wrapper = await pickSheet({ width: 96, height: 64 })
+      expect(selects(wrapper)[0]!.props('options').map((option: { value: string }) => option.value))
+        .toEqual(['4', '6', '8', '12', '16', '24', '32', '48', '96'])
+      expect(selects(wrapper)[1]!.props('options').map((option: { value: string }) => option.value))
+        .toEqual(['4', '8', '16', '32', '64'])
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    })
+
+    it('cuts the sheet by the chosen cells, all sharing the sheet file, and keeps keys clear of the set it adds to', async () => {
+      const wrapper = await pickSheet({ width: 64, height: 32 })
+      await setCell(wrapper, '32', '32')
+      await wrapper.get('form').trigger('submit')
+      expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({
+        name: 'Pixel Hero',
+        key: 'pixel-hero',
+        icons: [
+          { sourcePath: 'D:/Art/Pixel Hero.png', iconKey: 'pixel-hero-1', name: 'Pixel Hero 1', crop: { x: 0, y: 0, w: 32, h: 32 } },
+          { sourcePath: 'D:/Art/Pixel Hero.png', iconKey: 'pixel-hero-2', name: 'Pixel Hero 2', crop: { x: 32, y: 0, w: 32, h: 32 } },
+        ],
+      })
+
+      const append = mountDialog({ targetSeries: { name: 'Pixel', key: 'pixel', icons: [{ iconKey: 'pixel-hero-1', name: 'x', source: 's', tint: 'original' }] } })
+      await sourceOption(append, 'projectConfig.icons.chooseSprite').trigger('click')
+      await flushPromises()
+      await append.get('form').trigger('submit')
+      const keys = (append.emitted('submit')?.[0]?.[0] as { icons: { iconKey: string }[] }).icons.map(icon => icon.iconKey)
+      expect(keys).toEqual(['pixel-hero-1-2', 'pixel-hero-2'])
+    })
+
+    it('shows the whole sheet with the cut drawn over it instead of an album of icons', async () => {
+      const wrapper = await pickSheet({ width: 64, height: 32 })
+      await setCell(wrapper, '32', '16')
+
+      expect(wrapper.findComponent(OcAlbum).exists()).toBe(false)
+      expect(wrapper.get('.project-icon-registration-dialog__sheet-image').attributes('src')).toBe('asset://D:/Art/Pixel Hero.png')
+      const grid = wrapper.get('.project-icon-registration-dialog__sheet-grid')
+      expect(grid.attributes('viewBox')).toBe('0 0 64 32')
+      // 2 columns × 2 rows: three vertical and three horizontal lines, edges included.
+      expect(grid.get('path').attributes('d')).toBe('M0 0V32M32 0V32M64 0V32M0 0H64M0 16H64M0 32H64')
+
+      await setCell(wrapper, '16', '16')
+      expect(wrapper.get('.project-icon-registration-dialog__sheet-grid path').attributes('d')).toContain('M48 0V32')
+    })
+
+    it('switches between cell size and columns and rows without losing the cut', async () => {
+      const wrapper = await pickSheet({ width: 64, height: 32 })
+      await setCell(wrapper, '16', '16')
+      const values = () => selects(wrapper).map(select => select.props('modelValue'))
+      expect(values()).toEqual(['16', '16'])
+
+      await wrapper.getComponent(OcOptionGroup).vm.$emit('update:modelValue', 'grid')
+      await wrapper.vm.$nextTick()
+      // 64 / 16 = 4 columns, 32 / 16 = 2 rows: the same cut, counted instead of measured.
+      expect(values()).toEqual(['4', '2'])
+      expect(selects(wrapper)[0]!.props('options').map((option: { value: string }) => option.value)).toEqual(['1', '2', '4', '8', '16'])
+
+      selects(wrapper)[0]!.vm.$emit('update:modelValue', '8')
+      await wrapper.vm.$nextTick()
+      await wrapper.getComponent(OcOptionGroup).vm.$emit('update:modelValue', 'size')
+      await wrapper.vm.$nextTick()
+      expect(values()).toEqual(['8', '16'])
+      await wrapper.get('form').trigger('submit')
+      const icons = (wrapper.emitted('submit')?.[0]?.[0] as { icons: { crop: unknown }[] }).icons
+      expect(icons).toHaveLength(16)
+      expect(icons[1]!.crop).toEqual({ x: 8, y: 0, w: 8, h: 16 })
+    })
+
+    it('reports an image whose size cannot be read instead of continuing', async () => {
+      const wrapper = await pickSheet(null)
+      expect(wrapper.text()).toContain('projectConfig.icons.spriteUnreadable')
+      expect(wrapper.find('.project-icon-registration-dialog__sprite').exists()).toBe(false)
     })
   })
 })

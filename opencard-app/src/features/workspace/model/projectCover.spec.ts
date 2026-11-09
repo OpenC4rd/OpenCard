@@ -3,7 +3,6 @@ import {
   coverImageExtension,
   isProjectCoverPath,
   normalizeProjectRelativeCoverPath,
-  projectRelativePathFromAbsolute,
 } from './projectCover'
 
 describe('project cover paths', () => {
@@ -42,12 +41,5 @@ describe('project cover paths', () => {
     expect(isProjectCoverPath('assets/cover.svg')).toBe(true)
     expect(isProjectCoverPath('assets/cover.txt')).toBe(false)
     expect(isProjectCoverPath('../cover.png')).toBe(false)
-  })
-
-  it('refuses paths outside the project root', () => {
-    expect(projectRelativePathFromAbsolute('D:/Cards/Project', 'D:/Downloads/cover.png')).toBeNull()
-    expect(projectRelativePathFromAbsolute('D:/Cards/Project', 'D:/Cards/Project-backup/cover.png')).toBeNull()
-    expect(projectRelativePathFromAbsolute('D:/Cards/Project', 'D:/Cards/Project')).toBeNull()
-    expect(projectRelativePathFromAbsolute('', 'D:/Cards/Project/cover.png')).toBeNull()
   })
 })

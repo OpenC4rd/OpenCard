@@ -2178,14 +2178,15 @@ function buildMovePayload(preview: SelectionFrame, measurement: SelectionMeasure
   }
 }
 
-function hasMeaningfulResizeChange(preview: SelectionFrame, measurement: SelectionMeasurement): boolean {
-  const resizePayload = buildAbsoluteResizePayload(preview, measurement)
-  return (
-    Math.abs(preview.width - measurement.worldRect.width) > TRANSFORM_EPSILON ||
-    Math.abs(preview.height - measurement.worldRect.height) > TRANSFORM_EPSILON ||
-    Math.abs((resizePayload.x ?? 0) - buildAbsoluteResizePayload(measurement.worldRect, measurement).x!) > TRANSFORM_EPSILON ||
-    Math.abs((resizePayload.y ?? 0) - buildAbsoluteResizePayload(measurement.worldRect, measurement).y!) > TRANSFORM_EPSILON
-  )
+/** 只带上相对起始矩形真正变化的轴（宽与 x、高与 y 成对），未变的轴不写入文档。 */
+function buildChangedAbsoluteResizePayload(preview: SelectionFrame, measurement: SelectionMeasurement): ResizePayload {
+  const next = buildAbsoluteResizePayload(preview, measurement)
+  const base = buildAbsoluteResizePayload(measurement.worldRect, measurement)
+  const differs = (a: number, b: number) => Math.abs(a - b) > TRANSFORM_EPSILON
+  return {
+    ...(differs(next.width, base.width) || differs(next.x, base.x) ? { width: next.width, x: next.x } : {}),
+    ...(differs(next.height, base.height) || differs(next.y, base.y) ? { height: next.height, y: next.y } : {}),
+  }
 }
 
 function hasMeaningfulMoveChange(preview: SelectionFrame, measurement: SelectionMeasurement): boolean {
@@ -2203,11 +2204,13 @@ function stopTransform() {
   const preview = previewWorldRect.value
   const blockId = transformBlockId.value
   if (measurement && preview && blockId) {
-    if (activeHandle.value && hasMeaningfulResizeChange(preview, measurement)) {
-      const payload = resizeMode.value === 'flow'
-        ? buildFlowResizePayload(preview, activeHandle.value)
-        : buildAbsoluteResizePayload(preview, measurement)
-      emit('resize-selection', { blockId, ...payload })
+    const resizePayload = activeHandle.value && resizeMode.value !== 'flow'
+      ? buildChangedAbsoluteResizePayload(preview, measurement)
+      : null
+    if (activeHandle.value && resizePayload && Object.keys(resizePayload).length) {
+      emit('resize-selection', { blockId, ...resizePayload })
+    } else if (activeHandle.value && resizeMode.value === 'flow') {
+      emit('resize-selection', { blockId, ...buildFlowResizePayload(preview, activeHandle.value) })
     } else if (isMovingSelection.value && hasMeaningfulMoveChange(preview, measurement)) {
       emit('move-selection', { blockId, ...buildMovePayload(preview, measurement) })
     }

@@ -9,24 +9,26 @@ import {
   type ProjectFont,
   type ProjectFontRegistryDocument,
 } from '../model/projectFontRegistry'
+import type { ProjectIconRegistryDocument } from '../model/projectIconRegistry'
 import {
-  parseProjectIconRegistryText,
-  serializeProjectIconRegistry,
-  type ProjectIconRegistryDocument,
-} from '../model/projectIconRegistry'
-import { PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_PROFILE_FILE_NAME } from '../model/projectStructure'
+  PROJECT_FONT_REGISTRY_FILE_NAME,
+  PROJECT_ICON_SET_FILE_NAME,
+  PROJECT_PROFILE_FILE_NAME,
+  projectIconSetDirectory,
+} from '../model/projectStructure'
+import { readProjectIconRegistry } from './projectIconUnits'
 import { isProjectCoverPath, resolveCoverAbsolutePath } from '../model/projectCover'
 import { parseProjectMetadataText } from '../model/projectMetadata'
 import type { FileSystemService } from './fileSystemService'
 import { invoke } from '@tauri-apps/api/core'
 import { resolveFileType } from '../model/fileTypes'
 import { resolveResourcePath, type PackageScopeRoots } from '../model/scopedResourcePath'
-import type { ProjectIcon } from '../model/projectIcons'
+import { serializeProjectIconSetManifest, type ProjectIcon } from '../model/projectIcons'
 import { PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME } from '../model/projectStructure'
 import { parseCustomBlockRegistryText, serializeCustomBlockRegistry, type CustomBlockCollection } from '../model/customBlockRegistry'
 
 type ResourcePackageProjectBuildOptions = {
-  fs: Pick<FileSystemService, 'readFile' | 'fileExists'>
+  fs: Pick<FileSystemService, 'readFile' | 'fileExists' | 'readDirectory'>
   projectRootPath: string
   /** 身份由打包界面填:包自己说清楚自己是谁,文件名不算数。 */
   author: string
@@ -327,10 +329,8 @@ async function buildIconProjection(
   const selectedSeriesKeys = selectedIdentities(options.iconSelection?.seriesKeys ?? [])
   if (selectedSeriesKeys.size === 0) return { document: null, files: [], publicIconSeries: [] }
 
-  const registryPath = `${root}/${PROJECT_ICON_REGISTRY_FILE_NAME}`
-  if (!await options.fs.fileExists(registryPath)) throw new Error('Project icon registry is missing')
-  const document = parseProjectIconRegistryText(await options.fs.readFile(registryPath))
-  if (!document) throw new Error('Project icon registry is invalid')
+  const { document, errors } = await readProjectIconRegistry(options.fs, root)
+  if (errors.length > 0) throw new Error(`Project icon registry is invalid: ${errors.join('; ')}`)
   const series = document.iconSeries ?? []
   const seriesByKey = new Map(series.map(entry => [entry.key.toLocaleLowerCase(), entry]))
   for (const key of selectedSeriesKeys) {
@@ -401,7 +401,13 @@ export async function buildResourcePackageFromProject(
     texts.push({ archivePath: PROJECT_FONT_REGISTRY_FILE_NAME, text: serializeProjectFontRegistry(fontProjection.document) })
   }
   if (iconProjection.document) {
-    texts.push({ archivePath: PROJECT_ICON_REGISTRY_FILE_NAME, text: serializeProjectIconRegistry(iconProjection.document) })
+    // 包里的图标和项目里同一个布局：每套一个文件夹，清单与图标文件同夹。
+    for (const series of iconProjection.document.iconSeries ?? []) {
+      texts.push({
+        archivePath: `${projectIconSetDirectory(series.key)}/${PROJECT_ICON_SET_FILE_NAME}`,
+        text: serializeProjectIconSetManifest(series),
+      })
+    }
   }
   if (blockProjection.document) {
     texts.push({ archivePath: PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, text: serializeCustomBlockRegistry(blockProjection.document) })

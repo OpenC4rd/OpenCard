@@ -33,8 +33,9 @@ describe('useExportPreview', () => {
     const release = vi.fn()
     const scope = effectScope()
     const spread = ref(false)
-    const preview = scope.run(() => useExportPreview({ profile, active, spread, plan, renderPage, release }))!
-    return { profile, active, spread, plan, renderPage, release, preview, scope }
+    const switched = ref(0)
+    const preview = scope.run(() => useExportPreview({ profile, active, switched, spread, plan, renderPage, release }))!
+    return { profile, active, switched, spread, plan, renderPage, release, preview, scope }
   }
 
   it('debounces edits and renders only the page being viewed', async () => {

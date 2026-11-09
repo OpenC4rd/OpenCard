@@ -7,7 +7,7 @@ const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
 }
 /** Rasters at or below this short side are pixel art, which must not be smoothed when scaled up. */
-const PIXEL_ART_SHORT_SIDE = 32
+export const PIXEL_ART_SHORT_SIDE = 32
 
 /** Everything an imported icon file itself decides, as opposed to what the user chooses. */
 type ProjectIconFileFacts = {
@@ -63,7 +63,7 @@ export async function inspectProjectIconFile(
 }
 
 /** Reads natural dimensions from the file's own bytes, so no project asset URL is needed. */
-async function loadRasterDimensions(
+export async function loadRasterDimensions(
   source: string,
   bytes: Uint8Array,
 ): Promise<{ width: number; height: number } | null> {

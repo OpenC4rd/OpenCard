@@ -26,6 +26,7 @@ interface CollaborationSectionOptions {
       expandedKeys: Readonly<Ref<string[]>>
       onExpansionChange: (event: OcNodeExpansionEvent) => void
       onExpansionSync: (event: OcNodeExpansionSyncEvent) => void
+      onAction: (event: OcNodeActionEvent) => Promise<unknown>
     }
   }
 }
@@ -100,6 +101,7 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
                   activationMode: 'none' as const,
                   onExpansionChange: options.version.graph.onExpansionChange,
                   onExpansionSync: options.version.graph.onExpansionSync,
+                  onAction: options.version.graph.onAction,
                 },
               },
             ]

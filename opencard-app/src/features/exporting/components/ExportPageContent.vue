@@ -5,7 +5,8 @@
   <ProjectResourceWorkbench v-else :inspector-title="t('projectExport.inspectorTitle')"
     :inspector-actions="inspectorActions" @action="handleInspectorAction">
     <OcEmpty v-if="message" icon="mdiPrinter" tone="muted" fill role="status">{{ message }}</OcEmpty>
-    <div v-else class="export-page__stage" :class="{ 'is-loading': preview.loading }" :aria-busy="preview.loading">
+    <div v-else class="export-page__stage" :class="{ 'is-loading': preview.loading }" :aria-busy="preview.loading"
+      @wheel.prevent="handleWheel">
       <img v-for="url in preview.imageUrls" :key="url" class="export-page__sheet"
         :class="{ 'is-spread': preview.pageStep > 1 }" :src="url" :alt="t('projectExport.preview.alt')">
     </div>
@@ -124,6 +125,24 @@ const pageLabel = computed(() => {
 const message = computed(() => props.issue
   ? t(`projectExport.validation.${props.issue.code}`, { path: props.issue.path ?? '' })
   : '')
+
+const WHEEL_PAGE_THRESHOLD = 40
+const WHEEL_PAGE_COOLDOWN_MS = 180
+let wheelDelta = 0
+let wheelLockedUntil = 0
+
+/** 滚轮翻页：触控板的连续惯性滚动先累计到阈值，翻一页后冷却一小会儿，避免一划翻很多页。 */
+function handleWheel(event: WheelEvent): void {
+  const now = performance.now()
+  if (now < wheelLockedUntil) return
+  wheelDelta += Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
+  if (Math.abs(wheelDelta) < WHEEL_PAGE_THRESHOLD) return
+  const { pageIndex, pageStep, pageCount } = props.preview
+  const next = pageIndex + (wheelDelta > 0 ? pageStep : -pageStep)
+  wheelDelta = 0
+  wheelLockedUntil = now + WHEEL_PAGE_COOLDOWN_MS
+  if (next >= 0 && next < pageCount) emit('selectPage', next)
+}
 
 function handleInspectorAction({ key }: { key: string }): void {
   if (key === EDIT_ACTION_KEY) emit('edit')

@@ -73,8 +73,8 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     ))
   })
 
-  it('avoids a leftover folder instead of mixing two sets in one directory', async () => {
-    // A folder from an earlier set that was removed without cleanup still holds files.
+  it('refuses a leftover folder instead of mixing two sets in one directory', async () => {
+    // A set's folder is named by its Key, so a folder an earlier set left files in cannot be reused.
     const existing = new Set(['D:/Demo/.opencard/icons/outline'])
     mocks.fileExists.mockImplementation(async (path: string) => existing.has(path))
     mocks.readDirectory.mockResolvedValue([{ name: 'old.svg', isFile: true, isDirectory: false }])
@@ -86,11 +86,10 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     })
     await flushPromises()
 
-    // The folder name moves aside, and the file keeps its exact Key-derived name.
-    expect(mocks.writeBinaryFile.mock.calls.map(call => call[0]))
-      .toEqual(['D:/Demo/.opencard/icons/outline-2/warn.svg'])
-    expect(lastRegistry(wrapper).iconSeries[0].icons[0].source)
-      .toBe('.opencard/icons/outline-2/warn.svg')
+    expect(mocks.writeBinaryFile).not.toHaveBeenCalled()
+    expect(notificationMocks.notifyAppError).toHaveBeenCalledWith('OC-E3011', expect.objectContaining({
+      message: expect.stringContaining('projectConfig.icons.setFolderOccupied'),
+    }))
   })
 
   it('reuses an empty leftover folder so removing and re-creating a set keeps its folder', async () => {
@@ -267,13 +266,12 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     expect(progress.tasks.value.some(task => task.key === TASK_KEY)).toBe(false)
   })
 
-  it('adds new icons to the folder the set already owns instead of opening a second one', async () => {
-    // The set's folder may carry a suffix from an earlier set; adding follows the files.
+  it('adds new icons to the set folder that its Key names', async () => {
     const wrapper = mount(ProjectIconRegistryFileEditor, {
       props: { session: createTestSession({ path: 'D:/Demo/.opencard/icons/icons.json', draftContent: JSON.stringify({
           iconSeries: [{
             name: 'Outline', key: 'outline',
-            icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline-2/warn.svg', tint: 'context' }],
+            icons: [{ iconKey: 'warn', name: 'Warn', source: '.opencard/icons/outline/warn.svg', tint: 'context' }],
           }],
         }) }),  },
     })
@@ -290,10 +288,32 @@ describe('ProjectIconRegistryFileEditor icon registration', () => {
     await flushPromises()
 
     expect(mocks.writeBinaryFile.mock.calls.map(call => call[0]))
-      .toEqual(['D:/Demo/.opencard/icons/outline-2/gem.svg'])
+      .toEqual(['D:/Demo/.opencard/icons/outline/gem.svg'])
     expect(lastRegistry(wrapper).iconSeries[0].icons.map((icon: { iconKey: string }) => icon.iconKey))
       .toEqual(['warn', 'gem'])
     expect(notificationMocks.notifySuccess).toHaveBeenCalledWith('projectConfig.icons.iconsAdded')
+  })
+
+  it('copies a sprite sheet once and stores every cell as a crop of that one file', async () => {
+    mocks.inspectProjectIconFile.mockResolvedValue({ tint: 'original' })
+    const wrapper = mountEditor()
+    const sheet = 'D:/Art/Pixel Hero.png'
+    const cell = (index: number) => ({ x: index * 16, y: 0, w: 16, h: 16 })
+
+    wrapper.getComponent(ProjectIconRegistrationDialog).vm.$emit('submit', {
+      name: 'Pixel', key: 'pixel',
+      icons: [0, 1, 2].map(index => ({ sourcePath: sheet, iconKey: `hero-${index + 1}`, name: `Hero ${index + 1}`, crop: cell(index) })),
+    })
+    await flushPromises()
+
+    expect(mocks.readBinaryFile).toHaveBeenCalledTimes(1)
+    expect(mocks.writeBinaryFile.mock.calls.map(call => call[0])).toEqual(['D:/Demo/.opencard/icons/pixel/pixel-hero.png'])
+    expect(lastRegistry(wrapper).iconSeries[0].icons).toEqual([0, 1, 2].map(index => ({
+      iconKey: `hero-${index + 1}`, name: `Hero ${index + 1}`,
+      source: '.opencard/icons/pixel/pixel-hero.png', tint: 'original',
+      // A 16-pixel cell is pixel art by its own size, whatever the sheet around it measures.
+      pixelated: true, crop: cell(index),
+    })))
   })
 
   it('still delivers the new set when the editor is rebuilt mid-copy', async () => {

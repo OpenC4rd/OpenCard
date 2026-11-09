@@ -227,22 +227,25 @@ describe('CardViewport Adversarial Stress Tests', () => {
       const resizeEvents = wrapper.emitted('resize-selection')
       expect(resizeEvents).toBeDefined()
       expect(resizeEvents?.length).toBeGreaterThan(0)
-      const payload = resizeEvents![resizeEvents!.length - 1]![0] as {
-        blockId: string
-        width: number
-        height: number
-        x: number
-        y: number
-      }
-      expect(payload.blockId).toBe('resize-target')
-      expect(payload.width).toBeGreaterThan(0)
-      expect(payload.height).toBeGreaterThan(0)
-
       // Calculate fixed anchor in original configuration
       const origX = 100
       const origY = 100
       const origW = 120
       const origH = 80
+      // 只发变化的轴：未变的轴沿用原值。
+      const payload = {
+        width: origW, height: origH, x: origX, y: origY,
+        ...(resizeEvents![resizeEvents!.length - 1]![0] as {
+          blockId: string
+          width?: number
+          height?: number
+          x?: number
+          y?: number
+        }),
+      }
+      expect(payload.blockId).toBe('resize-target')
+      expect(payload.width).toBeGreaterThan(0)
+      expect(payload.height).toBeGreaterThan(0)
 
       const fixedXOrig = handle.includes('r') ? origX : handle.includes('l') ? origX + origW : origX + origW / 2
       const fixedYOrig = handle.includes('b') ? origY : handle.includes('t') ? origY + origH : origY + origH / 2

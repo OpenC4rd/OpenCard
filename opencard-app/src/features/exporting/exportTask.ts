@@ -12,6 +12,7 @@ type ExportTaskValidationCode =
   | 'invalid-scale'
   | 'output-required'
   | 'invalid-file-name'
+  | 'invalid-profile-name'
   | 'unknown-variable'
   | 'paper-too-small'
   | 'document-unavailable'

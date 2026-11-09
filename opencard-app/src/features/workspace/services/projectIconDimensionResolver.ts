@@ -34,25 +34,31 @@ async function loadProjectImageDimensions(src: string): Promise<ProjectIconDimen
   })
 }
 
-/** Identity is the catalog entry (including its concrete URL), never a relative path. */
+/**
+ * Identity is the file's concrete URL, never a relative path and never the entry.
+ *
+ * Icons cut from one sprite sheet share its file, so they must share one measurement: keyed by entry,
+ * a set of eight hundred cells decoded the same sheet eight hundred times and, as each answer arrived,
+ * invalidated every cell's style at once. One file is one request and one answer, whoever asks.
+ */
 export function createIconDimensionReader() {
-  let records = new WeakMap<ProjectIconCatalogEntry, { src: string; size: ReturnType<typeof shallowRef<ProjectIconDimensions | undefined>> }>()
+  let records = new Map<string, ReturnType<typeof shallowRef<ProjectIconDimensions | undefined>>>()
   let generation = 0
   return {
-    clear() { generation++; records = new WeakMap() },
+    clear() { generation++; records = new Map() },
     read(entry: ProjectIconCatalogEntry): ProjectIconDimensions | undefined {
       const src = entry.src
-      let record = records.get(entry)
-      if (!record || record.src !== src) {
-        record = { src, size: shallowRef<ProjectIconDimensions>() }
-        records.set(entry, record)
+      let size = records.get(src)
+      if (!size) {
+        size = shallowRef<ProjectIconDimensions>()
+        records.set(src, size)
         const request = generation
-        const owner = record
+        const owner = size
         void loadProjectImageDimensions(src).then(value => {
-          if (request === generation && records.get(entry) === owner) owner.size.value = value
+          if (request === generation && records.get(src) === owner) owner.value = value
         }).catch(() => undefined)
       }
-      return record.size.value
+      return size.value
     },
   }
 }

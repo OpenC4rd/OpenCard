@@ -75,7 +75,7 @@ export function createTemplateExportForm(options: {
 
   function togglePathIncluded(path: string): void {
     const normalized = normalizeRelativePath(path)
-    if (!normalized || normalized === 'project.json' || normalized === 'fonts.json' || normalized === 'icons.json' || normalized === 'locale.json') return
+    if (!normalized || normalized === 'project.json' || normalized === 'fonts.json' || normalized === 'locale.json') return
     const coveringExclusion = excludedPaths.value.find((excluded) => pathContains(excluded, normalized))
     if (coveringExclusion) {
       excludedPaths.value = excludedPaths.value.filter((excluded) => excluded !== coveringExclusion)

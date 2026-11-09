@@ -8,13 +8,11 @@ import { fileSystemService, type FileSystemService } from '../../workspace/servi
 import { CARD_DOCUMENT_SUFFIX } from '../../workspace/model/fileTypes'
 import { parseProjectMetadataText, serializeProjectMetadata } from '../../workspace/model/projectMetadata'
 import { parseProjectFontRegistryText } from '../../workspace/model/projectFontRegistry'
-import { parseProjectIconRegistryText } from '../../workspace/model/projectIconRegistry'
 import { parseProjectDictionaryText } from '../../workspace/model/projectDictionary'
 import { writeProjectManagementFile } from '../../workspace/services/projectStructureService'
 import {
   PROJECT_DICTIONARY_FILE_NAME,
   PROJECT_FONT_REGISTRY_FILE_NAME,
-  PROJECT_ICON_REGISTRY_FILE_NAME,
   PROJECT_PROFILE_FILE_NAME,
 } from '../../workspace/model/projectStructure'
 import {
@@ -38,6 +36,7 @@ import {
   type TemplateProjectInspection,
 } from '../model/projectTemplate'
 import { isProjectCoverPath } from '../../workspace/model/projectCover'
+import { APP_VERSION } from '../../../shared/appVersion'
 
 const BUILTIN_TEMPLATE_INDEX_PATH = 'templates/index.json'
 const TEMPLATE_MANIFEST_FILE_NAME = 'template.json'
@@ -45,7 +44,6 @@ const TEMPLATE_CONTENT_DIRECTORY_NAME = 'content'
 const STRUCTURED_PROJECT_FILES = [
   { name: PROJECT_PROFILE_FILE_NAME, parse: parseProjectMetadataText, label: 'project file' },
   { name: PROJECT_FONT_REGISTRY_FILE_NAME, parse: parseProjectFontRegistryText, label: 'font registry' },
-  { name: PROJECT_ICON_REGISTRY_FILE_NAME, parse: parseProjectIconRegistryText, label: 'icon registry' },
   { name: PROJECT_DICTIONARY_FILE_NAME, parse: parseProjectDictionaryText, label: 'dictionary' },
 ] as const
 const TEMPLATE_PACKAGE_EXTENSIONS = [PROJECT_TEMPLATE_PACKAGE_EXTENSION, 'zip']
@@ -410,6 +408,8 @@ export class ProjectTemplateService {
       await writeProjectManagementFile(this.fs, temporaryPath, PROJECT_PROFILE_FILE_NAME, serializeProjectMetadata({
         ...(templateProfile ?? {}),
         name: projectName,
+        // 没有项目文件的模板按当前结构新写；自带项目文件的沿用它记的版本，没记就交给适配器。
+        ...(templateProfile || await this.fs.fileExists(projectFilePath) ? {} : { openCardVersion: APP_VERSION }),
       }))
       const createdEntryPath = selectedEntry
         ? await this.paths.join(targetPath, ...pathSegments(selectedEntry))

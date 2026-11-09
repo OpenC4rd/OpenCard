@@ -28,6 +28,12 @@ export type EditorSessionState = {
   savedContent: string
   draftContent: string
   isDirty: boolean
+  /**
+   * An immediate-save editor's edit is already on its way to disk. While it is, the session is dirty
+   * but asks nothing of the user, so the unsaved mark stays hidden; a save that fails or cannot run
+   * clears this and leaves the session dirty, which is when the mark means something.
+   */
+  autoSavePending?: boolean
   isPreview: boolean
   /** undefined: not declared yet; null: use the resource name. */
   presentation?: EditorPresentation | null
@@ -48,6 +54,7 @@ export function createEditorSession(initial: Omit<EditorSessionState, 'viewState
   const canSave = () => editor ? editor.canSave !== false : lastCanSave
   let saveQueue: Promise<unknown> = Promise.resolve()
   let autoSaveTimer: ReturnType<typeof setTimeout> | undefined
+  let autoSaveTicket = 0
   const history = editorHistoryManager
   const declaration = () => resolveCapabilities(state.editorId)
 
@@ -75,8 +82,15 @@ export function createEditorSession(initial: Omit<EditorSessionState, 'viewState
       publish(content, content !== state.savedContent)
     } else history.recordContent(state.id, content, meta)
     if (declaration()?.immediateSave) {
+      const ticket = ++autoSaveTicket
+      state.autoSavePending = true
       clearTimeout(autoSaveTimer)
-      autoSaveTimer = setTimeout(() => { void save().catch(error => notifyAppError('OC-E4002', error)) }, 0)
+      autoSaveTimer = setTimeout(() => {
+        void save().catch(error => notifyAppError('OC-E4002', error)).finally(() => {
+          // A later edit has scheduled its own save; this one no longer speaks for the session.
+          if (ticket === autoSaveTicket && !closed) state.autoSavePending = false
+        })
+      }, 0)
     }
   }
 

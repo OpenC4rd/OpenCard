@@ -27,6 +27,27 @@
     </template>
   </OcDialog>
 
+  <OcDialog :open="Boolean(directorySelectorRequest)" :title="directorySelectorRequest?.title ?? ''"
+    size="lg" height="md" height-mode="fixed" @request-close="resolveDirectorySelector(null)">
+    <OcDirectorySelector v-if="directorySelectorRequest" v-model="directorySelectorSelection"
+      :scope="directorySelectorRequest.scope" :root="directorySelectorRequest.root"
+      :filter="directorySelectorRequest.filter" :multiple="directorySelectorRequest.multiple"
+      :view="directorySelectorRequest.view" :resolve-thumbnail-src="directorySelectorRequest.resolveThumbnailSrc"
+      :importable="Boolean(directorySelectorRequest.importInto)" :refresh-key="directorySelectorRefreshKey"
+      :search-placeholder="t('directorySelector.search')" :empty-text="t('directorySelector.empty')"
+      :import-label="t('directorySelector.import')" :root-label="t('directorySelector.root')"
+      @activate="resolveDirectorySelector([$event])" @import-request="importIntoDirectorySelector" />
+    <template #footer>
+      <OcButton variant="ghost" @click="resolveDirectorySelector(null)">
+        {{ t('projectTemplates.actions.cancel') }}
+      </OcButton>
+      <OcButton variant="solid" :disabled="directorySelectorSelection.length === 0"
+        @click="resolveDirectorySelector(directorySelectorSelection)">
+        {{ t('directorySelector.confirm') }}
+      </OcButton>
+    </template>
+  </OcDialog>
+
   <OverlayGroupRoot />
 </template>
 
@@ -37,11 +58,19 @@ import OcIcon from '../../../components/base/OcIcon.vue'
 import OcButton from '../../../components/base/OcButton.vue'
 import OcDialog from '../../../components/standard/OcDialog.vue'
 import OcInlineMarkup from '../../../components/standard/OcInlineMarkup.vue'
+import OcDirectorySelector from '../../../components/standard/OcDirectorySelector.vue'
 import ReleaseNotesDialog from './ReleaseNotesDialog.vue'
 import FeedbackDialog from '../../feedback/components/FeedbackDialog.vue'
 import type { FeedbackDiagnosticInput, FeedbackKind, FeedbackPage } from '../../feedback/model/feedback'
 import type { ReleaseNotesSnapshot } from '../composables/updateStatePersistence'
 import { confirmationRequest, resolveConfirmation } from '../services/appConfirmation'
+import {
+  directorySelectorRefreshKey,
+  directorySelectorRequest,
+  directorySelectorSelection,
+  importIntoDirectorySelector,
+  resolveDirectorySelector,
+} from '../../../shared/ui/directorySelectorService'
 
 defineProps<{
   isExternalFileDragActive: boolean

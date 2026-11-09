@@ -1,7 +1,6 @@
 import { markRaw } from 'vue'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
-import type { IconIndexRow, RegistryIndexRow, IndexJobKind } from './projectIndexWorkerRuntime'
-import type { ProjectIcon, ProjectIconSeries } from '../model/projectIcons'
+import type { IconIndexRow, IndexJobKind } from './projectIndexWorkerRuntime'
 import { taskScheduler } from '../../../utils/taskScheduler'
 
 let worker: Worker | undefined
@@ -45,7 +44,7 @@ async function indexRows<T, Output = T>(kind: IndexJobKind, entries: Iterable<T>
         if (!jobs.has(id)) return result as Promise<Output[]>
         signal?.throwIfAborted()
         batch.push(entry)
-        if (batch.length === (kind === 'registry' ? 1 : 256)) {
+        if (batch.length === 256) {
           worker?.postMessage({ type, kind, id, entries: batch }); batch = []
           await taskScheduler.yieldToUi(signal)
         }
@@ -72,16 +71,4 @@ export function sortProjectDirectory(entries: readonly DirEntry[], signal?: Abor
 
 export function prepareProjectIconEntries(entries: Iterable<IconIndexRow>, signal?: AbortSignal): Promise<IconIndexRow[]> {
   return indexRows('icons', entries, signal)
-}
-
-export async function parseProjectIconRegistryInWorker(text: string): Promise<import('../model/projectIconRegistry').ProjectIconRegistryDocument> {
-  function* chunks() { for (let offset = 0; offset < text.length; offset += 65536) yield text.slice(offset, offset + 65536) }
-  const rows = await indexRows<string, RegistryIndexRow>('registry', chunks())
-  const series: Array<ProjectIconSeries & { icons: ProjectIcon[] }> = []
-  const byKey = new Map<string, (typeof series)[number]>()
-  await taskScheduler.forEach(rows, row => {
-    if (row.type === 'series') { const item = { key: row.key, name: row.name, icons: [] }; series.push(item); byKey.set(row.key, item) }
-    else byKey.get(row.seriesKey)?.icons.push(row.icon)
-  })
-  return series.length ? { iconSeries: series } : {}
 }

@@ -7,6 +7,11 @@ import {
   normalizeProjectIconDirectory,
   normalizeProjectIconSource,
   parseProjectIconSeries,
+  guessProjectIconGridCell,
+  parseProjectIconSetManifest,
+  projectIconGridCellSizes,
+  projectIconGridCells,
+  serializeProjectIconSetManifest,
   type ProjectIconSeries,
 } from './projectIcons'
 
@@ -54,12 +59,20 @@ describe('projectIcons', () => {
     }])
   })
 
-  it('keeps pixelated, ignores removed fields and rejects unusable sources', () => {
+  it('keeps what a file can use, drops what it cannot, and rejects unusable sources', () => {
     const icon = series.icons[0]!
-    const withPixelated = parseProjectIconSeries([{
-      ...series, icons: [{ ...icon, pixelated: true, rotation: 270 as const }],
+    const raster = { ...icon, source: 'icons/warn.png', tint: 'context' as const }
+    const parsedRaster = parseProjectIconSeries([{
+      ...series, icons: [{ ...raster, pixelated: true, crop: { x: 16, y: 0, w: 16, h: 16 }, rotation: 270 as const }],
     }])
-    expect(withPixelated?.[0]?.icons[0]).toEqual({ ...icon, pixelated: true })
+    // A raster keeps its own pixels (never tinted), may be pixelated, and may be a rectangle of its file.
+    expect(parsedRaster?.[0]?.icons[0]).toEqual({
+      ...raster, tint: 'original', pixelated: true, crop: { x: 16, y: 0, w: 16, h: 16 },
+    })
+    // A vector has no pixels to keep crisp and no stable pixel unit to crop in.
+    expect(parseProjectIconSeries([{
+      ...series, icons: [{ ...icon, pixelated: true, crop: { x: 0, y: 0, w: 4, h: 4 } }],
+    }])?.[0]?.icons[0]).toEqual(icon)
 
     const reject = (patch: Record<string, unknown>) => parseProjectIconSeries([{
       ...series, icons: [{ ...icon, ...patch }],
@@ -67,6 +80,7 @@ describe('projectIcons', () => {
     expect(reject({ tint: 'blue' })?.[0]?.icons[0]?.tint).toBe('context')
     expect(reject({ rotation: 45 })?.[0]?.icons[0]).not.toHaveProperty('rotation')
     expect(reject({ pixelated: 'yes' })).toBeNull()
+    expect(reject({ source: 'icons/warn.png', crop: { x: 0, y: 0, w: 0, h: 16 } })).toBeNull()
     expect(reject({ source: 'icons/warn.svgx' })).toBeNull()
     expect(reject({ source: 7 })).toBeNull()
     expect(reject({ iconKey: 'Not Valid' })).toBeNull()
@@ -116,4 +130,82 @@ describe('projectIcons', () => {
     expect(duplicateProjectIcon(series, 99)).toBe(series)
   })
 
+})
+
+describe('icon set manifest', () => {
+  const manifest = {
+    name: 'Pixel UI',
+    icons: [
+      { key: 'sword', name: 'Sword', source: 'sheet.png', pixelated: true, crop: { x: 0, y: 0, w: 16, h: 16 } },
+      { key: 'logo', name: 'Logo', source: 'logo.svg', tint: 'original' },
+      { key: 'bad', name: 'Escapes', source: '../outside.png' },
+      { key: 'Bad Key', name: 'Broken', source: 'x.png' },
+    ],
+  }
+
+  it('reads sources relative to the set folder and leaves out entries that cannot be icons', () => {
+    expect(parseProjectIconSetManifest('pixel-ui', manifest)).toEqual({
+      name: 'Pixel UI',
+      key: 'pixel-ui',
+      icons: [
+        { iconKey: 'sword', name: 'Sword', source: '.opencard/icons/pixel-ui/sheet.png', tint: 'original', pixelated: true, crop: { x: 0, y: 0, w: 16, h: 16 } },
+        { iconKey: 'logo', name: 'Logo', source: '.opencard/icons/pixel-ui/logo.svg', tint: 'original' },
+      ],
+    })
+    expect(parseProjectIconSetManifest('pixel-ui', { icons: [] })).toBeNull()
+  })
+
+  it('writes back what it read, relative to the folder, and refuses files outside it', () => {
+    const series = parseProjectIconSetManifest('pixel-ui', manifest)!
+    expect(JSON.parse(serializeProjectIconSetManifest(series))).toEqual({
+      name: 'Pixel UI',
+      icons: [
+        { key: 'sword', name: 'Sword', source: 'sheet.png', pixelated: true, crop: { x: 0, y: 0, w: 16, h: 16 } },
+        { key: 'logo', name: 'Logo', source: 'logo.svg', tint: 'original' },
+      ],
+    })
+    expect(() => serializeProjectIconSetManifest({
+      ...series, icons: [{ ...series.icons[0]!, source: '.opencard/icons/other/sheet.png' }],
+    })).toThrow('outside its set folder')
+  })
+})
+
+describe('projectIconGridCells', () => {
+  it('cuts the sheet row by row and leaves out cells that would hang over the edge', () => {
+    expect(projectIconGridCells({ width: 40, height: 20 }, { width: 16, height: 16 })).toEqual([
+      { x: 0, y: 0, w: 16, h: 16 },
+      { x: 16, y: 0, w: 16, h: 16 },
+    ])
+    expect(projectIconGridCells({ width: 32, height: 32 }, { width: 16, height: 16 }).map(({ x, y }) => [x, y]))
+      .toEqual([[0, 0], [16, 0], [0, 16], [16, 16]])
+  })
+
+  it('gives nothing for a cell size that cannot be a grid', () => {
+    const sheet = { width: 64, height: 64 }
+    for (const width of [0, -4, 1.5, Number.NaN]) expect(projectIconGridCells(sheet, { width, height: 16 })).toEqual([])
+    expect(projectIconGridCells(sheet, { width: 65, height: 16 })).toEqual([])
+    expect(projectIconGridCells({ width: 4096, height: 4096 }, { width: 8, height: 8 })).toEqual([])
+  })
+})
+
+describe('sprite cell suggestions', () => {
+  it('offers whole divisors that keep a side to at most 64 cells, and always something', () => {
+    expect(projectIconGridCellSizes(64)).toEqual([4, 8, 16, 32, 64])
+    expect(projectIconGridCellSizes(96)).toEqual([4, 6, 8, 12, 16, 24, 32, 48, 96])
+    expect(projectIconGridCellSizes(1024)).toEqual([16, 32, 64, 128, 256, 512, 1024])
+    expect(projectIconGridCellSizes(61)).toEqual([61])
+    expect(projectIconGridCellSizes(2)).toEqual([2])
+  })
+
+  it('starts on a square common cell that fits both sides', () => {
+    expect(guessProjectIconGridCell({ width: 256, height: 256 })).toEqual({ width: 32, height: 32 })
+    expect(guessProjectIconGridCell({ width: 48, height: 16 })).toEqual({ width: 16, height: 16 })
+    expect(guessProjectIconGridCell({ width: 64, height: 64 })).toEqual({ width: 32, height: 32 })
+  })
+
+  it('falls back to the largest shared square, then to each side on its own', () => {
+    expect(guessProjectIconGridCell({ width: 28, height: 28 })).toEqual({ width: 28, height: 28 })
+    // 45 has no common size, so each side picks its own best divisor: 32 for the width, 45 itself for the height.
+    expect(guessProjectIconGridCell({ width: 64, height: 45 })).toEqual({ width: 32, height: 45 })
+  })
 })

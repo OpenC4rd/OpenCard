@@ -4,7 +4,7 @@
  */
 import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import type { ExportPlan, ExportPreparationResult, ExportTaskValidationIssue } from '../../exporting/exportTask'
-import { createExportProfile, parseExportProfiles, type ExportProfile } from '../../workspace/model/projectExportProfile'
+import { createExportProfile, isValidExportProfileName, parseExportProfiles, serializeExportProfile, type ExportProfile } from '../../workspace/model/projectExportProfile'
 import { PROJECT_EXPORT_DIRECTORY } from '../../workspace/model/projectStructure'
 import type { useProjectStore } from '../../workspace/store/projectStore'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
@@ -13,10 +13,10 @@ import { taskScheduler } from '../../../utils/taskScheduler'
 
 const PROFILE_FILE_EXTENSION = '.json'
 
-/** 每条配置是 `.opencard/exports/<id>.json`，文件名就是身份，改名不用动文件。 */
+/** 每条配置是 `.opencard/exports/<配置名>.json`，文件名就是配置名，改名就是换文件。 */
 export function createProjectExportStorage(store: ReturnType<typeof useProjectStore>) {
   const directory = () => store.resolveProjectInternalPath(PROJECT_EXPORT_DIRECTORY)
-  const profilePath = (id: string) => `${directory()}/${id}${PROFILE_FILE_EXTENSION}`
+  const profilePath = (name: string) => `${directory()}/${name}${PROFILE_FILE_EXTENSION}`
   return {
     listDocuments: async (signal: AbortSignal): Promise<string[]> => {
       const paths: string[] = []
@@ -30,21 +30,23 @@ export function createProjectExportStorage(store: ReturnType<typeof useProjectSt
       const entries = await fileSystemService.readDirectory(directory())
       const files = entries.filter(entry => entry.isFile && entry.name.endsWith(PROFILE_FILE_EXTENSION))
       const profiles = await Promise.all(files.map(async (entry) => {
-        const id = entry.name.slice(0, -PROFILE_FILE_EXTENSION.length)
+        const name = entry.name.slice(0, -PROFILE_FILE_EXTENSION.length)
         try {
-          const source = JSON.parse(await fileSystemService.readFile(profilePath(id))) as Record<string, unknown>
-          return parseExportProfiles([{ ...source, id }])
+          const source = JSON.parse(await fileSystemService.readFile(profilePath(name))) as Record<string, unknown>
+          return parseExportProfiles([{ ...source, name }])
         } catch {
           return []
         }
       }))
       return profiles.flat().sort((left, right) => left.name.localeCompare(right.name))
     },
-    saveProfile: async (profile: ExportProfile): Promise<void> => {
+    /** `previousName` 是改名前的配置名；名字变了就删掉旧文件。 */
+    saveProfile: async (profile: ExportProfile, previousName?: string): Promise<void> => {
       await fileSystemService.createDirectory(directory())
-      await fileSystemService.writeFile(profilePath(profile.id), `${JSON.stringify(profile, null, 2)}\n`)
+      await fileSystemService.writeFile(profilePath(profile.name), serializeExportProfile(profile))
+      if (previousName && previousName !== profile.name) await fileSystemService.deleteFile(profilePath(previousName))
     },
-    deleteProfile: (id: string): Promise<void> => fileSystemService.deleteFile(profilePath(id)),
+    deleteProfile: (name: string): Promise<void> => fileSystemService.deleteFile(profilePath(name)),
     /** 项目内的路径改写成相对路径；项目外返回 null。 */
     toProjectPath: (path: string): string | null => store.getRelativeProjectPathIfInside(path),
   }
@@ -61,11 +63,14 @@ export type ExportSpaceOptions = ProjectExportStorage & {
 
 export function useExportSpace(options: ExportSpaceOptions) {
   const profiles = ref<ExportProfile[]>([])
-  const activeId = ref<string | null>(null)
+  /** 当前配置的配置名；编辑中改名时跟着草稿走。 */
+  const activeName = ref<string | null>(null)
+  /** 每次换到另一条配置就加一；编辑中改名不算。 */
+  const switched = ref(0)
   const documents = ref<readonly string[]>([])
   const preparing = ref(false)
   const issues = ref<readonly ExportTaskValidationIssue[]>([])
-  const activeProfile = computed(() => profiles.value.find(profile => profile.id === activeId.value) ?? null)
+  const activeProfile = computed(() => profiles.value.find(profile => profile.name === activeName.value) ?? null)
   const busy = computed(() => preparing.value || options.running.value)
   const editing = ref(false)
   /** 进入编辑时的配置；新建的配置还没写过文件，这里是 null，取消就直接丢掉。 */
@@ -86,22 +91,30 @@ export function useExportSpace(options: ExportSpaceOptions) {
     original = null
     issues.value = []
     profiles.value = restored
-      ? profiles.value.map(profile => profile.id === restored.id ? restored : profile)
-      : profiles.value.filter(profile => profile.id !== activeId.value)
-    if (!restored) activeId.value = profiles.value[0]?.id ?? null
+      ? profiles.value.map(profile => profile.name === activeName.value ? restored : profile)
+      : profiles.value.filter(profile => profile.name !== activeName.value)
+    activeName.value = restored?.name ?? profiles.value[0]?.name ?? null
   }
 
   async function save(): Promise<void> {
     const profile = activeProfile.value
+    if (!profile) return
+    const taken = profiles.value.some(candidate => candidate !== profile && candidate.name === profile.name)
+    if (!isValidExportProfileName(profile.name) || taken) {
+      issues.value = [{ code: 'invalid-profile-name' }]
+      return
+    }
+    const previousName = original?.name
     editing.value = false
     original = null
-    if (profile) await options.saveProfile(profile).catch((error: unknown) => notifyAppError('OC-E3006', error))
+    await options.saveProfile(profile, previousName).catch((error: unknown) => notifyAppError('OC-E3006', error))
   }
 
   /** 没保存就切走等于放弃这次编辑。 */
-  function select(id: string | null): void {
+  function select(name: string | null): void {
     cancel()
-    activeId.value = id
+    activeName.value = name
+    switched.value += 1
     issues.value = []
   }
 
@@ -113,44 +126,56 @@ export function useExportSpace(options: ExportSpaceOptions) {
     if (owner.signal.aborted) return
     // 离开空间再回来不丢草稿。
     const draft = editing.value ? activeProfile.value : null
-    profiles.value = draft ? [...nextProfiles.filter(profile => profile.id !== draft.id), draft] : nextProfiles
+    profiles.value = draft
+      ? [...nextProfiles.filter(profile => profile.name !== draft.name && profile.name !== original?.name), draft]
+      : nextProfiles
     documents.value = nextDocuments
-    if (!activeProfile.value) activeId.value = nextProfiles[0]?.id ?? null
+    if (!activeProfile.value) activeName.value = nextProfiles[0]?.name ?? null
   }
 
   function insert(profile: ExportProfile): void {
     cancel()
     profiles.value = [...profiles.value, profile]
-    activeId.value = profile.id
+    activeName.value = profile.name
+    switched.value += 1
     issues.value = []
     editing.value = true
   }
 
+  /** 重名时在后面加数字：`配置`、`配置 2`、`配置 3`。 */
+  function uniqueName(base: string): string {
+    const used = new Set(profiles.value.map(profile => profile.name))
+    let name = base
+    for (let index = 2; used.has(name); index += 1) name = `${base} ${index}`
+    return name
+  }
+
   function add(): void {
-    insert(createExportProfile(options.newProfileName()))
+    insert(createExportProfile(uniqueName(options.newProfileName())))
   }
 
-  function duplicate(id: string): void {
-    const source = profiles.value.find(profile => profile.id === id)
-    if (source) insert({ ...parseExportProfiles([source])[0]!, id: crypto.randomUUID(), name: `${source.name} 2` })
+  function duplicate(name: string): void {
+    const source = profiles.value.find(profile => profile.name === name)
+    if (source) insert({ ...parseExportProfiles([source])[0]!, name: uniqueName(source.name) })
   }
 
-  function remove(id: string): void {
-    const neverSaved = editing.value && id === activeId.value && !original
-    if (id === activeId.value) cancel()
+  function remove(name: string): void {
+    const neverSaved = editing.value && name === activeName.value && !original
+    if (name === activeName.value) cancel()
     if (neverSaved) return
-    const index = profiles.value.findIndex(profile => profile.id === id)
+    const index = profiles.value.findIndex(profile => profile.name === name)
     if (index < 0) return
-    profiles.value = profiles.value.filter(profile => profile.id !== id)
-    if (activeId.value === id) select(profiles.value[Math.min(index, profiles.value.length - 1)]?.id ?? null)
-    options.deleteProfile(id).catch((error: unknown) => notifyAppError('OC-E3006', error))
+    profiles.value = profiles.value.filter(profile => profile.name !== name)
+    if (activeName.value === name) select(profiles.value[Math.min(index, profiles.value.length - 1)]?.name ?? null)
+    options.deleteProfile(name).catch((error: unknown) => notifyAppError('OC-E3006', error))
   }
 
   function update(profile: ExportProfile): void {
     const directory = options.toProjectPath(profile.output.directory) ?? profile.output.directory
-    profiles.value = profiles.value.map(candidate => candidate.id === profile.id
+    profiles.value = profiles.value.map(candidate => candidate.name === activeName.value
       ? { ...profile, output: { ...profile.output, directory } }
       : candidate)
+    activeName.value = profile.name
     issues.value = []
   }
 
@@ -172,5 +197,5 @@ export function useExportSpace(options: ExportSpaceOptions) {
     }
   }
 
-  return { profiles, activeProfile, documents, busy, issues, editing, load, select, add, duplicate, remove, update, beginEdit, save, cancel, submit }
+  return { profiles, activeProfile, switched, documents, busy, issues, editing, load, select, add, duplicate, remove, update, beginEdit, save, cancel, submit }
 }

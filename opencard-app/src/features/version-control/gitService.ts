@@ -72,3 +72,17 @@ export const merge = (projectRoot: string, request: MergeRequest) =>
   invokeRequest<OperationState, MergeRequest>('git_merge', projectRoot, request)
 
 export const releaseRevisionSnapshot = (rootPath: string): Promise<void> => invoke('git_release_revision_snapshot', { rootPath })
+
+export const resetRepository = (projectRoot: string, request: { revision: string, mode: 'soft' | 'mixed' | 'hard' }) =>
+  invokeRequest<RepositorySummary, typeof request>('git_reset', projectRoot, request)
+
+
+export const revertCommit = (projectRoot: string, request: { revision: string }) =>
+  invokeRequest<OperationState, typeof request>('git_revert', projectRoot, request)
+
+export const cleanupOperationState = (projectRoot: string) =>
+  invokeProject<RepositorySummary>('git_cleanup_state', projectRoot)
+
+/** Puts one file back as it was at a revision; the rest of the project is untouched. */
+export const restorePathAtRevision = (projectRoot: string, request: RevisionFileRequest) =>
+  invokeRequest<RepositorySummary, RevisionFileRequest>('git_restore_path', projectRoot, request)

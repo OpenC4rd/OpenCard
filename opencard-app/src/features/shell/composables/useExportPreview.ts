@@ -12,6 +12,8 @@ const PREVIEW_DELAY_MS = 300
 export type ExportPreviewOptions = {
   profile: Readonly<Ref<ExportProfile | null>>
   active: Readonly<Ref<boolean>>
+  /** 换了一条配置（不是改名）就加一，预览回到第一页。 */
+  switched: Readonly<Ref<number>>
   /** PDF 按跨页看：同时显示相邻两页。图片规则每页是独立文件，不分跨页。 */
   spread: Readonly<Ref<boolean>>
   plan: (profile: ExportProfile, signal: AbortSignal) => Promise<ExportPreparationResult>
@@ -111,10 +113,10 @@ export function useExportPreview(options: ExportPreviewOptions) {
     options.release()
   }
 
-  watch([options.profile, options.active], ([profile, active], previous) => {
+  watch([options.profile, options.active, options.switched], ([profile, active, switched], previous) => {
     clearTimeout(timer)
     if (!profile || !active) return reset()
-    if (profile.id !== previous?.[0]?.id) pageIndex.value = 0
+    if (switched !== previous?.[2]) pageIndex.value = 0
     timer = setTimeout(() => { void refresh(profile) }, PREVIEW_DELAY_MS)
   }, { immediate: true })
   watch(options.spread, () => {

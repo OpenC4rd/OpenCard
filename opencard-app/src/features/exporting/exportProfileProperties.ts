@@ -284,7 +284,7 @@ export function createExportProfileInput(
     pageRegion: view.region,
     ...Object.fromEntries(Object.entries(region ?? {}).map(([field, value]) => [`${regionKey}:${field}`, value])),
   }
-  return { key: profile.id, title: '', record, fields }
+  return { key: 'export-profile', title: '', record, fields }
 }
 
 export function applyExportProfileField(profile: ExportProfile, key: string, raw: unknown): ExportProfile {

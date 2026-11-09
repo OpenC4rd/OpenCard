@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   buildCustomBlockRegistry,
   parseCustomBlockRegistry,
-  serializeCustomBlockRegistry,
 } from './customBlockRegistry'
 
 const source = '.opencard/blocks/status/warning.ocblock'
@@ -22,12 +21,8 @@ describe('custom block registry', () => {
     })
   })
 
-  it('projects the old flat registry into a default collection and writes the new shape', () => {
-    const document = parseCustomBlockRegistry({ blocks: [{ key: 'button', name: 'Button', source: 'blocks/button.ocblock' }] })
-    expect(document).toEqual({
-      collections: [{ key: 'default', name: 'Custom Blocks', blocks: [{ key: 'button', source: 'blocks/button.ocblock' }] }],
-    })
-    expect(JSON.parse(serializeCustomBlockRegistry(document!))).toEqual(document)
+  it('reads only the current shape: the old flat registry is the adaptation script\'s to rewrite', () => {
+    expect(parseCustomBlockRegistry({ blocks: [{ key: 'button', name: 'Button', source: 'blocks/button.ocblock' }] })).toEqual({})
   })
 
   it('drops duplicate collection and same-collection block keys while allowing cross-collection duplicates', () => {

@@ -9,6 +9,13 @@ import { computed, readonly, ref, shallowRef, shallowReactive, markRaw } from 'v
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { DirEntry } from '@tauri-apps/plugin-fs'
 import { fileSystemService, takeDirectoryWalkMetrics } from '../services/fileSystemService'
+import {
+  copyEntryIntoDirectory,
+  findAvailableName,
+  isValidEntryName,
+  pathIdentity,
+} from '../services/copyIntoDirectory'
+import { readProjectIconRegistry, writeProjectIconRegistry } from '../services/projectIconUnits'
 import { createProjectOpenTimer } from '../services/projectOpenTiming'
 import { sortProjectDirectory, disposeProjectIndexWorker } from '../services/projectIndexWorker'
 import type { ProjectFileChange } from '../model/projectFileChange'
@@ -176,13 +183,6 @@ const renderEnvironment = computed<CardRenderEnvironment>(() => ({
 }))
 
 
-function pathIdentity(path: string): string {
-  const normalized = normalizePath(path)
-  return /^[A-Za-z]:\//.test(normalized) || normalized.startsWith('//')
-    ? normalized.toLowerCase()
-    : normalized
-}
-
 function ensureProjectOpen(): string {
   if (!projectPath.value) {
     throw new Error('Project is not open')
@@ -309,10 +309,11 @@ async function saveProjectIconRegistry(path: string, content: string): Promise<s
   if (pathIdentity(resolvedPath) !== pathIdentity(resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME))) {
     throw new Error('Project icon registry must be stored at the project root')
   }
-  const canonicalContent = serializeProjectIconRegistry(document)
-  await writeProjectFile(resolvedPath, canonicalContent)
+  const root = ensureProjectOpen()
+  await writeProjectIconRegistry(fileSystemService, root, document, (relativePath, content) =>
+    writeProjectManagementFile(fileSystemService, root, relativePath, content))
   await reloadProjectIconRegistry()
-  return canonicalContent
+  return serializeProjectIconRegistry(document)
 }
 
 async function saveProjectCustomBlockRegistry(path: string, content: string): Promise<string> {
@@ -595,6 +596,10 @@ function findProjectManagementFile(path: string) {
 
 async function readFile(path: string) {
   const resolvedPath = resolveProjectPath(path)
+  // 图标页的"文件"是磁盘上各个图标集文件夹拼起来的整体，不对应任何真实文件。
+  if (pathIdentity(resolvedPath) === pathIdentity(resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME))) {
+    return serializeProjectIconRegistry((await readProjectIconRegistry(fileSystemService, ensureProjectOpen())).document)
+  }
   const managedPath = findProjectManagementFile(resolvedPath)
   if (managedPath && !await fileSystemService.fileExists(resolvedPath)) {
     return PROJECT_INTERNAL_FILE_DEFAULTS[managedPath]
@@ -615,16 +620,8 @@ async function saveFile(relativePath: string, content: string) {
   if (!exists) await refreshIndexedEntries([relativePath])
 }
 
-async function findAvailableProjectAssetName(targetDirectory: string, fileName: string): Promise<string> {
-  const dotIndex = fileName.lastIndexOf('.')
-  const stem = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName
-  const suffix = dotIndex > 0 ? fileName.slice(dotIndex) : ''
-  let candidateIndex = 2
-  while (await fileSystemService.fileExists(`${targetDirectory}/${stem} (${candidateIndex})${suffix}`)) {
-    candidateIndex += 1
-  }
-  return `${stem} (${candidateIndex})${suffix}`
-}
+const findAvailableProjectAssetName = (targetDirectory: string, fileName: string) =>
+  findAvailableName(fileSystemService, targetDirectory, fileName)
 
 async function getProjectAssetImportConflict(
   sourcePath: string,
@@ -788,7 +785,7 @@ async function installResourcePackageFile(sourcePath: string, projectRootPath?: 
   const packagesRoot = `${rootPath}/${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`
   await fileSystemService.createDirectory(packagesRoot)
   // 源文件本来就在这个目录里时它不复制自己：那会先截断再读，把包毁成 0 字节。
-  if (await copyExternalEntryIntoDirectory(normalizePath(sourcePath), packagesRoot) === 'skipped') {
+  if (!await copyEntryIntoDirectory(fileSystemService, sourcePath, packagesRoot)) {
     throw new Error(`Cannot install the package: ${sourcePath}`)
   }
   // 装进一个还没打开的项目（新建项目时的预装）不需要刷新当前项目。
@@ -857,26 +854,6 @@ function isSameOrDescendantPath(targetPath: string, ancestorPath: string) {
   const normalizedTargetPath = pathIdentity(targetPath)
   const normalizedAncestorPath = pathIdentity(ancestorPath)
   return normalizedTargetPath === normalizedAncestorPath || normalizedTargetPath.startsWith(`${normalizedAncestorPath}/`)
-}
-
-function isValidEntryName(name: string) {
-  if (!name) {
-    return false
-  }
-
-  if (name === '.' || name === '..') {
-    return false
-  }
-
-  if (/[<>:"/\\|?*\u0000-\u001F]/.test(name)) {
-    return false
-  }
-
-  if (/[. ]$/.test(name)) {
-    return false
-  }
-
-  return !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(name)
 }
 
 function resolveFileTreeDestination({ key, targetKey, position }: WorkspaceEntryMoveRequest) {
@@ -1074,34 +1051,6 @@ function resolveExternalDropDirectory({ targetKey, position }: WorkspaceExternal
   return getPathDirectory(targetPath) || projectRoot
 }
 
-async function copyDirectoryIntoProject(sourceDirectory: string, targetDirectory: string): Promise<void> {
-  await fileSystemService.createDirectory(targetDirectory)
-  for (const entry of await fileSystemService.readDirectory(sourceDirectory)) {
-    // Symlinks are left out: copying one either duplicates a foreign subtree or loops back into it.
-    if (entry.isSymlink) continue
-    const sourcePath = `${sourceDirectory}/${entry.name}`
-    const targetPath = `${targetDirectory}/${entry.name}`
-    if (entry.isDirectory) await copyDirectoryIntoProject(sourcePath, targetPath)
-    else await fileSystemService.copyFile(sourcePath, targetPath)
-  }
-}
-
-/** Copies one external entry in without overwriting: a taken name gets the next free numbered name. */
-async function copyExternalEntryIntoDirectory(sourcePath: string, destinationDirectory: string): Promise<'copied' | 'skipped'> {
-  const sourceName = getPathBasename(sourcePath)
-  if (!isValidEntryName(sourceName)) return 'skipped'
-  if (isSameOrDescendantPath(destinationDirectory, sourcePath)) return 'skipped'
-
-  const info = await fileSystemService.getFileInfo(sourcePath)
-  const targetName = await fileSystemService.fileExists(`${destinationDirectory}/${sourceName}`)
-    ? await findAvailableProjectAssetName(destinationDirectory, sourceName)
-    : sourceName
-  const targetPath = `${destinationDirectory}/${targetName}`
-  if (info.isDirectory) await copyDirectoryIntoProject(sourcePath, targetPath)
-  else await fileSystemService.copyFile(sourcePath, targetPath)
-  return 'copied'
-}
-
 async function copyExternalEntriesIntoProject(
   payload: WorkspaceExternalDropRequest,
 ): Promise<CopyExternalEntriesResult> {
@@ -1119,7 +1068,7 @@ async function copyExternalEntriesIntoProject(
       continue
     }
     try {
-      if (await copyExternalEntryIntoDirectory(sourcePath, destinationDirectory) === 'copied') copied += 1
+      if (await copyEntryIntoDirectory(fileSystemService, sourcePath, destinationDirectory)) copied += 1
       else skipped += 1
     } catch (error) {
       failed += 1

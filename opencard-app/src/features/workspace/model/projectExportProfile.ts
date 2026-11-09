@@ -97,8 +97,8 @@ export type ExportWatermark = {
   color: string
 }
 
+/** `name` 就是文件名（不含扩展名），不写进文件内容。 */
 export type ExportProfile = {
-  id: string
   name: string
   /** 项目相对路径或通配符，如 `cards/hero.ocdocument`、`cards/**\/*.ocdocument`。 */
   documents: string[]
@@ -143,7 +143,6 @@ export function createExportRule(
 
 export function createExportProfile(name: string): ExportProfile {
   return {
-    id: crypto.randomUUID(),
     name,
     documents: [ALL_DOCUMENTS_PATTERN],
     selection: 'blueprint-and-instances',
@@ -235,12 +234,22 @@ function parseRule(value: unknown): ExportRule {
   }
 }
 
+/** 文件名不能为空、不能含路径分隔符等非法字符，也不能以点开头。 */
+export function isValidExportProfileName(name: string): boolean {
+  return name.trim() !== '' && !/[\\/:*?"<>|\u0000-\u001f]/.test(name) && !name.startsWith('.')
+}
+
+/** 文件内容不含配置名。 */
+export function serializeExportProfile({ name: _name, ...profile }: ExportProfile): string {
+  return `${JSON.stringify(profile, null, 2)}\n`
+}
+
+/** 调用方把文件名放进 `name` 再交进来。 */
 export function parseExportProfiles(value: unknown): ExportProfile[] {
   if (!Array.isArray(value)) return []
-  return value.filter(isRecord).map((source, index) => {
+  return value.filter(isRecord).map((source) => {
     const output = isRecord(source.output) ? source.output : {}
     return {
-      id: text(source.id, '') || `profile-${index + 1}`,
       name: text(source.name, ''),
       documents: Array.isArray(source.documents)
         ? [...new Set(source.documents.filter((path): path is string => typeof path === 'string' && path.trim() !== ''))]

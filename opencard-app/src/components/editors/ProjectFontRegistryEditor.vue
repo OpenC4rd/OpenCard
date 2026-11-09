@@ -18,9 +18,9 @@
     <template v-if="selectedEntry" #append>
       <OcFieldInput class="project-font-registry-workbench__text" full-width :value="previewText"
         :aria-label="t('projectConfig.fonts.previewText')" @input="updatePreviewText" />
-      <OcSlider class="project-font-registry-workbench__size" v-model="previewSize"
-        :min="PREVIEW_SIZE_MIN" :max="PREVIEW_SIZE_MAX" :step="PREVIEW_SIZE_STEP"
-        :value-text="`${previewSize} px`" :aria-label="t('projectConfig.fonts.previewSize')" />
+      <OcOptionGroup class="project-font-registry-workbench__size" :model-value="String(previewSize)"
+        :options="previewSizeOptions" appearance="sliding-outline" fill :aria-label="t('projectConfig.fonts.previewSize')"
+        @update:model-value="previewSize = Number($event)" />
     </template>
 
     <ProjectFontSpecimen v-if="selectedEntry" :families="families" :family="shownFamily" :composition="shownComposition"
@@ -56,7 +56,7 @@ import type {
 import OcEmpty from '../base/OcEmpty.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcText from '../base/OcText.vue'
-import OcSlider from '../standard/OcSlider.vue'
+import OcOptionGroup, { type OcOption } from '../standard/OcOptionGroup.vue'
 import OcTree from '../standard/OcTree.vue'
 import ProjectFontInspector from './ProjectFontInspector.vue'
 import ProjectFontSpecimen from './ProjectFontSpecimen.vue'
@@ -80,15 +80,17 @@ const emit = defineEmits<{
   'configure-composition': [compositionKey: string]
 }>()
 const { t } = useI18n()
-const PREVIEW_SIZE_MIN = 24
-const PREVIEW_SIZE_MAX = 120
-const PREVIEW_SIZE_STEP = 4
-const PREVIEW_SIZE_DEFAULT = 48
+/** A few specimen sizes to pick from, the same choice the icon page offers for its tiles. */
+const PREVIEW_SIZES = { small: 32, medium: 48, large: 88 } as const
+const PREVIEW_SIZE_DEFAULT = PREVIEW_SIZES.medium
 const activePage = ref<'families' | 'compositions'>('families')
 const selectedFamilyKey = ref<string | null>(null)
 const selectedCompositionKey = ref<string | null>(null)
 const previewText = ref(t('projectConfig.fonts.previewSample'))
-const previewSize = ref(PREVIEW_SIZE_DEFAULT)
+const previewSize = ref<number>(PREVIEW_SIZE_DEFAULT)
+const previewSizeOptions = computed<OcOption[]>(() => Object.entries(PREVIEW_SIZES).map(([size, value]) => ({
+  value: String(value), label: t(`projectConfig.fonts.previewSizes.${size}`),
+})))
 const selectedFamily = computed(() => props.families.find(family => family.key === selectedFamilyKey.value) ?? null)
 const selectedComposition = computed(() => props.compositions.find(entry => entry.key === selectedCompositionKey.value) ?? null)
 const shownFamily = computed(() => activePage.value === 'families' ? selectedFamily.value : null)

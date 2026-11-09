@@ -1,5 +1,4 @@
 import type { DirEntry } from '@tauri-apps/plugin-fs'
-import { parseProjectIconRegistryText } from '../model/projectIconRegistry'
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 export function sortDirectoryEntries(entries: DirEntry[]): DirEntry[] {
@@ -8,9 +7,8 @@ export function sortDirectoryEntries(entries: DirEntry[]): DirEntry[] {
 
 import type { ProjectIcon } from '../model/projectIcons'
 export type IconIndexRow = ProjectIcon & { seriesKey: string; identity?: string }
-export type RegistryIndexRow = { type: 'series'; key: string; name: string } | { type: 'icon'; seriesKey: string; icon: ProjectIcon }
-export type IndexJobKind = 'directory' | 'icons' | 'registry'
-type Row = DirEntry | IconIndexRow | RegistryIndexRow | string
+export type IndexJobKind = 'directory' | 'icons'
+type Row = DirEntry | IconIndexRow
 type Input = { type: 'page' | 'previous'; kind: IndexJobKind; id: number; entries: Row[] }
   | { type: 'finish' | 'next' | 'cancel'; kind: IndexJobKind; id: number }
 if (typeof document === 'undefined' && typeof self !== 'undefined') {
@@ -27,15 +25,6 @@ if (typeof document === 'undefined' && typeof self !== 'undefined') {
       if (job.kind !== 'icons') job.entries.push(...data.entries)
       else for (const row of data.entries as IconIndexRow[]) job.entries.push({ ...row, identity: `${row.seriesKey.toLowerCase()}\u0000${row.iconKey.toLowerCase()}` })
       return
-    }
-    if (data.type === 'finish' && job.kind === 'registry') {
-      const document = parseProjectIconRegistryText(job.entries.join(''))
-      if (!document) { self.postMessage({ id: data.id, error: 'Unreadable resource definition' }); jobs.delete(data.id); return }
-      job.entries = []
-      for (const series of document.iconSeries ?? []) {
-        job.entries.push({ type: 'series', key: series.key, name: series.name })
-        for (const icon of series.icons) job.entries.push({ type: 'icon', seriesKey: series.key, icon })
-      }
     }
     if (data.type === 'finish' && job.kind === 'directory') {
       const entries = sortDirectoryEntries(job.entries as DirEntry[])

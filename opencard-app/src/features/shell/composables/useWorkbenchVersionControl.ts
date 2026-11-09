@@ -6,6 +6,7 @@
  */
 import { computed, ref, watch, type DeepReadonly, type Ref } from 'vue'
 import type {
+  OcNodeActionEvent,
   OcNodeCollection,
   OcNodeExpansionEvent,
   OcNodeExpansionSyncEvent,
@@ -32,7 +33,8 @@ import {
 } from '../../version-control/changedPathActions'
 import { gitignorePatternForExtension, gitignorePatternForPath } from '../../version-control/gitignorePatterns'
 import { useProjectTimeline } from '../../version-control/useProjectTimeline'
-import { notifyError, notifyWarning } from '../../notifications/titlebarNotices'
+import { notifyError, notifySuccess, notifyWarning } from '../../notifications/titlebarNotices'
+import { useVersionHistoryActions } from './useVersionHistoryActions'
 import { resolveCommitterIdentity, type AppSettingKey, type AppSettings } from '../../settings/model/appSettings'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { isRepositorySidebarReady } from '../shellSidebarConfig'
@@ -108,6 +110,8 @@ type WorkbenchVersionControl = {
   handleChangesExpansionChange: (event: OcNodeExpansionEvent) => void
   handleChangesExpansionSync: (event: OcNodeExpansionSyncEvent) => void
   handleChangesAction: (event: { actionKey: string; key: string }) => Promise<void>
+  /** 版本图表与文件时间线上的回撤操作；不是这类操作时返回 false。 */
+  handleVersionHistoryAction: (event: OcNodeActionEvent) => Promise<boolean>
   closeCommitVersionDialog: () => void
   commitVersion: (value: { summary: string; description: string }) => Promise<void>
 }
@@ -139,6 +143,12 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
     timelineFilePath,
     locale,
     computed(() => t('versionControl.timelineCompareWithDisk')),
+    computed(() => ({
+      more: t('versionControl.history.more'),
+      revert: t('versionControl.history.revert.action'),
+      reset: t('versionControl.history.reset.action'),
+      restoreFile: t('versionControl.history.restoreFile.action'),
+    })),
   )
   const {
     treeData: timelineTreeData,
@@ -158,6 +168,15 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
    * 用户取消过的那些在下一轮刷新后仍然保持取消。
    */
   const uncheckedChangePaths = ref<string[]>([])
+
+  const { handleVersionAction: handleVersionHistoryAction } = useVersionHistoryActions({
+    projectPath,
+    hasUncommittedChanges: () => statusEntries.value.length > 0,
+    timeline: projectTimeline,
+    translate: t,
+    requestConfirmation: options.requestConfirmation,
+    notifySuccess, notifyWarning, notifyError,
+  })
   function isChangeSelected(path: string): boolean {
     return !uncheckedChangePaths.value.includes(path)
   }
@@ -449,6 +468,7 @@ export function useWorkbenchVersionControl(options: WorkbenchVersionControlOptio
     handleChangesExpansionChange,
     handleChangesExpansionSync,
     handleChangesAction,
+    handleVersionHistoryAction,
     closeCommitVersionDialog,
     initializeProjectRepository,
     commitVersion,

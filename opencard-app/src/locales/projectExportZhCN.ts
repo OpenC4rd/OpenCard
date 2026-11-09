@@ -82,6 +82,7 @@ export default {
     'invalid-scale': 'DPI 必须不小于 72。',
     'output-required': '请选择输出文件夹。',
     'invalid-file-name': '请填写文件名。',
+    'invalid-profile-name': '配置名不能为空、不能与其他配置重名，也不能包含 / \\ : * ? " < > | 等字符。',
     'unknown-variable': '不认识这个变量：{path}',
     'paper-too-small': '纸张放不下卡片，请调整纸张、边距、间距或行列数。',
     'document-unavailable': '无法读取需要导出的卡牌文档：{path}',

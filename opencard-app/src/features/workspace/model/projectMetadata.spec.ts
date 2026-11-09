@@ -79,8 +79,8 @@ describe('parseExportProfiles', () => {
   })
 
   it('ignores unknown fields', () => {
-    const [profile] = parseExportProfiles([{ id: 'one', futureField: true }])
-    expect(profile).toMatchObject({ id: 'one', errorPolicy: 'continue' })
+    const [profile] = parseExportProfiles([{ name: 'one', futureField: true }])
+    expect(profile).toMatchObject({ name: 'one', errorPolicy: 'continue' })
     expect(profile).not.toHaveProperty('futureField')
   })
 })

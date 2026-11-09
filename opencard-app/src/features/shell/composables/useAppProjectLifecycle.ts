@@ -32,6 +32,8 @@ type ProjectLifecycleOptions = {
   }
   shellLocation: Ref<ShellLocation>
   translate: (key: string) => string
+  /** 打开之前把项目带到当前结构；它只改磁盘上的文件，打开流程照常继续。 */
+  prepareProject?: (path: string) => Promise<unknown>
 }
 
 export function useAppProjectLifecycle(options: ProjectLifecycleOptions) {
@@ -54,6 +56,7 @@ export function useAppProjectLifecycle(options: ProjectLifecycleOptions) {
     isActivating.value = true
 
     try {
+      await options.prepareProject?.(path)
       await options.project.setProjectPath(path)
       options.history.rememberRecentProject(options.project.projectPath.value)
       if (entryPath) {

@@ -64,6 +64,28 @@ describe('editorSessionManager project profile manual save', () => {
     } finally { if (wrapper.exists()) wrapper.unmount(); store.dispose() }
   })
 
+  it('keeps an immediate save quiet while it runs, and flags the session only when it fails', async () => {
+    mocks.readFile.mockResolvedValue('{"collections":[]}')
+    let finish: (value: string) => void = () => {}
+    let fail: (error: Error) => void = () => {}
+    mocks.saveProjectCustomBlockRegistry.mockImplementation(() => new Promise<string>((resolve, reject) => { finish = resolve; fail = reject }))
+    const store = createEditorSessionManager()
+    const session = await store.open('D:/project/.opencard/blocks/blocks.json')
+    try {
+      session.updateContent('{"collections":[{"key":"a","name":"A","blocks":[]}]}')
+      expect(session.state).toMatchObject({ isDirty: true, autoSavePending: true })
+      await vi.waitFor(() => expect(mocks.saveProjectCustomBlockRegistry).toHaveBeenCalledOnce())
+      finish(session.state.draftContent)
+      await vi.waitFor(() => expect(session.state).toMatchObject({ isDirty: false, autoSavePending: false }))
+
+      session.updateContent('{"collections":[]}')
+      await vi.waitFor(() => expect(mocks.saveProjectCustomBlockRegistry).toHaveBeenCalledTimes(2))
+      fail(new Error('disk full'))
+      // The edit never reached disk: now the session is dirty in the way that asks the user to act.
+      await vi.waitFor(() => expect(session.state).toMatchObject({ isDirty: true, autoSavePending: false }))
+    } finally { store.dispose() }
+  })
+
   it('keeps profile edits dirty until explicitly saved', async () => {
     const store = createEditorSessionManager()
     const session = await store.open('.opencard/project.json')

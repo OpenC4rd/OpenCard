@@ -409,8 +409,7 @@
 .shell-space-rail__items {
   display: flex;
   flex-direction: column;
-  gap: var(--oc-space-xs);
-  padding: var(--oc-space-xs);
+  padding: var(--oc-space-xs) var(--oc-space-xs) 0;
 }
 
 .shell-space-rail__items--secondary {
@@ -420,16 +419,31 @@
 .shell-space-rail__item {
   width: 100%;
   min-height: var(--oc-size-lg);
+  max-height: var(--oc-size-lg);
+  margin-bottom: var(--oc-space-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border: 0;
   border-radius: var(--oc-radius-control);
   background: transparent;
   color: var(--oc-fg-default);
   transition:
     background-color var(--oc-duration) var(--oc-ease),
-    color var(--oc-duration) var(--oc-ease);
+    color var(--oc-duration) var(--oc-ease),
+    opacity var(--oc-duration-layout) var(--oc-ease),
+    min-height var(--oc-duration-layout) var(--oc-ease),
+    max-height var(--oc-duration-layout) var(--oc-ease),
+    margin-bottom var(--oc-duration-layout) var(--oc-ease);
+}
+
+.shell-space-rail-item-enter-from,
+.shell-space-rail-item-leave-to {
+  min-height: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  opacity: 0;
 }
 
 .shell-space-rail__item:hover {
@@ -438,12 +452,6 @@
 
 .shell-space-rail__item.is-active {
   background: var(--oc-bg-active);
-}
-
-.shell-space-rail__item.is-unavailable {
-  background: transparent;
-  cursor: not-allowed;
-  opacity: 0.4;
 }
 
 .shell-space-rail__item:focus-visible {

@@ -82,6 +82,7 @@ export default {
     'invalid-scale': 'DPI must be at least 72.',
     'output-required': 'Choose an output folder.',
     'invalid-file-name': 'Enter a file name.',
+    'invalid-profile-name': 'The profile name must be unique and cannot be empty or contain / \\ : * ? " < > | characters.',
     'unknown-variable': 'Unknown variable: {path}',
     'paper-too-small': 'Cards do not fit on the paper. Adjust the paper, margins, gaps, rows or columns.',
     'document-unavailable': 'Could not read the card document to export: {path}',

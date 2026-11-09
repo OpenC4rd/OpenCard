@@ -16,3 +16,20 @@ it('isolates identical relative sources and ignores a measurement after invalida
   expect(first.read(a)).toBeUndefined()
   expect(second.read(b)).toEqual({ width: 30, height: 20 })
 })
+
+it('measures a file once however many icons are cut from it, and answers them all together', async () => {
+  const images: { onload: () => void, naturalWidth: number, naturalHeight: number }[] = []
+  vi.stubGlobal('Image', class { onload = () => {}; naturalWidth = 512; naturalHeight = 432; constructor() { images.push(this) } })
+  const reader = createIconDimensionReader()
+  const cells = Array.from({ length: 800 }, (_, index): ProjectIconCatalogEntry => ({
+    iconKey: `cell-${index}`, name: 'Cell', seriesKey: 's', tint: 'original', source: 'sheet.png', src: 'asset://sheet.png?oc-revision=0',
+    crop: { x: 0, y: 0, w: 16, h: 16 },
+  }))
+  cells.forEach(cell => reader.read(cell))
+  expect(images).toHaveLength(1)
+
+  images[0]!.onload()
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+  expect(reader.read(cells[799]!)).toEqual({ width: 512, height: 432 })
+  expect(images).toHaveLength(1)
+})

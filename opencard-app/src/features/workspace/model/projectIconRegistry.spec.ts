@@ -25,7 +25,8 @@ describe('project icon registry', () => {
         key: 'status',
         icons: [{
           iconKey: 'warning', name: 'Warning',
-          source: 'alice/theme@1.0.0#icons/warning.svg', tint: 'original', pixelated: true,
+          // `pixelated` means nothing for a vector, so it is dropped.
+          source: 'alice/theme@1.0.0#icons/warning.svg', tint: 'original',
         }],
       }],
     })

@@ -1,7 +1,8 @@
 import { computed, readonly, shallowRef, shallowReactive, markRaw, type Ref } from 'vue'
 import { projectChangePaths, type ProjectFileChange } from '../model/projectFileChange'
 import { taskScheduler } from '../../../utils/taskScheduler'
-import { prepareProjectIconEntries, parseProjectIconRegistryInWorker } from './projectIndexWorker'
+import { prepareProjectIconEntries } from './projectIndexWorker'
+import { affectsIconSets, loadProjectIconRegistry } from './projectIconUnits'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { fileSystemService } from './fileSystemService'
 import { createResourceFontLoader, type ProjectFontLoadError } from './projectFontLoader'
@@ -25,7 +26,6 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import type { ProjectFontRegistry, ProjectFontRegistryDocument } from '../model/projectFontRegistry'
 import { buildProjectFontRegistry, parseProjectFontRegistryText } from '../model/projectFontRegistry'
 import type { ProjectIconRegistryDocument } from '../model/projectIconRegistry'
-import { parseProjectIconRegistryText } from '../model/projectIconRegistry'
 import type { ProjectIconCatalog, ProjectIconCatalogEntry, ProjectIconDimensionReader, ProjectIconSeriesRuntime } from './projectIconCatalog'
 import { buildProjectIconCatalog, EMPTY_PROJECT_ICON_CATALOG } from './projectIconCatalog'
 import type { FileSystemService } from './fileSystemService'
@@ -384,7 +384,7 @@ export async function loadProjectResourceEnvironment(options: {
   }
   const [fonts, icons, customBlockDocument, profile, dictionary] = await Promise.all([
     read('.opencard/fonts/fonts.json', parseProjectFontRegistryText, {}, previous?.fontDocument),
-    read('.opencard/icons/icons.json', text => text.length > 65536 ? parseProjectIconRegistryInWorker(text) : parseProjectIconRegistryText(text), {}, previous?.iconDocument),
+    previous && !changed(`${PROJECT_INTERNAL_DIRECTORY_NAME}/icons`) ? previous.iconDocument : loadProjectIconRegistry(options.fs, root, previous?.iconDocument, diagnostics),
     read(PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, parseCustomBlockRegistryText, {}, previous?.customBlockDocument),
     options.kind === 'project' ? read(PROJECT_PROFILE_FILE_NAME, parseProjectMetadataText, null, previous?.profile) : null,
     options.kind === 'project' ? read(PROJECT_DICTIONARY_FILE_NAME, parseProjectDictionaryText, null, previous?.dictionary) : null,
@@ -608,7 +608,7 @@ export async function createResourceEnvironment(folder: string, options: {
       const registryPaths = [PROJECT_PROFILE_FILE_NAME, PROJECT_DICTIONARY_FILE_NAME, PROJECT_FONT_REGISTRY_FILE_NAME, PROJECT_ICON_REGISTRY_FILE_NAME, PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, `${PROJECT_INTERNAL_DIRECTORY_NAME}/${PROJECT_PACKAGE_DIRECTORY}`]
       const registryChanged = !paths || registryPaths.some(path => paths.some(changedPath => {
         const target = normalize(`${root}/${path}`), changed = normalize(changedPath)
-        return target === changed || target.startsWith(`${changed}/`) || (path.endsWith(PROJECT_PACKAGE_DIRECTORY) && changed.startsWith(`${target}/`))
+        return target === changed || target.startsWith(`${changed}/`) || (path.endsWith(PROJECT_PACKAGE_DIRECTORY) && changed.startsWith(`${target}/`)) || (path === PROJECT_ICON_REGISTRY_FILE_NAME && affectsIconSets(normalize(`${root}/.opencard/icons`), changed))
       }))
       const customSourceChanged = [...invalidated].some(path => customSourcePaths.has(path))
       const fontSourceChanged = [...invalidated].some(path => fontSourcePaths.has(path))

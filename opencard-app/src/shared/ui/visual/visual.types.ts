@@ -11,7 +11,7 @@ type OcIconVisual = {
   iconTone?: IconTone
 }
 
-/** 调用方给定的呈现，例如项目图标的精灵图裁剪样式。 */
+/** 调用方给定的呈现，例如项目图标的裁切样式。 */
 type OcStyledVisual = {
   type: 'style'
   style: Readonly<Record<string, string>>

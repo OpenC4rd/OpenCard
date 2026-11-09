@@ -105,7 +105,9 @@ for (const v of graph.keys()) if (!index.has(v)) strong(v)
 const cycleMembers = cycles.flatMap((scc) => scc.map((f) => `cycle|${f}`))
 
 // ---- 体积 ---------------------------------------------------------------
-const sizes = Object.fromEntries(files.map((f) => [rel(f), readFileSync(f, 'utf8').split('\n').length]))
+// 语言文件是文案，不是逻辑：条目随功能增长，拆开只会让同一套文案散在几处，所以不受行数限制。
+const isCopy = (path) => path.startsWith('src/locales/')
+const sizes = Object.fromEntries(files.map((f) => [rel(f), readFileSync(f, 'utf8').split('\n').length]).filter(([f]) => !isCopy(f)))
 const oversize = Object.fromEntries(Object.entries(sizes).filter(([, n]) => n > MAX_LINES))
 
 // ---- 对照基线 -----------------------------------------------------------

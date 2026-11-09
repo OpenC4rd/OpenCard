@@ -65,6 +65,31 @@ describe('useProjectTimeline', () => {
     expect(tree.children.size).toBe(0)
   })
 
+  it('offers history actions on the version graph and tells which commit and file a node stands for', async () => {
+    const labels = ref({ more: 'More', revert: 'Undo', reset: 'Reset', restoreFile: 'Restore' })
+    mocks.readHistory.mockResolvedValue(ok([
+      commit('abc', 'Head commit'),
+      commit('old1', 'Older', [{ path: 'a.ocdocument', status: 'modified' }, { path: 'gone.md', status: 'deleted' }]),
+    ]))
+    mocks.readFileHistory.mockResolvedValue(ok([commit('old1', 'Older')]))
+    const state = useProjectTimeline(ref('D:/Cards/demo'), ref('cards/main.ocdocument'), ref('en-US'), ref('Compare'), labels)
+    await vi.waitFor(() => expect(state.projectTreeData.value.rootKeys).toHaveLength(2))
+
+    const menu = (key: string) => (normalizeNodeTail(state.projectTreeData.value.items.get(key)?.tail)
+      .filter(isNodeTailAction).find(action => action.key === 'version.more')?.children as { key?: string }[] | undefined)?.map(child => child.key)
+    // HEAD is where the project already is: only undoing it makes sense there.
+    expect(menu('project-timeline:abc')).toEqual(['version.revert'])
+    expect(menu('project-timeline:old1')).toEqual(['version.revert', 'version.reset'])
+    // A file the commit deleted has no content at that commit to restore.
+    const fileActions = (path: string) => normalizeNodeTail(state.projectTreeData.value.items.get(`project-timeline:old1:${path}`)?.tail)
+      .filter(isNodeTailAction).map(action => action.key)
+    expect(fileActions('a.ocdocument')).toEqual(['version.restore-file'])
+    expect(fileActions('gone.md')).toEqual([])
+    expect(state.resolveNodeTarget('project-timeline:old1:a.ocdocument')).toMatchObject({ commit: { id: 'old1' }, path: 'a.ocdocument' })
+    // The document timeline restores the document it shows.
+    expect(state.resolveNodeTarget('timeline:old1')).toMatchObject({ commit: { id: 'old1' }, path: 'cards/main.ocdocument' })
+  })
+
   it('stays empty without a current project', async () => {
     const state = useTimeline(ref<string | null>(null))
     await nextTick()

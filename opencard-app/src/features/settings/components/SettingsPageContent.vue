@@ -381,7 +381,7 @@ function handleCardAction(card: SettingsCardViewModel, actionKey: string): void 
   if (actionKey === 'locale.refresh') emit('intent', { type: 'locale.refresh' })
   if (actionKey === 'locale-folder.open') emit('intent', { type: 'locale-folder.open' })
   if (actionKey === 'project-workspace.reset') emit('intent', { type: 'project-workspace.reset' })
-  if (actionKey === 'cache.clear') emit('intent', { type: 'cache.clear' })
+  if (actionKey === 'cache.clear' || actionKey === 'project.adapt') emit('intent', { type: actionKey })
 }
 </script>
 

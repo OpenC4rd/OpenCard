@@ -180,7 +180,7 @@ const selected = computed(() => props.context.isSelected(props.entry.key))
 <style scoped>
 .oc-tree__node-visual {
   flex: none;
-  /* 精灵图裁剪按 em 计量，字号决定实际尺寸。 */
+  /* 图标裁切按 em 计量，字号决定实际尺寸。 */
   font-size: var(--oc-size-sm);
   transform-origin: center;
   transition: transform var(--oc-duration-quick) var(--oc-ease);

@@ -17,10 +17,6 @@ function stripTrailingSeparators(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/, '')
 }
 
-function isCaseInsensitivePath(path: string): boolean {
-  return /^[a-z]:\//i.test(path) || path.startsWith('//')
-}
-
 export function normalizeProjectRelativeCoverPath(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim().replace(/\\/g, '/')
@@ -69,16 +65,4 @@ export function isProjectCoverPath(value: string): boolean {
 export function resolveCoverAbsolutePath(rootPath: string, relativePath: string): string {
   const root = stripTrailingSeparators(rootPath)
   return root ? `${root}/${relativePath}` : relativePath
-}
-
-/** 把项目内的绝对路径转成封面用的项目相对路径；位于项目之外时返回 null。 */
-export function projectRelativePathFromAbsolute(rootPath: string, absolutePath: string): string | null {
-  const root = stripTrailingSeparators(rootPath)
-  const absolute = stripTrailingSeparators(absolutePath)
-  if (!root || !absolute) return null
-  const caseInsensitive = isCaseInsensitivePath(root) || isCaseInsensitivePath(absolute)
-  const rootIdentity = caseInsensitive ? root.toLocaleLowerCase() : root
-  const absoluteIdentity = caseInsensitive ? absolute.toLocaleLowerCase() : absolute
-  if (!absoluteIdentity.startsWith(`${rootIdentity}/`)) return null
-  return normalizeProjectRelativeCoverPath(absolute.slice(root.length + 1))
 }

@@ -18,6 +18,10 @@
           <path class="folder" d="M42 32a6 6 0 0 1 6-6h18l8 8h38a6 6 0 0 1 6 6v38a6 6 0 0 1-6 6H48a6 6 0 0 1-6-6z" />
           <text class="glyph" x="80" y="60" text-anchor="middle" dominant-baseline="central" font-size="20" font-weight="600">{{ glyph }}</text>
         </template>
+        <template v-else-if="option.art === 'sheet'">
+          <rect class="sheet sheet--accent" x="44" y="14" width="72" height="68" rx="6" />
+          <path class="stand" d="M80 14v68M44 48h72" />
+        </template>
         <template v-else-if="option.art === 'system'">
           <rect class="sheet sheet--accent" x="32" y="14" width="96" height="60" rx="6" />
           <path class="stand" d="M68 74v8M92 74v8M58 84h44" />
@@ -39,8 +43,8 @@ export type ProjectImportSourceOption = {
   key: string
   title: string
   description: string
-  /** 示意图：离散文件、整个文件夹、本机系统、从空白开始。 */
-  art: 'files' | 'folder' | 'system' | 'empty'
+  /** 示意图：离散文件、整个文件夹、一张按格子切开的图、本机系统、从空白开始。 */
+  art: 'files' | 'folder' | 'sheet' | 'system' | 'empty'
 }
 </script>
 

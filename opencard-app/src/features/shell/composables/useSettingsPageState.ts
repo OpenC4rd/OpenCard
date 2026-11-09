@@ -7,11 +7,13 @@ import { APP_LOCALE_DIRECTORY_NAME, resolveAppStoragePath } from '../../../share
 import { networkResourceCacheService } from '../../network-resources/services/networkResourceCacheService'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import { describeError } from '../../../shared/model/error'
-import { createPublisherKey, isSettingsCategoryKey, parseAppTheme, serializeAppTheme, type SettingsCategoryKey, type SettingsIntent } from '../../settings/model/appSettings'
+import { createPublisherKey, isSettingsCategoryKey, resolveCommitterIdentity, parseAppTheme, serializeAppTheme, type SettingsCategoryKey, type SettingsIntent } from '../../settings/model/appSettings'
 import { createSettingsSection } from '../sections/settingsSection'
 import { useSettingsViewModel } from '../../settings/composables/useSettingsViewModel'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { requestConfirmation } from '../services/appConfirmation'
+import { adaptProjectBeforeOpen } from '../services/projectAdaptationFlow'
 
 export function useSettingsPageState(options: {
   settingsStore: ReturnType<typeof useAppSettingsStore>
@@ -92,6 +94,15 @@ export function useSettingsPageState(options: {
       case 'identity.regenerate': return store.updateSetting('identity.publisherKey', createPublisherKey())
       case 'locale.refresh': return reloadLocales()
       case 'locale-folder.open': return openLocaleFolder()
+      case 'project.adapt': {
+        const root = useProjectStore().projectPath.value
+        if (!root) return
+        await adaptProjectBeforeOpen(root, {
+          force: true, identity: resolveCommitterIdentity(store.settings.value), translate: t, confirm: requestConfirmation,
+          notifySuccess, notifyWarning, notifyError,
+        })
+        return
+      }
       case 'cache.clear':
         if (options.projectOpen.value) return
         try { await options.cancelExportsAndWait(); await useProjectStore().disposeResources(); await clearAppCache(fileSystemService); networkResourceCacheService.forget(); await refreshAppCacheUsage() }

@@ -53,7 +53,7 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-/* 精灵图裁剪需要按 em 计量，字号由调用方 class 决定。 */
+/* 图标裁切需要按 em 计量，字号由调用方 class 决定。 */
 .oc-visual--style {
   display: inline-block;
   flex: none;

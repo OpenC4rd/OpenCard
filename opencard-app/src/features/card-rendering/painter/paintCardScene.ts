@@ -26,6 +26,7 @@ import { parsePaintStyle, roundRectPath } from './paintStyle'
 import type { CanvasAssetStore, LoadedAsset } from './canvasAssetStore'
 import { formatProjectIconPath } from '../../../shared/rich-text/projectIconReference'
 import { createDeviceBuffer } from './deviceBuffer'
+import { iconSize, iconSourceRect, type IconShape } from '../../../shared/model/iconGeometry'
 import {
   hasGlyphOutline,
   paintGlyphDecorations,
@@ -323,17 +324,20 @@ function paintImageBlock(
 
   let sourceSrc = ''
   let isContextIcon = false
+  let sourceSampling: ImageSampling = {}
   if (sourceRes?.kind === 'url') {
     sourceSrc = sourceRes.src
   } else if (sourceRes?.kind === 'icon') {
     sourceSrc = sourceRes.entry.src
     isContextIcon = sourceRes.entry.tint === 'context'
+    sourceSampling = sourceRes.entry
   } else if (!resourceContext) {
     sourceSrc = block.source
   }
 
   // 检查是否有遮罩（提前发起加载，避免串行等待）
   let maskSrc = ''
+  let maskSampling: ImageSampling = {}
   if (block.maskSource) {
     const maskRes = resourceContext
       ? resolveCardResource({
@@ -344,7 +348,7 @@ function paintImageBlock(
         }, resourceContext)
       : undefined
     if (maskRes?.kind === 'url') maskSrc = maskRes.src
-    else if (maskRes?.kind === 'icon') maskSrc = maskRes.entry.src
+    else if (maskRes?.kind === 'icon') { maskSrc = maskRes.entry.src; maskSampling = maskRes.entry }
     else if (!resourceContext) maskSrc = block.maskSource
   }
 
@@ -360,9 +364,9 @@ function paintImageBlock(
     const buffer = createDeviceBuffer(ctx, w, h)
     if (buffer) {
       const { offscreen, offCtx } = buffer
-      drawImageFitted(offCtx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined)
+      drawImageFitted(offCtx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined, sourceSampling)
       offCtx.globalCompositeOperation = 'destination-in'
-      drawImageFitted(offCtx, maskImg, 0, 0, w, h, block.maskFit ?? 'cover')
+      drawImageFitted(offCtx, maskImg, 0, 0, w, h, block.maskFit ?? 'cover', undefined, maskSampling)
       ctx.drawImage(offscreen, 0, 0, w, h)
       ctx.restore()
       return
@@ -370,9 +374,15 @@ function paintImageBlock(
   }
 
   // 无遮罩直接绘制
-  drawImageFitted(ctx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined)
+  drawImageFitted(ctx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined, sourceSampling)
   ctx.restore()
 }
+
+/**
+ * How to sample an image: which part of the file (an icon may be a crop of a shared file) and whether
+ * to keep its pixels hard. A project icon entry is itself a valid sampling; a plain URL samples nothing.
+ */
+type ImageSampling = IconShape & { pixelated?: boolean }
 
 function drawImageFitted(
   ctx: CanvasRenderingContext2D,
@@ -383,20 +393,22 @@ function drawImageFitted(
   targetH: number,
   fit: 'cover' | 'contain' | 'fill',
   contextColor?: string,
+  sampling: ImageSampling = {},
 ): void {
-  const naturalW = 'naturalWidth' in img ? img.naturalWidth : img.width
-  const naturalH = 'naturalHeight' in img ? img.naturalHeight : img.height
-  if (naturalW <= 0 || naturalH <= 0) return
+  const fileW = 'naturalWidth' in img ? img.naturalWidth : img.width
+  const fileH = 'naturalHeight' in img ? img.naturalHeight : img.height
+  if (fileW <= 0 || fileH <= 0) return
+  // The icon is this part of the file, so it is what gets fitted, not the whole file.
+  const source = iconSourceRect(sampling, { width: fileW, height: fileH })
+  const naturalW = source.w
+  const naturalH = source.h
 
   let dw = targetW
   let dh = targetH
   let dx = x
   let dy = y
 
-  if (fit === 'fill') {
-    dw = targetW
-    dh = targetH
-  } else {
+  if (fit !== 'fill') {
     const scale = fit === 'cover'
       ? Math.max(targetW / naturalW, targetH / naturalH)
       : Math.min(targetW / naturalW, targetH / naturalH)
@@ -406,26 +418,33 @@ function drawImageFitted(
     dy = y + (targetH - dh) / 2
   }
 
+  const draw = (target: CanvasRenderingContext2D, left: number, top: number) => {
+    const smoothing = target.imageSmoothingEnabled
+    if (sampling.pixelated) target.imageSmoothingEnabled = false
+    target.drawImage(img, source.x, source.y, source.w, source.h, left, top, dw, dh)
+    target.imageSmoothingEnabled = smoothing
+  }
+
   if (contextColor) {
     // context tint 着色：在独立离屏画布上以超采样高分辨率渲染并 source-in 着色
     const buffer = createDeviceBuffer(ctx, dw, dh)
     if (buffer) {
       const { offscreen, offCtx } = buffer
-      offCtx.drawImage(img, 0, 0, dw, dh)
+      draw(offCtx, 0, 0)
       offCtx.globalCompositeOperation = 'source-in'
       offCtx.fillStyle = contextColor
       offCtx.fillRect(0, 0, dw, dh)
       ctx.drawImage(offscreen, dx, dy, dw, dh)
     } else {
       ctx.save()
-      ctx.drawImage(img, dx, dy, dw, dh)
+      draw(ctx, dx, dy)
       ctx.globalCompositeOperation = 'source-in'
       ctx.fillStyle = contextColor
       ctx.fillRect(dx, dy, dw, dh)
       ctx.restore()
     }
   } else {
-    ctx.drawImage(img, dx, dy, dw, dh)
+    draw(ctx, dx, dy)
   }
 }
 
@@ -481,7 +500,7 @@ function paintTextBlock(
         fieldKey: 'content',
       }, options.resourceContext)
       if (res.kind === 'icon') {
-        const dims = options.resourceContext.resolveIconDimensions?.(res.entry)
+        const dims = iconSize(res.entry, options.resourceContext.resolveIconDimensions?.(res.entry))
         if (dims && dims.width > 0 && dims.height > 0) {
           return dims.width / dims.height
         }
@@ -582,7 +601,7 @@ function paintInlineIcon(
   const isContextTint = res?.kind === 'icon' ? res.entry.tint === 'context' : true
   const img = src ? assets.getImage(src) : null
   if (img) {
-    drawImageFitted(ctx, img, run.x, run.y, run.width, run.height, 'contain', isContextTint ? run.style.color : undefined)
+    drawImageFitted(ctx, img, run.x, run.y, run.width, run.height, 'contain', isContextTint ? run.style.color : undefined, res?.kind === 'icon' ? res.entry : {})
   }
 }
 
@@ -604,6 +623,6 @@ function paintInlineImage(
   const src = imgRes?.kind === 'url' ? imgRes.src : imgRes?.kind === 'icon' ? imgRes.entry.src : (!resourceContext ? run.image.src : '')
   const img = src ? assets.getImage(src) : null
   if (img) {
-    drawImageFitted(ctx, img, run.x, run.y, run.width, run.height, run.image.fit ?? 'contain')
+    drawImageFitted(ctx, img, run.x, run.y, run.width, run.height, run.image.fit ?? 'contain', undefined, imgRes?.kind === 'icon' ? imgRes.entry : {})
   }
 }

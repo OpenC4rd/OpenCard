@@ -81,7 +81,8 @@ import OcButton from '../base/OcButton.vue'
 import OcCheckbox from '../base/OcCheckbox.vue'
 import OcText from '../base/OcText.vue'
 import OcDialog from '../standard/OcDialog.vue'
-import { inspectProjectIconFile } from '../../features/workspace/services/projectIconFileFacts'
+import { toKeySlug } from '../../shared/model/keySlug'
+import { inspectProjectIconFile, PIXEL_ART_SHORT_SIDE } from '../../features/workspace/services/projectIconFileFacts'
 import { mapWithConcurrency } from '../../shared/async/mapWithConcurrency'
 import MonacoEditor from './MonacoEditor.vue'
 import ProjectIconRegistrationDialog, {
@@ -417,8 +418,9 @@ async function registerIconSet(request: ProjectIconRegistrationRequest): Promise
  * Preparing up front also means a file that cannot be read aborts the import before anything is
  * written, instead of leaving already-copied files on disk with no registry entry.
  *
- * An existing set keeps its own folder: the set already lives there, and a folder left behind by an
- * earlier set is not free to be reused by a new one, so only a brand-new set goes looking for one.
+ * A set's folder is named by its Key, because the folder is the set: it holds the set's `icon-set.json`
+ * and every file it lists. A brand-new set therefore needs its folder free; a folder an earlier set left
+ * files in is refused rather than mixed with the new set's files.
  */
 async function writeIconSetFiles(
   imports: readonly ProjectIconImport[],
@@ -428,87 +430,58 @@ async function writeIconSetFiles(
 ): Promise<ProjectIcon[]> {
   // Preparation and copy both report, so the bar keeps moving through the slow half.
   report(0, imports.length * 2)
-  const directory = targetSeries
-    ? seriesIconDirectory(targetSeries)
-    : await resolveIconSetDirectory(seriesKey)
+  const directory = `${DEFAULT_PROJECT_ICON_DIRECTORY}/${seriesKey}`
+  if (!targetSeries && await iconSetDirectoryIsOccupied(directory)) {
+    throw new Error(t('projectConfig.icons.setFolderOccupied', { key: seriesKey }))
+  }
+  // Icons cut from one sprite sheet share its file, so each file is read, probed and copied once.
+  const sourcePaths = [...new Set(imports.map(item => item.sourcePath))]
   let prepared = 0
-  const staged = await mapWithConcurrency(imports, ICON_IMPORT_CONCURRENCY, async item => {
-    const bytes = await fileSystemService.readBinaryFile(item.sourcePath)
-    const facts = await inspectProjectIconFile(item.sourcePath, bytes)
+  const staged = new Map((await mapWithConcurrency(sourcePaths, ICON_IMPORT_CONCURRENCY, async path => {
+    const bytes = await fileSystemService.readBinaryFile(path)
+    const facts = await inspectProjectIconFile(path, bytes)
     prepared += 1
     report(prepared)
-    return { item, bytes, facts }
-  })
+    return [path, { bytes, facts }] as const
+  })))
+  report(imports.length)
 
   const icons: ProjectIcon[] = []
-  for (const { item, bytes, facts } of staged) {
+  const sharedFiles = new Map<string, string>()
+  for (const item of imports) {
+    const { bytes, facts } = staged.get(item.sourcePath)!
     const extension = item.sourcePath.slice(item.sourcePath.lastIndexOf('.')).toLocaleLowerCase()
-    const source = await writeManagedIconFile(directory, `${item.iconKey}${extension}`, bytes)
+    // A sheet is named after its own file, since no single icon Key names it.
+    const fileStem = item.crop ? toKeySlug(item.sourcePath.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, ''), 'sheet') : item.iconKey
+    let source = item.crop ? sharedFiles.get(item.sourcePath) : undefined
+    if (!source) {
+      source = await writeManagedIconFile(directory, `${fileStem}${extension}`, bytes)
+      if (item.crop) sharedFiles.set(item.sourcePath, source)
+    }
     icons.push({
       iconKey: item.iconKey,
       name: item.name,
       source,
       tint: facts.tint,
-      ...(facts.pixelated === true ? { pixelated: true } : {}),
+      // A cell is pixel art by its own size, not by the size of the sheet it sits in.
+      ...((item.crop ? Math.min(item.crop.w, item.crop.h) <= PIXEL_ART_SHORT_SIDE : facts.pixelated === true) ? { pixelated: true } : {}),
+      ...(item.crop ? { crop: item.crop } : {}),
     })
     report(imports.length + icons.length)
   }
   return icons
 }
 
-/** Project-relative folder that names one icon set's files. */
-function projectIconSetDirectory(seriesKey: string): string {
-  return `${DEFAULT_PROJECT_ICON_DIRECTORY}/${seriesKey}`
-}
-
-/**
- * Picks the folder that will own a new set.
- *
- * One folder belongs to one set, so a folder left behind by an earlier set must not absorb a new set's
- * files: the leftovers would sit alongside them, indistinguishable from the new set's own files. The
- * folder name is suffixed rather than the file names inside it, which keeps every file in a set folder
- * named exactly after its icon Key and keeps creating a set producing the layout adding icons does.
- *
- * A folder that exists but holds no files is reused as-is. Removing a set with cleanup moves its files
- * out but leaves the folder behind, so suffixing there would rename the folder on every removal and
- * re-creation of the same set.
- */
-async function resolveIconSetDirectory(seriesKey: string): Promise<string> {
-  const base = projectIconSetDirectory(seriesKey)
-  let directory = base
-  let suffix = 2
-  while (await iconSetDirectoryIsOccupied(directory)) {
-    directory = `${base}-${suffix}`
-    suffix += 1
-  }
-  return directory
-}
-
 async function iconSetDirectoryIsOccupied(directory: string): Promise<boolean> {
   const absolute = projectStore.resolveProjectInternalPath(directory)
   if (!await fileSystemService.fileExists(absolute)) return false
+  // A folder that exists but holds no files is free: removing a set with cleanup leaves it behind.
   try {
     return (await fileSystemService.readDirectory(absolute)).length > 0
   } catch {
     // An unreadable folder counts as occupied, so its contents are never mixed into a new set.
     return true
   }
-}
-
-/**
- * The folder a set's own files already live in, so adding or replacing an icon lands next to them.
- *
- * The folder is read from the set's first icon rather than rebuilt from its Key: a set that was
- * renamed keeps its folder, and a set whose files sit outside the managed icon root keeps its own
- * place instead of being split across two folders. A set with no files yet uses the canonical folder.
- */
-function seriesIconDirectory(series: ProjectIconSeries): string {
-  const source = series.icons[0]?.source.replace(/\\/g, '/')
-  const managedPrefix = `${PROJECT_INTERNAL_DIRECTORY_NAME}/`
-  if (!source?.startsWith(managedPrefix)) return projectIconSetDirectory(series.key)
-  const segments = source.slice(managedPrefix.length).split('/')
-  segments.pop()
-  return segments.join('/') || projectIconSetDirectory(series.key)
 }
 
 function sameKey(left: string, right: string): boolean {

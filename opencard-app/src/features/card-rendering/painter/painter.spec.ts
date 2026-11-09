@@ -451,7 +451,8 @@ describe('paintCardScene images, masking & tinting', () => {
     } as RenderReadyImageBlock
     const scene = computeSceneLayout(face(at(imgBlock)))
     paintCardScene(ctx, scene, assets)
-    expect(ctx.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 25, 100, 50)
+    // Sampled as the whole 200 × 100 file, fitted into 100 × 50.
+    expect(ctx.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 200, 100, 0, 25, 100, 50)
   })
 
   it('composites image mask using destination-in on an offscreen surface', () => {
@@ -500,6 +501,49 @@ describe('paintCardScene images, masking & tinting', () => {
     expect(ctx.globalCompositeOperation).toBe('source-in')
     expect(ctx.fillStyle).toBe('#e11d48')
     expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 50, 50)
+  })
+
+  /** A cell of a 64 × 32 sheet: the canvas must draw the cell, never the whole sheet around it. */
+  const sheetEntry = {
+    seriesKey: 'pixel', iconKey: 'sword', name: 'sword', source: 'sheet.png', src: 'sheet.png',
+    tint: 'original' as const, pixelated: true, crop: { x: 16, y: 0, w: 16, h: 16 },
+  }
+  const sheetContext = () => createCardRenderResourceContext({
+    projectIconCatalog: { series: [], entries: [sheetEntry] },
+    resolveIconDimensions: () => ({ width: 64, height: 32 }),
+  })
+  /** Records the smoothing setting each draw ran with: pixel art must be drawn without it. */
+  function smoothingAwareContext() {
+    const ctx = createMockCanvasContext() as ReturnType<typeof createMockCanvasContext> & { imageSmoothingEnabled: boolean }
+    ctx.imageSmoothingEnabled = true
+    const smoothing: boolean[] = []
+    vi.mocked(ctx.drawImage).mockImplementation(() => { smoothing.push(ctx.imageSmoothingEnabled) })
+    return { ctx, smoothing }
+  }
+
+  it('draws a cropped icon in an image block as its cell, with hard pixels', () => {
+    const { ctx, smoothing } = smoothingAwareContext()
+    const assets = createMockAssetStore({ 'sheet.png': { width: 64, height: 32 } })
+    const iconBlock = { ...block('icon', { type: 'image-block', width: '50', height: '50', source: 'icon:pixel/sword', fit: 'contain' }) } as RenderReadyImageBlock
+    paintCardScene(ctx, computeSceneLayout(face(at(iconBlock))), assets, { resourceContext: sheetContext() })
+
+    expect(ctx.drawImage).toHaveBeenCalledWith(expect.anything(), 16, 0, 16, 16, 0, 0, 50, 50)
+    expect(smoothing).toEqual([false])
+    expect(ctx.imageSmoothingEnabled).toBe(true)
+  })
+
+  it('sizes and draws an inline icon by its cell, not by the sheet it is cut from', () => {
+    const { ctx } = smoothingAwareContext()
+    const assets = createMockAssetStore({ 'sheet.png': { width: 64, height: 32 } })
+    const text = block('txt', {
+      type: 'text-block', content: '@icon(key=pixel/sword)', fontFamily: 'sans-serif', fontSize: '10', lineHeight: '12', color: '#111111',
+    })
+    paintCardScene(ctx, computeSceneLayout(face(at(text))), assets, { resourceContext: sheetContext() })
+
+    const draw = vi.mocked(ctx.drawImage).mock.calls.find(call => call.length === 9)!
+    expect(draw.slice(1, 5)).toEqual([16, 0, 16, 16])
+    // The sheet is 2:1, the cell is square: the icon is laid out square.
+    expect(draw[7]).toBeCloseTo(draw[8] as number)
   })
 
   it('identifies SVG sources correctly', () => {

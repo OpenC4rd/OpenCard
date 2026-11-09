@@ -32,7 +32,7 @@ describe('useExportSpace', () => {
 
     await space.load()
 
-    expect(space.activeProfile.value?.id).toBe(first.id)
+    expect(space.activeProfile.value?.name).toBe(first.name)
     expect(space.documents.value).toEqual(['cards/a.ocdocument'])
   })
 
@@ -49,7 +49,7 @@ describe('useExportSpace', () => {
     await space.save()
     expect(space.editing.value).toBe(false)
     expect(options.saveProfile).toHaveBeenCalledTimes(1)
-    expect(options.saveProfile).toHaveBeenCalledWith(expect.objectContaining({ name: 'A' }))
+    expect(options.saveProfile).toHaveBeenCalledWith(expect.objectContaining({ name: 'A' }), 'First')
   })
 
   it('restores the profile on cancel and when switching away', async () => {
@@ -66,8 +66,23 @@ describe('useExportSpace', () => {
 
     space.beginEdit()
     space.update({ ...first, name: 'Draft' })
-    space.select(second.id)
-    expect(space.profiles.value.find(profile => profile.id === first.id)?.name).toBe('First')
+    space.select(second.name)
+    expect(space.profiles.value.find(profile => profile.name === first.name)?.name).toBe('First')
+    expect(options.saveProfile).not.toHaveBeenCalled()
+  })
+
+  it('refuses to save an empty, illegal or duplicate profile name', async () => {
+    const first = createExportProfile('First')
+    const { space, options } = createSpace([first, createExportProfile('Second')])
+    await space.load()
+    space.beginEdit()
+
+    for (const name of ['', 'a/b', 'Second']) {
+      space.update({ ...first, name })
+      await space.save()
+      expect(space.issues.value).toEqual([{ code: 'invalid-profile-name' }])
+      expect(space.editing.value).toBe(true)
+    }
     expect(options.saveProfile).not.toHaveBeenCalled()
   })
 
@@ -119,16 +134,16 @@ describe('useExportSpace', () => {
     await space.save()
     const created = space.activeProfile.value!
 
-    space.duplicate(created.id)
+    space.duplicate(created.name)
     await space.save()
     const copy = space.activeProfile.value!
     expect(copy).toMatchObject({ name: 'New 2' })
-    expect(copy.id).not.toBe(created.id)
+    expect(copy.name).not.toBe(created.name)
     expect(options.saveProfile).toHaveBeenCalledTimes(2)
 
-    space.remove(copy.id)
-    expect(options.deleteProfile).toHaveBeenCalledWith(copy.id)
-    expect(space.activeProfile.value?.id).toBe(created.id)
+    space.remove(copy.name)
+    expect(options.deleteProfile).toHaveBeenCalledWith(copy.name)
+    expect(space.activeProfile.value?.name).toBe(created.name)
   })
 
   it('never touches files for a draft removed before saving', async () => {
@@ -136,7 +151,7 @@ describe('useExportSpace', () => {
     await space.load()
     space.add()
 
-    space.remove(space.activeProfile.value!.id)
+    space.remove(space.activeProfile.value!.name)
 
     expect(options.saveProfile).not.toHaveBeenCalled()
     expect(options.deleteProfile).not.toHaveBeenCalled()

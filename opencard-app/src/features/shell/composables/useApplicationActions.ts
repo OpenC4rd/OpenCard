@@ -4,7 +4,11 @@ import { useProjectStore } from '../../workspace/store/projectStore'
 import { useProjectTemplateStore } from '../../project-templates/store/projectTemplateStore'
 import { useAppStateStore } from '../../app-state/store/appStateStore'
 import { getPathDirectory } from '../../../shared/model/filePath'
-import { notifyAppError, notifyWarning, notifySuccess } from '../../notifications/titlebarNotices'
+import { notifyAppError, notifyError, notifyWarning, notifySuccess } from '../../notifications/titlebarNotices'
+import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { resolveCommitterIdentity } from '../../settings/model/appSettings'
+import { requestConfirmation } from '../services/appConfirmation'
+import { adaptProjectBeforeOpen } from '../services/projectAdaptationFlow'
 import { classifyExternalOpenPath } from '../services/externalOpenService'
 import { initializeAppProjectActions } from '../services/appProjectActions'
 import { openFlow } from '../shellLocation'
@@ -27,11 +31,17 @@ export function useApplicationActions(options: {
   const history = useAppStateStore()
   const templates = useProjectTemplateStore()
   const navigation = useShellNavigation()
+  const settings = useAppSettingsStore().settings
+  const adaptationOptions = () => ({
+    identity: resolveCommitterIdentity(settings.value), translate: t, confirm: requestConfirmation,
+    notifySuccess, notifyWarning, notifyError,
+  })
   const lifecycle = useAppProjectLifecycle({
     project,
     sessions: { closeWorkspaceSessions: () => options.workbench().closeWorkspaceSessions(), open: path => options.workbench().open(path) },
     closeCurrentProject: () => options.workbench().requestProjectClose('current'),
     history, templates, shellLocation: navigation.location, translate: t,
+    prepareProject: path => adaptProjectBeforeOpen(path, adaptationOptions()),
   })
   const busy = computed(() => options.createProject().busy.value || options.exportTemplate().busy.value)
   async function newProject(): Promise<void> {

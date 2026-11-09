@@ -10,6 +10,14 @@ import { resolveEntryIcon } from '../workspace/model/fileTypes'
 
 const HISTORY_LIMIT = 50
 export const TIMELINE_COMPARE_WITH_DISK_ACTION_KEY = 'timeline.compare-with-disk'
+/** 版本图表与文件时间线上的回撤操作；执行与确认由外层负责，这里只给出按钮和"按的是哪一项"。 */
+export const VERSION_ACTION_KEYS = {
+  revert: 'version.revert',
+  reset: 'version.reset',
+  restoreFile: 'version.restore-file',
+} as const
+
+export type VersionActionLabels = Record<keyof typeof VERSION_ACTION_KEYS, string> & { more: string }
 const STATUS_REFRESH_DEBOUNCE_MS = 120
 
 const emptyHistoryResult = () => ({
@@ -28,6 +36,7 @@ export function useProjectTimeline(
   currentFilePath: Ref<string | null | undefined>,
   locale: Ref<string>,
   compareWithDiskLabel: Ref<string>,
+  actionLabels?: Ref<VersionActionLabels>,
 ) {
   const commits = ref<CommitSummary[]>([])
   const projectCommits = ref<CommitSummary[]>([])
@@ -37,6 +46,8 @@ export function useProjectTimeline(
   const loading = ref(false)
   const historyLoaded = ref(false)
   const initialized = ref<boolean | null>(null)
+  /** 当前分支与 HEAD。 */
+  const repository = ref<{ head: string | null, currentBranch: string | null } | null>(null)
   const errorKind = ref<GitErrorKind | null>(null)
   let requestRevision = 0
   let statusRequestRevision = 0
@@ -77,8 +88,8 @@ export function useProjectTimeline(
       const key = `${keyPrefix}:${commit.id}`
       items.set(key, {
         label: `${commit.summary.trim() || commit.shortId} ${commit.shortId}`,
-        tail: [formatRelativeTime(commit.authoredAtSeconds * 1000, locale.value), ...actions],
-        visual: { type: 'icon', icon: 'mdiSourceBranch' },
+        tail: [formatRelativeTime(commit.authoredAtSeconds * 1000, locale.value), ...actions, ...commitActions(commit, includeChangedPaths)],
+        visual: { type: 'icon', icon: commit.id === repository.value?.head ? 'mdiSourceCommit' : 'mdiSourceBranch' },
       })
       const changedFiles = Array.isArray(commit.changedFiles) ? commit.changedFiles : []
       if (!includeChangedPaths || changedFiles.length === 0) continue
@@ -89,7 +100,8 @@ export function useProjectTimeline(
           node: {
             label: file.path,
             visual: { type: 'icon', icon: presentation.icon, iconTone: presentation.tone },
-            tail: changedFileTail(file),
+            // 一次提交删掉的文件在那一版里不存在，没有可恢复的内容。
+            tail: file.status === 'deleted' ? changedFileTail(file) : [changedFileTail(file), ...restoreFileAction()],
           } satisfies OcNode,
         }
       }), key)
@@ -99,6 +111,38 @@ export function useProjectTimeline(
       for (const [parentKey, childKeys] of fileTree.children) children.set(parentKey, childKeys)
     }
     return { rootKeys, items, children }
+  }
+
+  function restoreFileAction(): OcNodeAction[] {
+    const labels = actionLabels?.value
+    return labels ? [{ key: VERSION_ACTION_KEYS.restoreFile, title: labels.restoreFile, icon: 'mdiFileRestoreOutline' }] : []
+  }
+
+  /**
+   * 版本图表上一次提交能做的事，收在一个菜单里。HEAD 那一版不提供"回退到这里"（已经在这里）。
+   */
+  function commitActions(commit: CommitSummary, graph: boolean): OcNodeAction[] {
+    const labels = actionLabels?.value
+    if (!graph || !labels) return []
+    const isHead = commit.id === repository.value?.head
+    const children: OcNodeAction[] = [
+      { key: VERSION_ACTION_KEYS.revert, title: labels.revert, icon: 'mdiUndoVariant' },
+      ...(isHead ? [] : [{ key: VERSION_ACTION_KEYS.reset, title: labels.reset, icon: 'mdiRestore' as const, iconTone: 'danger' as const }]),
+    ]
+    return [{ key: 'version.more', title: labels.more, icon: 'mdiDotsHorizontal', children }]
+  }
+
+  /**
+   * 操作事件的节点 key 指的是哪次提交、哪个文件。key 就是 `<树>:<提交>` 或 `<树>:<提交>:<文件路径>`
+   * （提交 id 不含冒号）；文件时间线的节点就是当前文件。
+   */
+  function resolveNodeTarget(key: string): { commit: CommitSummary, path?: string } | null {
+    const [tree, id, ...rest] = key.split(':')
+    const source = tree === 'timeline' ? commits.value : tree === 'project-timeline' ? projectCommits.value : []
+    const commit = source.find(candidate => candidate.id === id)
+    if (!commit) return null
+    const path = tree === 'timeline' ? currentFilePath.value ?? undefined : rest.join(':') || undefined
+    return path ? { commit, path } : { commit }
   }
 
   const compareWithDiskAction = computed<OcNodeAction>(() => ({
@@ -111,7 +155,7 @@ export function useProjectTimeline(
     commits.value,
     'timeline',
     Boolean(currentFilePath.value) && historyLoaded.value,
-    [compareWithDiskAction.value],
+    [compareWithDiskAction.value, ...restoreFileAction()],
   ))
   const projectTreeData = computed(() => createCommitTree(
     projectCommits.value,
@@ -222,6 +266,7 @@ export function useProjectTimeline(
         return
       }
       initialized.value = inspection.value.initialized
+      repository.value = { head: inspection.value.head, currentBranch: inspection.value.currentBranch }
       if (!inspection.value.initialized) return
 
       const [history, fileHistory, statusResult] = await Promise.all([
@@ -271,6 +316,7 @@ export function useProjectTimeline(
     refresh,
     refreshStatus,
     hasHistory: computed(() => commits.value.length > 0),
+    resolveNodeTarget,
     revisionOptions,
   }
 }

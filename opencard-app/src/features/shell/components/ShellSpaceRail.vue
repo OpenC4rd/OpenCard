@@ -20,7 +20,7 @@ const props = defineProps<ShellSpaceRailProps>()
 
 const spaceGroups = computed(() => (['primary', 'secondary'] as const).map(key => ({
   key,
-  spaces: props.spaces.filter(space => (space.railGroup ?? 'primary') === key),
+  spaces: props.spaces.filter(space => isAvailable(space) && (space.railGroup ?? 'primary') === key),
 })).filter(group => group.spaces.length > 0))
 
 const emit = defineEmits<{
@@ -30,17 +30,15 @@ const emit = defineEmits<{
 function isAvailable(space: ShellSpaceDefinition): boolean {
   return space.available?.value !== false
 }
-
-function selectSpace(space: ShellSpaceDefinition): void {
-  if (isAvailable(space)) emit('select', space.key)
-}
 </script>
 
 <template>
   <nav class="shell-space-rail" :aria-label="props.label" data-tooltip-placement="right" data-tooltip-group>
-    <div
+    <TransitionGroup
       v-for="group in spaceGroups"
       :key="group.key"
+      tag="div"
+      name="shell-space-rail-item"
       class="shell-space-rail__items"
       :class="{ 'shell-space-rail__items--secondary': group.key === 'secondary' }"
     >
@@ -49,17 +47,15 @@ function selectSpace(space: ShellSpaceDefinition): void {
         :key="space.key"
         :data-oc-tutorial="space.key === 'collaboration' ? 'shell.collaboration' : undefined"
         class="shell-space-rail__item"
-        :class="{ 'is-active': space.key === props.activeSpace, 'is-unavailable': !isAvailable(space) }"
+        :class="{ 'is-active': space.key === props.activeSpace }"
         type="button"
         :aria-label="props.translate(space.labelKey)"
         :aria-current="space.key === props.activeSpace ? 'page' : undefined"
-        :aria-disabled="!isAvailable(space) || undefined"
-        :data-tooltip="!isAvailable(space) && space.unavailableHintKey
-          ? props.translate(space.unavailableHintKey) : props.translate(space.labelKey)"
-        @click="selectSpace(space)"
+        :data-tooltip="props.translate(space.labelKey)"
+        @click="emit('select', space.key)"
       >
         <OcIcon :name="space.icon" :tone="space.key === props.activeSpace ? 'accent' : 'muted'" size="md" />
       </button>
-    </div>
+    </TransitionGroup>
   </nav>
 </template>

@@ -1,13 +1,10 @@
 /** Projects application settings into node, card and row view models. */
 import { computed, type ComputedRef, type DeepReadonly, type Ref } from 'vue'
-import type { OcActionDefinition } from '../../../shared/ui/action/action.types'
-import type { IconToken } from '../../../shared/ui/icon/iconRegistry'
 import type { OcNodeCollection } from '../../../shared/ui/node/node.types'
-import { CACHE_GIB_BYTES, formatCacheUsage, type AppCacheUsage } from '../../../shared/storage/appCache'
+import { CACHE_GIB_BYTES, type AppCacheUsage } from '../../../shared/storage/appCache'
+import { card, cardAction, editorPart, fieldItem, meterItem, type SettingsCardViewModel } from './settingsCards'
 import type {
   EditorItem,
-  EditorItemEditorPart,
-  PropertyEditorFieldDefinition,
   PropertyFieldCapabilities,
 } from '../../../shared/ui/property-editor/propertyEditor.types'
 import type { AppLocaleOption } from '../../../i18n/appLocale'
@@ -49,14 +46,7 @@ interface SettingsAnchor {
   itemKey: AppSettingKey
 }
 
-export interface SettingsCardViewModel {
-  key: string
-  title: string
-  icon?: IconToken
-  /** 作用于这张 card 整组的操作，例如主题预设的复制、读取与重置。 */
-  actions: OcActionDefinition[]
-  items: readonly EditorItem[]
-}
+export type { SettingsCardViewModel } from './settingsCards'
 
 export interface SettingsCategoryViewModel {
   key: SettingsCategoryKey
@@ -78,63 +68,6 @@ interface UseSettingsViewModelOptions {
   /** `cache/` 的现量占用；进设置页时由 shell 量一次。 */
   cacheUsage: Readonly<Ref<AppCacheUsage>>
   translate: (key: string, fallback: string) => string
-}
-
-function editorPart(
-  key: string,
-  definition: PropertyEditorFieldDefinition,
-  value: unknown,
-): EditorItemEditorPart {
-  return { type: 'editor', key, definition, value }
-}
-
-/** 标题保持简短，解释放在 subtitle 里；没有说明就不带这个字段。 */
-function fieldItem(
-  key: string,
-  definition: PropertyEditorFieldDefinition,
-  value: unknown,
-  subtitle = '',
-): EditorItem {
-  return {
-    key,
-    title: definition.title,
-    subtitle: subtitle || undefined,
-    content: [editorPart('value', definition, value)],
-  }
-}
-
-/** 只读用量行：用量条 + 文字，不参与编辑。 */
-function meterItem(
-  key: string,
-  title: string,
-  subtitle: string,
-  value: number,
-  max: number | null,
-): EditorItem {
-  return {
-    key,
-    title,
-    subtitle: subtitle || undefined,
-    content: [{ type: 'meter', key: 'meter', value, max, text: formatCacheUsage(value, max ?? undefined) }],
-  }
-}
-
-function cardAction(
-  key: string,
-  title: string,
-  icon: IconToken,
-  disabled = false,
-): OcActionDefinition {
-  return { key, title, icon, disabled }
-}
-
-function card(
-  key: string,
-  title: string,
-  items: readonly EditorItem[],
-  options: { icon?: IconToken; actions?: readonly OcActionDefinition[] } = {},
-): SettingsCardViewModel {
-  return { key, title, icon: options.icon, actions: [...(options.actions ?? [])], items }
 }
 
 const CATEGORY_KEYS = SETTINGS_CATEGORY_KEYS
@@ -516,6 +449,13 @@ export function useSettingsViewModel(
             }, settings.versionControl.createInitialCommit,
             options.translate('settings.descriptions.createInitialCommit', 'Also creates the first commit right after initializing.')),
           ], { icon: 'mdiSourceBranch' }),
+          // 项目结构随版本变化：在这里把当前项目重新走一遍适配，适配前同样先存 Git 快照。
+          card('projectStructure', options.translate('settings.cards.projectStructure', 'Project structure'), [], {
+            icon: 'mdiFolderOpenOutline',
+            actions: [
+              cardAction('project.adapt', options.translate('settings.actions.adaptProject', 'Adapt the open project to this version'), 'mdiRefresh', !options.projectOpen.value),
+            ],
+          }),
         ],
       }
     }
