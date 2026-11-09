@@ -484,7 +484,7 @@ function applyCellValidation(
     ? ['true', 'false']
     : definition.fieldType === 'string'
       ? definition.options
-      : getPropertyFieldTypeOptions(definition.fieldType.replace(/\[\]$/, '') as Parameters<typeof getPropertyFieldTypeOptions>[0])
+      : getPropertyFieldTypeOptions(definition.fieldType.replace(/(\[\])+$/, '') as Parameters<typeof getPropertyFieldTypeOptions>[0])
   if (!values?.length) return
   cell.dataValidation = {
     type: 'list',

@@ -4,6 +4,7 @@ import { useProjectStore } from '../../workspace/store/projectStore'
 import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
 import { useTutorialStore } from '../../tutorials/tutorialStore'
 import CommitVersionDialog from '../../version-control/components/CommitVersionDialog.vue'
+import { ensureGitignoreFile } from '../../version-control/changeActions'
 import type { SpacePage } from '../spacePage'
 import { createCollaborationSection } from '../sections/collaborationSection'
 import { useShellNavigation } from './useShellNavigation'
@@ -15,7 +16,7 @@ export function createCollaborationPage(options: {
   workbench: Pick<SpacePage, 'content' | 'contentProps' | 'header' | 'bottomPanel' | 'handleKeydown'>
   version: ReturnType<typeof useWorkbenchVersionControl>
   activateChange: (event: OcNodeActivateEvent) => Promise<void>
-  openProject: () => Promise<unknown>
+  openFile: (path: string) => Promise<unknown>
 }) {
   const { t } = useI18n()
   const navigation = useShellNavigation()
@@ -38,16 +39,13 @@ export function createCollaborationPage(options: {
     return id && !settings.settings.value.tutorials.seen.includes(id) ? id : null
   }, id => { if (id) tutorial.start(id) }, { immediate: true })
   async function onAction(key: string): Promise<void> {
-    if (key === 'open-project') {
-      await options.openProject()
-      return
-    }
-    if (!project.projectPath.value) return
     if (key === 'initialize-repository' && version.repositoryNeedsInitialization.value) {
       await version.initializeProjectRepository()
     } else if (key === 'publish-version' && version.selectedChangeCount.value > 0 && !version.isCommittingVersion.value) {
       version.commitVersionError.value = ''
       version.commitVersionDialogOpen.value = true
+    } else if (key === 'edit-gitignore' && version.repositoryReady.value) {
+      await options.openFile(await ensureGitignoreFile(project.projectPath.value))
     }
   }
   function refresh(): void {
@@ -57,7 +55,7 @@ export function createCollaborationPage(options: {
   onMounted(() => window.addEventListener('focus', refresh))
   onUnmounted(() => window.removeEventListener('focus', refresh))
   const sidebar = createCollaborationSection({
-    translate: t, projectOpen: computed(() => Boolean(project.projectPath.value)), onAction,
+    translate: t, onAction,
     version: {
       ready: version.repositoryReady, needsInitialization: version.repositoryNeedsInitialization,
       initializing: version.isInitializingRepository, committing: version.isCommittingVersion,
@@ -75,7 +73,10 @@ export function createCollaborationPage(options: {
   })
   const page: SpacePage = {
     key: 'collaboration',
-    navigation: { key: 'collaboration', icon: 'mdiAccountGroup', labelKey: 'app.shell.space.collaboration' },
+    navigation: {
+      key: 'collaboration', icon: 'mdiAccountGroup', labelKey: 'app.shell.space.collaboration',
+      available: computed(() => Boolean(project.projectPath.value)), unavailableHintKey: 'app.shell.space.needsProject',
+    },
     ...options.workbench,
     contentKey: 'workbench', sidebar,
     sidebarLayout: { persistenceKey: computed(() => {

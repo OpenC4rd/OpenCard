@@ -14,7 +14,6 @@ type EditorPropertyBase = {
     icon?: IconToken
     unremovable?: boolean
     isHidden?: boolean
-    isArray?: boolean
     isReadonly?: boolean
     resettable?: boolean
     nonOverridable?: true
@@ -35,6 +34,8 @@ type PropertyConstraintMap = {
         optionLabelKeys?: Readonly<Record<string, string>>
         presentation?: 'select' | 'stepper'
         autocomplete?: readonly string[]
+        /** 纯数字时在输入框末尾显示的默认单位（只是提示，不改写值）。 */
+        defaultUnit?: string
         multiline?: boolean
     }
     richText: {}
@@ -57,15 +58,14 @@ type PropertyConstraintMap = {
         min?: number
         max?: number
         step?: number
+        suffix?: string
     }
     boolean: {}
     color: {}
-    object: {
-        objectType: string
-    }
+    object: { objectType: string }
 }
 
-export type PropertyFieldType = keyof PropertyConstraintMap
+export type PropertyFieldType = keyof PropertyConstraintMap | `${keyof PropertyConstraintMap}[]${string}`
 type AdditionalFieldEditorOptions = Pick<EditorPropertyBase,
     'unremovable' | 'isHidden' | 'isReadonly' | 'resettable' | 'categoryId' | 'displayFieldKey'>
 type AdditionalFieldDefinitionBase<T extends PropertyFieldType> = AdditionalFieldEditorOptions & {
@@ -132,7 +132,7 @@ export function parseAdditionalFieldDefinitions(
         const fieldType = hasFieldType
             ? source.fieldType as (typeof additionalFieldTypes)[number]
             : nativeDefinition?.fieldType
-        if (!fieldType || fieldType === 'object') continue
+        if (!fieldType || getPropertyValueKind({ fieldType }) === 'object') continue
         const normalizedFieldKey = nativeKey ?? fieldKey
         const title = typeof source.title === 'string' ? source.title.trim() : ''
         const base = {
@@ -273,16 +273,14 @@ type AllConstraintKeys = {
     [K in keyof PropertyConstraintMap]: keyof PropertyConstraintMap[K]
 }[keyof PropertyConstraintMap]
 
-type StrictVariant<
-    T extends keyof PropertyConstraintMap
-> = EditorPropertyBase & {
-    fieldType: T
+type StrictVariant<T extends keyof PropertyConstraintMap, F extends PropertyFieldType> = EditorPropertyBase & {
+    fieldType: F
 } & PropertyConstraintMap[T] & {
         [K in Exclude<AllConstraintKeys, keyof PropertyConstraintMap[T]>]?: never
     }
 
 export type EditorPropertyDefinition = {
-    [K in keyof PropertyConstraintMap]: StrictVariant<K>
+    [K in keyof PropertyConstraintMap]: StrictVariant<K, K> | StrictVariant<K, `${K}[]${string}`>
 }[keyof PropertyConstraintMap]
 
 const propertyOptionsByFieldType: Partial<Record<PropertyFieldType, readonly string[]>> = {
@@ -365,11 +363,11 @@ function createBaseBlockPropertyEditorSchema(): Record<string, EditorPropertyDef
     return {
         name: { fieldType: 'string', categoryId: 'general' },
         notes: { fieldType: 'string', multiline: true, categoryId: 'general' },
-        width: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'size' },
-        height: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'size' },
+        width: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'size' },
+        height: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'size' },
         transformAnchor: { fieldType: 'anchorPosition', categoryId: 'transform' },
-        translateX: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'transform' },
-        translateY: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'transform' },
+        translateX: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'transform' },
+        translateY: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'transform' },
         rotation: { fieldType: 'number', categoryId: 'transform' },
         scaleX: { fieldType: 'number', categoryId: 'transform' },
         scaleY: { fieldType: 'number', categoryId: 'transform' },
@@ -380,7 +378,7 @@ function createBaseBlockPropertyEditorSchema(): Record<string, EditorPropertyDef
         borderColor: { fieldType: 'color', categoryId: 'surface' },
         borderWidth: { fieldType: 'number', min: 0, categoryId: 'surface' },
         borderStyle: { fieldType: 'string', options: blockBorderStyleOptions, categoryId: 'surface' },
-        borderRadius: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'surface' },
+        borderRadius: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'surface' },
         id: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, minLength: 1, categoryId: 'advanced', acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         additionalFieldDefinition: { fieldType: 'object', objectType: 'AdditionalFieldDefinition', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
@@ -402,7 +400,7 @@ function createTextContentBlockPropertyEditorSchema(): Record<string, EditorProp
         ...createBaseBlockPropertyEditorSchema(),
         content: { fieldType: 'richText', categoryId: 'content' },
         fontFamily: { fieldType: 'fontFamily', categoryId: 'textStyle' },
-        fontSize: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'textStyle' },
+        fontSize: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'textStyle' },
         fontWeight: {
             fieldType: 'string',
             options: textFontWeightOptions,
@@ -414,7 +412,7 @@ function createTextContentBlockPropertyEditorSchema(): Record<string, EditorProp
             categoryId: 'textStyle',
         },
         color: { fieldType: 'color', categoryId: 'textStyle', displayFieldKey: 'textColor' },
-        lineHeight: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'textLayout' },
+        lineHeight: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'textLayout' },
         textAlign: { fieldType: 'alignPosition', categoryId: 'textLayout' },
         verticalAlign: { fieldType: 'verticalAlignPosition', categoryId: 'textLayout' },
         writingMode: { fieldType: 'string', options: textWritingModeOptions, categoryId: 'textLayout' },
@@ -426,51 +424,51 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
     'image-block': {
         ...createBaseBlockPropertyEditorSchema(),
         source: { ...imageSourceField, displayFieldKey: 'imageSource' },
-        maskSource: { ...imageSourceField, unremovable: false, icon: 'mdiImageFilterBlackWhite' },
-        fit: { fieldType: 'string', unremovable: true, options: imageFitOptions, categoryId: 'content' },
+        maskSource: { ...imageSourceField, icon: 'mdiImageFilterBlackWhite' },
+        fit: { fieldType: 'string', options: imageFitOptions, categoryId: 'content' },
         maskFit: { fieldType: 'string', options: imageFitOptions, categoryId: 'content' },
     },
     'qrcode-block': {
         ...createBaseBlockPropertyEditorSchema(),
-        content: { fieldType: 'string', unremovable: true, multiline: true, categoryId: 'content' },
-        errorCorrection: { fieldType: 'string', unremovable: true, options: qrErrorCorrectionOptions, categoryId: 'content' },
-        quietZone: { fieldType: 'number', unremovable: true, min: 0, max: 16, categoryId: 'content' },
-        foreground: { fieldType: 'color', unremovable: true, categoryId: 'graphicStyle' },
-        backgroundColor: { fieldType: 'color', unremovable: true, categoryId: 'graphicStyle' },
+        content: { fieldType: 'string', multiline: true, categoryId: 'content' },
+        errorCorrection: { fieldType: 'string', options: qrErrorCorrectionOptions, categoryId: 'content' },
+        quietZone: { fieldType: 'number', min: 0, max: 16, categoryId: 'content' },
+        foreground: { fieldType: 'color', categoryId: 'graphicStyle' },
+        backgroundColor: { fieldType: 'color', categoryId: 'graphicStyle' },
     },
     'shape-block': {
         ...createBaseBlockPropertyEditorSchema(),
-        shape: { fieldType: 'string', unremovable: true, options: shapeOptions, categoryId: 'content' },
-        fill: { fieldType: 'color', unremovable: true, categoryId: 'graphicStyle' },
-        stroke: { fieldType: 'color', unremovable: true, categoryId: 'graphicStyle' },
-        strokeWidth: { fieldType: 'number', unremovable: true, min: 0, categoryId: 'graphicStyle' },
-        strokeStyle: { fieldType: 'string', unremovable: true, options: shapeStrokeStyleOptions, categoryId: 'graphicStyle' },
-        strokeAlignment: { fieldType: 'string', unremovable: true, options: shapeStrokeAlignmentOptions, categoryId: 'graphicStyle' },
-        strokeJoin: { fieldType: 'string', unremovable: true, options: shapeStrokeJoinOptions, categoryId: 'graphicStyle' },
-        strokeCap: { fieldType: 'string', unremovable: true, options: shapeStrokeCapOptions, categoryId: 'graphicStyle' },
-        strokeMiterLimit: { fieldType: 'number', unremovable: true, min: 1, categoryId: 'graphicStyle' },
+        shape: { fieldType: 'string', options: shapeOptions, categoryId: 'content' },
+        fill: { fieldType: 'color', categoryId: 'graphicStyle' },
+        stroke: { fieldType: 'color', categoryId: 'graphicStyle' },
+        strokeWidth: { fieldType: 'number', min: 0, categoryId: 'graphicStyle' },
+        strokeStyle: { fieldType: 'string', options: shapeStrokeStyleOptions, categoryId: 'graphicStyle' },
+        strokeAlignment: { fieldType: 'string', options: shapeStrokeAlignmentOptions, categoryId: 'graphicStyle' },
+        strokeJoin: { fieldType: 'string', options: shapeStrokeJoinOptions, categoryId: 'graphicStyle' },
+        strokeCap: { fieldType: 'string', options: shapeStrokeCapOptions, categoryId: 'graphicStyle' },
+        strokeMiterLimit: { fieldType: 'number', min: 1, categoryId: 'graphicStyle' },
     },
     'simple-container-block': {
         ...createBaseBlockPropertyEditorSchema(),
         packaged: { fieldType: 'boolean', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
-        clip: { fieldType: 'boolean', unremovable: true, categoryId: 'container' },
-        children: { fieldType: 'object', objectType: 'CardBlock', unremovable: true, isArray: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
+        clip: { fieldType: 'boolean', categoryId: 'container' },
+        children: { fieldType: 'object[]', objectType: 'CardBlock', unremovable: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     },
     'flow-container-block': {
         ...createBaseBlockPropertyEditorSchema(),
         packaged: { fieldType: 'boolean', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
-        clip: { fieldType: 'boolean', unremovable: true, categoryId: 'container' },
-        direction: { fieldType: 'flowDirection', unremovable: true, categoryId: 'container' },
-        gap: { fieldType: 'string', unremovable: true, autocomplete: cssLengthAutocomplete, categoryId: 'container' },
-        children: { fieldType: 'object', objectType: 'CardBlock', unremovable: true, isArray: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
+        clip: { fieldType: 'boolean', categoryId: 'container' },
+        direction: { fieldType: 'flowDirection', categoryId: 'container' },
+        gap: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'container' },
+        children: { fieldType: 'object[]', objectType: 'CardBlock', unremovable: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     },
     'custom-block': createCustomBlockPropertyEditorSchema(),
     'simple-container-location': {
         id: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         anchor: { fieldType: 'anchorPosition', unremovable: true, categoryId: 'position' },
-        x: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'position' },
-        y: { fieldType: 'string', autocomplete: cssLengthAutocomplete, categoryId: 'position' },
+        x: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'position' },
+        y: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'position' },
     },
     'flow-container-location': {
         id: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false },
@@ -483,20 +481,20 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
         description: { fieldType: 'string', multiline: true, categoryId: 'general', bindingScopes: ['project'] },
         notes: { fieldType: 'string', multiline: true, categoryId: 'general', bindingScopes: ['project'] },
         version: { fieldType: 'string', unremovable: true, categoryId: 'general', bindingScopes: ['project'] },
-        width: { fieldType: 'number', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
-        height: { fieldType: 'number', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
-        dpi: { fieldType: 'number', min: 72, categoryId: 'size', bindingScopes: ['project'] },
+        width: { fieldType: 'number', suffix: 'mm', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
+        height: { fieldType: 'number', suffix: 'mm', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
+        dpi: { fieldType: 'number', suffix: 'dpi', min: 72, categoryId: 'size', bindingScopes: ['project'] },
         id: { fieldType: 'string', unremovable: true, categoryId: 'advanced', isReadonly: true, isHidden: true, acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         faces: { fieldType: 'object', objectType: 'CardFace', unremovable: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
-        instances: { fieldType: 'object', objectType: 'CardInstanceRecord', unremovable: true, isArray: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
+        instances: { fieldType: 'object[]', objectType: 'CardInstanceRecord', unremovable: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
         dataTable: { fieldType: 'object', objectType: 'CardDataTableConfiguration', isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     },
     'card-face': {
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
         id: { fieldType: 'string', unremovable: true, categoryId: 'advanced', isReadonly: true, isHidden: true, acceptsBinding: false },
         background: { fieldType: 'color', unremovable: true, categoryId: 'surface' },
-        children: { fieldType: 'object', objectType: 'RootChild', unremovable: true, isArray: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
+        children: { fieldType: 'object[]', objectType: 'RootChild', unremovable: true, isHidden: true, categoryId: 'data', acceptsBinding: false, exposesReference: false },
     },
     'card-instance': {
         name: { fieldType: 'string', unremovable: true, categoryId: 'general' },
@@ -701,7 +699,7 @@ type ResolvedPropertyEditorSchema = {
 
 const editorConstraintKeys = [
     'minLength', 'maxLength', 'options', 'optionLabelKeys', 'presentation', 'autocomplete', 'multiline',
-    'filter', 'allowRemote', 'min', 'max', 'step', 'objectType', 'isArray', 'defaultValue',
+    'filter', 'allowRemote', 'min', 'max', 'step', 'objectType', 'defaultValue',
 ] as const
 
 function createDefinitionForFieldType(
@@ -808,11 +806,11 @@ export function resolvePropertyEditorSchema(
     return { fields, labels, customKeys }
 }
 
-export function getPropertyValueKind(definition: EditorPropertyDefinition | undefined): BindingValueKind {
+export function getPropertyValueKind(definition: { fieldType: string } | undefined): BindingValueKind {
     if (!definition) return 'string'
     if (definition.fieldType === 'number') return 'number'
     if (definition.fieldType === 'boolean') return 'boolean'
-    if (definition.fieldType === 'object') return 'object'
+    if (definition.fieldType === 'object' || definition.fieldType.endsWith('[]')) return 'object'
     return 'string'
 }
 
@@ -842,7 +840,9 @@ export function createPropertyDefaultValue(definition: EditorPropertyDefinition)
         case 'boolean':
             return 'false'
         case 'object':
-            return definition.isArray ? [] : {}
+            return {}
+        default: // `T[]`
+            return []
     }
 }
 

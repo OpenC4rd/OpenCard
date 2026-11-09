@@ -2,17 +2,20 @@ import {
   type ExportDestination,
   type ExportFaceRenderer,
   type ExportFailure,
+  type ExportPageComposer,
+  type ExportPdfPlan,
   type ExportPlan,
   type ExportProgressCounts,
   type ExportProgressEvent,
   type ExportRunResult,
-  resolveExportErrorPolicy,
 } from './exportTask'
+import { buildImagePdf, type PdfImagePage } from './imagePdf'
 import { ExportRenderDiagnosticsError } from './exportRenderingError'
 
 type RunExportPlanOptions = {
   plan: ExportPlan
   renderer: ExportFaceRenderer
+  composer: ExportPageComposer
   destination: ExportDestination
   signal: AbortSignal
   report: (event: ExportProgressEvent) => void
@@ -22,7 +25,80 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** 整份导出只有一个文件：渲染失败的卡位留白并记录，`stop` 时不写文件。 */
+async function runPdfPlan(options: RunExportPlanOptions, pdf: ExportPdfPlan): Promise<ExportRunResult> {
+  const { plan, renderer, composer, destination, signal } = options
+  const counts: ExportProgressCounts = { succeeded: 0, skipped: 0, failed: 0 }
+  const failures: ExportFailure[] = []
+  const totalUnits = pdf.pages.length + 1
+  const current = { sourcePath: plan.profile.name, outputPath: pdf.outputPath }
+  let completedUnits = 0
+  const report = (phase: ExportProgressEvent['phase']) => {
+    options.report({ phase, completedUnits, totalUnits, current, counts: { ...counts } })
+  }
+  const finish = (status: ExportRunResult['status']): ExportRunResult => {
+    report(status)
+    return { status, total: 1, ...counts, outputDirectory: plan.outputDirectory, failures }
+  }
+
+  try {
+    await destination.ensureDirectory(plan.outputDirectory)
+    if (plan.profile.output.conflict === 'skip' && await destination.exists(pdf.outputPath)) {
+      counts.skipped += 1
+      completedUnits = totalUnits
+      return finish('completed')
+    }
+
+    const dpi = plan.profile.rule.dpi
+    const pages: PdfImagePage[] = []
+    const unavailable = new Set<number>()
+    for (const page of pdf.pages) {
+      const images = new Map<number, Uint8Array>()
+      for (const { entryIndex } of page.placements) {
+        if (signal.aborted) return finish('cancelled')
+        if (images.has(entryIndex) || unavailable.has(entryIndex)) continue
+        const entry = plan.entries[entryIndex]!
+        report('rendering')
+        try {
+          images.set(entryIndex, await renderer.render({
+            sourcePath: entry.sourcePath, outputPath: entry.outputPath, faceKey: entry.faceKey,
+            render: entry.render, scale: 1, dpi,
+          }, signal))
+        } catch (error) {
+          if (signal.aborted) return finish('cancelled')
+          unavailable.add(entryIndex)
+          counts.failed += 1
+          failures.push({
+            sourcePath: entry.sourcePath, outputPath: entry.outputPath, stage: 'rendering', message: errorMessage(error),
+            ...(error instanceof ExportRenderDiagnosticsError ? { runtimeIssues: error.issues } : {}),
+          })
+          if (plan.profile.errorPolicy === 'stop') return finish('failed')
+        }
+      }
+      pages.push(await composer.compose(page, images, dpi, signal))
+      completedUnits += 1
+      report('rendering')
+    }
+
+    if (signal.aborted) return finish('cancelled')
+    report('writing')
+    await destination.write(pdf.outputPath, buildImagePdf(pages))
+    completedUnits = totalUnits
+    counts.succeeded += 1
+    return finish(counts.failed > 0 ? 'failed' : 'completed')
+  } catch (error) {
+    if (signal.aborted) return finish('cancelled')
+    counts.failed += 1
+    failures.push({ ...current, stage: 'writing', message: errorMessage(error) })
+    return finish('failed')
+  } finally {
+    renderer.reset()
+  }
+}
+
 export async function runExportPlan(options: RunExportPlanOptions): Promise<ExportRunResult> {
+  if (options.plan.pdf) return runPdfPlan(options, options.plan.pdf)
+
   const counts: ExportProgressCounts = { succeeded: 0, skipped: 0, failed: 0 }
   const failures: ExportFailure[] = []
   const totalUnits = options.plan.entries.length * 2
@@ -50,7 +126,7 @@ export async function runExportPlan(options: RunExportPlanOptions): Promise<Expo
       const current = { sourcePath: entry.sourcePath, outputPath: entry.outputPath }
 
       try {
-        if (options.plan.task.conflictMode === 'skip' && await options.destination.exists(entry.outputPath)) {
+        if (options.plan.profile.output.conflict === 'skip' && await options.destination.exists(entry.outputPath)) {
           counts.skipped += 1
           completedUnits += 2
           report('writing', current)
@@ -61,7 +137,7 @@ export async function runExportPlan(options: RunExportPlanOptions): Promise<Expo
         completedUnits += 2
         failures.push({ ...current, stage: 'writing', message: errorMessage(error) })
         report('failed', current)
-        if (resolveExportErrorPolicy(options.plan.task) === 'stop') {
+        if (options.plan.profile.errorPolicy === 'stop') {
           stoppedByFailure = true
           break
         }
@@ -75,8 +151,11 @@ export async function runExportPlan(options: RunExportPlanOptions): Promise<Expo
           ...current,
           faceKey: entry.faceKey,
           render: entry.render,
-          scale: options.plan.task.scale ?? 1,
-          dpi: options.plan.task.dpi,
+          scale: 1,
+          dpi: options.plan.profile.rule.dpi,
+          ...(options.plan.profile.rule.kind === 'images'
+            ? { format: options.plan.profile.rule.format, quality: options.plan.profile.rule.quality }
+            : {}),
         }, options.signal)
         completedUnits += 1
       } catch (error) {
@@ -93,7 +172,7 @@ export async function runExportPlan(options: RunExportPlanOptions): Promise<Expo
           ...(error instanceof ExportRenderDiagnosticsError ? { runtimeIssues: error.issues } : {}),
         })
         report('failed', current)
-        if (resolveExportErrorPolicy(options.plan.task) === 'stop') {
+        if (options.plan.profile.errorPolicy === 'stop') {
           stoppedByFailure = true
           break
         }
@@ -111,7 +190,7 @@ export async function runExportPlan(options: RunExportPlanOptions): Promise<Expo
       } catch (error) {
         counts.failed += 1
         failures.push({ ...current, stage: 'writing', message: errorMessage(error) })
-        if (resolveExportErrorPolicy(options.plan.task) === 'stop') stoppedByFailure = true
+        if (options.plan.profile.errorPolicy === 'stop') stoppedByFailure = true
       }
       completedUnits += 1
       report(stoppedByFailure ? 'failed' : 'writing', current)

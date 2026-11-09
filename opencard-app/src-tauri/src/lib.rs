@@ -45,6 +45,18 @@ struct WatcherState {
     watchers: Mutex<HashMap<String, notify::RecommendedWatcher>>,
 }
 
+/// 字面对用户展示与引用的家族名：优先本地化名称（如“宋体-简”），没有再取第一个名称。
+/// 设置里的字体下拉与项目字体的系统导入共用它，两处看到的是同一个名字。
+fn display_family(face: &fontdb::FaceInfo) -> Option<&str> {
+    let usable = |name: &&str| !name.is_empty() && !name.starts_with('@');
+    face.families
+        .iter()
+        .filter(|(_, language)| *language != fontdb::Language::English_UnitedStates)
+        .map(|(name, _)| name.trim())
+        .find(usable)
+        .or_else(|| face.families.iter().map(|(name, _)| name.trim()).find(usable))
+}
+
 #[tauri::command]
 async fn list_system_font_families() -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(|| {
@@ -52,9 +64,7 @@ async fn list_system_font_families() -> Result<Vec<String>, String> {
         database.load_system_fonts();
         database
             .faces()
-            .flat_map(|face| face.families.iter().map(|(name, _language)| name.trim()))
-            .filter(|name| !name.is_empty() && !name.starts_with('@'))
-            .map(str::to_owned)
+            .filter_map(|face| display_family(face).map(str::to_owned))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect()
@@ -87,11 +97,7 @@ async fn list_system_fonts() -> Result<Vec<SystemFontFace>, String> {
                     fontdb::Source::File(path) => path.to_string_lossy().into_owned(),
                     _ => return None,
                 };
-                let family = face
-                    .families
-                    .iter()
-                    .map(|(name, _language)| name.trim())
-                    .find(|name| !name.is_empty() && !name.starts_with('@'))?;
+                let family = display_family(face)?;
                 Some(SystemFontFace {
                     family: family.to_owned(),
                     face_name: face.post_script_name.clone(),

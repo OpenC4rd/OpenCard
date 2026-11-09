@@ -43,6 +43,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string, history?: HistoryOperationMeta]
   'save': []
+  /** 光标所在行（从 1 开始）；调用方据此把源码和结构化视图对齐。 */
+  'cursor-line': [line: number]
 }>()
 
 const { t } = useI18n()
@@ -133,6 +135,8 @@ function createEditor(api: MonacoApi, container: HTMLElement): void {
     if (viewState?.editor) editor.restoreViewState(viewState.editor)
   }
 
+  editor.onDidChangeCursorPosition(event => emit('cursor-line', event.position.lineNumber))
+
   // 监听保存快捷键 (Ctrl+S / Cmd+S)
   editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.KeyS, () => {
     if (props.session) void props.session.save().catch(error => notifyAppError('OC-E4002', error))
@@ -185,6 +189,14 @@ watch(() => props.modelValue, (newValue) => {
     editor.setValue(newValue ?? '')
   }
 })
+
+/** 把光标放到某一行并滚入视野；不抢焦点。 */
+function revealLine(line: number): void {
+  if (!editor) return
+  editor.setPosition({ lineNumber: line, column: 1 })
+  editor.revealLineInCenterIfOutsideViewport(line)
+}
+defineExpose({ revealLine })
 
 onUnmounted(() => {
   mountGeneration += 1

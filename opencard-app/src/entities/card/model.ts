@@ -61,32 +61,32 @@ export type TextBlock = TextContentBlock & {
 
 export type ImageBlock = BlockIdentity & {
     type: "image-block"
-    source: string
-    maskSource: string
-    maskFit: "cover" | "contain" | "fill"
-    fit: "cover" | "contain" | "fill"
+    source?: string
+    maskSource?: string
+    maskFit?: "cover" | "contain" | "fill"
+    fit?: "cover" | "contain" | "fill"
 }
 
 export type QrCodeBlock = BlockIdentity & {
     type: "qrcode-block"
-    content: string
-    errorCorrection: "L" | "M" | "Q" | "H"
-    foreground: string
-    backgroundColor: string
-    quietZone: string
+    content?: string
+    errorCorrection?: "L" | "M" | "Q" | "H"
+    foreground?: string
+    backgroundColor?: string
+    quietZone?: string
 }
 
 export type ShapeBlock = BlockIdentity & {
     type: "shape-block"
-    shape: "rectangle" | "ellipse" | "line" | "triangle" | "diamond"
-    fill: string
-    stroke: string
-    strokeWidth: string
-    strokeStyle: "solid" | "dashed" | "dotted"
-    strokeAlignment: "inside" | "center" | "outside"
-    strokeJoin: "miter" | "round" | "bevel"
-    strokeCap: "butt" | "round" | "square"
-    strokeMiterLimit: string
+    shape?: "rectangle" | "ellipse" | "line" | "triangle" | "diamond"
+    fill?: string
+    stroke?: string
+    strokeWidth?: string
+    strokeStyle?: "solid" | "dashed" | "dotted"
+    strokeAlignment?: "inside" | "center" | "outside"
+    strokeJoin?: "miter" | "round" | "bevel"
+    strokeCap?: "butt" | "round" | "square"
+    strokeMiterLimit?: string
 }
 export type SimpleContainerLocationInfo = {
     id: string
@@ -102,7 +102,7 @@ type ContainerPackaging = {
 
 export type SimpleContainerBlock = BlockIdentity & ContainerPackaging & {
     type: "simple-container-block"
-    clip: string
+    clip?: string
     children: {
         block: CardBlock
         location: SimpleContainerLocationInfo
@@ -120,9 +120,9 @@ export type FlowDirection = 'lr' | 'rl' | 'tb' | 'bt'
 
 export type FlowContainerBlock = BlockIdentity & ContainerPackaging & {
     type: "flow-container-block"
-    clip: string
-    direction: FlowDirection
-    gap: CssValue
+    clip?: string
+    direction?: FlowDirection
+    gap?: CssValue
     children: {
         block: CardBlock
         location: FlowContainerLocationInfo
@@ -176,7 +176,8 @@ export type CardInstanceRecord = {
     id: string
     name: string
     amount: string
-    data: Record<string, Record<string, CardStoredValue>>
+    /** `null` 是这张卡显式未定义：字段退回属性默认值，不再跟随蓝图。 */
+    data: Record<string, Record<string, CardStoredValue | null>>
 }
 
 export type CardStoredValue = string | CardStoredValue[] | { [key: string]: CardStoredValue }
@@ -417,9 +418,9 @@ function getDefaultBlockName(type: CardBlock['type']): string {
  */
 const blockSeedFieldKeys: Record<CardBlock['type'], readonly string[]> = {
     'text-block': ['width', 'height', 'fontSize', 'fontWeight', 'color', 'textAlign', 'verticalAlign', 'lineHeight'],
-    'image-block': ['width', 'height'],
-    'qrcode-block': ['width', 'height'],
-    'shape-block': ['width', 'height'],
+    'image-block': ['width', 'height', 'source'],
+    'qrcode-block': ['width', 'height', 'content'],
+    'shape-block': ['width', 'height', 'shape', 'fill'],
     'simple-container-block': ['width', 'height'],
     'flow-container-block': ['width', 'height'],
     'custom-block': [],
@@ -454,10 +455,6 @@ export function createImageBlock(init: ImageBlockInit = {}): ImageBlock {
             ...init,
         }),
         type: 'image-block',
-        source: init.source ?? '',
-        maskSource: init.maskSource ?? '',
-        maskFit: init.maskFit ?? 'contain',
-        fit: init.fit ?? 'cover',
     }
 
     return block as ImageBlock
@@ -472,11 +469,6 @@ function createQrCodeBlock(init: QrCodeBlockInit = {}): QrCodeBlock {
             ...init,
         }),
         type: 'qrcode-block',
-        content: init.content ?? '',
-        errorCorrection: init.errorCorrection ?? 'M',
-        foreground: init.foreground ?? '#000000',
-        backgroundColor: init.backgroundColor ?? '#FFFFFF',
-        quietZone: init.quietZone ?? '4',
     } as QrCodeBlock
 }
 
@@ -489,15 +481,6 @@ export function createShapeBlock(init: ShapeBlockInit = {}): ShapeBlock {
             ...init,
         }),
         type: 'shape-block',
-        shape: init.shape ?? 'rectangle',
-        fill: init.fill ?? '#7C6CFF',
-        stroke: init.stroke ?? '#000000',
-        strokeWidth: init.strokeWidth ?? '0',
-        strokeStyle: init.strokeStyle ?? 'solid',
-        strokeAlignment: init.strokeAlignment ?? 'center',
-        strokeJoin: init.strokeJoin ?? 'miter',
-        strokeCap: init.strokeCap ?? 'butt',
-        strokeMiterLimit: init.strokeMiterLimit ?? '4',
     } as ShapeBlock
 }
 export function createSimpleContainerBlock(init: SimpleContainerBlockInit = {}): SimpleContainerBlock {
@@ -509,12 +492,15 @@ export function createSimpleContainerBlock(init: SimpleContainerBlockInit = {}):
             ...init,
         }),
         type: 'simple-container-block',
-        ...(init.packaged !== undefined ? { packaged: init.packaged } : {}),
-        clip: init.clip ?? 'false',
         children: init.children ? [...init.children] : [],
     }
 
     return block
+}
+
+/** `direction` 可以缺失；编辑侧按方向做判断时一律走这里，和渲染看到的方向保持一致。 */
+export function getFlowDirection(block: FlowContainerBlock): FlowDirection {
+    return block.direction ?? getDefault(block.type, 'direction') as FlowDirection
 }
 
 export function createFlowContainerBlock(init: FlowContainerBlockInit = {}): FlowContainerBlock {
@@ -526,10 +512,6 @@ export function createFlowContainerBlock(init: FlowContainerBlockInit = {}): Flo
             ...init,
         }),
         type: 'flow-container-block',
-        ...(init.packaged !== undefined ? { packaged: init.packaged } : {}),
-        clip: init.clip ?? 'false',
-        direction: init.direction ?? 'lr',
-        gap: init.gap ?? '2mm',
         children: init.children ? [...init.children] : [],
     }
 

@@ -23,7 +23,6 @@
     <OcFieldInput
       as="textarea"
       class="oc-json-editor__input"
-      :class="`oc-json-editor__input--${heightMode}`"
       full-width
       mono
       resize="vertical"
@@ -55,10 +54,8 @@ defineOptions({ name: 'OcJsonEditor' })
 const props = withDefaults(defineProps<{
   modelValue: unknown
   readonly?: boolean
-  heightMode?: 'default' | 'array'
 }>(), {
   readonly: false,
-  heightMode: 'default',
 })
 
 const emit = defineEmits<{
@@ -145,13 +142,6 @@ function tryParseJson(value: string): { ok: true; value: unknown } | { ok: false
   width: 100%;
   min-width: 0;
   line-height: 1.5;
-}
-
-.oc-json-editor__input--default {
   min-height: 180px;
-}
-
-.oc-json-editor__input--array {
-  min-height: 220px;
 }
 </style>

@@ -213,7 +213,7 @@ export function useCdeDataTableModel(options: UseCdeDataTableModelOptions) {
         identity: `${column.key}\u0000${block.id}\u0000${field.key}`,
         cardId: column.key,
         kind: column.kind,
-        value: overridden ? overrideRecord![field.key] : blueprintValue,
+        value: overridden ? overrideRecord![field.key] ?? field.definition.defaultValue : blueprintValue,
         readonly: !canOverride,
         inherited: column.kind === 'instance' && !overridden,
         overridden,

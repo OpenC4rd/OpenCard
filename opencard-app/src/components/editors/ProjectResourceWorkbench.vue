@@ -1,4 +1,4 @@
-<!-- 业务 项目资源工作台骨架：图标、字体、自定义块、包四页共用的「舞台 + 悬浮面板」布局，几何与 CDE 同一套。 -->
+<!-- 业务 项目资源工作台骨架：资源四页和导出页共用的「舞台 + 悬浮面板」布局，几何与 CDE 同一套。 -->
 <template>
   <div class="project-resource-workbench" :class="{ 'is-full-bleed': fullBleed, 'is-resizing': isResizing }">
     <div class="project-resource-workbench__stage" :style="fullBleed ? undefined : stageInsets()">
@@ -17,7 +17,7 @@
       @update:extent="dock.updateDockExtent('left', $event)" @toggle-collapse="dock.toggleDockCollapsed('left')"
       @resize-start="isResizing = true" @resize-end="finishResize('left', $event)">
       <template #top>
-        <OcCard fill variant="glass" :padding="false" :title="leadingTitle" :actions="leadingActions" @action="emit('action', $event)">
+        <OcCard fill variant="glass" :title="leadingTitle" :actions="leadingActions" @action="emit('action', $event)">
           <OcPanel fill tone="transparent" border="none" padding="none" overflow="hidden" align="stretch">
             <slot name="leading" />
           </OcPanel>
@@ -33,14 +33,14 @@
       @toggle-collapse="dock.toggleDockCollapsed('right')" @resize-start="isResizing = true"
       @resize-end="finishResize('right', $event)">
       <template #top>
-        <OcCard fill variant="glass" :padding="false" :title="inspectorTitle" :actions="inspectorActions" @action="emit('action', $event)">
+        <OcCard fill variant="glass" :title="inspectorTitle" :actions="inspectorActions" @action="emit('action', $event)">
           <OcPanel fill tone="transparent" border="none" padding="none" overflow="auto" align="stretch">
             <slot name="inspector" />
           </OcPanel>
         </OcCard>
       </template>
       <template v-if="$slots.footer" #bottom>
-        <OcCard fill variant="glass" :padding="false" :title="footerTitle">
+        <OcCard fill variant="glass" :title="footerTitle">
           <OcPanel fill tone="transparent" border="none" padding="none" overflow="auto" align="stretch">
             <slot name="footer" />
           </OcPanel>
@@ -87,7 +87,7 @@ const { t } = useI18n()
 const slots = useSlots()
 const appState = useAppStateStore()
 const isResizing = ref(false)
-/** 四页共用一份面板宽度：切页面时面板不跳。 */
+/** 各页共用一份面板宽度：切页面时面板不跳。 */
 const dock = useDockLayout({
   layout: computed(() => appState.state.value.layout.resourceDock),
   geometryConfig: DOCK_GEOMETRY_CONFIG,

@@ -6,7 +6,6 @@ type Translate = (key: string, paramsOrFallback?: Record<string, unknown> | stri
 
 interface CollaborationSectionOptions {
   translate: Translate
-  projectOpen: Readonly<Ref<boolean>>
   onAction: (key: string) => void | Promise<void>
   version: {
     ready: Readonly<Ref<boolean>>
@@ -31,37 +30,8 @@ interface CollaborationSectionOptions {
   }
 }
 
-/** 未打开项目时的协作侧栏空状态：走空树，与其它侧栏列表共用同一套空状态渲染。 */
-const EMPTY_TREE_DATA: OcNodeCollection = { rootKeys: [], items: new Map(), children: new Map() }
-
 export function createCollaborationSection(options: CollaborationSectionOptions): ComputedRef<ShellListGroup[]> {
   return computed(() => {
-    if (!options.projectOpen.value) {
-      return [{
-        key: 'version-control',
-        title: options.translate('versionControl.title', 'Version Control'),
-        icon: 'mdiAccountGroup',
-        onAction: options.onAction,
-        headButtons: [{
-          key: 'open-project',
-          icon: 'mdiFolderOpenOutline',
-          title: options.translate('sidebar.openProject', 'Open Project Folder'),
-        }],
-        lists: [{
-          key: 'collaboration-empty',
-          title: options.translate('versionControl.title', 'Version Control'),
-          placeholder: options.translate('versionControl.empty', 'Open a project to see changes and version history'),
-          actions: [],
-          content: {
-            type: 'tree' as const,
-            data: EMPTY_TREE_DATA,
-            role: 'tree' as const,
-            selectionMode: 'none' as const,
-            activationMode: 'none' as const,
-          },
-        }],
-      }]
-    }
     return [
       {
         key: 'version-control',
@@ -85,6 +55,10 @@ export function createCollaborationSection(options: CollaborationSectionOptions)
                 hoverTip: options.translate('versionControl.commitSelectedCount', { count: options.version.selectedChangeCount.value }),
                 badge: options.version.selectedChangeCount.value,
                 disabled: options.version.selectedChangeCount.value === 0 || options.version.committing.value,
+              }, {
+                key: 'edit-gitignore',
+                icon: 'mdiEyeOffOutline',
+                title: options.translate('versionControl.editIgnore', 'Edit ignore rules'),
               }]
             : [],
         lists: options.version.ready.value

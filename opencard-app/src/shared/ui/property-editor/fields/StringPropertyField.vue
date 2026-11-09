@@ -13,6 +13,7 @@
     :model-value="stringValue"
     :options="selectOptions"
     appearance="sliding-outline"
+    size="md"
     fill
     @update:model-value="emit('update:value', $event)"
   />
@@ -69,6 +70,9 @@
         <span class="string-property-field__ghost-current">{{ draftValue }}</span>
         <span>{{ ghostSuffix }}</span>
       </div>
+      <template v-if="unitHint" #suffix>
+        <span class="string-property-field__unit" aria-hidden="true">{{ unitHint }}</span>
+      </template>
     </OcFieldFrame>
 
     <OcCompletionPopup :list="completion.list" :anchor="completionAnchor" @select="acceptSuggestionByKey" />
@@ -137,6 +141,12 @@ const ghostSuffix = computed(() => {
   if (!suggestion || !draftValue.value) return ''
   return suggestion.slice(draftValue.value.length)
 })
+
+const unitHint = computed(() =>
+  props.definition.defaultUnit && /^\s*-?(?:\d+\.?\d*|\.\d+)\s*$/.test(draftValue.value)
+    ? props.definition.defaultUnit
+    : '',
+)
 
 const completionProvider = computed(
   () => props.definition.completion?.provider ?? props.definition.binding?.provider,
@@ -335,6 +345,12 @@ function handleKeydown(event: KeyboardEvent): void {
 
 .string-property-field__ghost-current {
   visibility: hidden;
+}
+
+.string-property-field__unit {
+  padding-inline: var(--oc-space-xs);
+  color: var(--oc-fg-muted);
+  pointer-events: none;
 }
 
 .readonly-value {

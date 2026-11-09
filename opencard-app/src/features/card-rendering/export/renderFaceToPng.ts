@@ -6,6 +6,9 @@ import { paintCardScene, type PaintSceneOptions } from '../painter/paintCardScen
 export type RenderFaceToPngOptions = PaintSceneOptions & {
   dpi?: number
   scale?: number
+  format?: 'png' | 'jpeg'
+  /** 只对 JPEG 生效，0 到 1。 */
+  quality?: number
   assets?: CanvasAssetStore
   signal?: AbortSignal
 }
@@ -69,16 +72,22 @@ export async function renderFaceToPng(
   }
   if (!ctx) return new Uint8Array(0)
 
+  const mimeType = `image/${options.format ?? 'png'}`
+  // JPEG 没有透明通道：不铺底时透明区域会变成黑色。
+  if (options.format === 'jpeg') {
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, width, height)
+  }
   ctx.scale(scale, scale)
   paintCardScene(ctx, scene, assets, options)
 
   try {
     if ('convertToBlob' in canvas && typeof (canvas as OffscreenCanvas).convertToBlob === 'function') {
-      const blob = await (canvas as OffscreenCanvas).convertToBlob({ type: 'image/png' })
+      const blob = await (canvas as OffscreenCanvas).convertToBlob({ type: mimeType, quality: options.quality })
       return new Uint8Array(await blob.arrayBuffer())
     }
     if ('toDataURL' in canvas && typeof (canvas as HTMLCanvasElement).toDataURL === 'function') {
-      const dataUrl = (canvas as HTMLCanvasElement).toDataURL('image/png')
+      const dataUrl = (canvas as HTMLCanvasElement).toDataURL(mimeType, options.quality)
       const commaIdx = dataUrl.indexOf(',')
       const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl
       const binary = atob(base64)

@@ -68,13 +68,17 @@ export async function discardUntrackedPaths(options: {
   for (const path of paths) await options.moveToTrash(path)
 }
 
+/** 项目根的 `.gitignore` 绝对路径；还没有就先建一个空文件，好让编辑器有东西可开。 */
+export async function ensureGitignoreFile(projectRoot: string): Promise<string> {
+  const ignorePath = joinRoot(projectRoot, GITIGNORE_FILE_NAME)
+  if (!await fileSystemService.fileExists(ignorePath)) await fileSystemService.writeFile(ignorePath, '')
+  return ignorePath
+}
+
 /** 写一条忽略规则：`.gitignore` 不存在就建，已经有同一行就不动它。 */
 export async function ignoreGitPath(options: { projectRoot: string; pattern: string }): Promise<void> {
-  const ignorePath = joinRoot(options.projectRoot, GITIGNORE_FILE_NAME)
-  const existing = await fileSystemService.fileExists(ignorePath)
-    ? await fileSystemService.readFile(ignorePath)
-    : ''
+  const ignorePath = await ensureGitignoreFile(options.projectRoot)
+  const existing = await fileSystemService.readFile(ignorePath)
   const next = appendGitignorePattern(existing, options.pattern)
-  if (next === existing) return
-  await fileSystemService.writeFile(ignorePath, next)
+  if (next !== existing) await fileSystemService.writeFile(ignorePath, next)
 }

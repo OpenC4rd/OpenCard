@@ -13,6 +13,7 @@
       @blur="onBlur"
     />
     <template #suffix>
+      <span v-if="definition.suffix" class="number-field__unit" aria-hidden="true">{{ definition.suffix }}</span>
       <span class="number-field__steppers">
         <OcButton class="number-field__stepper" icon-only variant="ghost" icon="mdiChevronUp"
           :disabled="definition.isReadonly || isAtMaximum" aria-label="Increase"
@@ -191,6 +192,13 @@ onBeforeUnmount(stopStepHold)
 </script>
 
 <style scoped>
+.number-field__unit {
+  align-self: center;
+  padding-inline: var(--oc-space-xs);
+  color: var(--oc-fg-muted);
+  pointer-events: none;
+}
+
 .number-field__steppers {
   display: grid;
   flex: 0 0 var(--oc-icon-size-sm);

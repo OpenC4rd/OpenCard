@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onUnmounted } from 'vue'
+import { computed, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SpacePage } from '../spacePage'
 import type { ShellPage } from '../shellLocation'
@@ -13,6 +13,7 @@ import { createSettingsPage } from './createSettingsPage'
 import { createWorkbenchPage } from './createWorkbenchPage'
 import { createCollaborationPage } from './createCollaborationPage'
 import { createCreateProjectPage } from './createCreateProjectPage'
+import { createExportPage } from './createExportPage'
 import { createExportTemplatePage } from './createExportTemplatePage'
 import { createAboutPage } from './createAboutPage'
 import { useAppProjectActions } from '../services/appProjectActions'
@@ -46,7 +47,7 @@ function createAppPages(destroyWindow: () => Promise<void>) {
   })
   creation = createCreateProjectPage(application.lifecycle)
   templateExport = createExportTemplatePage(workbench.templateTree)
-  function placeholder(key: 'export' | 'market' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
+  function placeholder(key: 'market' | 'test', icon: ShellSpaceDefinition['icon']): SpacePage {
     return {
       key, navigation: { key, icon, labelKey: `app.shell.space.${key}` }, content: ComingSoonPageContent,
       contentProps: computed(() => ({ title: t(`app.shell.space.${key}`), icon })), sidebar: computed(() => []),
@@ -58,16 +59,18 @@ function createAppPages(destroyWindow: () => Promise<void>) {
     collaboration: createCollaborationPage({
       workbench: { content: workbench.page.content, contentProps: workbench.page.contentProps,
         header: workbench.page.header, bottomPanel: workbench.page.bottomPanel, handleKeydown: workbench.page.handleKeydown },
-      version: workbench.versionControl, activateChange: workbench.handleChangesNodeActivate,
-      openProject: workbench.openProject,
+      version: workbench.versionControl, activateChange: workbench.handleChangesNodeActivate, openFile: workbench.open,
     }),
-    export: placeholder('export', 'mdiPrinter'),
+    export: createExportPage(workbench.projectExport),
     market: { ...placeholder('market', 'mdiStorefront'), navigation: { key: 'market', icon: 'mdiStorefront', labelKey: 'app.shell.space.market', railGroup: 'secondary' } },
     settings: settings.page,
     test: placeholder('test', 'mdiCheckerboard'),
     'create-project': creation.page, 'export-template': templateExport.page, about: createAboutPage(services),
   }
   const currentPage = computed(() => pages[navigation.page.value])
+  watch(() => currentPage.value.navigation?.available?.value, (available) => {
+    if (available === false) navigation.selectSpace('welcome')
+  })
   const menuContribution = computed(() => ({ ...workbench.page.menuContribution?.value, ...currentPage.value.menuContribution?.value }))
   const spaces = Object.values(pages).flatMap(page => page.navigation ? [page.navigation] : [])
   const globalOverlayProps = computed(() => ({

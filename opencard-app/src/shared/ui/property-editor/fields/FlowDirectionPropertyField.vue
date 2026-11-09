@@ -4,6 +4,7 @@
     :model-value="currentValue"
     aria-label="Flow direction"
     :columns="4"
+    size="md"
     fill
     icon-only
     :disabled="definition.isReadonly"

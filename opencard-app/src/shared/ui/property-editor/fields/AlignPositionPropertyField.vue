@@ -4,6 +4,7 @@
     :model-value="currentValue"
     aria-label="Align position"
     :columns="4"
+    size="md"
     fill
     icon-only
     :disabled="definition.isReadonly"

@@ -89,6 +89,7 @@
           <OcTree
             v-if="treeData.rootKeys.length > 0"
             fill
+            virtualized
             role="tree"
             selection-mode="single"
             activation-mode="single-click"
@@ -367,9 +368,13 @@ defineExpose({ activate: openPopover })
   overflow: hidden;
 }
 
-.font-family-field__body {
-  display: flex;
-  flex: 1 1 auto;
+/* 子项都不收缩：只有列表区吃剩余高度，否则长列表会把搜索框压成一条线。 */
+.font-family-field__popover > * {
+  flex: none;
+}
+
+.font-family-field__popover > .font-family-field__body {
+  flex: 1 1 0;
   min-height: 0;
   overflow: auto;
 }

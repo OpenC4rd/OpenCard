@@ -7,7 +7,7 @@ import type {
 } from './cardMarkup.types'
 
 /** 文本里会被词法器当作语法的字符一律转义。`\n` 无法转义，交给 `@br()`（带括号，避免后续字母被并进标签名）。 */
-function escapeMarkupText(text: string): string {
+export function escapeMarkupText(text: string): string {
   return text.replace(/[\\@{}]/g, '\\$&')
 }
 

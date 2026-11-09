@@ -8,7 +8,8 @@ import {
   type CardDocument,
   type CardFaceKey,
 } from '../../entities/card/model'
-import { isInstanceBlockFieldOverridable } from '../../entities/card/instance'
+import { applyBlockOverrides, isInstanceBlockFieldOverridable } from '../../entities/card/instance'
+import { getPropertyValueKind } from '../../entities/card/schema'
 import { isBlockContainer, type ParentLookup } from '../../entities/card/tree'
 import type { PropertyEditorFieldDefinition } from '../../shared/ui/property-editor/propertyEditor.types'
 import type {
@@ -74,12 +75,7 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
       : document.instances?.find(candidate => candidate.id === cell.cardId) ?? null
     const canOverride = cell.cardId === options.blueprintCardId
       || isInstanceBlockFieldOverridable(field.key)
-    const record = {
-      ...target.block,
-      ...Object.fromEntries(Object.entries(instance?.data[target.block.id] ?? {}).filter(
-        ([fieldKey]) => isInstanceBlockFieldOverridable(fieldKey),
-      )),
-    } as Record<string, unknown>
+    const record = applyBlockOverrides(target.block, instance?.data[target.block.id]) as unknown as Record<string, unknown>
     const definition = enrichCardPropertyFieldDefinition({
       definition: canOverride
         ? field.definition
@@ -109,10 +105,7 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
       ? null
       : document.instances?.find(candidate => candidate.id === cardId) ?? null
     if (cardId !== options.blueprintCardId && !instance) return null
-    const currentBlockRecord = {
-      ...block,
-      ...(instance?.data[block.id] ?? {}),
-    } as Record<string, unknown>
+    const currentBlockRecord = applyBlockOverrides(block, instance?.data[block.id]) as unknown as Record<string, unknown>
     const ancestorScopes: ReferenceCompletionScope[] = []
     let currentBlockId = block.id
     let depth = 1
@@ -123,10 +116,7 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
         depth === 1
           ? options.translate('propertyEditor.references.parent')
           : options.translate('propertyEditor.references.ancestor', { depth }),
-        {
-          ...parent,
-          ...(instance?.data[parent.id] ?? {}),
-        } as Record<string, unknown>,
+        applyBlockOverrides(parent, instance?.data[parent.id]) as unknown as Record<string, unknown>,
       ))
       currentBlockId = parent.id
       depth += 1
@@ -169,9 +159,7 @@ export function useCdeDataTableCellProjection(options: UseCdeDataTableCellProjec
         : undefined,
       allowedScopes: field.definition.bindingScopes,
       getAncestor: ancestorDepth => ancestorScopes[ancestorDepth - 1],
-      targetKind: field.definition.fieldType === 'number' ? 'number'
-        : field.definition.fieldType === 'boolean' ? 'boolean'
-          : field.definition.fieldType === 'object' ? 'object' : 'string',
+      targetKind: getPropertyValueKind(field.definition),
     }
   }
 

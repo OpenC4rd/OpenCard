@@ -9,6 +9,7 @@ import {
   type CardDocument,
   type CardFaceKey,
 } from '../../entities/card/model'
+import { getPropertyValueKind } from '../../entities/card/schema'
 import type { ParentLookup } from '../../entities/card/tree'
 import type { PropertyEditorInput } from '../../shared/ui/property-editor/propertyEditor.types'
 import type {
@@ -115,9 +116,7 @@ export function useCdePropertyEditorProjection(options: UseCdePropertyEditorProj
           dictionary: dictionaryScope,
           allowedScopes: definition.bindingScopes,
           getAncestor: depth => ancestorScopes[depth - 1],
-          targetKind: definition.fieldType === 'number' ? 'number'
-            : definition.fieldType === 'boolean' ? 'boolean'
-              : definition.fieldType === 'object' ? 'object' : 'string',
+          targetKind: getPropertyValueKind(definition),
         } : undefined
         return [fieldKey, enrichCardPropertyFieldDefinition({
           definition,

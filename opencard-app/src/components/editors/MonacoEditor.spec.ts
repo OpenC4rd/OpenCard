@@ -7,6 +7,9 @@ const monacoMock = vi.hoisted(() => {
     getModel: vi.fn((): { dispose: () => void } | null => null),
     onDidChangeModelContent: vi.fn(),
     addCommand: vi.fn(),
+    onDidChangeCursorPosition: vi.fn(),
+    setPosition: vi.fn(),
+    revealLineInCenterIfOutsideViewport: vi.fn(),
     updateOptions: vi.fn(),
     restoreViewState: vi.fn(),
     saveViewState: vi.fn(() => null),
@@ -111,6 +114,20 @@ describe('MonacoEditor', () => {
 
     await wrapper.setProps({ readOnly: true })
     expect(monacoMock.editor.updateOptions).toHaveBeenCalledWith({ readOnly: true })
+    wrapper.unmount()
+  })
+
+  it('reports the cursor line and moves the cursor to a requested line', async () => {
+    const wrapper = mount(MonacoEditor, { props: { modelValue: '', language: 'plaintext' } })
+    await flushMonacoLoad()
+
+    const listener = monacoMock.editor.onDidChangeCursorPosition.mock.calls[0]![0] as (event: unknown) => void
+    listener({ position: { lineNumber: 4, column: 2 } })
+    expect(wrapper.emitted('cursor-line')).toEqual([[4]])
+
+    wrapper.vm.revealLine(7)
+    expect(monacoMock.editor.setPosition).toHaveBeenCalledWith({ lineNumber: 7, column: 1 })
+    expect(monacoMock.editor.revealLineInCenterIfOutsideViewport).toHaveBeenCalledWith(7)
     wrapper.unmount()
   })
 })

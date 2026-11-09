@@ -1,3 +1,4 @@
+import { parseExportProfiles } from './projectExportProfile'
 import { describe, expect, it } from 'vitest'
 import {
   parseProjectMetadata,
@@ -66,30 +67,20 @@ describe('project profile metadata', () => {
       .toEqual({ name: 'Demo', cover: 'assets/missing.png' })
   })
 
-  it('round-trips the project export task configuration', () => {
-    const exportTask = {
-      documentPaths: ['cards/main.ocdocument'],
-      selectionMode: 'blueprint-and-instances' as const,
-      scale: 2,
-      layoutMode: 'none' as const,
-      outputDirectory: 'D:/exports',
-      conflictMode: 'replace' as const,
-      errorPolicy: 'continue' as const,
-    }
-    expect(parseProjectMetadata({ exportTask })).toEqual({ exportTask })
-    expect(JSON.parse(serializeProjectMetadata({ exportTask }))).toEqual({ exportTask })
+  it('ignores export configuration, which lives in its own files', () => {
+    expect(parseProjectMetadata({ name: 'Demo', exportTask: { scale: 0 } })).toEqual({ name: 'Demo' })
+  })
+})
+
+describe('parseExportProfiles', () => {
+  it('fills defaults for a malformed profile instead of rejecting it', () => {
+    const [profile] = parseExportProfiles([{ documents: 'nope', rule: { kind: 'pdf', dpi: 1, paper: { size: 'nope', gapX: -1 } } }])
+    expect(profile).toMatchObject({ documents: [], rule: { kind: 'pdf', dpi: 300, paper: { size: 'a4', gapX: 0 } } })
   })
 
-  it('rejects malformed export task configuration', () => {
-    expect(parseProjectMetadata({ exportTask: { documentPaths: [], scale: 0 } })).toBeNull()
+  it('ignores unknown fields', () => {
+    const [profile] = parseExportProfiles([{ id: 'one', futureField: true }])
+    expect(profile).toMatchObject({ id: 'one', errorPolicy: 'continue' })
+    expect(profile).not.toHaveProperty('futureField')
   })
-
-  it('normalizes an omitted export failure policy to continue', () => {
-    const exportTask = {
-      documentPaths: ['cards/main.ocdocument'], selectionMode: 'blueprint' as const, scale: 1,
-      layoutMode: 'none' as const, outputDirectory: 'D:/exports', conflictMode: 'skip' as const,
-    }
-    expect(parseProjectMetadata({ exportTask })?.exportTask?.errorPolicy).toBe('continue')
-  })
-
 })

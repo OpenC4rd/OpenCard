@@ -1,8 +1,29 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { createBlock, type CardDocument, type CardInstanceRecord } from './model'
+import { createBlock, getFlowDirection, type CardDocument, type CardInstanceRecord, type FlowContainerBlock } from './model'
 import { applyInstance } from './instance'
 import { buildParentLookup } from './tree'
+
+describe('block seeds', () => {
+  it('starts each block with only its declared fields', () => {
+    expect(createBlock('shape-block', { id: 's' })).toMatchObject({ shape: 'rectangle', fill: '#7C6CFF' })
+    expect(createBlock('shape-block', { id: 's' })).not.toHaveProperty('strokeWidth')
+    expect(createBlock('qrcode-block', { id: 'q' })).toHaveProperty('content', '')
+    expect(createBlock('qrcode-block', { id: 'q' })).not.toHaveProperty('quietZone')
+    expect(createBlock('image-block', { id: 'i' })).toHaveProperty('source', '')
+    expect(createBlock('image-block', { id: 'i' })).not.toHaveProperty('fit')
+    expect(createBlock('flow-container-block', { id: 'f' })).not.toHaveProperty('gap')
+  })
+
+  it('keeps every field the caller passes explicitly', () => {
+    expect(createBlock('shape-block', { id: 's', strokeWidth: '2' })).toHaveProperty('strokeWidth', '2')
+    expect(createBlock('flow-container-block', { id: 'f', direction: 'tb' })).toHaveProperty('direction', 'tb')
+  })
+
+  it('reads a missing flow direction as the default one', () => {
+    expect(getFlowDirection(createBlock('flow-container-block', { id: 'f' }) as FlowContainerBlock)).toBe('lr')
+  })
+})
 
 describe('instance projection', () => {
   it('applies instance overrides without owning render materialization', () => {

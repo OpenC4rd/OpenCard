@@ -82,6 +82,30 @@ describe('useCdeBlockFieldCommands', () => {
     expect(document.instances[1]!.data.text).toBeUndefined()
   })
 
+  it('unsets an instance field without touching the blueprint, and reset brings it back', () => {
+    const { block, document, commands, markDocumentChanged } = createHarness()
+    const target = { cardId: 'one', blockId: 'text', fieldKey: 'content' }
+
+    expect(commands.unsetInstanceField(target)).toBe(true)
+    expect(document.instances[0]!.data).toEqual({ text: { content: null } })
+    expect(JSON.parse(JSON.stringify(document)).instances[0].data.text.content).toBeNull()
+    expect(block.content).toBe('Blueprint')
+
+    markDocumentChanged.mockClear()
+    expect(commands.unsetInstanceField(target)).toBe(false)
+    expect(markDocumentChanged).not.toHaveBeenCalled()
+
+    expect(commands.resetField(target)).toBe(true)
+    expect(document.instances[0]!.data).toEqual({})
+  })
+
+  it('refuses to unset blueprint targets and non-overridable fields', () => {
+    const { commands } = createHarness()
+
+    expect(commands.unsetInstanceField({ cardId: '__blueprint__', blockId: 'text', fieldKey: 'content' })).toBe(false)
+    expect(commands.unsetInstanceField({ cardId: 'one', blockId: 'text', fieldKey: 'name' })).toBe(false)
+  })
+
   it('updates a custom field definition in place and removes it with its value', () => {
     const { block, document, commands } = createHarness()
     expect(commands.createField({

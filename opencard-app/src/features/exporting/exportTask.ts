@@ -1,19 +1,22 @@
-import type { CardDocument, CardFaceKey, CardInstanceRecord } from '../../entities/card/model'
+import type { CardDocument, CardFaceKey } from '../../entities/card/model'
 import type { CardRenderEnvironment, PreparedCardRender } from '../card-rendering/renderPipeline'
 import type { CardPipelineIssue } from '../card-rendering/cardPipelineIssue'
-import type { ProjectExportTask } from '../workspace/model/projectMetadata'
+import type { ExportProfile } from '../workspace/model/projectExportProfile'
+import type { ExportPdfPage } from './exportImposition'
+import { findExportVariable } from './exportVariables'
+import type { PdfImagePage } from './imagePdf'
 
 type ExportTaskValidationCode =
   | 'documents-required'
-  | 'duplicate-document'
   | 'invalid-document-path'
   | 'invalid-scale'
-  | 'layout-unavailable'
   | 'output-required'
-  | 'invalid-error-policy'
-  | 'output-unavailable'
+  | 'invalid-file-name'
+  | 'unknown-variable'
+  | 'paper-too-small'
   | 'document-unavailable'
   | 'empty-plan'
+  | 'preview-failed'
 
 export type ExportTaskValidationIssue = {
   code: ExportTaskValidationCode
@@ -35,10 +38,17 @@ export type ExportPlanEntry = {
   render: PreparedCardRender
 }
 
+/** 整份导出合成一个 PDF：`entries` 是要渲染的卡面，`pages` 按下标引用它们。 */
+export type ExportPdfPlan = {
+  outputPath: string
+  pages: readonly ExportPdfPage[]
+}
+
 export type ExportPlan = {
-  task: ProjectExportTask
+  profile: ExportProfile
   entries: readonly ExportPlanEntry[]
   outputDirectory: string
+  pdf?: ExportPdfPlan
 }
 
 export type ExportPreparationResult =
@@ -84,15 +94,27 @@ type ExportRenderRequest = {
   render: PreparedCardRender
   scale: number
   dpi?: number
+  format?: 'png' | 'jpeg'
+  quality?: number
 }
 
 interface ExportDocumentSource {
+  list(): Promise<readonly string[]>
   load(relativePath: string): Promise<ExportDocumentSnapshot>
 }
 
 export interface ExportFaceRenderer {
   render(request: ExportRenderRequest, signal: AbortSignal): Promise<Uint8Array>
   reset(): void
+}
+
+export interface ExportPageComposer {
+  compose(
+    page: ExportPdfPage,
+    images: ReadonlyMap<number, Uint8Array>,
+    dpi: number,
+    signal: AbortSignal,
+  ): Promise<PdfImagePage>
 }
 
 export interface ExportDestination {
@@ -102,56 +124,68 @@ export interface ExportDestination {
 }
 
 export type PrepareExportTaskOptions = {
-  task: ProjectExportTask
+  profile: ExportProfile
   source: ExportDocumentSource
   destination: ExportDestination
   environment: Readonly<CardRenderEnvironment>
 }
 
-export type ExportProjection = {
-  suffix: string
-  instance: CardInstanceRecord | null
+const WILDCARD = /[*?]/
+
+function isProjectRelativePattern(path: string): boolean {
+  const normalized = path.trim().replace(/\\/g, '/')
+  return Boolean(normalized) && !normalized.startsWith('/') && !/^[a-z]:\//i.test(normalized)
+    && !normalized.split('/').includes('..')
 }
 
-export function resolveExportErrorPolicy(task: ProjectExportTask): 'continue' | 'stop' {
-  return task.errorPolicy ?? 'continue'
+/** 不以 `.ocdocument` 结尾的都当文件夹：等于它下面的所有文档，之后新建的也算进去。 */
+function toDocumentPattern(path: string): string {
+  const normalized = path.trim().replace(/\\/g, '/')
+  return normalized.toLocaleLowerCase().endsWith('.ocdocument')
+    ? normalized
+    : `${normalized.replace(/\/+$/, '')}/**/*.ocdocument`
 }
 
-export function createDefaultProjectExportTask(): ProjectExportTask {
-  return {
-    documentPaths: [],
-    selectionMode: 'blueprint-and-instances',
-    scale: 1,
-    dpi: 300,
-    layoutMode: 'none',
-    outputDirectory: '',
-    conflictMode: 'replace',
-    errorPolicy: 'continue',
-  }
+function patternToRegExp(pattern: string): RegExp {
+  const source = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*\//g, '\u0000')
+    .replace(/\*\*/g, '\u0001')
+    .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '[^/]')
+    .replace(/\u0000/g, '(?:.*/)?')
+    .replace(/\u0001/g, '.*')
+  return new RegExp(`^${source}$`, 'i')
 }
 
-export function validateExportTask(task: ProjectExportTask): ExportTaskValidationIssue[] {
-  const issues: ExportTaskValidationIssue[] = []
-  if (task.documentPaths.length === 0) issues.push({ code: 'documents-required' })
-
-  const identities = new Set<string>()
-  for (const path of task.documentPaths) {
-    const normalized = path.trim().replace(/\\/g, '/')
-    if (!normalized || normalized.startsWith('/') || /^[a-z]:\//i.test(normalized)
-      || normalized.split('/').includes('..') || !normalized.toLocaleLowerCase().endsWith('.ocdocument')) {
-      issues.push({ code: 'invalid-document-path', path })
+/** 按配置的先后顺序展开路径和通配符；不含通配符的路径原样保留，文件不存在时由读取环节报告。 */
+export function matchExportDocuments(patterns: readonly string[], paths: readonly string[]): string[] {
+  const matched = new Map<string, string>()
+  const add = (path: string): void => { if (!matched.has(path.toLocaleLowerCase())) matched.set(path.toLocaleLowerCase(), path) }
+  for (const raw of patterns) {
+    const pattern = toDocumentPattern(raw)
+    if (!WILDCARD.test(pattern)) {
+      add(pattern)
+      continue
     }
-    const identity = normalized.toLocaleLowerCase()
-    if (identities.has(identity)) issues.push({ code: 'duplicate-document', path })
-    identities.add(identity)
+    const expression = patternToRegExp(pattern)
+    paths.filter(path => expression.test(path)).forEach(add)
   }
+  return [...matched.values()]
+}
 
-  const scale = task.scale ?? (task.dpi ? task.dpi / 25.4 : 1)
-  if (!Number.isFinite(scale) || scale < 0.1) issues.push({ code: 'invalid-scale' })
-  if (task.layoutMode !== 'none') issues.push({ code: 'layout-unavailable' })
-  if (!task.outputDirectory.trim()) issues.push({ code: 'output-required' })
-  if (!['continue', 'stop'].includes(resolveExportErrorPolicy(task))) {
-    issues.push({ code: 'invalid-error-policy' })
+export function validateExportProfile(profile: ExportProfile): ExportTaskValidationIssue[] {
+  const issues: ExportTaskValidationIssue[] = []
+  if (profile.documents.length === 0) issues.push({ code: 'documents-required' })
+  for (const path of profile.documents) {
+    if (!isProjectRelativePattern(path)) issues.push({ code: 'invalid-document-path', path })
+  }
+  if (!Number.isFinite(profile.rule.dpi) || profile.rule.dpi < 72) issues.push({ code: 'invalid-scale' })
+  if (!profile.rule.fileName.trim()) issues.push({ code: 'invalid-file-name' })
+  if (!profile.output.directory.trim()) issues.push({ code: 'output-required' })
+  const templates = [profile.output.directory, ...(profile.rule.kind === 'pdf' ? [profile.rule.fileName] : [])]
+  for (const template of templates) {
+    const token = findExportVariable(template)
+    if (token) issues.push({ code: 'unknown-variable', path: token })
   }
   return issues
 }

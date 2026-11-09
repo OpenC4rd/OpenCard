@@ -9,6 +9,8 @@ export const PROJECT_DICTIONARY_FILE_NAME = `${PROJECT_INTERNAL_DIRECTORY_NAME}/
 export const PROJECT_FONT_DIRECTORY = 'fonts'
 export const PROJECT_ICON_DIRECTORY = 'icons'
 export const PROJECT_CUSTOM_BLOCK_DIRECTORY = 'blocks'
+/** 一条导出配置一个文件，协作时互不冲突。 */
+export const PROJECT_EXPORT_DIRECTORY = 'exports'
 /** 这个项目装了哪些包，就是看这个目录里有哪几个 `.ocpack` —— 没有清单文件。 */
 export const PROJECT_PACKAGE_DIRECTORY = 'packages'
 

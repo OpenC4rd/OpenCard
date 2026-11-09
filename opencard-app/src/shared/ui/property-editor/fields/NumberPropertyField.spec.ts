@@ -14,6 +14,11 @@ describe('NumberPropertyField', () => {
     vi.useRealTimers()
   })
 
+  it('shows the unit after the number', () => {
+    const wrapper = mountField({ title: 'Width', fieldType: 'number', suffix: 'mm' }, '11')
+    expect(wrapper.get('.number-field__unit').text()).toBe('mm')
+  })
+
   it('clamps a stepped value to the schema range and stops at its bounds', async () => {
     const wrapper = mountField({ title: 'Number', fieldType: 'number', min: 0, max: 2 }, '1.9')
 

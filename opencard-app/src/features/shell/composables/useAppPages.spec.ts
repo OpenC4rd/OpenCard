@@ -61,10 +61,16 @@ describe('application page ownership', () => {
       publishAppOutput({ severity: 'info', message: 'background output' })
       useShellProgressTasks().setTask({ key: 'page-test', title: 'Background task', progress: 0.5 })
 
-      for (const space of ['welcome', 'settings', 'export', 'market', 'test'] as const) {
+      for (const space of ['welcome', 'settings', 'market', 'test'] as const) {
         navigation.selectSpace(space)
         await nextTick()
         expect(app.currentPage.value).toBe(app.pages[space])
+      }
+      for (const space of ['export', 'collaboration'] as const) {
+        expect(app.pages[space].navigation?.available?.value).toBe(false)
+        navigation.selectSpace(space)
+        await nextTick()
+        expect(app.currentPage.value).toBe(app.pages.welcome)
       }
       navigation.selectSpace('workbench')
       await nextTick()

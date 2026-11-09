@@ -1,3 +1,4 @@
+import type { Ref } from 'vue'
 import type { SpaceKey } from './shellLocation'
 import type {
   OcNodeActionEvent,
@@ -127,6 +128,10 @@ export interface ShellSpaceDefinition {
   labelKey: string
   icon: IconToken
   railGroup?: 'primary' | 'secondary'
+  /** 不写就是一直可用；不可用时导航按钮保留但不能进入，当前停留在此空间时会回到首页。 */
+  available?: Readonly<Ref<boolean>>
+  /** 不可用时悬停显示的原因。 */
+  unavailableHintKey?: string
 }
 
 export type ShellHeaderModel = {

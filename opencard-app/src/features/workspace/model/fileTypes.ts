@@ -79,6 +79,15 @@ const fileTypes: FileTypeDefinition[] = [
     previewable: true,
   },
   {
+    id: 'gitignore',
+    labelKey: 'fileTypes.gitignore',
+    fileNames: ['.gitignore'],
+    icon: 'mdiEyeOffOutline',
+    iconTone: iconTone.config,
+    language: 'plaintext',
+    editorId: 'gitignore',
+  },
+  {
     id: 'opencard-font-registry',
     labelKey: 'fileTypes.opencardFontRegistry',
     patterns: ['.opencard/fonts/fonts.json'],

@@ -28,6 +28,16 @@ describe('StringPropertyField', () => {
     document.body.innerHTML = ''
   })
 
+  it('shows the default unit only while the value is a bare number', async () => {
+    const definition: Extract<PropertyEditorFieldDefinition, { fieldType: 'string' }> = { title: 'Width', fieldType: 'string', defaultUnit: 'mm' }
+    const unit = (value: string) => mount(StringPropertyField, { props: { value, definition } })
+      .find('.string-property-field__unit')
+    expect(unit('11').text()).toBe('mm')
+    expect(unit('-1.5').text()).toBe('mm')
+    expect(unit('11pt').exists()).toBe(false)
+    expect(unit('').exists()).toBe(false)
+  })
+
   it('steps through every string enum option in schema order', async () => {
     const wrapper = mount(StringPropertyField, {
       props: {

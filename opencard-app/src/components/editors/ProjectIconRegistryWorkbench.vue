@@ -392,8 +392,5 @@ defineExpose({ selectSeries, navigateToKeyConflict, selectedRuntime })
   min-width: 0;
 }
 .project-icon-registry-workbench__tile-size { flex: 0 1 var(--oc-resource-control-width); width: var(--oc-resource-control-width); min-width: 0; }
-.project-icon-registry-workbench__property-content {
-  min-width: 0;
-  padding: var(--oc-space-sm);
-}
+.project-icon-registry-workbench__property-content { min-width: 0; }
 </style>

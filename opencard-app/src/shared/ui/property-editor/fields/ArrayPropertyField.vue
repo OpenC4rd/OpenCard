@@ -1,14 +1,9 @@
 <template>
   <div class="array-property-field">
-    <div v-for="(item, index) in items" :key="index" class="array-property-field__item">
-      <component
-        :is="elementComponent"
-        class="array-property-field__control"
-        :definition="elementDefinition"
-        :value="item"
-        :capabilities="capabilities"
-        @update:value="updateItem(index, $event)"
-      />
+    <div v-for="(item, index) in items" :key="itemKeys[index]" class="array-property-field__item">
+      <div class="array-property-field__control">
+        <slot :value="item" :update="(value: unknown) => updateItem(index, value)" />
+      </div>
       <span class="array-property-field__actions">
         <OcButton
           icon-only
@@ -56,23 +51,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type Component } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OcButton from '../../../../components/base/OcButton.vue'
 import type {
-  BasePropertyFieldType,
   PropertyEditorFieldDefinition,
-  PropertyFieldCapabilities,
 } from '../propertyEditor.types'
-
-type ElementDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: BasePropertyFieldType }>
 
 const props = defineProps<{
   definition: PropertyEditorFieldDefinition
-  elementComponent: Component
-  elementDefinition: ElementDefinition
+  elementDefinition: PropertyEditorFieldDefinition
   value: unknown
-  capabilities?: PropertyFieldCapabilities
 }>()
 
 const emit = defineEmits<{
@@ -81,6 +70,9 @@ const emit = defineEmits<{
 
 const { t, te } = useI18n()
 const items = ref<unknown[]>(toArrayValue(props.value))
+// 值可以重复、也可以是原始类型，身份只能另外记，否则移动后子编辑器的草稿会留在原位。
+let nextItemKey = 0
+const itemKeys = ref(items.value.map(() => nextItemKey++))
 const addText = computed(() => te('propertyEditor.arrays.add') ? t('propertyEditor.arrays.add') : 'Add item')
 const deleteText = computed(() => te('propertyEditor.arrays.delete') ? t('propertyEditor.arrays.delete') : 'Delete item')
 const moveUpText = computed(() => te('propertyEditor.arrays.moveUp') ? t('propertyEditor.arrays.moveUp') : 'Move up')
@@ -106,6 +98,7 @@ watch(() => props.value, (value) => {
   const committedDraft = items.value.filter(item => item !== '' && item !== undefined && item !== null)
   const hasPendingItem = committedDraft.length !== items.value.length
   if (hasPendingItem && arraysEqual(committedDraft, next)) return
+  itemKeys.value = next.map((_, index) => itemKeys.value[index] ?? nextItemKey++)
   items.value = next
 })
 
@@ -116,10 +109,12 @@ function updateItem(index: number, value: unknown): void {
 }
 
 function addItem(): void {
+  itemKeys.value = [...itemKeys.value, nextItemKey++]
   emitItems([...items.value, structuredClone(props.elementDefinition.defaultValue)])
 }
 
 function deleteItem(index: number): void {
+  itemKeys.value = itemKeys.value.filter((_, itemIndex) => itemIndex !== index)
   emitItems(items.value.filter((_, itemIndex) => itemIndex !== index))
 }
 
@@ -128,6 +123,9 @@ function moveItem(index: number, offset: -1 | 1): void {
   if (targetIndex < 0 || targetIndex >= items.value.length) return
   const next = [...items.value]
   ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
+  const keys = [...itemKeys.value]
+  ;[keys[index], keys[targetIndex]] = [keys[targetIndex], keys[index]]
+  itemKeys.value = keys
   emitItems(next)
 }
 </script>

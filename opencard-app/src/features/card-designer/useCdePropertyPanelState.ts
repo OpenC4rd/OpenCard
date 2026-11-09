@@ -30,7 +30,7 @@ import {
 import type { CdeDocumentChangeMode } from './useCdeDocumentState'
 import { findCdeBlock, useCdeBlockFieldCommands } from './useCdeBlockFieldCommands'
 import { isPropertyRemovable } from '../../shared/ui/property-editor/propertyRemovability'
-import { isInstanceBlockFieldOverridable } from '../../entities/card/instance'
+import { applyBlockOverrides } from '../../entities/card/instance'
 import {
   resolveCardPropertyFields,
   type CardPropertyEditorInput,
@@ -161,11 +161,8 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
     options.documentRevision.value
     const block = options.selectedBlock.value
     if (!block) return null
-    const blockOverrides = options.selectedCardId.value === options.blueprintCardId || !options.selectedCard.value
-      ? {}
-      : Object.fromEntries(Object.entries(options.selectedCard.value.data[block.id] ?? {})
-        .filter(([fieldKey]) => isInstanceBlockFieldOverridable(fieldKey)))
-    const record = { ...block, ...blockOverrides } as Record<string, unknown>
+    const blockOverrides = options.selectedCardId.value === options.blueprintCardId ? undefined : options.selectedCard.value?.data[block.id]
+    const record = applyBlockOverrides(block, blockOverrides) as unknown as Record<string, unknown>
     if (block.type === 'custom-block') {
       const publicFields = resolveCustomBlockPublicFields(block, options.customBlockCatalog)
       const source = options.customBlockCatalog?.resolve(block.source, 'project')
@@ -176,6 +173,10 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
           if (templateValue !== undefined) record[fieldKey] = structuredClone(templateValue)
         }
       }
+    }
+    // 面板按值渲染：未定义的字段保留一行显示默认值，否则这张卡就没有重置入口了。
+    for (const [fieldKey, value] of Object.entries(blockOverrides ?? {})) {
+      if (value === null) record[fieldKey] ??= getDefault(block.type, fieldKey) ?? ''
     }
     return resolveNulls(block.type, record) as Record<string, unknown> & { type?: string }
   })
@@ -610,9 +611,8 @@ export function useCdePropertyPanelState(options: UseCdePropertyPanelStateOption
 
     const selectedCardId = options.selectedCardId.value
     if (selectedCardId !== options.blueprintCardId) {
-      // 实例上能删的只有覆写：删掉后该属性回到继承蓝图值。
       if (!selectedCardId || block?.id !== key) return false
-      return blockFieldCommands.resetField({
+      return blockFieldCommands.unsetInstanceField({
         cardId: selectedCardId,
         blockId: key,
         fieldKey,

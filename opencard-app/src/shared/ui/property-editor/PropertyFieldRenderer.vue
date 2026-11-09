@@ -14,14 +14,20 @@
       v-else-if="isArrayPropertyFieldType(definition.fieldType) && !(definition.fieldType === 'string[]' && definition.listSeparator)"
       ref="fieldComponent"
       :definition="definition"
-      :element-component="getArrayPropertyElementComponent(definition.fieldType)"
       :element-definition="toArrayPropertyElementDefinition(definition)"
       :value="value"
-      :capabilities="capabilities"
       @update:value="handleCommit"
-      @preview:value="emit('preview:value', $event)"
-      @cancel:value="emit('cancel:value')"
-    />
+    >
+      <template #default="{ value: itemValue, update }">
+        <PropertyFieldRenderer
+          editor-id="field"
+          :definition="toArrayPropertyElementDefinition(definition)"
+          :value="itemValue"
+          :capabilities="capabilities"
+          @update:value="update"
+        />
+      </template>
+    </ArrayPropertyField>
     <component
       v-else
       ref="fieldComponent"
@@ -47,7 +53,6 @@ import type { PropertyFieldEditorId } from './propertyFieldEditorMode'
 import ArrayPropertyField from './fields/ArrayPropertyField.vue'
 import StringPropertyField from './fields/StringPropertyField.vue'
 import {
-  getArrayPropertyElementComponent,
   getPropertyFieldComponent,
   toArrayPropertyElementDefinition,
 } from './propertyFieldRegistry'

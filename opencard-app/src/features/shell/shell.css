@@ -440,6 +440,12 @@
   background: var(--oc-bg-active);
 }
 
+.shell-space-rail__item.is-unavailable {
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .shell-space-rail__item:focus-visible {
   outline: 2px solid var(--oc-border-accent);
   outline-offset: -2px;

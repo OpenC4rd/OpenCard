@@ -57,7 +57,7 @@ import OcFieldInput from '../../../../components/base/OcFieldInput.vue'
 
 import { usePropertyCompletion } from './usePropertyCompletion'
 
-type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' | 'string[]' }>
+type StringDefinition = Extract<PropertyEditorFieldDefinition, { fieldType: 'string' | `string[]${string}` }>
 type TextControl = HTMLInputElement | HTMLTextAreaElement
 
 const props = defineProps<{

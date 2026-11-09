@@ -4,6 +4,7 @@
     :model-value="currentValue"
     aria-label="Vertical align position"
     :columns="3"
+    size="md"
     fill
     icon-only
     :disabled="definition.isReadonly"

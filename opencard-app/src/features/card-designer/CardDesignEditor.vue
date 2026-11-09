@@ -251,6 +251,7 @@ import {
   type CardBlock,
   type CardFaceKey,
   type FlowDirection,
+  getFlowDirection,
 } from '../../entities/card/model'
 import { getBlockPresentation } from './blockPresentation'
 import OcPanel from '../../components/base/OcPanel.vue'
@@ -626,7 +627,7 @@ const isMultiBlockSelection = computed(() => effectiveSelectedBlockKeys.value.le
 const selectedCardKeys = ref<string[]>([])
 const propertyFieldActionLabels = computed(() => ({
   reset: t('cardDesigner.fieldActions.resetToBlueprint'),
-  delete: t(`cardDesigner.fieldActions.${selectedCardId.value === BLUEPRINT_CARD_ID ? 'deleteToDefault' : 'resetToBlueprint'}`),
+  delete: t('cardDesigner.fieldActions.deleteToDefault'),
 }))
 const selectedCardId = ref<string | null>(
   sessionView.value.view?.selectedInstanceId ?? BLUEPRINT_CARD_ID,
@@ -1166,7 +1167,7 @@ const selectedParentFlowDirection = computed(() => {
   const block = selectedBlock.value
   if (!block) return null
   const parent = parentLookup.value.get(block.id)
-  return parent?.type === 'flow-container-block' ? parent.direction : null
+  return parent?.type === 'flow-container-block' ? getFlowDirection(parent) : null
 })
 const selectedFlowAlign = computed(() => (
   selectedLocation.value?.type === 'flow-container-location' ? selectedLocation.value.align : null
@@ -1188,7 +1189,7 @@ const selectionCommandActions = computed<OcActionDefinition[]>(() => {
     actions.push(...FLOW_DIRECTION_ACTIONS.map(action => ({
       key: action.key,
       icon: action.icon,
-      iconTone: block.direction === action.direction ? 'accent' : 'default',
+      iconTone: getFlowDirection(block) === action.direction ? 'accent' : 'default',
       title: t(`cardDesigner.selectionActions.${action.titleKey}`),
     } satisfies OcActionDefinition)))
   }
@@ -1215,7 +1216,7 @@ async function handleSelectionCommand(intent: CardViewportSelectionCommand): Pro
 
   const flowDirectionAction = FLOW_DIRECTION_ACTIONS.find(action => action.key === intent.key)
   if (flowDirectionAction) {
-    if (block.type !== 'flow-container-block' || block.direction === flowDirectionAction.direction) return
+    if (block.type !== 'flow-container-block' || getFlowDirection(block) === flowDirectionAction.direction) return
     blockFieldCommands.updateField({
       cardId: selectedCardId.value ?? BLUEPRINT_CARD_ID,
       blockId: block.id,

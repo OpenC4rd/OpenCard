@@ -1,8 +1,4 @@
 <template>
-  <ProjectExportDialog :open="projectExportDialogOpen" :model-value="projectExportDialogTask"
-    :documents="projectExportDocumentCandidates" :busy="isExportPreparing || isProjectExportRunning"
-    :preparation-issues="exportPreparationIssues" @update:model-value="emit('update:projectExportDialogTask', $event)"
-    @close="emit('close-project-export')" @submit="emit('submit-project-export')" />
   <ResourcePackageBuilderDialog :open="resourcePackageBuilderOpen" :project-root-path="projectPath ?? ''"
     :project-name="projectName" :entries="resourcePackageBuilderEntries" @close="emit('close-resource-package-builder')" />
 
@@ -21,21 +17,11 @@
 </template>
 
 <script setup lang="ts">
-import ProjectExportDialog from '../../exporting/components/ProjectExportDialog.vue'
 import ResourcePackageBuilderDialog from '../../workspace/components/ResourcePackageBuilderDialog.vue'
 import UnsavedEditorsDialog from './UnsavedEditorsDialog.vue'
-import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
-import type { ExportDocumentCandidate } from '../../../components/editors/ProjectExportTaskEditor.vue'
-import type { ExportTaskValidationIssue } from '../../exporting/exportTask'
 import type { UnsavedCloseIntent, UnsavedEditorDecision } from '../composables/useUnsavedSessionGuard'
 
 defineProps<{
-  projectExportDialogOpen: boolean
-  projectExportDialogTask: ProjectExportTask
-  projectExportDocumentCandidates: readonly ExportDocumentCandidate[]
-  isExportPreparing: boolean
-  isProjectExportRunning: boolean
-  exportPreparationIssues: readonly ExportTaskValidationIssue[]
   resourcePackageBuilderOpen: boolean
   projectPath: string | null
   projectName: string
@@ -55,9 +41,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:projectExportDialogTask': [task: ProjectExportTask]
-  'close-project-export': []
-  'submit-project-export': []
   'close-resource-package-builder': []
   'select-all-unsaved': [selected: boolean]
   'select-unsaved-row': [sessionId: string, selected: boolean]

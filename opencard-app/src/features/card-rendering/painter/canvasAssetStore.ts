@@ -14,6 +14,8 @@ export type CanvasAssetStore = {
   clear(): void
 }
 
+const MAX_RESOURCE_WAITS = 4
+
 export function createCanvasAssetStore(): CanvasAssetStore {
   const cache = new Map<string, Promise<LoadedAsset | null>>()
   const loadedMap = new Map<string, LoadedAsset>()
@@ -70,82 +72,58 @@ export function createCanvasAssetStore(): CanvasAssetStore {
     return null
   }
 
+  /** 走一遍场景，加载已经能拿到地址的素材；返回是否还有素材在等项目环境给结果。 */
+  async function loadSceneAssets(scene: CardSceneGraph, resourceContext: CardRenderResourceContext): Promise<boolean> {
+    const loads: Promise<unknown>[] = []
+    let pending = false
+    const request = (value: string, blockId: string, fieldKey: string) => {
+      const resource = resolveCardResource({ value, expect: 'asset', blockId, fieldKey }, resourceContext)
+      if (resource.kind === 'url') loads.push(loadImage(resource.src))
+      else if (resource.kind === 'icon') loads.push(loadImage(resource.entry.src))
+      else if (resource.kind === 'pending') pending = true
+    }
+
+    for (const { block } of scene.paintOrderNodes) {
+      if (block.type === 'image-block') {
+        const imageBlock = block as RenderReadyImageBlock
+        if (imageBlock.source) request(imageBlock.source, imageBlock.id, 'source')
+        if (imageBlock.maskSource) request(imageBlock.maskSource, imageBlock.id, 'maskSource')
+      } else if (block.type === 'text-block') {
+        const textBlock = block as RenderReadyTextBlock
+        if (!textBlock.content) continue
+        extractInlineAssets(parseCardMarkup(textBlock.content).document.blocks, (ref) => {
+          if (ref.type === 'img') request(ref.src, textBlock.id, 'content')
+          else if (ref.type === 'icon') {
+            request(formatProjectIconPath({
+              packageKey: ref.pkg ?? null,
+              seriesKey: ref.key.includes('/') ? ref.key.split('/')[0]! : '',
+              iconKey: ref.key.includes('/') ? ref.key.split('/')[1]! : ref.key,
+            }), textBlock.id, 'content')
+          }
+        })
+      }
+    }
+
+    await Promise.all(loads)
+    return pending
+  }
+
+  /**
+   * 项目环境第一次被问到某个素材时只回答"等待中"，查询本身才启动读取，所以要问过再等，
+   * 等完再问一遍。图标包解开后图标还要再查一次文件，因此是循环；次数有上限，
+   * 一个永远等不到的素材不能卡住整次渲染。
+   */
   async function preloadSceneAssets(
     scene: CardSceneGraph,
     resourceContext?: CardRenderResourceContext,
   ): Promise<void> {
-    const promises: Promise<unknown>[] = []
+    await (typeof document !== 'undefined' && 'fonts' in document ? document.fonts.ready : undefined)
+    if (!resourceContext) return
 
-    // 1. 等待字体加载就绪
-    if (typeof document !== 'undefined' && 'fonts' in document && document.fonts.ready) {
-      promises.push(document.fonts.ready)
+    const wait = resourceContext.hostEnvironment.waitForResources
+    for (let attempt = 0; await loadSceneAssets(scene, resourceContext) && wait && attempt < MAX_RESOURCE_WAITS; attempt += 1) {
+      await wait()
     }
-
-    if (!resourceContext) {
-      await Promise.all(promises)
-      return
-    }
-
-    // 2. 遍历场景图中的图片和文本块内联图标/图片
-    for (const node of scene.paintOrderNodes) {
-      const block = node.block
-      if (block.type === 'image-block') {
-        const imageBlock = block as RenderReadyImageBlock
-        if (imageBlock.source) {
-          const res = resolveCardResource({
-            value: imageBlock.source,
-            expect: 'asset',
-            blockId: imageBlock.id,
-            fieldKey: 'source',
-          }, resourceContext)
-          if (res.kind === 'url') promises.push(loadImage(res.src))
-          else if (res.kind === 'icon') promises.push(loadImage(res.entry.src))
-        }
-        if (imageBlock.maskSource) {
-          const maskRes = resolveCardResource({
-            value: imageBlock.maskSource,
-            expect: 'asset',
-            blockId: imageBlock.id,
-            fieldKey: 'maskSource',
-          }, resourceContext)
-          if (maskRes.kind === 'url') promises.push(loadImage(maskRes.src))
-          else if (maskRes.kind === 'icon') promises.push(loadImage(maskRes.entry.src))
-        }
-      } else if (block.type === 'text-block') {
-        const textBlock = block as RenderReadyTextBlock
-        if (textBlock.content) {
-          const parsed = parseCardMarkup(textBlock.content)
-          extractInlineAssets(parsed.document.blocks, (ref) => {
-            if (ref.type === 'img') {
-              const res = resolveCardResource({
-                value: ref.src,
-                expect: 'asset',
-                blockId: textBlock.id,
-                fieldKey: 'content',
-              }, resourceContext)
-              if (res.kind === 'url') promises.push(loadImage(res.src))
-              else if (res.kind === 'icon') promises.push(loadImage(res.entry.src))
-            } else if (ref.type === 'icon') {
-              const iconPath = formatProjectIconPath({
-                packageKey: ref.pkg ?? null,
-                seriesKey: ref.key.includes('/') ? ref.key.split('/')[0]! : '',
-                iconKey: ref.key.includes('/') ? ref.key.split('/')[1]! : ref.key,
-              })
-              const res = resolveCardResource({
-                value: iconPath,
-                expect: 'asset',
-                blockId: textBlock.id,
-                fieldKey: 'content',
-              }, resourceContext)
-              if (res.kind === 'icon') promises.push(loadImage(res.entry.src))
-              else if (res.kind === 'url') promises.push(loadImage(res.src))
-            }
-          })
-        }
-      }
-    }
-
-    await Promise.all(promises)
   }
 
   return {

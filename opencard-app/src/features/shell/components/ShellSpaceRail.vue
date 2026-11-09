@@ -26,6 +26,14 @@ const spaceGroups = computed(() => (['primary', 'secondary'] as const).map(key =
 const emit = defineEmits<{
   select: [space: SpaceKey]
 }>()
+
+function isAvailable(space: ShellSpaceDefinition): boolean {
+  return space.available?.value !== false
+}
+
+function selectSpace(space: ShellSpaceDefinition): void {
+  if (isAvailable(space)) emit('select', space.key)
+}
 </script>
 
 <template>
@@ -41,12 +49,14 @@ const emit = defineEmits<{
         :key="space.key"
         :data-oc-tutorial="space.key === 'collaboration' ? 'shell.collaboration' : undefined"
         class="shell-space-rail__item"
-        :class="{ 'is-active': space.key === props.activeSpace }"
+        :class="{ 'is-active': space.key === props.activeSpace, 'is-unavailable': !isAvailable(space) }"
         type="button"
         :aria-label="props.translate(space.labelKey)"
         :aria-current="space.key === props.activeSpace ? 'page' : undefined"
-        :data-tooltip="props.translate(space.labelKey)"
-        @click="emit('select', space.key)"
+        :aria-disabled="!isAvailable(space) || undefined"
+        :data-tooltip="!isAvailable(space) && space.unavailableHintKey
+          ? props.translate(space.unavailableHintKey) : props.translate(space.labelKey)"
+        @click="selectSpace(space)"
       >
         <OcIcon :name="space.icon" :tone="space.key === props.activeSpace ? 'accent' : 'muted'" size="md" />
       </button>

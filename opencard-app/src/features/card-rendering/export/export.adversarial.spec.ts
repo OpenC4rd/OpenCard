@@ -368,7 +368,7 @@ describe('Milestone 2 Headless Export Adversarial Suite', () => {
         const face = createSampleFace(400, 600)
         const bytes = await renderFaceToPng(face, { scale: 1.5 })
 
-        expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png')
+        expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png', undefined)
         expect(mockCtx.scale).toHaveBeenCalledWith(1.5, 1.5)
 
         const parsed = parsePngStructure(bytes)

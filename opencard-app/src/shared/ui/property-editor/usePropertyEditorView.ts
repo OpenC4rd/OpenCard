@@ -52,7 +52,7 @@ export function usePropertyEditorView(options: UsePropertyEditorViewOptions) {
     options.inputs.value
       .map((source) => ({
         key: source.key,
-        title: source.title?.trim() || source.key,
+        title: source.title?.trim() ?? source.key,
         categories: buildCategories(source, options),
       }))
       .filter((source) => source.categories.length > 0),

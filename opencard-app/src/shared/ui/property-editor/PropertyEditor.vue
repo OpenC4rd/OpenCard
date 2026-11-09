@@ -47,7 +47,10 @@
             <div v-else-if="row.kind === 'field' && row.category && row.entry"
               class="property-editor__row"
               :style="indentStyle(row.level)"
-              :class="{ 'is-revealed': revealedFieldIdentity === fieldIdentity(row.category.inputKey, row.entry.key) }"
+              :class="{
+                'is-revealed': revealedFieldIdentity === fieldIdentity(row.category.inputKey, row.entry.key),
+                'is-stacked': isArrayPropertyFieldType(row.entry.definition.fieldType),
+              }"
               :data-input-key="row.category.inputKey" :data-field-key="row.entry.key">
               <div class="property-editor__row-label">
                 <OcIcon :name="getPropertyFieldIcon(row.entry.definition)" tone="muted" size="md" />
@@ -57,7 +60,7 @@
                 <PropertyFieldLabel :label="row.entry.label" :field-key="row.entry.key" :copyable="copyableFieldKeys" />
               </div>
               <div class="property-editor__value">
-                <span v-if="row.entry.readonly" class="property-editor__readonly-value">
+                <span v-if="row.entry.readonly && row.entry.definition.fieldType !== 'boolean'" class="property-editor__readonly-value">
                   {{ formatPropertyFieldReadonlyValue(row.entry.definition, row.entry.value) }}
                 </span>
                 <PropertyFieldRenderer v-else
@@ -128,6 +131,7 @@ import {
   createPropertyFieldEditorModeAction,
   usePropertyFieldEditorModes,
 } from './propertyFieldEditorMode'
+import { isArrayPropertyFieldType } from './propertyEditor.types'
 import { getPropertyFieldIcon } from './propertyFieldRegistry'
 import { formatPropertyFieldReadonlyValue } from './propertyFieldRegistry'
 import { useContextMenu } from '../useContextMenu'
@@ -210,14 +214,16 @@ interface PropertyEditorDisplayRow {
 const displayRows = computed<PropertyEditorDisplayRow[]>(() => {
   const rows: PropertyEditorDisplayRow[] = []
   for (const source of displaySources.value) {
-    rows.push({
-      key: `source:${source.key}`,
-      kind: 'source',
-      level: 0,
-      title: source.title,
-      category: null,
-      entry: null,
-    })
+    if (source.title) {
+      rows.push({
+        key: `source:${source.key}`,
+        kind: 'source',
+        level: 0,
+        title: source.title,
+        category: null,
+        entry: null,
+      })
+    }
     for (const category of source.categories) {
       rows.push({
         key: `category:${source.key}:${category.key}`,
@@ -524,6 +530,20 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+/* 列表每项都带操作按钮，留在值列里输入框会被挤没，所以独占一整行。 */
+.property-editor__row.is-stacked {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--oc-space-2xs);
+}
+
+.property-editor__row.is-stacked .property-editor__value {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.property-editor__row.is-stacked .property-editor__tail {
+  justify-self: end;
+}
+
 /* 行的悬浮高光不再出现：行内本身就是输入控件，靠控件的焦点外观区分即可。 */
 .property-editor__row:focus-within {
   background-image: var(--oc-overlay-hover);
@@ -561,7 +581,11 @@ onBeforeUnmount(() => {
 }
 
 .property-editor__readonly-value {
+  display: flex;
+  align-items: center;
   min-width: 0;
+  min-height: var(--oc-property-row-height);
+  white-space: pre-line;
   overflow-wrap: anywhere;
   color: var(--oc-fg-default);
 }

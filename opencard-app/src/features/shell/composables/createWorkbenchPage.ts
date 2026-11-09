@@ -25,7 +25,7 @@ import type { ApplicationCloseAction } from './useUnsavedSessionGuard'
 import { useWorkbenchEditorHost } from './useWorkbenchEditorHost'
 import { useWorkbenchActions } from './useWorkbenchActions'
 import { useWorkbenchVersionActions } from './useWorkbenchVersionActions'
-import { useWorkbenchProjectExport } from './useWorkbenchProjectExport'
+import { createProjectExportStorage } from './useExportSpace'
 import { useWorkbenchVersionControl } from './useWorkbenchVersionControl'
 import { useWorkbenchFileTree } from './useWorkbenchFileTree'
 import { useWorkbenchIssues } from './useWorkbenchIssues'
@@ -40,7 +40,6 @@ import { useAppProjectActions } from '../services/appProjectActions'
 import WorkbenchPageContent from '../components/WorkbenchPageContent.vue'
 import WorkbenchOverlays from '../components/WorkbenchOverlays.vue'
 import { useWorkbenchKeyboardShortcuts } from './useWorkbenchKeyboardShortcuts'
-import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
 import { PROJECT_FILES_LIST_KEY, PROJECT_NEW_FOLDER_ACTION_KEY, PROJECT_NEW_OPENCARD_ACTION_KEY, PROJECT_NEW_MARKDOWN_ACTION_KEY, PROJECT_NEW_TEXT_ACTION_KEY, PROJECT_REVEAL_ACTION_KEY, TIMELINE_LIST_KEY, TIMELINE_REFRESH_ACTION_KEY } from '../shellSidebarConfig'
 
 /** 仅保留树公开的重命名能力，避免侧栏投影持有整个组件实例。 */
@@ -177,16 +176,25 @@ export function createWorkbenchPage(options: {
     resolveProjectPath,
     onChangesExpansionChange: handleChangesExpansionChange,
   })
+  const projectExportStorage = createProjectExportStorage(projectStore)
   const {
     isRunning: isProjectExportRunning,
-    loadDocumentSnapshot,
     prepare: prepareProjectExport,
     run: runProjectExport,
+    planPreview: planProjectExportPreview,
+    renderPreviewPage: renderProjectExportPreviewPage,
+    releasePreview: releaseProjectExportPreview,
     renderCardImages, cancelAndWait: cancelExportsAndWait,
   } = useProjectExport({
     sessions,
     renderEnvironment: projectRenderEnvironment,
+    projectInfo: () => ({
+      name: projectName.value,
+      version: projectProfile.value?.version ?? '',
+      author: projectProfile.value?.author ?? '',
+    }),
     readProjectFile,
+    listDocuments: projectExportStorage.listDocuments,
     resolveProjectPath,
     getRelativeProjectPath,
     translate: t,
@@ -274,29 +282,6 @@ export function createWorkbenchPage(options: {
     if (nextPath !== previousPath) { clearAllSessionIssues(); closeResourcePackageBuilder() }
   })
 
-  const {
-    open: projectExportDialogOpen,
-    task: projectExportDialogTask,
-    candidates: projectExportDocumentCandidates,
-    preparing: isExportPreparing,
-    issues: exportPreparationIssues,
-    show: openProjectExportDialog,
-    close: closeProjectExportDialog,
-    submit: startProjectExport,
-  } = useWorkbenchProjectExport({
-    projectProfile,
-    listDocuments: async signal => {
-      const paths: string[] = []
-      await taskScheduler.forEach(await projectStore.scanProjectEntries(signal), entry => {
-        if (entry.isFile && entry.name.toLowerCase().endsWith('.ocdocument')) paths.push(entry.name)
-      }, signal)
-      return paths
-    },
-    running: isProjectExportRunning,
-    loadDocumentSnapshot,
-    prepare: prepareProjectExport,
-    run: runProjectExport,
-  })
 
   const {
     projectTreeData,
@@ -617,7 +602,7 @@ export function createWorkbenchPage(options: {
       case 'new-open-card': return createUntitledOpenCard()
       case 'open-project': await app.openProject(); return
       case 'export-project-template': return app.exportTemplate()
-      case 'export-card-documents': if (projectPath.value) await openProjectExportDialog(); return
+      case 'export-card-documents': showPrimarySpacePage('export'); return
     }
   }
 
@@ -724,17 +709,13 @@ export function createWorkbenchPage(options: {
     handleKeydown,
     overlays: WorkbenchOverlays,
     overlayProps: computed(() => ({
-      projectExportDialogOpen: projectExportDialogOpen.value, projectExportDialogTask: projectExportDialogTask.value,
-      projectExportDocumentCandidates: projectExportDocumentCandidates.value, isExportPreparing: isExportPreparing.value, isProjectExportRunning: isProjectExportRunning.value,
-      exportPreparationIssues: exportPreparationIssues.value, resourcePackageBuilderOpen: resourcePackageBuilderOpen.value, projectPath: projectPath.value,
+      resourcePackageBuilderOpen: resourcePackageBuilderOpen.value, projectPath: projectPath.value,
       projectName: projectName.value, resourcePackageBuilderEntries: resourcePackageBuilderEntries.value,
       isUnsavedEditorsDialogOpen: isUnsavedEditorsDialogOpen.value, pendingCloseIntent: pendingCloseIntent.value,
       unsavedEditorDecisions: unsavedEditorDecisions.value, isUnsavedCloseBusy: isUnsavedCloseBusy.value, unsavedCloseError: unsavedCloseError.value,
       unsavedSelectedCount: unsavedSelectedCount.value, unsavedPendingCount: unsavedPendingCount.value, unsavedSaveCount: unsavedSaveCount.value,
       unsavedDiscardCount: unsavedDiscardCount.value, allUnsavedPendingSelected: allUnsavedPendingSelected.value, someUnsavedPendingSelected: someUnsavedPendingSelected.value,
       canConfirmUnsavedClose: canConfirmUnsavedClose.value,
-      'onUpdate:projectExportDialogTask': (value: ProjectExportTask) => { projectExportDialogTask.value = value },
-      onCloseProjectExport: closeProjectExportDialog, onSubmitProjectExport: startProjectExport,
       onCloseResourcePackageBuilder: closeResourcePackageBuilder,
       onSelectAllUnsaved: setAllUnsavedPendingSelected, onSelectUnsavedRow: setUnsavedRowSelected, onMarkUnsavedDiscard: markSelectedUnsavedDiscard,
       onMarkUnsavedSave: markSelectedUnsavedSave, onResetUnsavedDecision: resetUnsavedDecision, onCancelUnsavedClose: cancelUnsavedCloseRequest,
@@ -745,6 +726,10 @@ export function createWorkbenchPage(options: {
   return {
     page, versionControl, handleChangesNodeActivate, openProject: app.openProject,
     openFile: openFileFromPicker, open: openEditorSession,
+    projectExport: {
+      ...projectExportStorage, running: isProjectExportRunning, prepare: prepareProjectExport, run: runProjectExport,
+      planPreview: planProjectExportPreview, renderPreviewPage: renderProjectExportPreviewPage, releasePreview: releaseProjectExportPreview,
+    },
     closeWorkspaceSessions, requestProjectClose, requestApplicationClose, cancelExportsAndWait,
     newDocument: createUntitledOpenCard, addResourcePackageToProject,
     openIconRegistry: async () => { await handleProjectManagementSelect([resolveProjectPath(PROJECT_ICON_REGISTRY_FILE_NAME)]) },

@@ -204,6 +204,14 @@ describe('useCdeSelectionCommands', () => {
     expect(flow.children[0]!.location.align).toBe('center')
   })
 
+  it('treats a flow container without a direction as horizontal, like rendering does', () => {
+    const { commands, flow } = createHarness()
+    delete flow.direction
+
+    expect(commands.applySelectionLayout({ type: 'fill-cross-axis', blockId: 'flow-child' })).toBe(true)
+    expect(flow.children[0]!.block).toMatchObject({ height: '100%' })
+  })
+
   it('filters layout writes on locked axes', () => {
     const { commands, simple } = createHarness((_blockId, axis) => axis === 'width')
     const child = simple.children[0]!

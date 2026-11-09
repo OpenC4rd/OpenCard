@@ -160,6 +160,5 @@ defineExpose({ presentation, headerActions, onHeaderAction })
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: var(--oc-space-xs);
 }
 </style>

@@ -5,6 +5,7 @@ import {
   getCardFieldKeys,
   getCardFieldValueKind,
 } from '../../entities/card/model'
+import { getPropertyValueKind } from '../../entities/card/schema'
 import type {
   PropertyCompletionProvider,
   PropertyEditorFieldDefinition,
@@ -104,7 +105,7 @@ export function enrichCardPropertyFieldDefinition(options: {
 }): PropertyEditorFieldDefinition {
   const bindingProvider = options.referenceContext
     && options.definition.acceptsBinding !== false
-    && options.definition.fieldType !== 'object'
+    && getPropertyValueKind(options.definition) !== 'object'
     ? createReferenceCompletionProvider(options.referenceContext)
     : undefined
   const baseStyle = options.definition.fieldType === 'richText'

@@ -35,13 +35,13 @@ export type ProjectWorkspaceState = {
   packageBuilder?: ProjectPackageBuilderState
 }
 export interface AppState {
-  layout: { sidebarWidth: number; sidebarCollapsed: boolean; resourceDock?: DockLayoutState }
+  layout: { sidebarWidth: number; sidebarCollapsed: boolean; exportSpread: boolean; resourceDock?: DockLayoutState }
   projects: { lastParentPath: string; recent: string[]; workspaces: Record<string, ProjectWorkspaceState> }
 }
 
 export function createDefaultAppState(): AppState {
   return {
-    layout: { sidebarWidth: 292, sidebarCollapsed: false },
+    layout: { sidebarWidth: 292, sidebarCollapsed: false, exportSpread: false },
     projects: { lastParentPath: '', recent: [], workspaces: {} },
   }
 }
@@ -55,6 +55,7 @@ export function normalizeAppState(value: unknown): AppState {
       sidebarWidth: typeof layout.sidebarWidth === 'number' && Number.isFinite(layout.sidebarWidth)
         ? Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(layout.sidebarWidth))) : 292,
       sidebarCollapsed: layout.sidebarCollapsed === true,
+      exportSpread: layout.exportSpread === true,
       ...(isRecord(layout.resourceDock) ? { resourceDock: layout.resourceDock as unknown as DockLayoutState } : {}),
     },
     projects: {

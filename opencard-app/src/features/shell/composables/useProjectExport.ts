@@ -7,7 +7,10 @@
 import { readonly, ref, type Ref } from 'vue'
 import { parseCardDocument } from '../../../entities/card/storage'
 import { isSameOrDescendantPath, normalizePath } from '../../../shared/model/filePath'
+import { composeExportPage } from '../../exporting/composeExportPage'
 import { prepareExportTask } from '../../exporting/exportPlanner'
+import { renderExportPreviewPage } from '../../exporting/exportPreview'
+import { expandExportVariables, type ExportProjectInfo } from '../../exporting/exportVariables'
 import { runExportPlan } from '../../exporting/exportRunner'
 import type {
   ExportDocumentSnapshot,
@@ -17,10 +20,11 @@ import type {
   ExportProgressEvent,
   ExportRunResult,
 } from '../../exporting/exportTask'
+import { matchExportDocuments } from '../../exporting/exportTask'
 import type { CardRenderEnvironment } from '../../card-rendering/renderPipeline'
 import type { PreparedCardRender } from '../../card-rendering/renderPipeline'
 import type { CardFaceKey } from '../../../entities/card/model'
-import type { ProjectExportTask } from '../../workspace/model/projectMetadata'
+import type { ExportProfile } from '../../workspace/model/projectExportProfile'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import type { EditorSession } from '../../editor-runtime/session/editorSession'
 import { renderFaceToPng } from '../../card-rendering/export/renderFaceToPng'
@@ -34,7 +38,9 @@ const PROJECT_EXPORT_PROGRESS_KEY = 'project-export'
 type UseProjectExportOptions = {
   sessions: Readonly<Ref<readonly EditorSession[]>>
   renderEnvironment: Readonly<Ref<Readonly<CardRenderEnvironment>>>
+  projectInfo: () => ExportProjectInfo
   readProjectFile: (relativePath: string) => Promise<string>
+  listDocuments: (signal: AbortSignal) => Promise<readonly string[]>
   resolveProjectPath: (relativePath: string) => string
   getRelativeProjectPath: (path: string) => string
   translate: (key: string, params?: Record<string, unknown>) => string
@@ -79,53 +85,79 @@ export function useProjectExport(options: UseProjectExportOptions) {
     },
   }
 
-  async function prepare(task: ProjectExportTask): Promise<ExportPreparationResult> {
+  function resolveOutputDirectory(directory: string): string {
+    return /^(?:[a-z]:[\\/]|[\\/])/i.test(directory) ? directory : options.resolveProjectPath(directory)
+  }
+
+  async function planProfile(source: ExportProfile, signal: AbortSignal): Promise<ExportPreparationResult> {
+    const environment = options.renderEnvironment.value
+    const expanded = expandExportVariables(source, options.projectInfo(), new Date())
+    const profile = { ...expanded, output: { ...expanded.output, directory: resolveOutputDirectory(expanded.output.directory.trim()) } }
+    const paths = await options.listDocuments(signal)
+    const snapshots = new Map<string, ExportDocumentSnapshot>()
+    for (const path of matchExportDocuments(profile.documents, paths)) {
+      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+      const snapshot = await loadDocumentSnapshot(path).catch(() => null)
+      if (snapshot) snapshots.set(normalizePath(path).toLowerCase(), snapshot)
+    }
+    if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+    const request = {
+      profile,
+      source: {
+        list: async () => paths,
+        load: async (path: string) => snapshots.get(normalizePath(path).toLowerCase()) ?? await loadDocumentSnapshot(path),
+      },
+      destination,
+      environment,
+    }
+    await prepareExportTask(request)
+    await environment.projectResourceEnvironment?.waitForResources?.()
+    if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+    return await prepareExportTask(request)
+  }
+
+  async function prepare(source: ExportProfile): Promise<ExportPreparationResult> {
     if (isRunning.value) throw new Error('Export renderer is busy')
     isRunning.value = true
     start()
-    const environment = options.renderEnvironment.value
-    const signal = controller.value!.signal
     try {
-      const snapshots = new Map<string, ExportDocumentSnapshot>()
-      for (const path of task.documentPaths) {
-        if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
-        snapshots.set(normalizePath(path).toLowerCase(), await loadDocumentSnapshot(path))
-      }
-      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
-      const request = { task, source: { load: async (path: string) => snapshots.get(normalizePath(path).toLowerCase())! }, destination, environment }
-      await prepareExportTask(request)
-      await environment.projectResourceEnvironment?.waitForResources?.()
-      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
-      return await prepareExportTask(request)
+      return await planProfile(source, controller.value!.signal)
     } finally { controller.value = null; isRunning.value = false; settle?.(); settle = undefined }
   }
 
-  const exportAssetStore = createCanvasAssetStore()
-
-  const renderer: ExportFaceRenderer = {
-    async render(request, signal) {
-      if (signal.aborted || request.render.resources.hostEnvironment.isDisposed?.()) throw new DOMException('Export cancelled', 'AbortError')
-      await request.render.resources.hostEnvironment.waitForResources?.()
-      if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
-      const resolvedDpi = (typeof request.dpi === 'number' && Number.isFinite(request.dpi) && request.dpi > 0)
-        ? request.dpi
-        : (request.render.document.dpi ?? 300)
-      const bytes = await renderFaceToPng(request.render.document.faces[request.faceKey], {
-        scale: request.scale,
-        dpi: resolvedDpi,
-        resourceContext: request.render.resources,
-        signal,
-        assets: exportAssetStore,
-      })
-      if (!bytes || bytes.length === 0) {
-        throw new Error(`Export render produced 0 bytes for face '${request.faceKey}'`)
-      }
-      return bytes
-    },
-    reset() {
-      exportAssetStore.clear()
-    },
+  function createFaceRenderer(): ExportFaceRenderer {
+    const assets = createCanvasAssetStore()
+    return {
+      async render(request, signal) {
+        if (signal.aborted || request.render.resources.hostEnvironment.isDisposed?.()) throw new DOMException('Export cancelled', 'AbortError')
+        await request.render.resources.hostEnvironment.waitForResources?.()
+        if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+        const resolvedDpi = (typeof request.dpi === 'number' && Number.isFinite(request.dpi) && request.dpi > 0)
+          ? request.dpi
+          : (request.render.document.dpi ?? 300)
+        const bytes = await renderFaceToPng(request.render.document.faces[request.faceKey], {
+          scale: request.scale,
+          dpi: resolvedDpi,
+          format: request.format,
+          quality: request.quality,
+          resourceContext: request.render.resources,
+          signal,
+          assets,
+        })
+        if (!bytes || bytes.length === 0) {
+          throw new Error(`Export render produced 0 bytes for face '${request.faceKey}'`)
+        }
+        return bytes
+      },
+      reset() {
+        assets.clear()
+      },
+    }
   }
+
+  const renderer = createFaceRenderer()
+  /** 预览和正式导出各用一份资源缓存：导出收尾清缓存不能打断预览。 */
+  const previewRenderer = createFaceRenderer()
 
   function progressDetail(event: ExportProgressEvent): string | undefined {
     if (!event.current) return undefined
@@ -177,11 +209,16 @@ export function useProjectExport(options: UseProjectExportOptions) {
       const result = await runExportPlan({
         plan,
         renderer,
+        composer: { compose: composeExportPage },
         destination,
         signal: controller.value!.signal,
         report: reportProgress,
       })
       reportResult(result)
+      if (result.status === 'completed' && plan.profile.output.openFolder) {
+        void fileSystemService.openWithDefaultApp(result.outputDirectory)
+          .catch((error: unknown) => notifyAppError('OC-E5006', error))
+      }
       return result
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return null
@@ -253,6 +290,10 @@ export function useProjectExport(options: UseProjectExportOptions) {
     loadDocumentSnapshot,
     prepare,
     run,
+    planPreview: planProfile,
+    renderPreviewPage: (plan: ExportPlan, index: number, signal: AbortSignal) =>
+      renderExportPreviewPage(plan, index, previewRenderer, { compose: composeExportPage }, signal),
+    releasePreview: () => previewRenderer.reset(),
     renderCardImages,
     cancel,
     cancelAndWait: async () => { cancel(); await settled },

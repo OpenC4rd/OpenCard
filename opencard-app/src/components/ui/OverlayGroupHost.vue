@@ -72,11 +72,10 @@ function measure(): void {
  * 只有绝对定位内容量不到高度时才退回老办法。
  */
 function naturalHeight(element: HTMLElement): number {
-  const range = document.createRange()
-  range.selectNodeContents(element)
-  // jsdom 的 Range 没有 getBoundingClientRect：量不到就走下面的退路。
-  const rect = typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect() : null
-  const height = rect ? Math.ceil(rect.height) : 0
+  // 只量直接子元素的盒子：Range 会把被裁剪的滚动内容（长列表的全部行）也并进来，把弹层撑到上限。
+  const top = element.getBoundingClientRect().top
+  const bottoms = [...element.children].map(child => child.getBoundingClientRect().bottom - top)
+  const height = Math.ceil(Math.max(0, ...bottoms))
   if (height > 0) return height
   const pinnedHeight = element.style.height
   element.style.height = 'auto'

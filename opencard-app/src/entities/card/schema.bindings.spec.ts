@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   acceptsPropertyBinding,
+  createPropertyDefaultValue,
   exposesPropertyReference,
   getPropertyValueKind,
   getTypePropertyEditorSchema,
@@ -29,6 +30,28 @@ describe('property binding schema policy', () => {
     expect(isReferenceFieldExposed('simple-container-block', 'children')).toBe(false)
     expect(getPropertyValueKind(textSchema.opacity)).toBe('number')
     expect(getPropertyValueKind(textSchema.content)).toBe('string')
+  })
+
+  it('treats any `T[]` field as a non-bindable list that defaults to empty', () => {
+    const { children } = getTypePropertyEditorSchema('simple-container-block')
+
+    expect(children).toMatchObject({ fieldType: 'object[]', objectType: 'CardBlock' })
+    for (const definition of [children!, { fieldType: 'string[]' } as const, { fieldType: 'boolean[]' } as const]) {
+      expect(getPropertyValueKind(definition)).toBe('object')
+      expect(acceptsPropertyBinding(definition)).toBe(false)
+      expect(createPropertyDefaultValue(definition)).toEqual([])
+    }
+  })
+
+  it('keeps only structural fields unremovable on blocks', () => {
+    const unremovable = (type: string) => Object.entries(getTypePropertyEditorSchema(type))
+      .filter(([, definition]) => definition.unremovable).map(([key]) => key).sort()
+
+    expect(unremovable('shape-block')).toEqual(['id', 'type'])
+    expect(unremovable('qrcode-block')).toEqual(['id', 'type'])
+    expect(unremovable('image-block')).toEqual(['id', 'type'])
+    expect(unremovable('flow-container-block')).toEqual(['children', 'id', 'type'])
+    expect(unremovable('custom-block')).toEqual(['id', 'source', 'type'])
   })
 
   it('exposes face background but hides face structure and document faces', () => {

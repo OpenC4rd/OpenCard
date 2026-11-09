@@ -51,7 +51,8 @@ it.each([false, true])('starts separate tutorials for a repository initially ini
     })
     const page = createCollaborationPage({
       version, workbench: { content: {}, contentProps: ref({}), header: ref(null) },
-      activateChange: async () => {}, openProject: async () => {},
+      activateChange: async () => {},
+      openFile: async () => {},
     })
     return () => h(ShellSidebar, { collapsed: false, width: 260, bodyGroup: page.sidebar.value[0] })
   } }), { global: { plugins: [createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } })] } })

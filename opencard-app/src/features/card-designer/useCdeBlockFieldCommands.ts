@@ -105,6 +105,19 @@ export function useCdeBlockFieldCommands(options: UseCdeBlockFieldCommandsOption
     return true
   }
 
+  /** 删除实例上的字段：写入“未定义”，这张卡退回默认值，之后可以用重置回到蓝图。 */
+  function unsetInstanceField(target: CdeBlockFieldTarget): boolean {
+    const { block, instance } = resolveTarget(target)
+    if (!block || !instance || !isInstanceBlockFieldOverridable(target.fieldKey)) return false
+    const overrides = instance.data[block.id] ?? (instance.data[block.id] = {})
+    if (overrides[target.fieldKey] === null) return false
+    overrides[target.fieldKey] = null
+
+    options.refreshDocumentState()
+    options.markDocumentChanged('action')
+    return true
+  }
+
   function createField(target: CdeBlockFieldCreateTarget): AdditionalFieldKeyError | 'invalid-target' | null {
     if (target.cardId !== options.blueprintCardId) return 'invalid-target'
     const { block } = resolveTarget(target)
@@ -152,5 +165,5 @@ export function useCdeBlockFieldCommands(options: UseCdeBlockFieldCommandsOption
     return true
   }
 
-  return { updateField, resetField, createField, updateFieldDefinition, removeFieldDefinition, resetBlueprintField }
+  return { updateField, resetField, unsetInstanceField, createField, updateFieldDefinition, removeFieldDefinition, resetBlueprintField }
 }

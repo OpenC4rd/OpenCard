@@ -1,5 +1,5 @@
 import type { CardBlock, CardDocument, CardFaceKey } from '../../entities/card/model'
-import { createPropertyDefaultValue, getPropertyAllowedValues, resolvePropertyEditorSchema } from '../../entities/card/schema'
+import { createPropertyDefaultValue, getPropertyAllowedValues, getPropertyValueKind, resolvePropertyEditorSchema } from '../../entities/card/schema'
 import { isRenderCssColor, isRenderCssLength, normalizeRenderCssLength } from './renderValueSyntax'
 import {
   createCardPipelineIssue,
@@ -455,6 +455,7 @@ const dynamicImageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] as c
 function dynamicRenderContract(
   definition: ReturnType<typeof resolvePropertyEditorSchema>['fields'][string],
  ): RenderFieldContract | null {
+  if (getPropertyValueKind(definition) === 'object') return null
   let kind: RenderFieldContract['kind']
   switch (definition.fieldType) {
     case 'filePath':
@@ -474,8 +475,6 @@ function dynamicRenderContract(
     case 'fontFamily':
       kind = 'string'
       break
-    case 'object':
-      return null
     default:
       kind = 'option'
       break

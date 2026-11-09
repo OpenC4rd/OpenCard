@@ -78,16 +78,6 @@
           </div>
         </ProjectConfigSection>
 
-        <ProjectConfigSection section-id="project-profile-section-export"
-          content-indent="single"
-          :heading="t('projectConfig.export.title')" :description="t('projectConfig.export.description')"
-          :expand-label="t('projectConfig.sections.expand', { section: t('projectConfig.export.title') })"
-          :collapse-label="t('projectConfig.sections.collapse', { section: t('projectConfig.export.title') })"
-          :collapsed="isProjectSectionCollapsed('export')" @toggle="toggleProjectSection('export')">
-          <ProjectExportTaskEditor :model-value="defaultExportTask" :documents="exportDocumentCandidates"
-            @update:model-value="updateDefaultExportTask" />
-        </ProjectConfigSection>
-
       </template>
 
       <section v-else class="project-profile-editor__repair" role="alert">
@@ -145,15 +135,11 @@ import {
   PROJECT_PROFILE_FILE_NAME,
   serializeProjectMetadata,
   type ProjectProfile,
-  type ProjectExportTask,
 } from '../../features/workspace/model/projectMetadata'
-import { createDefaultProjectExportTask } from '../../features/exporting/exportTask'
-import { parseCardDocument } from '../../entities/card/storage'
 import OcOptionGroup, { type OcOption } from '../standard/OcOptionGroup.vue'
 import MonacoEditor from './MonacoEditor.vue'
 import ProjectConfigSection from './ProjectConfigSection.vue'
 import ProjectCoverField from './ProjectCoverField.vue'
-import ProjectExportTaskEditor, { type ExportDocumentCandidate } from './ProjectExportTaskEditor.vue'
 import OcButton from '../base/OcButton.vue'
 import OcFieldInput from '../base/OcFieldInput.vue'
 import OcIcon from '../base/OcIcon.vue'
@@ -167,7 +153,6 @@ const projectStore = useProjectStore()
 const appStateStore = useAppStateStore()
 const profile = ref<ProjectProfile | null>(null)
 const remoteHostDrafts = ref<string[]>([])
-const exportDocumentCandidates = ref<ExportDocumentCandidate[]>([])
 const editorRoot = ref<HTMLElement | null>(null)
 const activeSection = ref<ProjectProfileSectionKey>('information')
 let sectionObserver: IntersectionObserver | null = null
@@ -178,12 +163,11 @@ const presentation = computed<EditorPresentation>(() => ({
   icon: 'mdiFileCogOutline',
 }))
 
-type ProjectProfileSectionKey = 'information' | 'remote-resources' | 'export'
+type ProjectProfileSectionKey = 'information' | 'remote-resources'
 
 const projectProfileSections = [
   { key: 'information', labelKey: 'projectConfig.sections.information' },
   { key: 'remote-resources', labelKey: 'projectConfig.remoteResources.title' },
-  { key: 'export', labelKey: 'projectConfig.export.title' },
 ] as const satisfies readonly { key: ProjectProfileSectionKey, labelKey: string }[]
 
 const themeId = computed(() => props.themeId ?? 'dark')
@@ -207,7 +191,6 @@ const remoteResourceModeOptions = computed<readonly OcOption[]>(() => [
 ])
 const hasInvalidRemoteHostDraft = computed(() => remoteResourceMode.value === 'allowlist'
   && remoteHostDrafts.value.some(host => !isRemoteHostValid(host)))
-const defaultExportTask = computed(() => profile.value?.exportTask ?? createDefaultProjectExportTask())
 watch(() => editorState.value.draftContent, content => {
   const nextProfile = parseProjectMetadataText(content ?? '')
   profile.value = nextProfile
@@ -215,25 +198,6 @@ watch(() => editorState.value.draftContent, content => {
     ? [...nextProfile.remoteResources.allowedHosts]
     : []
   void nextTick(connectSectionObserver)
-}, { immediate: true })
-
-watch(() => projectStore.indexedEntries.value, async entries => {
-  const paths = entries
-    .filter(entry => !entry.isDirectory && entry.name.toLocaleLowerCase().endsWith('.ocdocument'))
-    .map(entry => entry.name.replace(/\\/g, '/'))
-  exportDocumentCandidates.value = await Promise.all(paths.map(async path => {
-    try {
-      const document = parseCardDocument(JSON.parse(await projectStore.readFile(path)) as unknown)
-      const width = Number(document.width)
-      const height = Number(document.height)
-      return {
-        path,
-        ...(Number.isFinite(width) && Number.isFinite(height) ? { width, height } : {}),
-      }
-    } catch {
-      return { path }
-    }
-  }))
 }, { immediate: true })
 
 function updateProfileField(fieldKey: 'name' | 'description' | 'version' | 'author', event: Event) {
@@ -308,11 +272,6 @@ function updateProfile(next: ProjectProfile, history: HistoryOperationMeta = { m
   } catch (error) {
     reportAppError('OC-E3006', error)
   }
-}
-
-function updateDefaultExportTask(task: ProjectExportTask): void {
-  if (!profile.value) return
-  updateProfile({ ...profile.value, exportTask: task })
 }
 
 function isProjectSectionCollapsed(sectionKey: ProjectProfileSectionKey): boolean {

@@ -3,7 +3,7 @@
  * Selection state, DOM measurement, keyboard routing, and viewport focus stay with the caller.
  */
 import type { Ref } from 'vue'
-import { getBlockProperty, setBlockProperty, type CardDocument } from '../../entities/card/model'
+import { getBlockProperty, getFlowDirection, setBlockProperty, type CardDocument } from '../../entities/card/model'
 import type { ParentLookup } from '../../entities/card/tree'
 
 type CdeSelectionResizeIntent = {
@@ -145,7 +145,8 @@ export function useCdeSelectionCommands(options: UseCdeSelectionCommandsOptions)
       ) return false
 
       if (intent.type === 'fill-cross-axis') {
-        if (target.parent.direction === 'lr' || target.parent.direction === 'rl') {
+        const direction = getFlowDirection(target.parent)
+        if (direction === 'lr' || direction === 'rl') {
           if (options.isResizeAxisLocked?.(intent.blockId, 'height')) return false
           setBlockProperty(target.block, 'height', '100%')
         } else {

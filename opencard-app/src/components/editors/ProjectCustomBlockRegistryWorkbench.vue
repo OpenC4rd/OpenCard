@@ -263,5 +263,5 @@ function updateProperty(mutation: PropertyEditorMutation): void {
 </script>
 
 <style scoped>
-.custom-block-registry-workbench__properties { min-width: 0; padding: var(--oc-space-sm); }
+.custom-block-registry-workbench__properties { min-width: 0; }
 </style>

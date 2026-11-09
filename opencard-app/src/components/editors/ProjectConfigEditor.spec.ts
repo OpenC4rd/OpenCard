@@ -3,7 +3,6 @@ import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectConfigEditor from './ProjectConfigEditor.vue'
 import ProjectCoverField from './ProjectCoverField.vue'
-import ProjectExportTaskEditor from './ProjectExportTaskEditor.vue'
 import OcOptionGroup from '../standard/OcOptionGroup.vue'
 import { useAppStateStore } from '../../features/app-state/store/appStateStore'
 
@@ -80,26 +79,6 @@ describe('ProjectConfigEditor', () => {
     await wrapper.vm.$nextTick()
 
     expect(draft(wrapper).remoteResources).toEqual({ mode: 'allow-all' })
-  })
-
-  it('stores export fields as the default export configuration', async () => {
-    const wrapper = mount(ProjectConfigEditor, {
-      props: { session: createTestSession({ path: 'D:/Demo/.opencard/project.json', draftContent: '{}' }) },
-    })
-    const task = {
-      documentPaths: ['cards/main.ocdocument'],
-      selectionMode: 'blueprint',
-      scale: 1,
-      layoutMode: 'none',
-      outputDirectory: 'D:/exports',
-      conflictMode: 'replace',
-      errorPolicy: 'continue',
-    } as const
-
-    wrapper.getComponent(ProjectExportTaskEditor).vm.$emit('update:modelValue', task)
-    await wrapper.vm.$nextTick()
-
-    expect(draft(wrapper).exportTask).toEqual(task)
   })
 
   it('persists collapsed profile sections outside the document', async () => {

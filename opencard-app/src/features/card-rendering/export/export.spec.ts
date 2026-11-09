@@ -214,7 +214,7 @@ describe('renderFaceToPng', () => {
       const bytes = await renderFaceToPng(face, { scale: 1.5 })
 
       expect(mockCtx.scale).toHaveBeenCalledWith(1.5, 1.5)
-      expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png')
+      expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png', undefined)
       expect(Array.from(bytes.slice(0, 8))).toEqual(PNG_MAGIC_BYTES)
     } finally {
       HTMLCanvasElement.prototype.getContext = originalGetContext

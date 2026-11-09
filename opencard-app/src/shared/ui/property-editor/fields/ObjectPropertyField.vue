@@ -3,7 +3,6 @@
     class="object-property-field"
     :model-value="normalizedValue"
     :readonly="definition.isReadonly"
-    :height-mode="definition.isArray ? 'array' : 'default'"
     @update:model-value="emit('update:value', $event)"
   />
 </template>
@@ -26,7 +25,7 @@ const normalizedValue = computed(() => {
   if (props.value !== undefined) {
     return props.value
   }
-  return props.definition.isArray ? [] : {}
+  return {}
 })
 </script>
 

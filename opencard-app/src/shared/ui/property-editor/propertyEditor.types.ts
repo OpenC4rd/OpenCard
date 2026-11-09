@@ -140,6 +140,8 @@ type PropertyFieldConstraintMap = {
     optionLabels?: Readonly<Record<string, string>>
     placeholder?: string
     multiline?: boolean
+    /** 纯数字时在输入框末尾显示的默认单位（只是提示，不改写值）。 */
+    defaultUnit?: string
     /** 多项输入的分隔符。设置后这个字段按分隔符分项编辑：回车或该分隔符成一项，值仍是单个字符串。 */
     listSeparator?: 'semicolon' | 'comma' | 'newline'
     /** 判断一项是否可用；不可用项会被标出，输入框也带 aria-invalid。 */
@@ -194,25 +196,12 @@ type PropertyFieldConstraintMap = {
     allowAlpha?: boolean
     placeholder?: string
   }
-  object: {
-    isArray?: boolean
-  }
+  object: Record<never, never>
 }
 
 export type BasePropertyFieldType = keyof PropertyFieldConstraintMap
-type PropertyArrayElementType = Extract<
-  BasePropertyFieldType,
-  | 'string'
-  | 'richText'
-  | 'filePath'
-  | 'imageSource'
-  | 'fontFamily'
-  | 'customBlockSource'
-  | 'number'
-  | 'boolean'
-  | 'color'
->
-type PropertyArrayFieldType = `${PropertyArrayElementType}[]`
+/** 每个 `[]` 是一层列表，`string[][]` 是列表的列表；类型系统写不出“重复若干次”，运行时才拆层。 */
+type PropertyArrayFieldType = `${BasePropertyFieldType}[]${string}`
 export type PropertyFieldType = BasePropertyFieldType | PropertyArrayFieldType
 
 type PropertyEditorFieldBase = {
@@ -247,21 +236,26 @@ type ScalarPropertyEditorFieldDefinition = {
 }[BasePropertyFieldType]
 
 type ArrayPropertyEditorFieldDefinition = {
-  [K in PropertyArrayElementType]: PropertyEditorFieldBase & {
-    fieldType: `${K}[]`
+  [K in BasePropertyFieldType]: PropertyEditorFieldBase & {
+    fieldType: `${K}[]${string}`
   } & PropertyFieldConstraintMap[K]
-}[PropertyArrayElementType]
+}[BasePropertyFieldType]
 
 export type PropertyEditorFieldDefinition =
   | ScalarPropertyEditorFieldDefinition
   | ArrayPropertyEditorFieldDefinition
 
 export function isArrayPropertyFieldType(fieldType: PropertyFieldType): fieldType is PropertyArrayFieldType {
-  return fieldType.endsWith('[]') && !fieldType.slice(0, -2).endsWith('[]')
+  return fieldType.endsWith('[]')
 }
 
-export function getArrayElementFieldType(fieldType: PropertyArrayFieldType): PropertyArrayElementType {
-  return fieldType.slice(0, -2) as PropertyArrayElementType
+/** 只拆一层：`string[][]` 的元素是 `string[]`。 */
+export function getArrayElementFieldType(fieldType: PropertyArrayFieldType): PropertyFieldType {
+  return fieldType.slice(0, -2) as PropertyFieldType
+}
+
+export function getBasePropertyFieldType(fieldType: PropertyFieldType): BasePropertyFieldType {
+  return fieldType.replace(/(\[\])+$/, '') as BasePropertyFieldType
 }
 
 export type PropertyEditorBindingInterpreter = {
@@ -272,6 +266,7 @@ type PropertyEditorRecord = Readonly<Record<string, unknown>>
 
 export type PropertyEditorInput = {
   key: string
+  /** 来源行的标题，缺省用 key；空字符串表示不显示这一行。 */
   title?: string
   record: PropertyEditorRecord
   fields: Readonly<Record<string, PropertyEditorFieldDefinition>>

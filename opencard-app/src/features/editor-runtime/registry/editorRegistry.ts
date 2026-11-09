@@ -9,6 +9,7 @@ import type { Component } from 'vue'
 import type { EditorCapabilities } from '../editorProtocol'
 import CardDesignEditor from '../../card-designer/CardDesignEditor.vue'
 import DictionaryEditor from '../../../components/editors/DictionaryEditor.vue'
+import GitignoreEditor from '../../../components/editors/GitignoreEditor.vue'
 import FontPreviewEditor from '../../../components/editors/FontPreviewEditor.vue'
 import ImagePreviewEditor from '../../../components/editors/ImagePreviewEditor.vue'
 import MonacoEditor from '../../../components/editors/MonacoEditor.vue'
@@ -41,6 +42,7 @@ const editors: Record<string, IEditor> = {
   'package-manager': { id: 'package-manager', content: 'none', name: 'Package Manager', component: PackageManagerEditor, hasPreview: false },
   'font-preview': { id: 'font-preview', content: 'none', name: 'Font Preview', component: FontPreviewEditor, hasPreview: false, supportsDiff: true },
   'unsupported-file': { id: 'unsupported-file', content: 'none', name: 'Unsupported File', component: UnsupportedFileEditor, hasPreview: false },
+  gitignore: { id: 'gitignore', history: 'monaco', name: 'Ignore Rules', component: GitignoreEditor, hasPreview: false, supportsDiff: true },
   dictionary: { id: 'dictionary', history: 'structured', name: 'Dictionary', component: DictionaryEditor, hasPreview: false },
 }
 
