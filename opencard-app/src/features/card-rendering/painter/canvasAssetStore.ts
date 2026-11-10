@@ -16,58 +16,75 @@ export type CanvasAssetStore = {
 
 const MAX_RESOURCE_WAITS = 4
 
-export function createCanvasAssetStore(): CanvasAssetStore {
-  const cache = new Map<string, Promise<LoadedAsset | null>>()
-  const loadedMap = new Map<string, LoadedAsset>()
-  const listeners = new Set<() => void>()
-  const createdBlobUrls: string[] = []
+/**
+ * 解码后的图片整个应用共用一份：同一张图被设计画布、图层视图和导出各问一遍时只解码一次。
+ * 最近用过的留下，放满后丢掉最久没用的 —— 文件改过以后旧地址（带旧修订号）不再有人问，自然被挤出去。
+ */
+const MAX_DECODED_IMAGES = 256
+const decoding = new Map<string, Promise<LoadedAsset | null>>()
+const decoded = new Map<string, LoadedAsset>()
 
-  function notify() {
-    for (const listener of listeners) {
-      try {
-        listener()
-      } catch {
-        // 忽略监听回调错误
-      }
-    }
+function touch(src: string, image: LoadedAsset): LoadedAsset {
+  decoded.delete(src)
+  decoded.set(src, image)
+  if (decoded.size > MAX_DECODED_IMAGES) {
+    const oldest = decoded.keys().next().value!
+    decoded.delete(oldest)
+    decoding.delete(oldest)
   }
+  return image
+}
+
+function decodeImage(src: string): Promise<LoadedAsset | null> {
+  const known = decoding.get(src)
+  if (known) return known
+  const pending = (async (): Promise<LoadedAsset | null> => {
+    if (typeof Image === 'undefined') return null
+    const actualSrc = await prepareSvgSource(src)
+    return new Promise<LoadedAsset | null>(resolve => {
+      const image = new Image()
+      if (!actualSrc.startsWith('data:')) {
+        image.crossOrigin = 'anonymous'
+      }
+      image.onload = () => resolve(touch(src, image))
+      image.onerror = () => {
+        decoding.delete(src)
+        resolve(null)
+      }
+      image.src = actualSrc
+    })
+  })()
+  decoding.set(src, pending)
+  return pending
+}
+
+/** 一个使用方的视角：图片是共用的，"我等的那张到了"只通知自己的监听者。 */
+export function createCanvasAssetStore(): CanvasAssetStore {
+  const listeners = new Set<() => void>()
+  const awaited = new Set<string>()
 
   function loadImage(source: string): Promise<LoadedAsset | null> {
-    if (!source || !source.trim()) return Promise.resolve(null)
-    const src = source.trim()
-    const cached = cache.get(src)
-    if (cached) return cached
-
-    const pending = (async (): Promise<LoadedAsset | null> => {
-      if (typeof Image === 'undefined') return null
-      const actualSrc = await prepareSvgSource(src)
-      return new Promise<LoadedAsset | null>(resolve => {
-        const image = new Image()
-        if (!actualSrc.startsWith('data:')) {
-          image.crossOrigin = 'anonymous'
+    const src = source?.trim()
+    if (!src) return Promise.resolve(null)
+    const pending = decodeImage(src)
+    if (!decoded.has(src) && !awaited.has(src)) {
+      awaited.add(src)
+      void pending.then(image => {
+        awaited.delete(src)
+        if (!image) return
+        for (const listener of listeners) {
+          try { listener() } catch { /* 一个监听者出错不该拦住其余的 */ }
         }
-        image.onload = () => {
-          loadedMap.set(src, image)
-          notify()
-          resolve(image)
-        }
-        image.onerror = () => {
-          cache.delete(src)
-          resolve(null)
-        }
-        image.src = actualSrc
       })
-    })()
-
-    cache.set(src, pending)
+    }
     return pending
   }
 
   function getImage(source: string): LoadedAsset | null {
-    if (!source || !source.trim()) return null
-    const src = source.trim()
-    const loaded = loadedMap.get(src)
-    if (loaded) return loaded
+    const src = source?.trim()
+    if (!src) return null
+    const loaded = decoded.get(src)
+    if (loaded) return touch(src, loaded)
     void loadImage(src)
     return null
   }
@@ -135,19 +152,8 @@ export function createCanvasAssetStore(): CanvasAssetStore {
       return () => listeners.delete(cb)
     },
     clear: () => {
-      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-        for (const url of createdBlobUrls) {
-          try {
-            URL.revokeObjectURL(url)
-          } catch {
-            // 忽略销毁错误
-          }
-        }
-      }
-      createdBlobUrls.length = 0
-      cache.clear()
-      loadedMap.clear()
       listeners.clear()
+      awaited.clear()
     },
   }
 }

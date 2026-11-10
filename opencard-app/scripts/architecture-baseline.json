@@ -26,7 +26,18 @@
     "rendering-below-workspace|src/features/card-rendering/validateRenderResources.ts -> src/features/workspace/model/packageCoordinate.ts",
     "rendering-below-workspace|src/features/card-rendering/validateRenderResources.ts -> src/features/workspace/model/projectMetadata.ts",
     "rendering-below-workspace|src/features/card-rendering/validateRenderResources.ts -> src/features/workspace/services/projectResourceEnvironment.ts",
-    "rendering-below-workspace|src/features/card-rendering/validateRenderResources.ts -> src/features/workspace/services/resourceReference.ts"
+    "rendering-below-workspace|src/features/card-rendering/validateRenderResources.ts -> src/features/workspace/services/resourceReference.ts",
+    "shared-below-features|src/shared/rich-text/projectIconReference.ts -> src/features/workspace/model/packageCoordinate.ts",
+    "shared-below-features|src/shared/rich-text/richTextResourceStyle.ts -> src/features/workspace/model/projectFonts.ts",
+    "shared-below-features|src/shared/ui/drop/externalFileDrop.ts -> src/features/shell/services/externalOpenService.ts",
+    "shared-below-features|src/shared/ui/markdown/renderMarkdown.ts -> src/features/workspace/services/projectIconCatalog.ts",
+    "shared-below-features|src/shared/ui/property-editor/PropertyFieldLabel.vue -> src/features/notifications/titlebarNotices.ts",
+    "shared-below-features|src/shared/ui/rich-text/RichTextPreview.vue -> src/features/card-rendering/markup/index.ts",
+    "shared-below-features|src/shared/ui/rich-text/richTextStyleExtensions.ts -> src/features/workspace/model/projectFonts.ts",
+    "shared-below-features|src/shared/ui/rich-text/useRichTextEditor.ts -> src/features/card-rendering/markup/index.ts",
+    "shared-below-features|src/shared/ui/rich-text/useRichTextFormatting.ts -> src/features/card-rendering/markup/index.ts",
+    "shared-below-features|src/shared/ui/rich-text/useRichTextSession.ts -> src/features/card-rendering/markup/index.ts",
+    "workspace-below-shell|src/features/workspace/components/ResourcePackageBuilderDialog.vue -> src/features/shell/composables/useShellProgressTasks.ts"
   ],
   "cycleMembers": [
     "cycle|src/features/card-rendering/cardRenderResources.ts",

@@ -37,6 +37,18 @@ const rules = [
     forbids: (spec) => /^src\/(shared\/ui|features|components)\//.test(spec.target ?? '')
       || FORBIDDEN_PACKAGES.test(spec.pkg ?? ''),
   },
+  {
+    id: 'shared-below-features',
+    why: 'shared 与基础组件可被任何层使用，所以不能反过来依赖 features',
+    applies: (f) => /^src\/(shared|components\/(base|standard))\//.test(f),
+    forbids: (spec) => spec.target?.startsWith('src/features/'),
+  },
+  {
+    id: 'workspace-below-shell',
+    why: 'shell 组合 workspace，workspace 不得反过来依赖 shell',
+    applies: (f) => f.startsWith('src/features/workspace/'),
+    forbids: (spec) => spec.target?.startsWith('src/features/shell/'),
+  },
 ]
 
 // ---- 扫描 ---------------------------------------------------------------

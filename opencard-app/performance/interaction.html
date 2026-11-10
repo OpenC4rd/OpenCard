@@ -28,12 +28,12 @@
       })))
       const front = createCardFace({ id: 'front' })
       front.children = Array.from({ length: 40 }, (_, index) => ({
-        block: createTextBlock({ id: `block-${index}`, content: `Text ${index}` }),
+        block: createTextBlock({ id: `block-${index}`, content: `Text ${index}`, width: '14mm', height: '7mm' }),
         location: { id: `location-${index}`, type: 'simple-container-location', anchor: 'lt',
-          x: `${index % 4 * 120}px`, y: `${Math.floor(index / 4) * 70}px` },
+          x: `${index % 4 * 15}mm`, y: `${Math.floor(index / 4) * 8}mm` },
       }))
       const content = JSON.stringify({ type: 'card-document', id: 'document', name: 'Performance',
-        width: '540', height: '850', faces: { front, back: createCardFace({ id: 'back' }) }, instances: [] })
+        width: '63', height: '88', faces: { front, back: createCardFace({ id: 'back' }) }, instances: [] })
       const session = createEditorSession({ id: 'performance', path: 'D:/Performance/card.ocdocument',
         resourceKind: 'external', fileTypeId: 'opencard', editorId: 'card-designer', name: 'Performance',
         savedContent: content, draftContent: content, isDirty: false, isPreview: false, mode: 'edit',

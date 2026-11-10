@@ -46,3 +46,33 @@ describe('preloadSceneAssets', () => {
     expect(wait.mock.calls.length).toBeLessThan(10)
   })
 })
+
+describe('decoded images', () => {
+  beforeEach(() => vi.stubGlobal('Image', LoadedImage))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('are decoded once for every user and only announced to the one that waited', async () => {
+    const first = createCanvasAssetStore()
+    const second = createCanvasAssetStore()
+    const heard = vi.fn()
+    second.onAssetLoaded(heard)
+
+    const image = await first.loadImage('shared.png')
+
+    expect(second.getImage('shared.png')).toBe(image)
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('drop the least recently used one when the cache is full', async () => {
+    const assets = createCanvasAssetStore()
+    await assets.loadImage('stale.png?oc-revision=0')
+    await assets.loadImage('kept.png')
+    for (let index = 0; index < 256; index += 1) {
+      assets.getImage('kept.png')
+      await assets.loadImage(`filler-${index}.png`)
+    }
+
+    expect(assets.getImage('kept.png')).not.toBeNull()
+    expect(assets.getImage('stale.png?oc-revision=0')).toBeNull()
+  })
+})
