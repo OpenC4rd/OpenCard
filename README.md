@@ -62,7 +62,7 @@ OpenCard 适合“同一套设计需要反复填充”的项目。它不是通�
 
 ### 5. 检查并继续迭代
 
-OpenCard 当前更适合作为编辑和维护工作台。完成一轮设计后，可以继续调整蓝图、实例和项目资源；正式发布流程仍在完善中。
+完成一轮设计后，在导出空间里预览版面，导出图片或拼版 PDF；之后可以继续调整蓝图、实例和项目资源，再导出一次。
 
 ## 当前能力
 
@@ -75,13 +75,14 @@ OpenCard 当前更适合作为编辑和维护工作台。完成一轮设计后�
 - 项目字体登记与复用
 - 精灵图图标集的登记、裁剪和配置
 - 全局字典记录的查看与编辑
+- 图片与拼版 PDF 导出，带预览、水印和页面信息
+- 基于 Git 的项目存档点、历史与差异查看
+- 资源包的打包与安装
 - 深色和浅色主题
 
 ### 仍在开发
 
 - 面向最终使用者的发布流程
-- 完整的项目版本管理与历史管理
-- 更成熟的导出和交付流程
 - 网络联机式项目测试
 - 在线协作与云端同步
 
@@ -118,8 +119,11 @@ npm run dev
 # 类型检查并构建前端
 npm run build
 
-# 运行测试
-npm test
+# 提交前的完整检查：架构与界面 lint、类型检查、测试
+npm run verify
+
+# Rust 侧测试（在 src-tauri 目录下）
+cargo test
 ```
 
 ## 项目结构
@@ -127,7 +131,9 @@ npm test
 ```text
 OpenCard/
 ├─ opencard-app/       # Vue + Tauri 应用
+├─ services/            # 反馈服务（Cloudflare Worker）
 ├─ docs/                # 项目文档
+├─ AGENTS.md            # 给 agent 的协作规矩
 └─ README.md            # 项目入口说明
 ```
 
@@ -135,9 +141,8 @@ OpenCard/
 
 - 版本变化：[`opencard-app/RELEASE_NOTES.md`](opencard-app/RELEASE_NOTES.md)
 - 最新发布：[Releases](https://github.com/OpenC4rd/OpenCard/releases)
-- 工程约定：[`docs/工程规则.md`](docs/工程规则.md)
-- 实现指南（存储、资源包、教程、性能）：[`docs/实现指南.md`](docs/实现指南.md)
-- 命名规范：[`docs/命名规范.md`](docs/命名规范.md)
+- 架构与分层：[`docs/架构地图.md`](docs/架构地图.md)
+- 错误码手册：[`docs/错误码.md`](docs/错误码.md)
 - UI 组件规范：[`docs/UI_RULES.md`](docs/UI_RULES.md)
 - 问题反馈：[GitHub Issues](https://github.com/OpenC4rd/OpenCard/issues)
 - 社群交流（QQ）：[OpenCard 桌游交流群（约 1200+ 人）](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=MJD18YzJxqft6Q6rKX-sSNiLrtmqVQmJ&authKey=TM3En%2BxxzFeqimSCUhG%2F5VLmfRDeXtnfm1h6P7cwfoGR6bVXkXk2cYm%2BOG0MHuJ8&noverify=0&group_code=567915181)
