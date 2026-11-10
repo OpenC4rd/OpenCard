@@ -45,11 +45,23 @@ export function isAbsoluteLength(value: string): boolean {
   return ABSOLUTE_LENGTH.test(value.trim())
 }
 
+/**
+ * 解析是纯函数，而同一段标记会被诊断、素材预加载和每一帧绘制各问一遍，所以按源文本记住结果。
+ * 结果是共享的，只读不改。
+ */
+const parsedMarkup = new Map<string, CardMarkupParseResult>()
+const MAX_PARSED_MARKUP = 1024
+
 export function parseCardMarkup(source: string): CardMarkupParseResult {
+  const known = parsedMarkup.get(source)
+  if (known) return known
   const { tokens, diagnostics } = lexCardMarkup(source)
   const parser = new MarkupParser(tokens, diagnostics)
   const blocks = parser.parseBlocks(0)
-  return { document: { source, blocks }, diagnostics, valid: diagnostics.length === 0 }
+  const result = { document: { source, blocks }, diagnostics, valid: diagnostics.length === 0 }
+  if (parsedMarkup.size >= MAX_PARSED_MARKUP) parsedMarkup.clear()
+  parsedMarkup.set(source, result)
+  return result
 }
 
 class MarkupParser {

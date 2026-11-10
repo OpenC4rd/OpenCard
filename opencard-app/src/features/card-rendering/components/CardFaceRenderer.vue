@@ -11,6 +11,7 @@ import { createCanvasAssetStore } from '../painter/canvasAssetStore'
 import { paintCardScene } from '../painter/paintCardScene'
 import { computeSceneLayout, hitTestScene, type CardSceneGraph } from '../geometry'
 import type { CardFaceView } from './cardFaceView'
+import { taskScheduler } from '../../../utils/taskScheduler'
 
 const props = withDefaults(defineProps<{
   face: RenderReadyCardFace
@@ -73,7 +74,11 @@ const renderFace = computed(() => props.visibleRootBlockIds.length
 
 const sceneGraph = computed<CardSceneGraph>(() => computeSceneLayout(renderFace.value))
 
+// 素材与字体是一个个到的：每到一个只登记一次重绘，同一帧里到多少个都只画一遍。
+const repaint = taskScheduler.frame<void>(paint)
+
 function paint(): void {
+  repaint.cancel()
   const canvas = canvasRef.value
   if (!canvas) return
   const { left, top, width, height, pixelScale } = paintedView.value
@@ -109,25 +114,21 @@ function handleClick(event: MouseEvent): void {
   }
 }
 
-let unbindAssets: (() => void) | null = null
-const handleFontLoaded = () => { paint() }
+const requestRepaint = () => repaint.schedule()
 
 onMounted(() => {
-  unbindAssets = assets.onAssetLoaded(() => { paint() })
+  assets.onAssetLoaded(requestRepaint)
   if (typeof document !== 'undefined' && 'fonts' in document) {
-    document.fonts?.addEventListener?.('loadingdone', handleFontLoaded)
-    void document.fonts?.ready?.then(() => { paint() })
+    document.fonts?.addEventListener?.('loadingdone', requestRepaint)
+    void document.fonts?.ready?.then(requestRepaint)
   }
   paint()
 })
 
 onBeforeUnmount(() => {
-  if (unbindAssets) {
-    unbindAssets()
-    unbindAssets = null
-  }
+  repaint.cancel()
   if (typeof document !== 'undefined' && 'fonts' in document) {
-    document.fonts?.removeEventListener?.('loadingdone', handleFontLoaded)
+    document.fonts?.removeEventListener?.('loadingdone', requestRepaint)
   }
   assets.clear()
 })
@@ -136,11 +137,8 @@ watch(() => [props.face, props.resourceContext], () => {
   void assets.preloadSceneAssets(sceneGraph.value, props.resourceContext)
 }, { immediate: true })
 
-watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds], () => {
-  paint()
-}, { deep: true, flush: 'post' })
-
-watch(paintedView, paint, { flush: 'post' })
+// 渲染就绪的卡面每次都是整份新产出，换了引用才需要重画，不必逐层比对。
+watch(() => [props.face, props.resourceContext, props.diffHighlights, props.visibleRootBlockIds, paintedView.value], paint, { flush: 'post' })
 
 defineExpose({
   getCanvasElement: () => canvasRef.value,

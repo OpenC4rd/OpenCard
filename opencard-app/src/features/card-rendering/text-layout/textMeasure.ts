@@ -37,13 +37,27 @@ function createDefaultContext(): CanvasRenderingContext2D | null {
 }
 
 /**
+ * 度量只取决于字体和文字，所以跟着画布上下文活过每一帧：同一张画布重画时不再重新量。
+ * 字体到位后数字会变，那一刻起旧结果全部作废。
+ */
+const measuredByContext = new WeakMap<object, { fonts: number, samples: Map<string, TextMetricsSample> }>()
+const MAX_MEASURED_SAMPLES = 8192
+let loadedFonts = 0
+if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { loadedFonts += 1 })
+
+/**
  * 基于 Canvas `measureText` 的度量。拿不到 2D 上下文（SSR / node）时退回 mock 度量。
  * ascent / descent 优先取字体级别的包围盒，这样同一字体不同文字得到相同行高。
  */
 export function createCanvasTextMeasurer(ctx?: CanvasRenderingContext2D): TextMeasurePort {
   const context = ctx ?? createDefaultContext()
   if (!context) return createMockTextMeasurer()
-  const cache = new Map<string, TextMetricsSample>()
+  let measured = measuredByContext.get(context)
+  if (measured?.fonts !== loadedFonts || measured.samples.size > MAX_MEASURED_SAMPLES) {
+    measured = { fonts: loadedFonts, samples: new Map() }
+    measuredByContext.set(context, measured)
+  }
+  const cache = measured.samples
   return {
     measureText(text, font: FontSpec) {
       const key = `${font.fontFamily}|${font.fontSize}|${font.fontWeight}|${font.italic}|${text}`

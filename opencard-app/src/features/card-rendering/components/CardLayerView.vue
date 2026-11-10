@@ -125,6 +125,7 @@ import { buildCardLayerGroups, type CardLayerGroup } from './cardLayerModel'
 import { computeSceneLayout } from '../geometry'
 import { createCanvasAssetStore } from '../painter/canvasAssetStore'
 import { paintCardScene } from '../painter/paintCardScene'
+import { taskScheduler } from '../../../utils/taskScheduler'
 import { prefersReducedMotion } from '../../../shared/ui/foundation'
 
 type Snapshot = {
@@ -177,7 +178,6 @@ const scene = computed(() => computeSceneLayout(props.face))
 const layers = computed(() => buildCardLayerGroups(props.face, new Set(props.atomicBlockIds ?? [])))
 const snapshots = ref(new Map<string, Snapshot>())
 const assets = createCanvasAssetStore()
-let unsubscribeAssets: (() => void) | null = null
 let preloadToken = 0
 const layerPosition = ref(0)
 const targetLayerPosition = ref(0)
@@ -434,7 +434,11 @@ function rebuildSnapshots(): void {
   snapshots.value = nextSnapshots
 }
 
+// 每层一张画布：素材一个个到时只登记一次重绘，同一帧里全部画布只画一遍。
+const repaint = taskScheduler.frame<void>(repaintAllCanvases)
+
 function repaintAllCanvases(): void {
+  repaint.cancel()
   if (!rootRef.value) return
   const previewCanvas = rootRef.value.querySelector<HTMLCanvasElement>('.card-layer-view__preview-canvas')
   if (previewCanvas) paintCanvas(previewCanvas)
@@ -609,7 +613,7 @@ watch(() => [props.face, props.resourceContext], async () => {
   await nextTick()
   repaintAllCanvases()
   void loadAndRepaint()
-}, { deep: true })
+})
 
 watch(planeEntries, () => {
   const next = clampIndex(focusedPlaneIndex.value)
@@ -621,20 +625,15 @@ watch(planeEntries, () => {
 onMounted(() => {
   selectInitialLayer()
   rebuildSnapshots()
-  unsubscribeAssets = assets.onAssetLoaded(() => {
-    repaintAllCanvases()
-  })
+  assets.onAssetLoaded(() => repaint.schedule())
   void loadAndRepaint()
 })
 
 onBeforeUnmount(() => {
   preloadToken += 1
+  repaint.cancel()
   stopAnimation()
   if (wheelResetTimer !== null) window.clearTimeout(wheelResetTimer)
-  if (unsubscribeAssets) {
-    unsubscribeAssets()
-    unsubscribeAssets = null
-  }
   assets.clear()
 })
 
