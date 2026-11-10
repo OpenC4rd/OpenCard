@@ -33,7 +33,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 git2 = "0.21"
 futures-util = "0.3"
 reqwest = { version = "0.13", features = ["stream"] }
-tokio = { version = "1", features = ["fs", "io-util"] }
+tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread"] }
 sha2 = "0.10"
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 unicode-normalization = "0.1"

@@ -5,10 +5,10 @@ use git2::{
     StashApplyOptions, StashFlags, Status, StatusOptions,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::DefaultHasher, HashSet};
+use std::collections::{hash_map::DefaultHasher, BTreeMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_GITIGNORE: &str = "\
@@ -20,7 +20,7 @@ ehthumbs.db
 Desktop.ini
 ";
 static REVISION_SNAPSHOTS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
-static GIT_OPERATION_LOCK: Mutex<()> = Mutex::new(());
+static REPOSITORY_LOCKS: Mutex<BTreeMap<String, Arc<RwLock<()>>>> = Mutex::new(BTreeMap::new());
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -90,15 +90,42 @@ impl GitServiceError {
 
 pub type GitServiceResult<T> = Result<T, GitServiceError>;
 
-fn run_exclusive<T>(operation: impl FnOnce() -> GitServiceResult<T>) -> GitServiceResult<T> {
-    // 命令是并发执行的（`#[tauri::command(async)]`），同一时刻会有多个 git 操作在飞：
-    // 打开项目时界面就并行读状态、历史、文件历史。这里必须排队等待，不能直接报
-    // "另一个操作正在运行"——那等于用界面自己的读取把界面顶掉，协作侧栏会整块空着。
-    // 持锁线程 panic 只污染锁本身，取回内层值继续用，别让一次失败让所有 git 命令永久不可用。
-    let _guard = GIT_OPERATION_LOCK
+/*
+ * 命令是并发执行的（`#[tauri::command(async)]`），同一时刻会有多个 git 操作在飞：打开项目时界面就
+ * 并行读状态、历史、文件历史。撞上了必须排队等待，不能直接报"另一个操作正在运行"——那等于用界面
+ * 自己的读取把界面顶掉，协作侧栏会整块空着。
+ *
+ * 排队只发生在同一个仓库里：每个仓库一把读写锁，只读命令共享、会改仓库的命令独占，
+ * 所以并行的读取不再互相等，一个项目的拉取也不会卡住另一个项目。
+ *
+ * 等锁和 git 本身都会阻塞线程，而这些命令直接跑在异步运行时的工作线程上。`block_in_place`
+ * 把这条线程让出去：一次慢的克隆后面排多少个读取，下载、读目录这些异步命令都照常有线程可用。
+ */
+fn repository_lock(project_root: &str) -> Arc<RwLock<()>> {
+    let key = project_root.replace('\\', "/").trim_end_matches('/').to_owned();
+    REPOSITORY_LOCKS
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    operation()
+        .unwrap_or_else(PoisonError::into_inner)
+        .entry(key)
+        .or_default()
+        .clone()
+}
+
+// 持锁线程 panic 只污染锁本身，取回内层值继续用，别让一次失败让这个仓库的 git 命令永久不可用。
+fn run_shared<T>(project_root: &str, operation: impl FnOnce() -> GitServiceResult<T>) -> GitServiceResult<T> {
+    tokio::task::block_in_place(|| {
+        let lock = repository_lock(project_root);
+        let _guard = lock.read().unwrap_or_else(PoisonError::into_inner);
+        operation()
+    })
+}
+
+fn run_exclusive<T>(project_root: &str, operation: impl FnOnce() -> GitServiceResult<T>) -> GitServiceResult<T> {
+    tokio::task::block_in_place(|| {
+        let lock = repository_lock(project_root);
+        let _guard = lock.write().unwrap_or_else(PoisonError::into_inner);
+        operation()
+    })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1715,13 +1742,14 @@ pub fn materialize_revision(
     })
 }
 
-#[tauri::command]
+// 删一整棵快照目录可能要几百毫秒：不放在主线程上做，也不在删的时候占着登记表。
+#[tauri::command(async)]
 pub fn git_release_revision_snapshot(root_path: String) -> Result<(), String> {
     let path = PathBuf::from(root_path);
-    let mut snapshots = REVISION_SNAPSHOTS.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap();
-    if !snapshots.contains(&path) { return Err("Snapshot is not owned by this application".to_string()); }
-    if path.exists() { std::fs::remove_dir_all(&path).map_err(|error| error.to_string())?; }
-    snapshots.remove(&path);
+    let snapshots = REVISION_SNAPSHOTS.get_or_init(|| Mutex::new(HashSet::new()));
+    if !snapshots.lock().unwrap().contains(&path) { return Err("Snapshot is not owned by this application".to_string()); }
+    tokio::task::block_in_place(|| if path.exists() { std::fs::remove_dir_all(&path).map_err(|error| error.to_string()) } else { Ok(()) })?;
+    snapshots.lock().unwrap().remove(&path);
     Ok(())
 }
 
@@ -2268,7 +2296,7 @@ pub fn write_repository_config(
 
 #[tauri::command(async)]
 pub fn git_inspect(project_root: String) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| inspect_repository(&project_root)).into()
+    run_shared(&project_root, || inspect_repository(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2276,12 +2304,12 @@ pub fn git_initialize(
     project_root: String,
     identity: GitIdentity,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| initialize_repository(&project_root, &identity)).into()
+    run_exclusive(&project_root, || initialize_repository(&project_root, &identity)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_status(project_root: String) -> GitCommandResult<GitStatusResult> {
-    command_result_with_conflicts(run_exclusive(|| read_status(&project_root)), |value| {
+    command_result_with_conflicts(run_shared(&project_root, || read_status(&project_root)), |value| {
         value.repository.has_conflicts
     })
 }
@@ -2291,12 +2319,12 @@ pub fn git_stage(
     project_root: String,
     request: PathRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| stage_paths(&project_root, &request)).into()
+    run_exclusive(&project_root, || stage_paths(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_stage_all(project_root: String) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| stage_all(&project_root)).into()
+    run_exclusive(&project_root, || stage_all(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2304,12 +2332,12 @@ pub fn git_unstage(
     project_root: String,
     request: PathRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| unstage_paths(&project_root, &request)).into()
+    run_exclusive(&project_root, || unstage_paths(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_unstage_all(project_root: String) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| unstage_all(&project_root)).into()
+    run_exclusive(&project_root, || unstage_all(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2317,17 +2345,17 @@ pub fn git_discard(
     project_root: String,
     request: PathRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| discard_paths(&project_root, &request)).into()
+    run_exclusive(&project_root, || discard_paths(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_commit(project_root: String, request: CommitRequest) -> GitCommandResult<CommitSummary> {
-    run_exclusive(|| create_commit(&project_root, &request)).into()
+    run_exclusive(&project_root, || create_commit(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_amend(project_root: String, request: CommitRequest) -> GitCommandResult<CommitSummary> {
-    run_exclusive(|| amend_commit(&project_root, &request)).into()
+    run_exclusive(&project_root, || amend_commit(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2335,7 +2363,7 @@ pub fn git_history(
     project_root: String,
     request: HistoryRequest,
 ) -> GitCommandResult<Vec<CommitSummary>> {
-    run_exclusive(|| read_history(&project_root, &request)).into()
+    run_shared(&project_root, || read_history(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2343,17 +2371,17 @@ pub fn git_commit_summary(
     project_root: String,
     request: RevisionRequest,
 ) -> GitCommandResult<CommitSummary> {
-    run_exclusive(|| read_commit_summary(&project_root, &request)).into()
+    run_shared(&project_root, || read_commit_summary(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_diff(project_root: String, request: DiffRequest) -> GitCommandResult<DiffResult> {
-    run_exclusive(|| read_diff(&project_root, &request)).into()
+    run_shared(&project_root, || read_diff(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_branches(project_root: String) -> GitCommandResult<Vec<BranchSummary>> {
-    run_exclusive(|| list_branches(&project_root)).into()
+    run_shared(&project_root, || list_branches(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2361,7 +2389,7 @@ pub fn git_create_branch(
     project_root: String,
     request: CreateBranchRequest,
 ) -> GitCommandResult<BranchSummary> {
-    run_exclusive(|| create_branch(&project_root, &request)).into()
+    run_exclusive(&project_root, || create_branch(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2369,7 +2397,7 @@ pub fn git_delete_branch(
     project_root: String,
     request: NamedRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| delete_branch(&project_root, &request)).into()
+    run_exclusive(&project_root, || delete_branch(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2377,12 +2405,12 @@ pub fn git_rename_branch(
     project_root: String,
     request: RenameRequest,
 ) -> GitCommandResult<BranchSummary> {
-    run_exclusive(|| rename_branch(&project_root, &request)).into()
+    run_exclusive(&project_root, || rename_branch(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_tags(project_root: String) -> GitCommandResult<Vec<TagSummary>> {
-    run_exclusive(|| list_tags(&project_root)).into()
+    run_shared(&project_root, || list_tags(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2390,7 +2418,7 @@ pub fn git_create_tag(
     project_root: String,
     request: CreateTagRequest,
 ) -> GitCommandResult<TagSummary> {
-    run_exclusive(|| create_tag(&project_root, &request)).into()
+    run_exclusive(&project_root, || create_tag(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2398,12 +2426,12 @@ pub fn git_delete_tag(
     project_root: String,
     request: NamedRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| delete_tag(&project_root, &request)).into()
+    run_exclusive(&project_root, || delete_tag(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_stashes(project_root: String) -> GitCommandResult<Vec<StashSummary>> {
-    run_exclusive(|| list_stashes(&project_root)).into()
+    run_shared(&project_root, || list_stashes(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2411,7 +2439,7 @@ pub fn git_create_stash(
     project_root: String,
     request: CreateStashRequest,
 ) -> GitCommandResult<StashSummary> {
-    run_exclusive(|| create_stash(&project_root, &request)).into()
+    run_exclusive(&project_root, || create_stash(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2419,7 +2447,7 @@ pub fn git_apply_stash(
     project_root: String,
     request: StashIndexRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| apply_stash(&project_root, &request)).into()
+    run_exclusive(&project_root, || apply_stash(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2427,7 +2455,7 @@ pub fn git_drop_stash(
     project_root: String,
     request: StashIndexRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| drop_stash(&project_root, &request)).into()
+    run_exclusive(&project_root, || drop_stash(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2435,7 +2463,7 @@ pub fn git_reset(
     project_root: String,
     request: ResetRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| reset_repository(&project_root, &request)).into()
+    run_exclusive(&project_root, || reset_repository(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2444,7 +2472,7 @@ pub fn git_cherry_pick(
     request: RevisionRequest,
 ) -> GitCommandResult<OperationState> {
     command_result_with_conflicts(
-        run_exclusive(|| cherry_pick(&project_root, &request)),
+        run_exclusive(&project_root, || cherry_pick(&project_root, &request)),
         |value| value.repository.has_conflicts,
     )
 }
@@ -2455,7 +2483,7 @@ pub fn git_revert(
     request: RevisionRequest,
 ) -> GitCommandResult<OperationState> {
     command_result_with_conflicts(
-        run_exclusive(|| revert_commit(&project_root, &request)),
+        run_exclusive(&project_root, || revert_commit(&project_root, &request)),
         |value| value.repository.has_conflicts,
     )
 }
@@ -2465,17 +2493,17 @@ pub fn git_restore_path(
     project_root: String,
     request: RevisionFileRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| restore_path_at_revision(&project_root, &request)).into()
+    run_exclusive(&project_root, || restore_path_at_revision(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_cleanup_state(project_root: String) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| cleanup_operation_state(&project_root)).into()
+    run_exclusive(&project_root, || cleanup_operation_state(&project_root)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_remotes(project_root: String) -> GitCommandResult<Vec<RemoteSummary>> {
-    run_exclusive(|| list_remotes(&project_root)).into()
+    run_shared(&project_root, || list_remotes(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2483,7 +2511,7 @@ pub fn git_add_remote(
     project_root: String,
     request: AddRemoteRequest,
 ) -> GitCommandResult<RemoteSummary> {
-    run_exclusive(|| add_remote(&project_root, &request)).into()
+    run_exclusive(&project_root, || add_remote(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2491,7 +2519,7 @@ pub fn git_delete_remote(
     project_root: String,
     request: NamedRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| delete_remote(&project_root, &request)).into()
+    run_exclusive(&project_root, || delete_remote(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2499,7 +2527,7 @@ pub fn git_rename_remote(
     project_root: String,
     request: RenameRequest,
 ) -> GitCommandResult<RemoteSummary> {
-    run_exclusive(|| rename_remote(&project_root, &request)).into()
+    run_exclusive(&project_root, || rename_remote(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2507,7 +2535,7 @@ pub fn git_fetch(
     project_root: String,
     request: FetchRequest,
 ) -> GitCommandResult<RemoteOperationResult> {
-    run_exclusive(|| fetch_remote(&project_root, &request)).into()
+    run_exclusive(&project_root, || fetch_remote(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2515,7 +2543,7 @@ pub fn git_push(
     project_root: String,
     request: PushRequest,
 ) -> GitCommandResult<RemoteOperationResult> {
-    run_exclusive(|| push_remote(&project_root, &request)).into()
+    run_exclusive(&project_root, || push_remote(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2524,7 +2552,7 @@ pub fn git_pull(
     request: PullRequest,
 ) -> GitCommandResult<RemoteOperationResult> {
     command_result_with_conflicts(
-        run_exclusive(|| pull_remote(&project_root, &request)),
+        run_exclusive(&project_root, || pull_remote(&project_root, &request)),
         |value| value.repository.has_conflicts || !value.conflicts.is_empty(),
     )
 }
@@ -2534,12 +2562,12 @@ pub fn git_clone(
     project_root: String,
     request: CloneRequest,
 ) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| clone_repository(&project_root, &request)).into()
+    run_exclusive(&project_root, || clone_repository(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_read_config(project_root: String) -> GitCommandResult<Vec<ConfigEntry>> {
-    run_exclusive(|| read_repository_config(&project_root)).into()
+    run_shared(&project_root, || read_repository_config(&project_root)).into()
 }
 
 #[tauri::command(async)]
@@ -2547,7 +2575,7 @@ pub fn git_write_config(
     project_root: String,
     request: ConfigRequest,
 ) -> GitCommandResult<ConfigEntry> {
-    run_exclusive(|| write_repository_config(&project_root, &request)).into()
+    run_exclusive(&project_root, || write_repository_config(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2555,7 +2583,7 @@ pub fn git_file_history(
     project_root: String,
     request: FileHistoryRequest,
 ) -> GitCommandResult<Vec<CommitSummary>> {
-    run_exclusive(|| read_file_history(&project_root, &request)).into()
+    run_shared(&project_root, || read_file_history(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2563,7 +2591,7 @@ pub fn git_read_file_at_revision(
     project_root: String,
     request: RevisionFileRequest,
 ) -> GitCommandResult<RevisionFileContent> {
-    run_exclusive(|| read_file_at_revision(&project_root, &request)).into()
+    run_shared(&project_root, || read_file_at_revision(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
@@ -2571,12 +2599,12 @@ pub fn git_materialize_revision(
     project_root: String,
     request: MaterializeRevisionRequest,
 ) -> GitCommandResult<RevisionSnapshot> {
-    run_exclusive(|| materialize_revision(&project_root, &request)).into()
+    run_shared(&project_root, || materialize_revision(&project_root, &request)).into()
 }
 
 #[tauri::command(async)]
 pub fn git_conflicts(project_root: String) -> GitCommandResult<Vec<ConflictEntry>> {
-    command_result_with_conflicts(run_exclusive(|| read_conflicts(&project_root)), |value| {
+    command_result_with_conflicts(run_shared(&project_root, || read_conflicts(&project_root)), |value| {
         !value.is_empty()
     })
 }
@@ -2584,7 +2612,7 @@ pub fn git_conflicts(project_root: String) -> GitCommandResult<Vec<ConflictEntry
 #[tauri::command(async)]
 pub fn git_merge(project_root: String, request: MergeRequest) -> GitCommandResult<OperationState> {
     command_result_with_conflicts(
-        run_exclusive(|| merge_revision(&project_root, &request)),
+        run_exclusive(&project_root, || merge_revision(&project_root, &request)),
         |value| value.repository.has_conflicts,
     )
 }
@@ -2595,21 +2623,21 @@ pub fn git_rebase_start(
     request: RebaseRequest,
 ) -> GitCommandResult<OperationState> {
     command_result_with_conflicts(
-        run_exclusive(|| start_rebase(&project_root, &request)),
+        run_exclusive(&project_root, || start_rebase(&project_root, &request)),
         |value| value.repository.has_conflicts,
     )
 }
 
 #[tauri::command(async)]
 pub fn git_rebase_continue(project_root: String) -> GitCommandResult<OperationState> {
-    command_result_with_conflicts(run_exclusive(|| continue_rebase(&project_root)), |value| {
+    command_result_with_conflicts(run_exclusive(&project_root, || continue_rebase(&project_root)), |value| {
         value.repository.has_conflicts
     })
 }
 
 #[tauri::command(async)]
 pub fn git_abort_operation(project_root: String) -> GitCommandResult<RepositorySummary> {
-    run_exclusive(|| abort_operation(&project_root)).into()
+    run_exclusive(&project_root, || abort_operation(&project_root)).into()
 }
 
 #[cfg(test)]
@@ -3265,26 +3293,52 @@ mod tests {
     }
 
     #[test]
-    fn command_lock_serializes_concurrent_operations() {
-        // 命令是并发执行的：同时发起的两个 git 操作都必须成功。
-        // 界面打开项目时就是并行读状态、历史、文件历史，一个被"另一个操作正在运行"顶掉，
-        // 协作侧栏就会空着。
-        let completed = std::sync::Arc::new(Mutex::new(0usize));
-        let handles: Vec<_> = (0..2)
-            .map(|_| {
-                let completed = completed.clone();
-                std::thread::spawn(move || {
-                    run_exclusive(|| {
-                        *completed.lock().unwrap() += 1;
-                        Ok(())
-                    })
-                })
+    fn waiting_git_commands_leave_the_runtime_free() {
+        // 运行时只有一条工作线程：它要是被一个 git 命令占死，后面那个任务永远轮不到，
+        // 也就没人来放行这个 git 命令。
+        let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(1).build().unwrap();
+        let (release, wait_release) = std::sync::mpsc::channel::<()>();
+        let (finished, wait_finished) = std::sync::mpsc::channel::<()>();
+        runtime.spawn(async move {
+            run_exclusive("/runtime", || { wait_release.recv().unwrap(); Ok(()) }).unwrap();
+            finished.send(()).unwrap();
+        });
+        runtime.spawn(async move { release.send(()).unwrap() });
+        assert!(wait_finished.recv_timeout(std::time::Duration::from_secs(5)).is_ok());
+    }
+
+    /// 在 `first` 里等 `second` 进来：两者能同时持锁就返回 true，被排在后面就超时返回 false。
+    fn overlaps(
+        first: impl FnOnce(&mut dyn FnMut() -> GitServiceResult<()>) -> GitServiceResult<()> + Send + 'static,
+        second: impl FnOnce(&mut dyn FnMut() -> GitServiceResult<()>) -> GitServiceResult<()> + Send + 'static,
+    ) -> bool {
+        let (entered, wait_entered) = std::sync::mpsc::channel::<()>();
+        let (joined, wait_joined) = std::sync::mpsc::channel::<()>();
+        let holder = std::thread::spawn(move || {
+            let mut overlapped = false;
+            first(&mut || {
+                entered.send(()).unwrap();
+                overlapped = wait_joined.recv_timeout(std::time::Duration::from_millis(300)).is_ok();
+                Ok(())
             })
-            .collect();
-        for handle in handles {
-            assert!(handle.join().unwrap().is_ok());
-        }
-        assert_eq!(*completed.lock().unwrap(), 2);
+            .unwrap();
+            overlapped
+        });
+        wait_entered.recv().unwrap();
+        // 被排在后面的那一个要等 `first` 超时放手才进得来，那时已经没人在听了。
+        second(&mut || { let _ = joined.send(()); Ok(()) }).unwrap();
+        holder.join().unwrap()
+    }
+
+    #[test]
+    fn repository_lock_queues_writers_and_shares_readers() {
+        // 命令是并发执行的：同时发起的 git 操作都必须成功，撞上了排队，不报"另一个操作正在运行"。
+        // 只读的不互相等（界面打开项目时就是并行读状态、历史、文件历史）；
+        // 改仓库的独占；别的仓库不受影响。
+        assert!(overlaps(|run| run_shared("/a", run), |run| run_shared("/a", run)));
+        assert!(!overlaps(|run| run_exclusive("/a", run), |run| run_shared("/a", run)));
+        assert!(!overlaps(|run| run_exclusive("/a", run), |run| run_exclusive("/a/", run)));
+        assert!(overlaps(|run| run_exclusive("/a", run), |run| run_exclusive("/b", run)));
     }
 
     #[test]
