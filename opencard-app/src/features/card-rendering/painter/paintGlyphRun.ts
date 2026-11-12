@@ -2,10 +2,14 @@ import { resolveCardResource, type CardRenderResourceContext } from '../cardRend
 import type { PositionedGlyphRun, PositionedTextRun } from '../text-layout'
 import type { CanvasAssetStore, LoadedAsset } from './canvasAssetStore'
 import type { IconShape } from '../../../shared/model/iconGeometry'
-import { createDeviceBuffer, readDeviceTransform } from './deviceBuffer'
+import { paintSilhouetteShadow } from './paintSilhouette'
 
-const GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS = 16
 const GLYPH_SHADOW_MASK_COLOR = '#000000'
+/**
+ * 画布横平竖直时，浏览器把字形基线对齐到整数像素，缩放过程中文字会逐帧跳动；
+ * 只要画布带一点旋转就改用亚像素定位。这个角度绕每段文字的中心转，500 像素宽的一段两端只偏约 0.1 像素。
+ */
+const GLYPH_UNSNAP_ANGLE = 5e-4
 
 export function resolveBlockFontFamily(
   fontReference: string | undefined,
@@ -74,48 +78,19 @@ export type GlyphPaintContext = {
   resourceContext?: CardRenderResourceContext
 }
 
-/**
- * 先把内容的完整外形画进遮罩，再从遮罩生成投影：字、描边、装饰线和行内对象
- * 共用一条链路，形状不随尺寸变化。模糊固定精度后放大，避开 WebKit 大半径模糊的块状。
- */
+/** 字、描边、装饰线和行内对象共用一条投影链路；范围留出描边与字形出格的余量。 */
 export function paintRunShadow(
   ctx: CanvasRenderingContext2D,
   run: PositionedTextRun,
   paintShape: (target: CanvasRenderingContext2D) => void,
 ): void {
-  const { shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, fontSize, strokeWidth } = run.style
-  const padding = shadowBlur * 1.5 + strokeWidth + fontSize / 2
-  const left = run.x + Math.min(shadowOffsetX, 0) - padding
-  const top = run.y + Math.min(shadowOffsetY, 0) - padding
-  const width = run.width + Math.abs(shadowOffsetX) + padding * 2
-  const height = run.height + Math.abs(shadowOffsetY) + padding * 2
-  const maxScale = GLYPH_SHADOW_BLUR_MAX_DEVICE_PIXELS / shadowBlur
-  const mask = createDeviceBuffer(ctx, width, height, maxScale)
-  const shadow = createDeviceBuffer(ctx, width, height, maxScale)
-  if (!mask || !shadow) return
-
-  const { a, d } = readDeviceTransform(mask.offCtx)
-  mask.offCtx.translate(-left, -top)
-  paintShape(mask.offCtx)
-
-  // 遮罩画在缓冲外，只留下投影；不透明地生成再上色，半透明投影才均匀
-  const shift = mask.offscreen.width
-  const shadowCtx = shadow.offCtx
-  shadowCtx.setTransform(1, 0, 0, 1, 0, 0)
-  shadowCtx.shadowColor = GLYPH_SHADOW_MASK_COLOR
-  shadowCtx.shadowOffsetX = shadowOffsetX * a + shift
-  shadowCtx.shadowOffsetY = shadowOffsetY * d
-  shadowCtx.shadowBlur = shadowBlur * Math.sqrt(a * d)
-  shadowCtx.drawImage(mask.offscreen, -shift, 0)
-  shadowCtx.shadowColor = 'transparent'
-  shadowCtx.globalCompositeOperation = 'source-in'
-  shadowCtx.fillStyle = shadowColor!
-  shadowCtx.fillRect(0, 0, shadow.offscreen.width, shadow.offscreen.height)
-
-  ctx.save()
-  ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(shadow.offscreen, left, top, shadow.offscreen.width / a, shadow.offscreen.height / d)
-  ctx.restore()
+  const padding = run.style.strokeWidth + run.style.fontSize / 2
+  paintSilhouetteShadow(ctx, {
+    x: run.x - padding,
+    y: run.y - padding,
+    width: run.width + padding * 2,
+    height: run.height + padding * 2,
+  }, run.style, paintShape)
 }
 
 /** 字形的完整外形：描边、填充与装饰线。 */
@@ -162,14 +137,20 @@ export function paintGlyphPass(
     : resolveBlockFontFamily(style.fontFamily, blockId, 'content', resourceContext)
   ctx.font = `${italic}${weight} ${style.fontSize}px ${resolvedFont}`
   ctx.textBaseline = 'alphabetic'
+  ctx.letterSpacing = `${style.letterSpacing}px`
   let drawX = run.x
   let drawY = run.baselineY
+  const centerX = run.x + run.width / 2
+  const centerY = run.y + run.height / 2
+  ctx.translate(centerX, centerY)
+  ctx.rotate(run.angleRad + GLYPH_UNSNAP_ANGLE)
   if (run.angleRad !== 0) {
     // 竖排旋转西文：绕中心旋转 π/2
-    ctx.translate(run.x + run.width / 2, run.y + run.height / 2)
-    ctx.rotate(run.angleRad)
     drawX = -run.height / 2
     drawY = -run.width / 2 + (run.baselineY - run.y)
+  } else {
+    // 横排回到原坐标系，图片填充的平铺才能跨字连续
+    ctx.translate(-centerX, -centerY)
   }
 
   if (pass !== 'fill' && hasGlyphOutline(style)) {

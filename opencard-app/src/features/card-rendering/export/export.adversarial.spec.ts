@@ -155,6 +155,7 @@ function createMockContext() {
     restore: record('restore'),
     transform: record('transform'),
     translate: record('translate'),
+    rotate: record('rotate'),
     beginPath: record('beginPath'),
     closePath: record('closePath'),
     clip: record('clip'),
@@ -501,6 +502,12 @@ describe('Milestone 2 Headless Export Adversarial Suite', () => {
         source: 'project://cards/hero.png',
         maskSource: 'project://cards/mask.png',
         maskFit: 'cover',
+        outlineColor: '#000000',
+        outlineWidth: '0mm',
+        shadowColor: '',
+        shadowBlur: '0mm',
+        shadowOffsetX: '0mm',
+        shadowOffsetY: '0mm',
         fit: 'cover',
       }
 

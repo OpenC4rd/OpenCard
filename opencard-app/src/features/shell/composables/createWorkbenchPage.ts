@@ -24,6 +24,7 @@ import { useWorkbenchCloseCoordinator } from './useWorkbenchCloseCoordinator'
 import type { ApplicationCloseAction } from './useUnsavedSessionGuard'
 import { useWorkbenchEditorHost } from './useWorkbenchEditorHost'
 import { useWorkbenchActions } from './useWorkbenchActions'
+import { releaseFileDiff } from '../../version-control/fileDiffRuntimes'
 import { useWorkbenchVersionActions } from './useWorkbenchVersionActions'
 import { createProjectExportStorage } from './useExportSpace'
 import { useWorkbenchVersionControl } from './useWorkbenchVersionControl'
@@ -101,7 +102,7 @@ export function createWorkbenchPage(options: {
     renameEntry,
   } = projectStore
 
-  const sessionManager = createEditorSessionManager(id => { void projectStore.releaseComparison(id) })
+  const sessionManager = createEditorSessionManager(id => { void releaseFileDiff(id) })
   const { sessions, activeSession, open: openEditorSession, activateSession, createDraftSession,
     closeSession, closeWorkspaceSessions, closeSessionsByPath, remapSessionPaths } = sessionManager
 

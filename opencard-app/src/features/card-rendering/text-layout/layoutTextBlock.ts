@@ -81,6 +81,7 @@ function applySpan(parent: ResolvedRunStyle, spec: InlineStyleSpec, baseSize: nu
     const size = resolveSize(spec.fontSize, parent.fontSize, parent.fontSize, baseSize)
     if (size !== undefined && size > 0) style.fontSize = size
   }
+  if (spec.letterSpacing !== undefined) style.letterSpacing = evaluateRenderLength(spec.letterSpacing, 0)
   if (spec.stroke) {
     style.strokeColor = spec.stroke.color
     style.strokeWidth = evaluateRenderLength(spec.stroke.width, 0)
@@ -104,6 +105,7 @@ function baseStyle(input: TextLayoutInput): ResolvedRunStyle {
     underline: false,
     strikethrough: false,
     color: input.baseColor,
+    letterSpacing: 0,
     strokeWidth: 0,
     shadowOffsetX: 0,
     shadowOffsetY: 0,
@@ -123,9 +125,11 @@ function measure(ctx: Ctx, text: string, style: ResolvedRunStyle) {
 function glyphUnit(ctx: Ctx, text: string, style: ResolvedRunStyle, kind: 'text' | 'space'): Unit {
   const sample = measure(ctx, text, style)
   const upright = ctx.vertical && kind === 'text' && isCjkChar(text[0]!)
+  // 与画布 letterSpacing 一致：每个字后面都加一格，包括最后一个。
+  const spacing = style.letterSpacing * Array.from(text).length
   return {
     kind, text, style,
-    advance: upright ? style.fontSize : sample.width,
+    advance: (upright ? style.fontSize : sample.width) + spacing,
     ascent: sample.ascent,
     descent: sample.descent,
     rotated: ctx.vertical && !upright,
@@ -238,7 +242,10 @@ function layoutParagraph(
     ? ctx.input.lineHeight / ctx.input.baseFontSize
     : 1.2
   return breakLines(units, available).map(({ units: row, hard }, index) => {
-    const natural = row.reduce((sum, unit) => sum + unit.advance, 0)
+    // 行尾那一格字间距不参与对齐，否则居中和右对齐会偏。
+    const last = row[row.length - 1]
+    const trailing = last?.kind === 'text' ? last.style.letterSpacing : 0
+    const natural = row.reduce((sum, unit) => sum + unit.advance, 0) - trailing
     const extra = Math.max(0, available - natural)
     const after = row.map(() => 0)
     if (align === 'justify' && !hard && extra > 0 && row.length > 1) {
@@ -278,7 +285,7 @@ function layoutParagraph(
     return {
       items,
       start,
-      length: cursor - start,
+      length: cursor - start - trailing,
       ascent,
       descent,
       cross: lineCross,

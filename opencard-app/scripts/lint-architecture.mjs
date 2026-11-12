@@ -119,7 +119,13 @@ const cycleMembers = cycles.flatMap((scc) => scc.map((f) => `cycle|${f}`))
 // ---- 体积 ---------------------------------------------------------------
 // 语言文件是文案，不是逻辑：条目随功能增长，拆开只会让同一套文案散在几处，所以不受行数限制。
 const isCopy = (path) => path.startsWith('src/locales/')
-const sizes = Object.fromEntries(files.map((f) => [rel(f), readFileSync(f, 'utf8').split('\n').length]).filter(([f]) => !isCopy(f)))
+// 定义类文件同理：属性表、默认值表、渲染契约表按类型逐条列举，每加一个属性就多几行，拆开只会让同一张表散在几处。
+const DEFINITION_FILES = new Set([
+  'src/entities/card/schema.ts',
+  'src/entities/card/schemaDefaults.ts',
+  'src/features/card-rendering/renderFieldContracts.ts',
+])
+const sizes = Object.fromEntries(files.map((f) => [rel(f), readFileSync(f, 'utf8').split('\n').length]).filter(([f]) => !isCopy(f) && !DEFINITION_FILES.has(f)))
 const oversize = Object.fromEntries(Object.entries(sizes).filter(([, n]) => n > MAX_LINES))
 
 // ---- 对照基线 -----------------------------------------------------------

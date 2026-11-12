@@ -85,6 +85,7 @@ function renderInlines(nodes: readonly CardMarkupInlineNode[]): VNodeChild[] {
         if (node.style.strikethrough) style.textDecoration = 'line-through'
         if (node.style.color) style.color = node.style.color
         if (node.style.fontSize) style.fontSize = node.style.fontSize
+        if (node.style.letterSpacing) style.letterSpacing = node.style.letterSpacing
         if (node.style.fontFamily) {
           const resolved = fontFamilyByValue.value.get(node.style.fontFamily) ?? node.style.fontFamily
           style.fontFamily = resolved

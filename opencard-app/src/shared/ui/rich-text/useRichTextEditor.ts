@@ -1,6 +1,6 @@
 import { computed, getCurrentInstance, ref, watch, watchEffect } from 'vue'
 import { createRichTextInteraction } from './richTextInteraction'
-import { useRichTextFormatting } from './useRichTextFormatting'
+import { lengthUnit, sizeSteps, useRichTextFormatting } from './useRichTextFormatting'
 import { resolveRichTextStyle } from '../../rich-text/richTextResourceStyle'
 import { Extension, type ChainedCommands, type Editor, type JSONContent } from '@tiptap/core'
 import { richTextStyleExtensions, fontVariable } from './richTextStyleExtensions'
@@ -114,14 +114,15 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
   const activeFontSize = computed(() => formatting.value('fontSize'))
   const fontSizeOptions = computed(() => {
     const current = activeFontSize.value
-    const sizes = [...new Set([...formatting.sizeSteps, ...(current.endsWith('mm') ? [Number.parseFloat(current)] : [])])].sort((a, b) => a - b)
-    const options = sizes.map(size => ({ key: `${size}mm`, label: `${size}mm` }))
-    return current && !current.endsWith('mm') ? [{ key: current, label: current }, ...options] : options
+    const unit = lengthUnit(current)
+    const size = Number.parseFloat(current)
+    const sizes = [...new Set([...sizeSteps[unit] ?? [], ...(Number.isFinite(size) ? [size] : [])])].sort((a, b) => a - b)
+    return { unit, items: sizes.map(size => ({ key: `${size}${unit}`, label: `${size}${unit}` })) }
   })
-  function createToolbarCompletion(items: readonly { key: string; label: string; labelStyle?: Readonly<Record<string, string>> }[]): PropertyCompletionProvider {
+  function createToolbarCompletion(items: readonly { key: string; label: string; labelStyle?: Readonly<Record<string, string>> }[], unit = 'mm'): PropertyCompletionProvider {
     return ({ value }) => {
       const raw = value.trim().toLocaleLowerCase()
-      const query = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw) ? `${raw}mm` : raw
+      const query = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw) ? `${raw}${unit}` : raw
       const filterQuery = items.some(item => item.key.toLocaleLowerCase() === query) ? '' : query
       const suggestions: PropertyCompletionItem[] = items
         .filter(item => !filterQuery || `${item.label} ${item.key}`.toLocaleLowerCase().includes(filterQuery))
@@ -143,7 +144,7 @@ export function useRichTextEditor(props: RichTextEditorProps, onChange: () => vo
     title: tr('propertyEditor.richText.fontSize', '字号'), fieldType: 'string',
     commitMode: 'blur',
     placeholder: formatting.state.value.fontSize.kind === 'mixed' ? tr('propertyEditor.richText.mixed', '混合') : undefined,
-    completion: { provider: createToolbarCompletion(fontSizeOptions.value) },
+    completion: { provider: createToolbarCompletion(fontSizeOptions.value.items, fontSizeOptions.value.unit) },
   }))
   const strokeWidthFieldDefinition = computed<StringFieldDefinition>(() => ({
     title: tr('propertyEditor.richText.strokeWidth', '描边宽度'), fieldType: 'string',

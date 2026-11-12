@@ -15,12 +15,3 @@ export interface DiffRevisionOption {
   shortId?: string
   authoredAtSeconds?: number
 }
-
-export interface DiffSession {
-  id: string
-  fileTypeId: string
-  path: string
-  name: string
-  before: DiffSnapshot
-  after: DiffSnapshot
-}

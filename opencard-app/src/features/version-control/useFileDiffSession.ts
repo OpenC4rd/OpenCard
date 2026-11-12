@@ -1,26 +1,20 @@
-import { computed, ref, shallowRef, watch, markRaw, type Ref } from 'vue'
+import { ref, shallowRef, watch, markRaw, type Ref } from 'vue'
 import { fileSystemService } from '../workspace/services/fileSystemService'
 import { createResourceEnvironment, type ResourceEnvironment } from '../workspace/services/projectResourceEnvironment'
 import { materializeRevision, readFileAtRevision, releaseRevisionSnapshot } from './gitService'
-import type { DiffRevisionOption, DiffSession, DiffSnapshot } from './diff.types'
-import { compareOcdocuments, type OcdocumentDiffModel } from './ocdocumentDiff'
+import type { DiffRevisionOption, DiffSnapshot } from './diff.types'
+import { resolveFileType } from '../workspace/model/fileTypes'
 
-interface OcdocumentDiffSessionOptions {
+interface FileDiffSessionOptions {
   translate: (key: string) => string
   projectRoot: Readonly<Ref<string | null | undefined>>
   environment: Readonly<Ref<ResourceEnvironment | null>>
   filePath: Readonly<Ref<string | null | undefined>>
-  fileName: Readonly<Ref<string | null | undefined>>
   revisions: Readonly<Ref<readonly DiffRevisionOption[]>>
 }
-const DIFF_RESOURCE_SNAPSHOT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf', 'ttc', 'otc', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
-function isResourceSnapshotDiffPath(path: string): boolean {
-  const extension = path.split('.').pop()?.toLocaleLowerCase()
-  return Boolean(extension && DIFF_RESOURCE_SNAPSHOT_EXTENSIONS.has(extension))
-}
 
-
-export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) {
+/** 读出一个文件两侧版本的内容；文件类型需要时才把提交检出成快照并为它建资源环境。 */
+export function useFileDiffSession(options: FileDiffSessionOptions) {
   const t = options.translate
   const before = shallowRef<DiffSnapshot | null>(null)
   const after = shallowRef<DiffSnapshot | null>(null)
@@ -30,11 +24,6 @@ export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) 
   let closed = false
   let owned: { environment: ResourceEnvironment, root: string }[] = []
   const requests = new Set<Promise<void>>()
-  const diffSession = computed<DiffSession | null>(() => before.value && after.value && options.filePath.value ? {
-    id: `diff:${options.filePath.value}`, fileTypeId: 'ocdocument', path: options.filePath.value,
-    name: options.fileName.value ?? '', before: before.value, after: after.value,
-  } : null)
-  const diffModel = computed<OcdocumentDiffModel | null>(() => before.value && after.value ? compareOcdocuments(before.value.content, after.value.content) : null)
   async function release(entries: typeof owned) {
     const results = await Promise.allSettled(entries.map(async entry => { try { await entry.environment.dispose() } finally { await releaseRevisionSnapshot(entry.root) } }))
     const failure = results.find(result => result.status === 'rejected')
@@ -44,19 +33,22 @@ export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) 
     let content = ''
     let resourceRootPath = root
     let environment = options.environment.value
+    const source = resolveFileType(path, root).diff
     if (commitId === null) {
-      if (!isResourceSnapshotDiffPath(path)) content = await fileSystemService.readFile(`${root}/${path}`)
+      if (source !== 'resource') content = await fileSystemService.readFile(`${root}/${path}`)
     } else {
       const result = await readFileAtRevision(root, { revision: commitId, path })
       if (!result.ok || !result.value) throw new Error(result.error?.message ?? t('versionControl.diffViewer.readRevisionFailed'))
-      if (result.value.binary && !isResourceSnapshotDiffPath(path)) throw new Error(t('versionControl.diffViewer.notTextFile'))
+      if (result.value.binary && source !== 'resource') throw new Error(t('versionControl.diffViewer.notTextFile'))
       content = result.value.content
-      const snapshot = await materializeRevision(root, { revision: commitId })
-      if (!snapshot.ok || !snapshot.value) throw new Error(snapshot.error?.message ?? t('versionControl.diffViewer.prepareResourcesFailed'))
-      resourceRootPath = snapshot.value.rootPath
-      try { environment = await createResourceEnvironment(resourceRootPath, { watch: false, cacheIdentity: root }) }
-      catch (error) { await releaseRevisionSnapshot(resourceRootPath); throw error }
-      acquired.push({ environment, root: resourceRootPath })
+      if (source) {
+        const snapshot = await materializeRevision(root, { revision: commitId })
+        if (!snapshot.ok || !snapshot.value) throw new Error(snapshot.error?.message ?? t('versionControl.diffViewer.prepareResourcesFailed'))
+        resourceRootPath = snapshot.value.rootPath
+        try { environment = await createResourceEnvironment(resourceRootPath, { watch: false, cacheIdentity: root }) }
+        catch (error) { await releaseRevisionSnapshot(resourceRootPath); throw error }
+        acquired.push({ environment, root: resourceRootPath })
+      }
     }
     return { commitId, label, content, resourceRootPath, sourceFilePath: `${resourceRootPath}/${path}`, resourceEnvironment: environment }
   }
@@ -97,11 +89,8 @@ export function useOcdocumentDiffSession(options: OcdocumentDiffSessionOptions) 
     requests.add(work)
   }, { flush: 'sync' })
   let disposal: Promise<void> | undefined
-  return markRaw({ before, after, diffSession, diffModel, loading, error, selectComparison,
-    beforeSnapshotRoot: computed(() => before.value?.resourceRootPath ?? null),
-    afterSnapshotRoot: computed(() => after.value?.resourceRootPath ?? null),
-    refresh: () => selectComparison(options.revisions.value.find(item => item.commitId !== null)?.commitId ?? null, null),
+  return markRaw({ before, after, loading, error, selectComparison,
     dispose() { return disposal ??= (async () => { closed = true; revision++; stop(); await Promise.allSettled([...requests]); const previous = owned; owned = []; await release(previous); before.value = null; after.value = null })() },
   })
 }
-export type OcdocumentDiffRuntime = ReturnType<typeof useOcdocumentDiffSession>
+export type FileDiffRuntime = ReturnType<typeof useFileDiffSession>

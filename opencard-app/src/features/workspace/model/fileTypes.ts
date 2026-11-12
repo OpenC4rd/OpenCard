@@ -28,6 +28,12 @@ interface FileTypeDefinition {
   language?: string
   editorId: string
   previewable?: boolean
+  /**
+   * 版本对比的取数方式；缺省按文本对比，只读两侧内容。
+   * `resource`：二进制资源，不读内容，由编辑器从两侧的版本快照里取文件。
+   * `document`：既读内容，也要版本快照来解析它引用的资源。
+   */
+  diff?: 'resource' | 'document'
 }
 
 export interface EntryIconPresentation {
@@ -158,6 +164,7 @@ const fileTypes: FileTypeDefinition[] = [
     language: 'json',
     editorId: 'card-designer',
     previewable: true,
+    diff: 'document',
   },
   {
     id: 'opencard-custom-block',
@@ -242,6 +249,7 @@ const fileTypes: FileTypeDefinition[] = [
     icon: 'mdiFormatFont',
     iconTone: 'active',
     editorId: 'font-preview',
+    diff: 'resource',
   },
   {
     id: 'image',
@@ -250,6 +258,15 @@ const fileTypes: FileTypeDefinition[] = [
     icon: 'mdiFileImageOutline',
     iconTone: iconTone.image,
     editorId: 'image-preview',
+    diff: 'resource',
+  },
+  {
+    id: 'pdf',
+    labelKey: 'fileTypes.pdf',
+    extensions: ['pdf'],
+    icon: 'mdiFilePdfBox',
+    iconTone: 'danger',
+    editorId: 'pdf-preview',
   },
   {
     id: 'env',

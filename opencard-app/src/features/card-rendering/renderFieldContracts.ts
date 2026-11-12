@@ -92,6 +92,7 @@ const contractsByType: Readonly<Record<string, Readonly<Record<string, RenderFie
     notes: { kind: 'string', defaultValue: '' },
     width: { kind: 'number', defaultValue: '63', min: 0 },
     height: { kind: 'number', defaultValue: '88', min: 0 },
+    bleed: { kind: 'number', defaultValue: '0', min: 0 },
     dpi: { kind: 'number', defaultValue: '', min: 72 },
   },
   'card-face': {
@@ -107,6 +108,12 @@ const contractsByType: Readonly<Record<string, Readonly<Record<string, RenderFie
     maskSource: { ...imageSourceContract, displayFieldKey: 'maskSource' },
     fit: { kind: 'option', defaultValue: 'cover', options: ['cover', 'contain', 'fill'] },
     maskFit: { kind: 'option', defaultValue: 'contain', options: ['cover', 'contain', 'fill'] },
+    outlineColor: { kind: 'color', defaultValue: '#000000' },
+    outlineWidth: { kind: 'css-length', defaultValue: '0mm' },
+    shadowColor: { kind: 'color', defaultValue: '' },
+    shadowBlur: { kind: 'css-length', defaultValue: '1mm' },
+    shadowOffsetX: { kind: 'css-length', defaultValue: '0.5mm' },
+    shadowOffsetY: { kind: 'css-length', defaultValue: '0.5mm' },
   },
   'qrcode-block': {
     ...baseBlockContracts('qrcode-block'),

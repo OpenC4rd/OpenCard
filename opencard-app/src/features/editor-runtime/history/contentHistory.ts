@@ -50,7 +50,6 @@ export type ContentHistoryPort = {
   redo: () => Promise<void>
   flush: () => void
   markSaved: (content?: string) => void
-  reset: (content: string) => void
   setEntryLimit: (limit: number) => void
   dispose: () => void
   getByteSize: () => number
@@ -79,7 +78,8 @@ export function createContentHistory(options: ContentHistoryOptions): ContentHis
 
   function record(nextContent: string, meta: ContentHistoryOperationMeta): boolean {
     assertActive()
-    if (nextContent === content) return false
+    // 撤销/重做正在搬运文件时内容还没落定，此刻写入会让补丁对不上；丢弃这次编辑，由撤销结果重新发布。
+    if (applying || nextContent === content) return false
     if (meta.mode === 'immediate') flush()
     else if (pending && !sameMerge(pending.merge, meta.merge)) flush()
 
@@ -180,23 +180,6 @@ export function createContentHistory(options: ContentHistoryOptions): ContentHis
     options.onStateChange?.()
   }
 
-  function reset(nextContent: string): void {
-    assertActive()
-    clearTimer()
-    if (pending) releaseEntries([pending])
-    pending = null
-    releaseEntries(entries)
-    entries = []
-    cursor.value = 0
-    bytes = 0
-    content = nextContent
-    const stateId = nextStateId++
-    currentStateId.value = stateId
-    savedBaseline = nextContent
-    dirtyValue.value = false
-    options.onStateChange?.()
-  }
-
   function setEntryLimit(limit: number): void {
     assertActive()
     flush()
@@ -293,7 +276,6 @@ export function createContentHistory(options: ContentHistoryOptions): ContentHis
     redo,
     flush,
     markSaved,
-    reset,
     setEntryLimit,
     dispose,
     getByteSize: () => bytes + (pending?.bytes ?? 0),

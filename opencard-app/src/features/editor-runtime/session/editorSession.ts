@@ -81,17 +81,29 @@ export function createEditorSession(initial: Omit<EditorSessionState, 'viewState
     if (history.kind(state.id) === 'none' || (history.kind(state.id) === 'monaco' && !history.getMonacoModel(state.id))) {
       publish(content, content !== state.savedContent)
     } else history.recordContent(state.id, content, meta)
-    if (declaration()?.immediateSave) {
-      const ticket = ++autoSaveTicket
-      state.autoSavePending = true
-      clearTimeout(autoSaveTimer)
-      autoSaveTimer = setTimeout(() => {
-        void save().catch(error => notifyAppError('OC-E4002', error)).finally(() => {
-          // A later edit has scheduled its own save; this one no longer speaks for the session.
-          if (ticket === autoSaveTicket && !closed) state.autoSavePending = false
-        })
-      }, 0)
-    }
+    scheduleImmediateSave()
+  }
+
+  /** Every content change of an immediate-save editor goes to disk: edits, and undo/redo alike. */
+  function scheduleImmediateSave(): void {
+    if (!declaration()?.immediateSave) return
+    const ticket = ++autoSaveTicket
+    state.autoSavePending = true
+    clearTimeout(autoSaveTimer)
+    autoSaveTimer = setTimeout(() => {
+      void save().catch(error => notifyAppError('OC-E4002', error)).finally(() => {
+        // A later edit has scheduled its own save; this one no longer speaks for the session.
+        if (ticket === autoSaveTicket && !closed) state.autoSavePending = false
+      })
+    }, 0)
+  }
+
+  async function travel(step: 'undo' | 'redo'): Promise<void> {
+    if (closed || state.mode !== 'edit') return
+    await flush()
+    const before = state.draftContent
+    await history[step](state.id)
+    if (state.draftContent !== before) scheduleImmediateSave()
   }
 
   async function flush(): Promise<void> {
@@ -209,8 +221,8 @@ export function createEditorSession(initial: Omit<EditorSessionState, 'viewState
     },
     flush, save,
     saveAs: () => enqueueSave(undefined, true),
-    async undo(): Promise<void> { if (!closed && state.mode === 'edit') { await flush(); await history.undo(state.id) } },
-    async redo(): Promise<void> { if (!closed && state.mode === 'edit') { await flush(); await history.redo(state.id) } },
+    undo: () => travel('undo'),
+    redo: () => travel('redo'),
     textModel: {
       get: () => history.getMonacoModel(state.id),
       attach: (model: Monaco.editor.ITextModel) => { if (!closed) history.attachMonacoModel(state.id, model); else model.dispose() },

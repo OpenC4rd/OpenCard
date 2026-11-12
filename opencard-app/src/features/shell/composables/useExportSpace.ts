@@ -1,6 +1,6 @@
 /**
  * 导出空间的状态：配置列表、当前配置、运行入口。
- * 编辑时改的是内存里的草稿，预览跟着草稿走；点保存才写回文件，取消就恢复。
+ * 新建和复制的配置立即写成文件；编辑时改的是内存里的草稿，预览跟着草稿走，点保存才写回文件，取消就恢复。
  */
 import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import type { ExportPlan, ExportPreparationResult, ExportTaskValidationIssue } from '../../exporting/exportTask'
@@ -49,12 +49,14 @@ export function createProjectExportStorage(store: ReturnType<typeof useProjectSt
     deleteProfile: (name: string): Promise<void> => fileSystemService.deleteFile(profilePath(name)),
     /** 项目内的路径改写成相对路径；项目外返回 null。 */
     toProjectPath: (path: string): string | null => store.getRelativeProjectPathIfInside(path),
+    /** 在文件管理器里定位配置文件。 */
+    revealProfile: (name: string): Promise<void> => fileSystemService.revealInFileManager(profilePath(name)),
   }
 }
 
 export type ProjectExportStorage = ReturnType<typeof createProjectExportStorage>
 
-export type ExportSpaceOptions = ProjectExportStorage & {
+export type ExportSpaceOptions = Omit<ProjectExportStorage, 'revealProfile'> & {
   running: Readonly<Ref<boolean>>
   prepare: (profile: ExportProfile) => Promise<ExportPreparationResult>
   run: (plan: ExportPlan) => Promise<unknown> | void
@@ -73,7 +75,7 @@ export function useExportSpace(options: ExportSpaceOptions) {
   const activeProfile = computed(() => profiles.value.find(profile => profile.name === activeName.value) ?? null)
   const busy = computed(() => preparing.value || options.running.value)
   const editing = ref(false)
-  /** 进入编辑时的配置；新建的配置还没写过文件，这里是 null，取消就直接丢掉。 */
+  /** 进入编辑时的配置，取消时恢复成它。 */
   let original: ExportProfile | null = null
   let request: AbortController | undefined
 
@@ -85,15 +87,13 @@ export function useExportSpace(options: ExportSpaceOptions) {
   }
 
   function cancel(): void {
-    if (!editing.value) return
     const restored = original
+    if (!editing.value || !restored) return
     editing.value = false
     original = null
     issues.value = []
-    profiles.value = restored
-      ? profiles.value.map(profile => profile.name === activeName.value ? restored : profile)
-      : profiles.value.filter(profile => profile.name !== activeName.value)
-    activeName.value = restored?.name ?? profiles.value[0]?.name ?? null
+    profiles.value = profiles.value.map(profile => profile.name === activeName.value ? restored : profile)
+    activeName.value = restored.name
   }
 
   async function save(): Promise<void> {
@@ -139,7 +139,7 @@ export function useExportSpace(options: ExportSpaceOptions) {
     activeName.value = profile.name
     switched.value += 1
     issues.value = []
-    editing.value = true
+    options.saveProfile(profile).catch((error: unknown) => notifyAppError('OC-E3006', error))
   }
 
   /** 重名时在后面加数字：`配置`、`配置 2`、`配置 3`。 */
@@ -160,9 +160,7 @@ export function useExportSpace(options: ExportSpaceOptions) {
   }
 
   function remove(name: string): void {
-    const neverSaved = editing.value && name === activeName.value && !original
     if (name === activeName.value) cancel()
-    if (neverSaved) return
     const index = profiles.value.findIndex(profile => profile.name === name)
     if (index < 0) return
     profiles.value = profiles.value.filter(profile => profile.name !== name)

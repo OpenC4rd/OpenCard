@@ -46,8 +46,9 @@ export async function renderFaceToPng(
     const rawScale = options.scale ?? 1
     scale = typeof rawScale === 'number' && Number.isFinite(rawScale) ? rawScale : 1
   }
-  const width = Math.max(1, Math.round(scene.width * scale))
-  const height = Math.max(1, Math.round(scene.height * scale))
+  const bleed = scene.face.bleed ?? 0
+  const width = Math.max(1, Math.round((scene.width + bleed * 2) * scale))
+  const height = Math.max(1, Math.round((scene.height + bleed * 2) * scale))
 
   let canvas: OffscreenCanvas | HTMLCanvasElement | null = null
   try {
@@ -79,6 +80,7 @@ export async function renderFaceToPng(
     ctx.fillRect(0, 0, width, height)
   }
   ctx.scale(scale, scale)
+  ctx.translate(bleed, bleed)
   paintCardScene(ctx, scene, assets, options)
 
   try {

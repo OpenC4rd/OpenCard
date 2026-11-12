@@ -120,6 +120,59 @@ function face(...children: ReturnType<typeof at>[]): RenderReadyCardFace {
 
 // --- Test Suites ---
 
+describe('image silhouette effects', () => {
+  /** 按创建顺序记录离屏缓冲：内容，然后是描边或投影各自的一对。 */
+  function paintImage(extra: Record<string, unknown>) {
+    const buffers: { width: number; height: number; ctx: ReturnType<typeof createMockCanvasContext> }[] = []
+    class FakeOffscreenCanvas {
+      ctx = createMockCanvasContext()
+      constructor(public width: number, public height: number) {
+        this.ctx.setTransform = vi.fn()
+        buffers.push({ width, height, ctx: this.ctx })
+      }
+      getContext() { return this.ctx }
+    }
+    vi.stubGlobal('OffscreenCanvas', FakeOffscreenCanvas)
+    try {
+      const ctx = createMockCanvasContext()
+      const img = block('pic', {
+        type: 'image-block', source: 'img.png', maskSource: '', fit: 'fill',
+        outlineColor: '#ff0000', outlineWidth: '0mm', shadowColor: '', shadowBlur: '0mm', shadowOffsetX: '0mm', shadowOffsetY: '0mm', ...extra,
+      })
+      paintCardScene(ctx, face(at(img)), createMockAssetStore({ 'img.png': { width: 10, height: 10 } }))
+      const draws = ctx.calls.filter(call => call.method === 'drawImage').map(call => call.args.slice(-4))
+      return { buffers, draws }
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }
+
+  it('draws straight to the canvas when no effect is set', () => {
+    const { buffers, draws } = paintImage({})
+    expect(buffers).toHaveLength(0)
+    expect(draws).toEqual([[0, 0, 100, 50]])
+  })
+
+  it('grows the outline from the image pixels and paints it under the image', () => {
+    const { buffers, draws } = paintImage({ outlineWidth: '2mm' })
+    const outline = buffers[2]!
+    expect([outline.width, outline.height]).toEqual([104, 54])
+    expect(outline.ctx.calls.filter(call => call.method === 'drawImage')).toHaveLength(Math.ceil(Math.PI * 4))
+    expect(outline.ctx.globalCompositeOperation).toBe('source-in')
+    expect(outline.ctx.fillStyle).toBe('#ff0000')
+    expect(draws).toEqual([[-2, -2, 104, 54], [0, 0, 100, 50]])
+  })
+
+  it('casts the shadow from the image and its outline together', () => {
+    const { buffers, draws } = paintImage({ outlineWidth: '2mm', shadowColor: '#00000080', shadowOffsetX: '3mm', shadowOffsetY: '4mm' })
+    const [, mask, shadow] = buffers
+    expect([mask!.width, mask!.height]).toEqual([107, 58])
+    expect(mask!.ctx.calls.filter(call => call.method === 'drawImage')).toHaveLength(2)
+    expect(shadow!.ctx.fillStyle).toBe('#00000080')
+    expect(draws).toEqual([[-2, -2, 107, 58], [-2, -2, 104, 54], [0, 0, 100, 50]])
+  })
+})
+
 describe('run shadows', () => {
   function faceWithText(content: string): RenderReadyCardFace {
     const text = block('txt', {

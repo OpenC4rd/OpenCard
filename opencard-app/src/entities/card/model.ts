@@ -65,6 +65,12 @@ export type ImageBlock = BlockIdentity & {
     maskSource?: string
     maskFit?: "cover" | "contain" | "fill"
     fit?: "cover" | "contain" | "fill"
+    outlineColor?: string
+    outlineWidth?: string
+    shadowColor?: string
+    shadowBlur?: string
+    shadowOffsetX?: string
+    shadowOffsetY?: string
 }
 
 export type QrCodeBlock = BlockIdentity & {
@@ -165,6 +171,8 @@ export type CardDocument = {
     version: string
     width: string
     height: string
+    /** 成品尺寸之外四边外扩的出血，单位 mm。 */
+    bleed?: string
     dpi?: number
     faces: Record<CardFaceKey, CardFace>
     instances: CardInstanceRecord[]
@@ -360,7 +368,7 @@ type TextBlockInit = BlockInit & {
     color?: string; textAlign?: AlignmentPosition; verticalAlign?: VerticalAlignmentPosition
     lineHeight?: CssValue; writingMode?: TextWritingMode
 }
-type ImageBlockInit = BlockInit & { source?: string; maskSource?: string; fit?: 'cover' | 'contain' | 'fill'; maskFit?: 'cover' | 'contain' | 'fill' }
+type ImageBlockInit = BlockInit & { source?: string; maskSource?: string; fit?: 'cover' | 'contain' | 'fill'; maskFit?: 'cover' | 'contain' | 'fill'; outlineColor?: string; outlineWidth?: string; shadowColor?: string; shadowBlur?: string; shadowOffsetX?: string; shadowOffsetY?: string }
 type QrCodeBlockInit = BlockInit & { content?: string; errorCorrection?: 'L' | 'M' | 'Q' | 'H'; foreground?: string; backgroundColor?: string; quietZone?: string }
 type ShapeBlockInit = BlockInit & { shape?: ShapeBlock['shape']; fill?: string; stroke?: string; strokeWidth?: string; strokeStyle?: ShapeBlock['strokeStyle']; strokeAlignment?: ShapeBlock['strokeAlignment']; strokeJoin?: ShapeBlock['strokeJoin']; strokeCap?: ShapeBlock['strokeCap']; strokeMiterLimit?: string }
 type SimpleContainerBlockInit = BlockInit & { packaged?: string; clip?: string; children?: SimpleContainerBlock['children'] }

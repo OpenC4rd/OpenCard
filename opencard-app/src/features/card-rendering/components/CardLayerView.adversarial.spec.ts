@@ -130,6 +130,7 @@ function createMockContext(canvas: HTMLCanvasElement): MockCanvasContext {
       ctx.currentTransform = [a * sx, b * sx, c * sy, d * sy, e, f]
       record('scale', [sx, sy])
     }),
+    rotate: vi.fn(),
     translate: vi.fn((tx: number, ty: number) => {
       const [a, b, c, d, e, f] = ctx.currentTransform
       ctx.currentTransform = [a, b, c, d, a * tx + c * ty + e, b * tx + d * ty + f]
@@ -235,6 +236,12 @@ function imageBlock(
     source,
     maskSource: '',
     maskFit: 'cover',
+    outlineColor: '#000000',
+    outlineWidth: '0mm',
+    shadowColor: '',
+    shadowBlur: '0mm',
+    shadowOffsetX: '0mm',
+    shadowOffsetY: '0mm',
     fit: 'contain',
     tint: 'none',
     ...options,

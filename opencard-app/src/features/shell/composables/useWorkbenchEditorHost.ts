@@ -81,7 +81,8 @@ export function useWorkbenchEditorHost(options: {
     const state = bound.session.state
     const definition = editorRegistry.getEditor(state.editorId) ?? editorRegistry.getEditor('unsupported-file')!
     const fileType = state.path ? resolveFileType(state.path) : resolveFileTypeById(state.fileTypeId)
-    const fallback = state.mode === 'diff' && !definition.supportsDiff && fileType.language
+    // 文本对比统一交给 Monaco；只有文件类型声明了自己的对比取数方式，才由它的编辑器来画。
+    const fallback = state.mode === 'diff' && !fileType.diff
     const theme = settings.value.appearance.theme === 'system' ? getOcTheme() : settings.value.appearance.theme
     return {
       component: fallback ? MonacoEditor : definition.component, key: bound.key, capture: bound.capture,
@@ -111,6 +112,8 @@ export function useWorkbenchEditorHost(options: {
     editorRef, key, mount, contribution: computed(() => { editorRef.value; return binding.value?.contribution ?? { actions: [], onAction: () => {} } }),
     canUndo: computed(() => options.activeSession.value?.canUndo.value ?? false),
     canRedo: computed(() => options.activeSession.value?.canRedo.value ?? false),
-    save, undo: () => options.activeSession.value?.undo(), redo: () => options.activeSession.value?.redo(),
+    save,
+    undo: async () => { await options.activeSession.value?.undo().catch(error => notifyAppError('OC-E4006', error)) },
+    redo: async () => { await options.activeSession.value?.redo().catch(error => notifyAppError('OC-E4006', error)) },
   }
 }

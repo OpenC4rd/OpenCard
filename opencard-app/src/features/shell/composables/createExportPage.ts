@@ -3,21 +3,26 @@ import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExportPageContent from '../../exporting/components/ExportPageContent.vue'
 import type { OcNode, OcNodeAction, OcNodeActionEvent, OcNodeCollection, OcNodeSelectionEvent } from '../../../shared/ui/node/node.types'
+import { notifyAppError } from '../../notifications/titlebarNotices'
+import { useAppSettingsStore } from '../../settings/store/appSettingsStore'
+import { useTutorialStore } from '../../tutorials/tutorialStore'
 import { useAppStateStore } from '../../app-state/store/appStateStore'
 import { createResourcePropertyCapabilities } from '../../workspace/services/propertyResourceCapabilities'
 import { fileSystemService } from '../../workspace/services/fileSystemService'
 import { useProjectStore } from '../../workspace/store/projectStore'
 import type { SpacePage } from '../spacePage'
 import { useExportPreview, type ExportPreviewOptions } from './useExportPreview'
-import { useExportSpace, type ExportSpaceOptions } from './useExportSpace'
+import { useExportSpace, type ExportSpaceOptions, type ProjectExportStorage } from './useExportSpace'
 import { useShellNavigation } from './useShellNavigation'
 
 const NEW_PROFILE_KEY = 'new-profile'
 const DUPLICATE_ACTION_KEY = 'duplicate-profile'
+const REVEAL_ACTION_KEY = 'reveal-profile'
 const DELETE_ACTION_KEY = 'delete-profile'
 const SUBMIT_ACTION_KEY = 'export.submit'
 
 type ExportPageOptions = Omit<ExportSpaceOptions, 'newProfileName'> & {
+  revealProfile: ProjectExportStorage['revealProfile']
   planPreview: ExportPreviewOptions['plan']
   renderPreviewPage: ExportPreviewOptions['renderPage']
   releasePreview: ExportPreviewOptions['release']
@@ -43,6 +48,16 @@ export function createExportPage(options: ExportPageOptions) {
     if (active && path) void space.load()
   }, { immediate: true })
 
+  const settings = useAppSettingsStore()
+  const tutorial = useTutorialStore()
+  watch([navigation.isExport, project.projectPath], ([active, path], [, previousPath]) => {
+    if (tutorial.session.value?.tutorialId === 'exportProject' && (!active || path !== previousPath)) tutorial.exit()
+  })
+  watch(() => navigation.isExport.value && Boolean(space.activeProfile.value) && settings.isReady.value
+    && !tutorial.session.value && !settings.settings.value.tutorials.seen.includes('exportProject'), ready => {
+    if (ready) tutorial.start('exportProject')
+  }, { immediate: true })
+
   /** 配置里的富文本和卡片共用一套资源：项目图标、字体、图片都从这里选。 */
   const capabilities = computed(() => createResourcePropertyCapabilities({
     projectLabel: t('propertyEditor.references.project'),
@@ -54,6 +69,7 @@ export function createExportPage(options: ExportPageOptions) {
   const treeData = computed<OcNodeCollection>(() => {
     const actions: readonly OcNodeAction[] = [
       { key: DUPLICATE_ACTION_KEY, title: t('projectExport.duplicateProfile'), icon: 'mdiContentCopy' },
+      { key: REVEAL_ACTION_KEY, title: t('projectExport.revealProfile'), icon: 'mdiFolderOpenOutline' },
       { key: DELETE_ACTION_KEY, title: t('projectExport.deleteProfile'), icon: 'mdiTrashCanOutline', iconTone: 'danger' },
     ]
     const profiles = space.profiles.value
@@ -70,7 +86,9 @@ export function createExportPage(options: ExportPageOptions) {
 
   function handleTreeAction(event: OcNodeActionEvent): void {
     if (space.busy.value) return
-    if (event.actionKey === DUPLICATE_ACTION_KEY) space.duplicate(String(event.key))
+    if (event.actionKey === REVEAL_ACTION_KEY) {
+      void options.revealProfile(String(event.key)).catch((error: unknown) => notifyAppError('OC-E3006', error))
+    } else if (event.actionKey === DUPLICATE_ACTION_KEY) space.duplicate(String(event.key))
     else if (event.actionKey === DELETE_ACTION_KEY) space.remove(String(event.key))
   }
 
@@ -102,6 +120,7 @@ export function createExportPage(options: ExportPageOptions) {
       headButtons: [{ key: NEW_PROFILE_KEY, icon: 'mdiPlus', title: t('projectExport.newProfile') }],
       lists: [{
         key: 'export-profiles',
+        tutorialKey: 'export.profiles',
         title: t('projectExport.profiles'),
         placeholder: t('projectExport.noProfiles'),
         actions: [],

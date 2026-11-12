@@ -40,6 +40,11 @@ export function createRichTextFormatInput(options: {
   const fields: Record<string, PropertyEditorFieldDefinition> = {
     fontFamily: { ...format.fontField, title: labels('propertyEditor.richText.family', '名称'), category: 'typography' },
     fontSize: { ...format.fontSizeField, title: labels('propertyEditor.richText.size', '大小'), category: 'typography' },
+    letterSpacing: {
+      title: labels('propertyEditor.richText.letterSpacing', '字间距'),
+      fieldType: 'string', category: 'typography', commitMode: 'blur',
+      completion: { provider: format.lengthCompletionProvider },
+    },
     foregroundType: {
       title: labels('propertyEditor.richText.fill', '类型'),
       fieldType: 'string', category: 'foreground', presentation: 'select',

@@ -1,8 +1,6 @@
 <!-- 业务 忽略项编辑器：舞台是规则的预览树，右侧是规则列表和当前规则的属性；注释和空行原样留在文件里。 -->
 <template>
-  <MonacoEditor v-if="editorState.mode === 'diff'" :model-value="editorState.draftContent ?? ''" language="plaintext"
-    :mode="editorState.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
-  <ProjectRegistryEditorShell v-else content-mode="workspace">
+  <ProjectRegistryEditorShell content-mode="workspace">
     <ProjectResourceWorkbench :inspector-title="t('gitignoreEditor.rules')" :inspector-actions="ruleActions"
       :footer-title="t('cardDesigner.panels.properties')" @action="handleRuleAction">
       <div class="gitignore-editor__stage">

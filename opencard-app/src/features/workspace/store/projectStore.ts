@@ -1,4 +1,3 @@
-import type { OcdocumentDiffRuntime } from '../../version-control/useOcdocumentDiffSession'
 /**
  * 模块说明：
  * - 维护项目路径 目录索引 监听与文件树移动重命名事务
@@ -131,16 +130,8 @@ type CopyExternalEntriesResult =
 const projectPath = ref('')
 let projectOpenRevision = 0
 const indexedEntries = shallowRef<DirEntry[]>([])
-const comparisons = shallowReactive(new Map<string, OcdocumentDiffRuntime>())
-const comparisonDisposals = new Set<Promise<void>>()
-function releaseComparison(id: string): Promise<void> {
-  const comparison = comparisons.get(id)
-  comparisons.delete(id)
-  const work = comparison?.dispose() ?? Promise.resolve()
-  comparisonDisposals.add(work)
-  void work.finally(() => comparisonDisposals.delete(work)).catch(error => reportAppError('OC-E3016', { path: projectPath.value, error }))
-  return work
-}
+/** 跟项目同生命周期的外部资源（如版本对比的快照）在这里登记；关闭项目时等它们放完。 */
+const projectDisposers = new Set<() => Promise<void>>()
 const resourceEnvironment = shallowRef<ResourceEnvironment | null>(null)
 const isWatching = computed(() => resourceEnvironment.value?.watching.value ?? false)
 const fileChangeRevision = ref(0)
@@ -523,7 +514,7 @@ async function disposeResources(invalidate = true) {
   resourceEnvironment.value = null
   const environmentDisposal = environment?.dispose()
   disposeProjectIndexWorker()
-  const released = await Promise.allSettled([...comparisonDisposals, ...[...comparisons.keys()].map(releaseComparison)])
+  const released = await Promise.allSettled([...projectDisposers].map(dispose => dispose()))
   await environmentDisposal
   const failure = released.find(result => result.status === 'rejected')
   if (failure?.status === 'rejected') throw failure.reason
@@ -1101,7 +1092,7 @@ export function useProjectStore() {
     projectResourcePackages: readonly(projectResourcePackages),
     projectResourcePackageFiles,
     unreadableProjectResourcePackages,
-    comparisons, releaseComparison,
+    onDispose: (disposer: () => Promise<void>) => { projectDisposers.add(disposer) },
     projectResourceEnvironment,
     resourceEnvironment: computed(() => resourceEnvironment.value),
     resolvedDictionary: readonly(resolvedDictionary),

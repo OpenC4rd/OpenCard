@@ -1,7 +1,5 @@
 <template>
-  <MonacoEditor v-if="editorState.mode === 'diff'" :model-value="editorState.draftContent ?? ''" language="json"
-    :mode="editorState.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
-  <ProjectRegistryEditorShell v-else content-mode="workspace" @keydown.ctrl.s.prevent="save">
+  <ProjectRegistryEditorShell content-mode="workspace" @keydown.ctrl.s.prevent="save">
     <template v-if="document">
       <ProjectCustomBlockRegistryWorkbench :resource-environment="props.resourceEnvironment" :collections="document.collections ?? []"
         @update:collections="updateCollections" @add-collection="addCollection"
@@ -33,7 +31,6 @@ import { createAvailableKey } from '../../shared/model/keySlug'
 import { fileSystemService } from '../../features/workspace/services/fileSystemService'
 import { parseOcBlock } from '../../features/card-rendering/customBlockRuntime'
 import { PROJECT_CUSTOM_BLOCK_REGISTRY_FILE_NAME, PROJECT_INTERNAL_DIRECTORY_NAME } from '../../features/workspace/model/projectStructure'
-import MonacoEditor from './MonacoEditor.vue'
 import ProjectRegistryEditorShell from './ProjectRegistryEditorShell.vue'
 import ProjectRegistryRepairEditor from './ProjectRegistryRepairEditor.vue'
 import ProjectCustomBlockRegistryWorkbench from './ProjectCustomBlockRegistryWorkbench.vue'

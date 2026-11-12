@@ -13,6 +13,7 @@ export default {
   name: '配置名',
   newProfile: '新建配置',
   duplicateProfile: '复制配置',
+  revealProfile: '在文件管理器中显示配置',
   deleteProfile: '删除配置',
   noProfiles: '还没有导出配置，点侧栏的 + 新建一个。',
   profiles: '导出配置',

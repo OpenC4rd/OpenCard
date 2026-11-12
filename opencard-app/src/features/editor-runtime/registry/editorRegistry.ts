@@ -13,6 +13,7 @@ import GitignoreEditor from '../../../components/editors/GitignoreEditor.vue'
 import FontPreviewEditor from '../../../components/editors/FontPreviewEditor.vue'
 import ImagePreviewEditor from '../../../components/editors/ImagePreviewEditor.vue'
 import MonacoEditor from '../../../components/editors/MonacoEditor.vue'
+import PdfPreviewEditor from '../../../components/editors/PdfPreviewEditor.vue'
 import PackageManagerEditor from '../../../components/editors/PackageManagerEditor.vue'
 import PackageManifestEditor from '../../../components/editors/PackageManifestEditor.vue'
 import ProjectConfigEditor from '../../../components/editors/ProjectConfigEditor.vue'
@@ -26,23 +27,23 @@ interface IEditor extends EditorCapabilities {
   name: string
   component: Component
   hasPreview?: boolean
-  supportsDiff?: boolean
   previewComponent?: string
 }
 
 const editors: Record<string, IEditor> = {
-  monaco: { id: 'monaco', history: 'monaco', name: 'Monaco Editor', component: MonacoEditor, hasPreview: false, supportsDiff: true },
-  'card-designer': { id: 'card-designer', history: 'structured', name: 'Card Designer', component: CardDesignEditor, hasPreview: false, supportsDiff: true },
-  'image-preview': { id: 'image-preview', content: 'none', name: 'Image Preview', component: ImagePreviewEditor, hasPreview: false, supportsDiff: true },
+  monaco: { id: 'monaco', history: 'monaco', name: 'Monaco Editor', component: MonacoEditor, hasPreview: false },
+  'card-designer': { id: 'card-designer', history: 'structured', name: 'Card Designer', component: CardDesignEditor, hasPreview: false },
+  'image-preview': { id: 'image-preview', content: 'none', name: 'Image Preview', component: ImagePreviewEditor, hasPreview: false },
+  'pdf-preview': { id: 'pdf-preview', content: 'none', name: 'PDF Preview', component: PdfPreviewEditor, hasPreview: false },
   'project-config': { id: 'project-config', history: 'structured', name: 'Project Configuration', component: ProjectConfigEditor, hasPreview: false },
-  'font-registry': { id: 'font-registry', history: 'structured', immediateSave: true, name: 'Project Font Set', component: ProjectFontRegistryFileEditor, hasPreview: false, supportsDiff: true },
-  'icon-registry': { id: 'icon-registry', history: 'structured', immediateSave: true, name: 'Project Icon Registry', component: ProjectIconRegistryFileEditor, hasPreview: false, supportsDiff: true },
-  'custom-block-registry': { id: 'custom-block-registry', history: 'structured', immediateSave: true, name: 'Project Custom Block Registry', component: ProjectCustomBlockRegistryFileEditor, hasPreview: false, supportsDiff: true },
+  'font-registry': { id: 'font-registry', history: 'structured', immediateSave: true, name: 'Project Font Set', component: ProjectFontRegistryFileEditor, hasPreview: false },
+  'icon-registry': { id: 'icon-registry', history: 'structured', immediateSave: true, name: 'Project Icon Registry', component: ProjectIconRegistryFileEditor, hasPreview: false },
+  'custom-block-registry': { id: 'custom-block-registry', history: 'structured', immediateSave: true, name: 'Project Custom Block Registry', component: ProjectCustomBlockRegistryFileEditor, hasPreview: false },
   'package-manifest': { id: 'package-manifest', content: 'none', name: 'Package Manifest', component: PackageManifestEditor, hasPreview: false },
   'package-manager': { id: 'package-manager', content: 'none', name: 'Package Manager', component: PackageManagerEditor, hasPreview: false },
-  'font-preview': { id: 'font-preview', content: 'none', name: 'Font Preview', component: FontPreviewEditor, hasPreview: false, supportsDiff: true },
+  'font-preview': { id: 'font-preview', content: 'none', name: 'Font Preview', component: FontPreviewEditor, hasPreview: false },
   'unsupported-file': { id: 'unsupported-file', content: 'none', name: 'Unsupported File', component: UnsupportedFileEditor, hasPreview: false },
-  gitignore: { id: 'gitignore', history: 'monaco', name: 'Ignore Rules', component: GitignoreEditor, hasPreview: false, supportsDiff: true },
+  gitignore: { id: 'gitignore', history: 'monaco', name: 'Ignore Rules', component: GitignoreEditor, hasPreview: false },
   dictionary: { id: 'dictionary', history: 'structured', name: 'Dictionary', component: DictionaryEditor, hasPreview: false },
 }
 

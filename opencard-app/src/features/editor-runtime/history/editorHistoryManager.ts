@@ -7,6 +7,7 @@ import {
   type ContentHistoryPort,
 } from './contentHistory'
 import type { HistoryOperationMeta } from './history.types'
+import { applyModelText } from '../services/monacoTextEdit'
 
 export type EditorHistoryKind = 'structured' | 'monaco' | 'none'
 
@@ -107,19 +108,6 @@ class EditorHistoryManager {
     this.refreshState(sessionId)
   }
 
-  syncExternalContent(sessionId: string, content: string, saved: boolean): void {
-    const session = this.sessions.get(sessionId)
-    if (!session) return
-    if (session.content) {
-      if (saved) session.content.reset(content)
-      else session.content.record(content, DEFAULT_OPERATION)
-    } else if (session.model && session.model.getValue() !== content) {
-      this.replaceMonacoValue(session, content)
-    }
-    if (saved) session.savedContent = content
-    this.refreshState(sessionId)
-  }
-
   markSaved(sessionId: string, content: string): void {
     const session = this.sessions.get(sessionId)
     if (!session) return
@@ -180,7 +168,8 @@ class EditorHistoryManager {
     if (!session.model) return
     session.updatingModel = true
     try {
-      session.model.setValue(content)
+      // setValue 会清空 Monaco 的撤销栈；作为一次编辑写入，表单改动才能和键入一起撤销。
+      applyModelText(session.model, content)
     } finally {
       session.updatingModel = false
     }

@@ -258,7 +258,6 @@ defineExpose({ editor, focus, getHtml, applyHtml, getContent, setContent, flushP
   outline: none;
   color: var(--oc-fg-default);
   overflow-wrap: anywhere;
-  paint-order: stroke fill;
   white-space: break-spaces;
 }
 

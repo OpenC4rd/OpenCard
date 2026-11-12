@@ -27,7 +27,7 @@ const FLAG_SPANS: Record<string, FlagField> = {
   underline: 'underline',
   strikethrough: 'strikethrough',
 }
-const STYLE_KEYS = new Set(['color', 'bg', 'size', 'font', 'fill', 'stroke', 'shadow'])
+const STYLE_KEYS = new Set(['color', 'bg', 'size', 'font', 'spacing', 'fill', 'stroke', 'shadow'])
 const ICON_SCOPES = new Set(['current', 'host', 'package'])
 const IMAGE_FITS = new Set(['contain', 'cover', 'fill'])
 const IMAGE_ALIGNS = new Set(['start', 'center', 'end'])
@@ -307,6 +307,10 @@ class MarkupParser {
       case 'font':
         if (!value) this.report('invalid-argument', tag.offset, 'font 为空')
         else style.fontFamily = value
+        return
+      case 'spacing':
+        if (!isAbsoluteLength(value)) this.report('invalid-argument', tag.offset, `spacing 需要绝对单位（mm/cm/in/pt）：${value || '(空)'}`)
+        else style.letterSpacing = value
         return
       case 'fill':
         if (!value) this.report('invalid-argument', tag.offset, 'fill 为空')

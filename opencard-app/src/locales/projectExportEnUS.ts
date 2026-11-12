@@ -13,6 +13,7 @@ export default {
   name: 'Profile name',
   newProfile: 'New profile',
   duplicateProfile: 'Duplicate profile',
+  revealProfile: 'Reveal profile in file manager',
   deleteProfile: 'Delete profile',
   noProfiles: 'No export profiles yet. Use + in the sidebar to create one.',
   profiles: 'Export profiles',

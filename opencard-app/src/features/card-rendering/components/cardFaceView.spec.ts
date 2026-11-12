@@ -7,7 +7,7 @@ const viewport = { width: 800, height: 600 }
 describe('resolveVisibleCardFaceView', () => {
   it('covers the whole face when it fits inside the viewport', () => {
     const view = resolveVisibleCardFaceView(face, { x: 100, y: 50 }, 4, viewport, 2)
-    expect(view).toEqual({ left: 0, top: 0, width: 63, height: 88, pixelScale: 8 })
+    expect(view).toEqual({ left: 0, top: 0, width: 63, height: 88, pixelScale: 8, screenScale: 4 })
   })
 
   it('clips to the viewport so the bitmap never outgrows the screen at high zoom', () => {
@@ -22,6 +22,11 @@ describe('resolveVisibleCardFaceView', () => {
     const view = resolveVisibleCardFaceView(face, { x: 10.3, y: 20.3 }, 4, viewport, 2)!
     expect((10.3 + view.left * 4) * 2 % 1).toBeCloseTo(0)
     expect((20.3 + view.top * 4) * 2 % 1).toBeCloseTo(0)
+  })
+
+  it('extends the view over the bleed', () => {
+    const view = resolveVisibleCardFaceView({ ...face, bleed: 3 }, { x: 100, y: 100 }, 4, viewport, 1)!
+    expect(view).toMatchObject({ left: -3, top: -3, width: face.width + 6, height: face.height + 6 })
   })
 
   it('returns null when the face is off screen', () => {

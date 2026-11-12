@@ -22,8 +22,8 @@ import {
   type CardRenderEnvironment,
   type PreparedCardRender,
 } from '../card-rendering/renderPipeline'
+import type { CardDiffHighlight } from '../card-rendering/components/CardDiffOverlay.vue'
 import {
-  type CardDiffHighlight,
   type CardViewportComparison,
   type CardViewportStatusFlash,
 } from '../card-rendering/components/CardViewport.vue'

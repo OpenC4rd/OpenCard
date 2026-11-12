@@ -155,6 +155,11 @@ export const APP_ERROR_CATALOG = {
     meaning: { 'zh-CN': '无法加载文件路径补全', 'en-US': 'Could not load file-path completions' },
     solution: '刷新项目目录索引并确认相关目录可读取；仍失败时可直接输入有效相对路径。',
   },
+  'OC-E4006': {
+    area: '编辑器与文档',
+    meaning: { 'zh-CN': '无法撤销或重做这一步', 'en-US': 'Could not undo or redo this step' },
+    solution: '这一步涉及的项目文件可能已被移动或占用；确认相关文件仍在原位后重试，内容本身没有被改动。',
+  },
   'OC-E5001': {
     area: '渲染与导出',
     meaning: { 'zh-CN': '没有可导出的活动文件', 'en-US': 'There is no active file to export' },

@@ -29,12 +29,20 @@ const TextStyleAttributes = Extension.create({
             ? { style: `font-size: ${attributes.fontSize}` }
             : {},
         },
+        letterSpacing: {
+          default: null,
+          parseHTML: element => element.style.letterSpacing || null,
+          renderHTML: attributes => attributes.letterSpacing
+            ? { style: `letter-spacing: ${attributes.letterSpacing}` }
+            : {},
+        },
         textStroke: {
           default: null,
           parseHTML: element => effectAttribute(element, 'data-oc-text-stroke'),
           renderHTML: ({ textStroke: stroke }) => stroke ? {
             'data-oc-text-stroke': JSON.stringify(stroke),
-            style: `-webkit-text-stroke: ${stroke.width} ${stroke.color}`,
+            // 描边压在填充下面；只挂在有描边的文字上，WebKit 对无描边文字设了它就不画阴影。
+            style: `-webkit-text-stroke: ${stroke.width} ${stroke.color}; paint-order: stroke fill`,
           } : {},
         },
         textFillType: {

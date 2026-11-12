@@ -85,6 +85,7 @@ export function parseRenderDocument(
 
   const width = fields.number('width')
   const height = fields.number('height')
+  const bleed = fields.number('bleed')
   const dpi = typeof source.dpi === 'number' && Number.isFinite(source.dpi) && source.dpi > 0 ? source.dpi : undefined
   const faces = toRecord(source.faces)
   const document: RenderReadyCardDocument = {
@@ -96,8 +97,8 @@ export function parseRenderDocument(
     notes: fields.optionalString('notes'),
     dpi,
     faces: {
-      front: parseFace(faces.front, 'front', width, height, id, context.instanceId, issues, dpi),
-      back: parseFace(faces.back, 'back', width, height, id, context.instanceId, issues, dpi),
+      front: { ...parseFace(faces.front, 'front', width, height, id, context.instanceId, issues, dpi), bleed },
+      back: { ...parseFace(faces.back, 'back', width, height, id, context.instanceId, issues, dpi), bleed },
     },
   }
 
@@ -248,6 +249,12 @@ function parseBlock(
         maskSource: fields.string('maskSource'),
         fit: fields.option('fit'),
         maskFit: fields.option('maskFit'),
+        outlineColor: fields.string('outlineColor'),
+        outlineWidth: fields.cssLength('outlineWidth'),
+        shadowColor: fields.string('shadowColor'),
+        shadowBlur: fields.cssLength('shadowBlur'),
+        shadowOffsetX: fields.cssLength('shadowOffsetX'),
+        shadowOffsetY: fields.cssLength('shadowOffsetY'),
       }
     case 'qrcode-block':
       return {
@@ -517,20 +524,22 @@ function createFieldReader(
     return contract
   }
 
-  function value(fieldKey: string, suppliedContract?: RenderFieldContract): unknown {
+  /** 缺失或无效时取 fallback；没给 fallback 就取契约默认值。 */
+  function value(fieldKey: string, suppliedContract?: RenderFieldContract, fallback?: unknown): unknown {
     const contract = suppliedContract ?? contractFor(fieldKey)
+    const orDefault = () => fallback ?? parseRenderDefault(context.typeName, fieldKey, contract)
     const hasValue = Object.prototype.hasOwnProperty.call(source, fieldKey)
       && source[fieldKey] !== null
       && source[fieldKey] !== undefined
 
-    if (!hasValue) return parseRenderDefault(context.typeName, fieldKey, contract)
+    if (!hasValue) return orDefault()
 
     const parsed = parseRenderField(source[fieldKey], contract, allowTypedLiterals)
     if (!parsed.ok) {
       for (const diagnostic of parsed.diagnostics) {
         pushIssue(context, fieldKey, contract, diagnostic.code, issues, diagnostic.path)
       }
-      return parseRenderDefault(context.typeName, fieldKey, contract)
+      return orDefault()
     }
     return parsed.value
   }
@@ -543,20 +552,7 @@ function createFieldReader(
       return value(fieldKey) as string
     },
     optionalString(fieldKey: string, fallback = ''): string {
-      const contract = contractFor(fieldKey)
-      const hasValue = Object.prototype.hasOwnProperty.call(source, fieldKey)
-        && source[fieldKey] !== null
-        && source[fieldKey] !== undefined
-      if (!hasValue) return fallback
-
-      const parsed = parseRenderField(source[fieldKey], contract, allowTypedLiterals)
-      if (!parsed.ok) {
-        for (const diagnostic of parsed.diagnostics) {
-          pushIssue(context, fieldKey, contract, diagnostic.code, issues, diagnostic.path)
-        }
-        return fallback
-      }
-      return parsed.value as string
+      return value(fieldKey, undefined, fallback) as string
     },
     number(fieldKey: string): number {
       return value(fieldKey) as number

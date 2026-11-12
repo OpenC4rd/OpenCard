@@ -111,50 +111,24 @@ describe('useExportSpace', () => {
     expect(space.activeProfile.value?.output.directory).toBe('E:/elsewhere')
   })
 
-  it('starts new profiles as unsaved drafts that cancel removes', async () => {
+  it('creates, duplicates and deletes profiles as files right away', async () => {
     const { space, options } = createSpace()
     await space.load()
 
     space.add()
-    expect(space.activeProfile.value).toMatchObject({ name: 'New', documents: ['**/*.ocdocument'] })
-    expect(space.editing.value).toBe(true)
-    await vi.advanceTimersByTimeAsync(1000)
-    expect(options.saveProfile).not.toHaveBeenCalled()
-
-    space.cancel()
-    expect(space.profiles.value).toEqual([])
-    expect(space.activeProfile.value).toBeNull()
-  })
-
-  it('creates, duplicates and deletes profiles as files', async () => {
-    const { space, options } = createSpace()
-    await space.load()
-
-    space.add()
-    await space.save()
     const created = space.activeProfile.value!
+    expect(created).toMatchObject({ name: 'New', documents: ['**/*.ocdocument'] })
+    expect(space.editing.value).toBe(false)
+    expect(options.saveProfile).toHaveBeenCalledWith(created)
 
     space.duplicate(created.name)
-    await space.save()
     const copy = space.activeProfile.value!
     expect(copy).toMatchObject({ name: 'New 2' })
-    expect(copy.name).not.toBe(created.name)
-    expect(options.saveProfile).toHaveBeenCalledTimes(2)
+    expect(options.saveProfile).toHaveBeenLastCalledWith(copy)
 
     space.remove(copy.name)
     expect(options.deleteProfile).toHaveBeenCalledWith(copy.name)
     expect(space.activeProfile.value?.name).toBe(created.name)
-  })
-
-  it('never touches files for a draft removed before saving', async () => {
-    const { space, options } = createSpace()
-    await space.load()
-    space.add()
-
-    space.remove(space.activeProfile.value!.name)
-
-    expect(options.saveProfile).not.toHaveBeenCalled()
-    expect(options.deleteProfile).not.toHaveBeenCalled()
   })
 
   it('exports the draft without saving it', async () => {

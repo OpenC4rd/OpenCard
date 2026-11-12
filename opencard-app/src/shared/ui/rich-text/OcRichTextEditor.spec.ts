@@ -190,6 +190,17 @@ describe('OcRichTextEditor locale reactivity', () => {
       await input.setValue('1.5em')
       await input.trigger('keydown', { key: 'Enter' })
       expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('1.5em')
+      // 字号的增减与裸数字都沿用当前单位。
+      await input.setValue('14pt')
+      await input.trigger('keydown', { key: 'Enter' })
+      await wrapper.get('button[aria-label="增大字号"]').trigger('click')
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('16pt')
+      await wrapper.get('button[aria-label="减小字号"]').trigger('click')
+      await wrapper.get('button[aria-label="减小字号"]').trigger('click')
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('12pt')
+      await input.setValue('9')
+      await input.trigger('keydown', { key: 'Enter' })
+      expect((wrapper.vm as unknown as { editor: Editor }).editor.getAttributes('textStyle').fontSize).toBe('9pt')
     } finally {
       wrapper.unmount()
       overlayRoot.unmount()

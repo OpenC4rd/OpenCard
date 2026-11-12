@@ -1,8 +1,5 @@
 <template>
-  <MonacoEditor v-if="editorState.mode === 'diff'" :model-value="editorState.draftContent ?? ''" language="json"
-    :mode="editorState.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
-
-  <ProjectRegistryEditorShell v-else content-mode="workspace" @keydown.ctrl.s.prevent="save">
+  <ProjectRegistryEditorShell content-mode="workspace" @keydown.ctrl.s.prevent="save">
     <ProjectFontRegistryEditor v-if="document" ref="workbenchRef" :families="document.families ?? []"
       :compositions="document.compositions ?? []"
       :resolve-asset-src="source => projectStore.resolveResourceAssetSrcFromFile(filePath, source)"
@@ -51,7 +48,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import MonacoEditor from './MonacoEditor.vue'
 import type { EditorEmits, EditorProps } from '../../features/editor-runtime/editorProtocol'
 import type { ContentHistoryOperationMeta } from '../../features/editor-runtime/history/contentHistory'
 import type { EditorIssue, EditorIssueSnapshot, EditorNavigationResult, SessionNavigationToken } from '../../features/editor-runtime/model/editorIssue'

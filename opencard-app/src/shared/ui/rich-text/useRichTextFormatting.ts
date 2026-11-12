@@ -10,7 +10,7 @@ import { isAbsoluteLength, isLength, type TextShadow, type TextStroke } from '..
 const initialStroke: TextStroke = { color: '#000000', width: '0.2mm' }
 const initialShadow: TextShadow = { color: '#00000080', offsetX: '0.3mm', offsetY: '0.3mm', blur: '0mm' }
 const defaults = {
-  fontFamily: '', fontSize: '', foregroundColor: '#24292f', backgroundColor: '#00000000',
+  fontFamily: '', fontSize: '3.5mm', letterSpacing: '0mm', foregroundColor: '#24292f', backgroundColor: '#00000000',
   foregroundType: 'solid', foregroundSource: '',
   strokeEnabled: 'false', strokeColor: initialStroke.color, strokeWidth: initialStroke.width,
   shadowEnabled: 'false', shadowColor: initialShadow.color, shadowOffsetX: initialShadow.offsetX,
@@ -20,7 +20,7 @@ const defaults = {
 type Field = keyof typeof defaults
 export type RichTextFormatValue = { kind: 'unset' | 'value' | 'mixed'; value: string; explicit: boolean }
 const styleAttributes: Partial<Record<Field, string>> = {
-  fontFamily: 'fontFamily', fontSize: 'fontSize', foregroundColor: 'color', foregroundSource: 'textFillSource',
+  fontFamily: 'fontFamily', fontSize: 'fontSize', letterSpacing: 'letterSpacing', foregroundColor: 'color', foregroundSource: 'textFillSource',
 }
 type Effect = { attribute: string; initial: Record<string, string> }
 const stroke: Effect = { attribute: 'textStroke', initial: initialStroke }
@@ -31,7 +31,22 @@ const effectParts: Record<string, Effect & { part: string }> = {
   shadowColor: { ...shadow, part: 'color' }, shadowOffsetX: { ...shadow, part: 'offsetX' },
   shadowOffsetY: { ...shadow, part: 'offsetY' }, shadowBlur: { ...shadow, part: 'blur' },
 }
-const sizeSteps = [2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32]
+/** 字号档位跟随当前单位；没有档位表的单位按比例增减。 */
+export const sizeSteps: Record<string, readonly number[]> = {
+  mm: [2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32],
+  pt: [6, 7, 8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72],
+}
+/** 裸数字在卡片长度里就是毫米。 */
+export const lengthUnit = (length: string) => /[a-z%]+$/i.exec(length.trim())?.[0].toLowerCase() || 'mm'
+function steppedSize(size: string, direction: -1 | 1): string | null {
+  const current = Number.parseFloat(size)
+  if (!Number.isFinite(current)) return null
+  const unit = lengthUnit(size)
+  const steps = sizeSteps[unit]
+  const next = !steps ? Math.round(current * (direction > 0 ? 1.1 : 1 / 1.1) * 100) / 100
+    : direction > 0 ? steps.find(step => step > current) : [...steps].reverse().find(step => step < current)
+  return `${next ?? current}${unit}`
+}
 
 export function useRichTextFormatting(
   getEditor: () => Editor | undefined,
@@ -44,7 +59,7 @@ export function useRichTextFormatting(
     const editor = getEditor()
     const inheritedStyle = editor?.view.dom ? getComputedStyle(editor.view.dom) : null
     const inherited = { ...defaults,
-      fontSize: baseSize() || '3.5mm',
+      fontSize: baseSize() || defaults.fontSize,
       foregroundColor: inheritedStyle?.color || defaults.foregroundColor,
       textAlign: inheritedStyle?.textAlign && inheritedStyle.textAlign !== 'start' ? inheritedStyle.textAlign : defaults.textAlign,
     }
@@ -120,7 +135,7 @@ export function useRichTextFormatting(
   })
   const value = (field: Field) => state.value[field].value
   /** 逐段改写效果：选区里各段的其余参数互不相同时也要各自保留。 */
-  function patchEffect(chain: ChainedCommands, attribute: string, next: (current: object | null) => object | null) {
+  function patchEffect<T>(chain: ChainedCommands, attribute: string, next: (current: T | null) => T | null) {
     chain.command(({ tr, state }) => {
       const type = state.schema.marks.textStyle!
       const patched = (marks: readonly Mark[]) => {
@@ -154,9 +169,13 @@ export function useRichTextFormatting(
       } else if (field === 'foregroundColor') chain.setMark('textStyle', { color: raw, textFillType: null, textFillSource: null })
       else if (field === 'fontFamily') raw ? chain.setFontFamily(raw) : chain.unsetFontFamily()
       else if (field === 'fontSize') {
-        const size = normalizeLength(raw, isLength)
+        const size = normalizeLength(raw, isLength, lengthUnit(value('fontSize')))
         if (!size || Number.parseFloat(size) <= 0) return
         chain.setMark('textStyle', { fontSize: size })
+      } else if (field === 'letterSpacing') {
+        const spacing = normalizeLength(raw, isAbsoluteLength, lengthUnit(value('letterSpacing')))
+        if (!spacing) return
+        chain.setMark('textStyle', { letterSpacing: Number.parseFloat(spacing) === 0 ? null : spacing })
       } else if (field === 'foregroundType') {
         chain.setMark('textStyle', raw === 'image' ? { textFillType: 'image' }
           : { textFillType: null, textFillSource: null })
@@ -169,7 +188,7 @@ export function useRichTextFormatting(
         patchEffect(chain, attribute, raw === 'true' ? current => current ?? initial : () => null)
       } else if (field in effectParts) {
         const { attribute, initial, part } = effectParts[field]!
-        const next = part === 'color' ? raw : normalizeLength(raw, isAbsoluteLength)
+        const next = part === 'color' ? raw : normalizeLength(raw, isAbsoluteLength, lengthUnit(value(field as Field)))
         if (!next || ((part === 'width' || part === 'blur') && Number.parseFloat(next) < 0)) return
         patchEffect(chain, attribute, current => ({ ...(current ?? initial), [part]: next }))
       }
@@ -195,7 +214,7 @@ export function useRichTextFormatting(
     const style = document.createElement('span').style
     if (field === 'foregroundColor') { style.color = color; style.backgroundImage = 'none' }
     else if (field === 'backgroundColor') style.backgroundColor = color
-    else if (field === 'strokeColor') style.webkitTextStroke = `${value('strokeWidth')} ${color}`
+    else if (field === 'strokeColor') { style.webkitTextStroke = `${value('strokeWidth')} ${color}`; style.paintOrder = 'stroke fill' }
     else if (field === 'shadowColor') style.textShadow = `${value('shadowOffsetX')} ${value('shadowOffsetY')} ${value('shadowBlur')} ${color}`
     interaction.preview(style.cssText)
   }
@@ -206,19 +225,20 @@ export function useRichTextFormatting(
     if (mutation.key === 'rich-text-selection') preview(mutation.fieldKey, String(mutation.value ?? ''))
   }
   function adjustSize(direction: -1 | 1) {
-    const active = value('fontSize')
-    const size = Number.parseFloat(active) || 3.5
-    const next = direction > 0
-      ? sizeSteps.find(step => step > size) ?? sizeSteps[sizeSteps.length - 1]
-      : [...sizeSteps].reverse().find(step => step < size) ?? sizeSteps[0]
-    apply('fontSize', `${next}mm`)
+    const inherited = baseSize() || defaults.fontSize
+    interaction.run(editor => {
+      const chain = editor.chain()
+      // 逐段按各自的字号和单位走一档，混合选区不会被抹成同一个字号。
+      patchEffect<string>(chain, 'fontSize', current => steppedSize(current ?? inherited, direction) ?? current)
+      commit(chain)
+    }, true)
   }
-  return { state, value, apply, reset, update, preview, previewProperty, adjustSize, sizeSteps }
+  return { state, value, apply, reset, update, preview, previewProperty, adjustSize }
 }
 
-/** 裸数字按毫米补单位；什么单位合法由 Card Markup 决定，存下的值必须能写回源码。 */
-function normalizeLength(raw: string, isValid: (value: string) => boolean): string | null {
+/** 裸数字沿用字段当前的单位；什么单位合法由 Card Markup 决定，存下的值必须能写回源码。 */
+function normalizeLength(raw: string, isValid: (value: string) => boolean, unit: string): string | null {
   const value = raw.trim().toLowerCase()
-  const length = /^-?(?:\d+\.?\d*|\.\d+)$/.test(value) ? `${value}mm` : value
+  const length = /^-?(?:\d+\.?\d*|\.\d+)$/.test(value) ? `${value}${unit}` : value
   return isValid(length) ? length : null
 }

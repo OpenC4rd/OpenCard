@@ -92,6 +92,13 @@ describe('imposeCards', () => {
     expect(page!.cropMarks).toHaveLength(16)
   })
 
+  it('aligns crop marks to the trim line and keeps them outside the bleed', () => {
+    const [page] = imposeCards(paper({ cropMarks: true, placement: 'top-left', marginLeft: 20, marginTop: 20 }), [{ key: 0, width: 69, height: 94, bleed: 3 }], null)!
+    expect(page!.placements[0]).toMatchObject({ x: 20, y: 20, width: 69, height: 94 })
+    expect(page!.cropMarks[0]).toEqual([23, 16, 23, 19])
+    expect(page!.cropMarks[4]).toEqual([16, 23, 19, 23])
+  })
+
   it('never prints a crop mark over a neighbouring card', () => {
     const [page] = imposeCards(paper({ cropMarks: true }), cards(9), null)!
 

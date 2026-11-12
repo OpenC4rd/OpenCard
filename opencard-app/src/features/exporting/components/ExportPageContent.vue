@@ -5,7 +5,7 @@
   <ProjectResourceWorkbench v-else :inspector-title="t('projectExport.inspectorTitle')"
     :inspector-actions="inspectorActions" @action="handleInspectorAction">
     <OcEmpty v-if="message" icon="mdiPrinter" tone="muted" fill role="status">{{ message }}</OcEmpty>
-    <div v-else class="export-page__stage" :class="{ 'is-loading': preview.loading }" :aria-busy="preview.loading"
+    <div v-else class="export-page__stage" data-oc-tutorial="export.preview" :class="{ 'is-loading': preview.loading }" :aria-busy="preview.loading"
       @wheel.prevent="handleWheel">
       <img v-for="url in preview.imageUrls" :key="url" class="export-page__sheet"
         :class="{ 'is-spread': preview.pageStep > 1 }" :src="url" :alt="t('projectExport.preview.alt')">
@@ -29,11 +29,11 @@
 
     <template #inspector>
       <div class="export-page__properties">
-        <div class="export-page__fields">
+        <div class="export-page__fields" data-oc-tutorial="export.properties">
           <PropertyEditor :inputs="inputs" :categories="categories" :capabilities="capabilities" sort-mode="category"
             @update-property="updateProperty" />
         </div>
-        <OcButton class="export-page__submit" block size="lg" variant="solid" icon="mdiExport" :disabled="busy || Boolean(issue)" @click="emit('submit')">
+        <OcButton class="export-page__submit" data-oc-tutorial="export.submit" block size="lg" variant="solid" icon="mdiExport" :disabled="busy || Boolean(issue)" @click="emit('submit')">
           {{ t(busy ? 'projectExport.preparing' : 'projectExport.submit') }}
         </OcButton>
       </div>

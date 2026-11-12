@@ -414,7 +414,8 @@ describe('Invariant 3: Vertical text layout baseline positioning', () => {
 
     // Find translate & rotate calls for rotated text
     expect(ctx.translate).toHaveBeenCalled()
-    expect(ctx.rotate).toHaveBeenCalledWith(Math.PI / 2)
+    // 叠加了一个关闭字形像素对齐的极小角度
+    expect(vi.mocked(ctx.rotate).mock.calls[0]![0]).toBeCloseTo(Math.PI / 2, 2)
 
     // Check drawText coordinates
     const fillTextCalls = ctx.recordedDrawCalls.filter(c => c.method === 'fillText')

@@ -1,13 +1,9 @@
-/**
- * 模块说明：
- * - 定义属性编辑 schema 默认值与字段物化策略
- * 职责边界：
- * - 只维护字段协议与默认值 不承载 UI 写回逻辑
- */
+/** 属性编辑 schema：只维护字段协议、默认值与字段物化策略，不承载 UI 写回逻辑。 */
 import type { IconToken } from '../../shared/ui/icon/iconRegistry'
 import type { BindingValueKind } from '../../features/editor-runtime/model/binding'
 import type { BindingScopeKind } from '../../features/editor-runtime/model/bindingExpression'
 import type { FilePathFilter } from '../../shared/model/filePath'
+import { schemaDefaultValuesByType } from './schemaDefaults'
 
 type EditorPropertyBase = {
     /** 覆盖属性行按 fieldType 显示的图标；缺省时用类型图标。 */
@@ -427,6 +423,12 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
         maskSource: { ...imageSourceField, icon: 'mdiImageFilterBlackWhite' },
         fit: { fieldType: 'string', options: imageFitOptions, categoryId: 'content' },
         maskFit: { fieldType: 'string', options: imageFitOptions, categoryId: 'content' },
+        outlineColor: { fieldType: 'color', categoryId: 'graphicStyle' },
+        outlineWidth: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'graphicStyle' },
+        shadowColor: { fieldType: 'color', categoryId: 'graphicStyle' },
+        shadowBlur: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'graphicStyle' },
+        shadowOffsetX: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'graphicStyle' },
+        shadowOffsetY: { fieldType: 'string', autocomplete: cssLengthAutocomplete, defaultUnit: 'mm', categoryId: 'graphicStyle' },
     },
     'qrcode-block': {
         ...createBaseBlockPropertyEditorSchema(),
@@ -483,6 +485,7 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
         version: { fieldType: 'string', unremovable: true, categoryId: 'general', bindingScopes: ['project'] },
         width: { fieldType: 'number', suffix: 'mm', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
         height: { fieldType: 'number', suffix: 'mm', unremovable: true, min: 0, categoryId: 'size', bindingScopes: ['project'] },
+        bleed: { fieldType: 'number', suffix: 'mm', min: 0, categoryId: 'size', bindingScopes: ['project'] },
         dpi: { fieldType: 'number', suffix: 'dpi', min: 72, categoryId: 'size', bindingScopes: ['project'] },
         id: { fieldType: 'string', unremovable: true, categoryId: 'advanced', isReadonly: true, isHidden: true, acceptsBinding: false },
         type: { fieldType: 'string', unremovable: true, isReadonly: true, isHidden: true, categoryId: 'advanced', acceptsBinding: false, exposesReference: false },
@@ -506,136 +509,6 @@ const rawPropertyEditorSchemaByType: TypePropertyDefinitions = {
 }
 
 /** 五种块的公共默认值：公共属性只写一遍，各型只补 `type` 与自己的字段。 */
-const BASE_BLOCK_DEFAULTS = {
-    id: '',
-    name: '',
-    notes: '',
-    visible: 'true',
-    width: '32%',
-    height: '18%',
-    translateX: '0mm',
-    translateY: '0mm',
-    scaleX: '1',
-    scaleY: '1',
-    transformAnchor: 'cc',
-    zIndex: '0',
-    rotation: '0',
-    opacity: '1',
-    borderColor: '#000000',
-    borderWidth: '0',
-    borderStyle: 'solid',
-    borderRadius: '',
-    background: '',
-}
-
-function createTextContentBlockDefaultValues(): Record<string, unknown> {
-    return {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'text-block',
-        content: '',
-        fontSize: '3.5mm',
-        fontFamily: '',
-        fontWeight: 'normal',
-        color: '#000000',
-        textAlign: 'start',
-        verticalAlign: 'top',
-        lineHeight: '150%',
-        writingMode: 'horizontal-tb',
-    }
-}
-
-const schemaDefaultValuesByType: Record<string, Record<string, unknown>> = {
-    'text-block': createTextContentBlockDefaultValues(),
-    'image-block': {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'image-block',
-        source: '',
-        maskSource: '',
-        maskFit: 'contain',
-        fit: 'cover',
-    },
-    'qrcode-block': {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'qrcode-block',
-        content: '',
-        errorCorrection: 'M',
-        foreground: '#000000',
-        backgroundColor: '#FFFFFF',
-        quietZone: '4',
-    },
-    'shape-block': {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'shape-block',
-        shape: 'rectangle',
-        fill: '#7C6CFF',
-        stroke: '#000000',
-        strokeWidth: '0',
-        strokeStyle: 'solid',
-        strokeAlignment: 'center',
-        strokeJoin: 'miter',
-        strokeCap: 'butt',
-        strokeMiterLimit: '4',
-    },
-    'simple-container-block': {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'simple-container-block',
-        packaged: 'false',
-        clip: 'false',
-        children: [],
-    },
-    'flow-container-block': {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'flow-container-block',
-        packaged: 'false',
-        clip: 'false',
-        direction: 'lr',
-        gap: '2mm',
-        children: [],
-    },
-    'custom-block': {
-        ...BASE_BLOCK_DEFAULTS,
-        type: 'custom-block',
-        source: '',
-    },
-    'simple-container-location': {
-        id: '',
-        type: 'simple-container-location',
-        anchor: 'lt',
-        x: '0mm',
-        y: '0mm',
-    },
-    'flow-container-location': {
-        id: '',
-        type: 'flow-container-location',
-        index: '0',
-        align: 'start',
-    },
-    'card-document': {
-        type: 'card-document',
-        id: '',
-        version: '1.0.0',
-        width: '63',
-        height: '88',
-        faces: {
-            front: { type: 'card-face', id: '', background: '#FFFFFF', children: [] },
-            back: { type: 'card-face', id: '', background: '#FFFFFF', children: [] },
-        },
-        instances: [],
-    },
-    'card-face': {
-        type: 'card-face',
-        id: '',
-        background: '#FFFFFF',
-        children: [],
-    },
-    'card-instance': {
-        type: 'card-instance',
-        amount: '1',
-        id: '',
-        name: '',
-    },
-}
-
 function applyDefaultsToSchema(schemaByType: TypePropertyDefinitions): TypePropertyDefinitions {
     const nextSchema: TypePropertyDefinitions = {}
 

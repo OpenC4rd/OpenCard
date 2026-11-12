@@ -41,6 +41,7 @@ function styleArgs(style: InlineStyleSpec): string[] {
   text('bg', style.backgroundColor)
   text('size', style.fontSize)
   text('font', style.fontFamily)
+  text('spacing', style.letterSpacing)
   text('fill', style.fillSource)
   if (style.stroke) text('stroke', `${style.stroke.color} ${style.stroke.width}`)
   if (style.shadow) {

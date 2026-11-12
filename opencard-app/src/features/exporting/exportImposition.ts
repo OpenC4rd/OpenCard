@@ -5,8 +5,9 @@ import { EXPORT_PAPER_SIZES, type ExportPaper } from '../workspace/model/project
 const CROP_MARK_LENGTH = 3
 const CROP_MARK_OFFSET = 1
 
-export type ExportSheetCard = { key: number; width: number; height: number }
-export type ExportPlacement = { entryIndex: number; x: number; y: number; width: number; height: number }
+/** 宽高含出血；`bleed` 是其中每边的出血量，裁切标记据此对齐成品线。 */
+export type ExportSheetCard = { key: number; width: number; height: number; bleed?: number }
+export type ExportPlacement = { entryIndex: number; x: number; y: number; width: number; height: number; bleed?: number }
 export type ExportCropMark = readonly [x1: number, y1: number, x2: number, y2: number]
 
 export type ExportPdfPage = {
@@ -26,16 +27,18 @@ function fitCount(available: number, cell: number, gap: number): number {
 }
 
 function cropMarksFor(card: ExportPlacement): ExportCropMark[] {
-  const { x, y, width, height } = card
+  const { x, y, width, height, bleed = 0 } = card
   const right = x + width
   const bottom = y + height
   const near = CROP_MARK_OFFSET
   const far = CROP_MARK_OFFSET + CROP_MARK_LENGTH
+  // 标记画在出血之外，位置对齐成品线。
+  const [trimLeft, trimRight, trimTop, trimBottom] = [x + bleed, right - bleed, y + bleed, bottom - bleed]
   return [
-    [x, y - far, x, y - near], [right, y - far, right, y - near],
-    [x, bottom + near, x, bottom + far], [right, bottom + near, right, bottom + far],
-    [x - far, y, x - near, y], [x - far, bottom, x - near, bottom],
-    [right + near, y, right + far, y], [right + near, bottom, right + far, bottom],
+    [trimLeft, y - far, trimLeft, y - near], [trimRight, y - far, trimRight, y - near],
+    [trimLeft, bottom + near, trimLeft, bottom + far], [trimRight, bottom + near, trimRight, bottom + far],
+    [x - far, trimTop, x - near, trimTop], [x - far, trimBottom, x - near, trimBottom],
+    [right + near, trimTop, right + far, trimTop], [right + near, trimBottom, right + far, trimBottom],
   ]
 }
 
@@ -91,6 +94,7 @@ function imposeSameSizeCards(
         y: placedY + (cellHeight - card.height) / 2,
         width: card.width,
         height: card.height,
+        bleed: card.bleed,
       }
     })
     const cropMarks = paper.cropMarks

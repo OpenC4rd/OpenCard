@@ -96,4 +96,12 @@ export const tutorials = {
       },
     ],
   },
+  exportProject: {
+    title: 'tutorial.exportProject.title',
+    blockInteraction: true,
+    steps: ['profiles', 'preview', 'properties', 'submit'].map(key => ({
+      id: key, manual: true,
+      targets: [{ key: `export.${key}`, title: `tutorial.exportProject.${key}.title`, desc: `tutorial.exportProject.${key}.description` }],
+    })),
+  },
 } satisfies Record<string, TutorialDefinition>

@@ -120,26 +120,11 @@
       </Transition>
     </div>
     <div v-if="!effectiveLayerViewActive" class="card-selection-layer">
-      <div v-if="props.comparison" class="card-diff-overlay-layer card-diff-overlay-layer--before" :class="{ 'is-hidden': !diffOverlayVisible }" :style="comparisonBeforeLayerStyle" aria-hidden="true">
-        <div v-for="highlight in diffOverlayBeforeHighlights" :key="highlight.key" :data-block-id="highlight.key.split(':')[1]" class="card-diff-overlay"
-          :class="[`card-diff-overlay--${highlight.kind}`, `card-diff-overlay--${highlight.side}`]" :style="highlight.style">
-          <span class="card-diff-overlay__label"><OcIcon :name="highlight.icon" size="sm" /></span>
-        </div>
-      </div>
-      <div v-if="props.comparison" class="card-diff-overlay-layer card-diff-overlay-layer--after" :class="{ 'is-hidden': !diffOverlayVisible }" :style="comparisonAfterLayerStyle" aria-hidden="true">
-        <div v-for="highlight in diffOverlayAfterHighlights" :key="highlight.key" :data-block-id="highlight.key.split(':')[1]" class="card-diff-overlay"
-          :class="[`card-diff-overlay--${highlight.kind}`, `card-diff-overlay--${highlight.side}`]" :style="highlight.style">
-          <span class="card-diff-overlay__label"><OcIcon :name="highlight.icon" size="sm" /></span>
-        </div>
-      </div>
-      <svg v-if="comparisonHoverLink" class="card-diff-hover-link" aria-hidden="true">
-        <defs>
-          <marker id="card-diff-hover-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L7,3.5 L0,7 Z" />
-          </marker>
-        </defs>
-        <path :d="comparisonHoverLink.path" marker-end="url(#card-diff-hover-arrow)" />
-      </svg>
+      <CardDiffOverlay v-if="props.comparison && comparisonOrigins" ref="diffOverlayRef"
+        :before="props.comparison.before" :after="props.comparison.after"
+        :origins="comparisonOrigins" :scale="scale || 1"
+        :clips="{ before: comparisonBeforeLayerStyle, after: comparisonAfterLayerStyle }"
+        :side-by-side="props.comparison.viewMode === 'side-by-side'" />
       <svg v-if="alignmentSnapGuides.length > 0" class="selection-alignment-guides" aria-hidden="true">
         <line v-for="guide in alignmentSnapGuides" :key="guide.axis"
           :x1="guide.x1" :y1="guide.y1" :x2="guide.x2" :y2="guide.y2" />
@@ -261,6 +246,7 @@
 <script lang="ts">
 import type { IconToken, IconTone } from '../../../shared/ui/icon/iconRegistry'
 import type { RenderReadyCardFace as ComparisonCardFace } from '../render.types'
+import type { CardDiffHighlight } from './CardDiffOverlay.vue'
 import type { CardRenderResourceContext as ComparisonResourceContext } from '../cardRenderResources'
 
 type CardViewportSelectionAction =
@@ -304,11 +290,6 @@ export type CardViewportStatusFlash = {
   message: string
 }
 
-export type CardDiffHighlight = {
-  blockId: string
-  kind: 'added' | 'removed' | 'changed'
-}
-
 interface CardViewportComparisonLayer {
   face: ComparisonCardFace
   resourceContext: ComparisonResourceContext
@@ -340,6 +321,7 @@ import OcOverlayToolbar from '../../../components/standard/OcOverlayToolbar.vue'
 import type { OcShortcutPart } from '../../../components/standard/OcShortcut.vue'
 import { useContextMenu } from '../../../shared/ui/useContextMenu'
 import CardFaceRenderer from './CardFaceRenderer.vue'
+import CardDiffOverlay from './CardDiffOverlay.vue'
 import {
   resolveFullFaceRasterScale,
   resolveVisibleCardFaceView,
@@ -389,13 +371,6 @@ type SelectionFrame = {
   height: number
 }
 
-type DiffOverlayHighlight = SelectionFrame & {
-  key: string
-  kind: CardDiffHighlight['kind']
-  icon: 'mdiPlus' | 'mdiMinus' | 'mdiCircleMedium'
-  side: 'before' | 'after'
-  style: Record<string, string>
-}
 type SelectionMeasurement = {
   frame: SelectionFrame
   parentFrame: SelectionFrame
@@ -613,25 +588,7 @@ const selectionWorldFrame = ref<SelectionFrame | null>(null)
 let selectionSyncScheduled = false
 let selectionSyncInFlight = false
 let selectionSyncAgain = false
-const diffOverlayHighlights = ref<DiffOverlayHighlight[]>([])
-const diffOverlayVisible = ref(true)
-const diffOverlayBeforeHighlights = computed(() => diffOverlayHighlights.value.filter(highlight => highlight.side === 'before'))
-const diffOverlayAfterHighlights = computed(() => diffOverlayHighlights.value.filter(highlight => highlight.side === 'after'))
-const hoveredComparisonBlockId = ref<string | null>(null)
-const comparisonHoverLink = computed(() => {
-  if (props.comparison?.viewMode !== 'side-by-side' || !hoveredComparisonBlockId.value) return null
-  const before = diffOverlayHighlights.value.find(highlight => highlight.key === `before:${hoveredComparisonBlockId.value}`)
-  const after = diffOverlayHighlights.value.find(highlight => highlight.key === `after:${hoveredComparisonBlockId.value}`)
-  if (!before || !after) return null
-  const startX = before.left + before.width
-  const startY = before.top + before.height / 2
-  const endX = after.left
-  const endY = after.top + after.height / 2
-  const controlX = (startX + endX) / 2
-  return {
-    path: `M ${startX} ${startY} C ${controlX} ${startY}, ${controlX} ${endY}, ${endX} ${endY}`,
-  }
-})
+const diffOverlayRef = ref<InstanceType<typeof CardDiffOverlay> | null>(null)
 const activeHandle = ref<ResizeHandle | null>(null)
 const isMovingSelection = ref(false)
 const rotateDrag = ref<RotateDrag | null>(null)
@@ -733,11 +690,11 @@ const selectionFrame = computed<SelectionFrame | null>({
 
 function resolveStageStyle(face: { width: number; height: number }, x: number, y: number) {
   return {
-    transform: `translate(${x}px, ${y}px) scale(${scale.value})`,
+    transform: `translate(${x}px, ${y}px)`,
     transformOrigin: '0 0',
-    width: `${face.width}px`,
-    height: `${face.height}px`,
-    '--oc-viewport-inverse-scale': String(1 / scale.value),
+    width: `${face.width * scale.value}px`,
+    height: `${face.height * scale.value}px`,
+    '--oc-card-stage-scale': String(scale.value),
   }
 }
 const stageStyle = computed(() => resolveStageStyle(props.face, translateX.value, translateY.value))
@@ -800,7 +757,7 @@ const comparisonAfterStageStyle = computed(() => props.comparison
   ? resolveComparisonStageStyle(props.comparison.after)
   : stageStyle.value)
 function placeholderStyle(face: ComparisonCardFace): Record<string, string> {
-  return { width: `${face.width}px`, height: `${face.height}px` }
+  return { width: `${face.width * scale.value}px`, height: `${face.height * scale.value}px` }
 }
 function resolveFaceRasterScale(face: ComparisonCardFace): number {
   return resolveFullFaceRasterScale(face, window.devicePixelRatio || 1)
@@ -832,6 +789,15 @@ const comparisonBeforeLayerStyle = computed(() => ({
 const comparisonAfterLayerStyle = computed(() => ({
   clipPath: `inset(0 0 0 ${comparisonDividerPosition.value / Math.max(1, viewportWidth.value) * 100}%)`,
 }))
+const comparisonOrigins = computed(() => {
+  const comparison = props.comparison
+  if (!comparison) return null
+  const at = (layer: CardViewportComparisonLayer) => {
+    const origin = resolveZoomOrigin(layer, scale.value || 1)
+    return { x: origin.x + panX.value, y: origin.y + panY.value }
+  }
+  return { before: at(comparison.before), after: at(comparison.after) }
+})
 const comparisonDividerStyle = computed(() => ({
   left: `${comparisonDividerPosition.value}px`,
   top: '0',
@@ -1372,7 +1338,7 @@ function handleMouseDown(event: MouseEvent) {
 }
 
 function handleMouseMove(event: MouseEvent) {
-  updateHoveredComparisonBlock(event.target)
+  diffOverlayRef.value?.hover(event.target)
 }
 
 function applyPan(point: { x: number; y: number }): void {
@@ -1392,32 +1358,11 @@ function applyPan(point: { x: number; y: number }): void {
 let stopPan: (() => void) | null = null
 
 function handleComparisonMouseOver(event: MouseEvent): void {
-  updateHoveredComparisonBlock(event.target)
-}
-
-function updateHoveredComparisonBlock(target: EventTarget | null): void {
-  if (props.comparison?.viewMode !== 'side-by-side' || !(target instanceof Element)) {
-    hoveredComparisonBlockId.value = null
-    return
-  }
-  const afterIds = new Set((props.comparison?.after.diffHighlights ?? []).map(highlight => highlight.blockId))
-  const linkedBlockIds = new Set((props.comparison?.before.diffHighlights ?? [])
-    .map(highlight => highlight.blockId)
-    .filter(blockId => afterIds.has(blockId)))
-  let element: Element | null = target.closest('[data-block-id]')
-  while (element) {
-    const blockId = element instanceof HTMLElement ? element.dataset.blockId : undefined
-    if (blockId && linkedBlockIds.has(blockId)) {
-      hoveredComparisonBlockId.value = blockId
-      return
-    }
-    element = element.parentElement?.closest('[data-block-id]') ?? null
-  }
-  hoveredComparisonBlockId.value = null
+  diffOverlayRef.value?.hover(event.target)
 }
 
 function handleMouseLeave(): void {
-  hoveredComparisonBlockId.value = null
+  diffOverlayRef.value?.hover(null)
 }
 
 function handleWheel(event: WheelEvent) {
@@ -1692,92 +1637,6 @@ function stopFaceDimensionDrag(): void {
   emit('face-dimension-change', { dimension: drag.dimension, value: drag.lastValue, final: true })
 }
 
-async function refreshDiffOverlay(): Promise<void> {
-  await nextTick()
-  syncDiffOverlayHighlights()
-}
-
-function syncDiffOverlayHighlights(): void {
-  const comparison = props.comparison
-  if (!comparison) {
-    if (diffOverlayHighlights.value.length > 0) diffOverlayHighlights.value = []
-    return
-  }
-  const safeScale = scale.value || 1
-  const beforeScene = computeSceneLayout(comparison.before.face)
-  const afterScene = computeSceneLayout(comparison.after.face)
-
-  const beforeOrigin = comparison.viewMode === 'side-by-side'
-    ? resolveZoomOrigin(comparison.before, safeScale)
-    : { x: baseOffsetX.value, y: baseOffsetY.value }
-  const afterOrigin = comparison.viewMode === 'side-by-side'
-    ? resolveZoomOrigin(comparison.after, safeScale)
-    : { x: baseOffsetX.value, y: baseOffsetY.value }
-
-  const layers = [
-    {
-      side: 'before' as const,
-      scene: beforeScene,
-      highlights: comparison.before.diffHighlights ?? [],
-      origin: { x: beforeOrigin.x + panX.value, y: beforeOrigin.y + panY.value },
-    },
-    {
-      side: 'after' as const,
-      scene: afterScene,
-      highlights: comparison.after.diffHighlights ?? [],
-      origin: { x: afterOrigin.x + panX.value, y: afterOrigin.y + panY.value },
-    },
-  ]
-
-  const nextHighlights: DiffOverlayHighlight[] = layers.flatMap(({ side, scene, highlights, origin }) => {
-    return highlights.flatMap(highlight => {
-      const node = scene.nodeMap.get(highlight.blockId)
-      if (!node) return []
-      const frame: SelectionFrame = {
-        left: origin.x + node.worldAabb.x * safeScale,
-        top: origin.y + node.worldAabb.y * safeScale,
-        width: node.worldAabb.width * safeScale,
-        height: node.worldAabb.height * safeScale,
-      }
-      return [{
-        ...frame,
-        key: `${side}:${highlight.blockId}`,
-        kind: highlight.kind,
-        icon: highlight.kind === 'added' ? 'mdiPlus' : highlight.kind === 'removed' ? 'mdiMinus' : 'mdiCircleMedium',
-        side,
-        style: {
-          left: `${frame.left}px`,
-          top: `${frame.top}px`,
-          width: `${frame.width}px`,
-          height: `${frame.height}px`,
-        },
-      }]
-    })
-  })
-
-  if (!sameDiffOverlayHighlights(diffOverlayHighlights.value, nextHighlights)) {
-    diffOverlayHighlights.value = nextHighlights
-  }
-}
-
-function sameDiffOverlayHighlights(
-  current: readonly DiffOverlayHighlight[],
-  next: readonly DiffOverlayHighlight[],
-): boolean {
-  if (current.length !== next.length) return false
-  return current.every((item, index) => {
-    const candidate = next[index]
-    return candidate !== undefined
-      && item.key === candidate.key
-      && item.left === candidate.left
-      && item.top === candidate.top
-      && item.width === candidate.width
-      && item.height === candidate.height
-      && item.kind === candidate.kind
-      && item.side === candidate.side
-  })
-}
-
 function measureSelection(): SelectionMeasurement | null {
   const selectedBlockId = props.selectedBlockId
   if (!selectedBlockId) return null
@@ -1900,7 +1759,6 @@ function requestSelectionFrameSync() {
 async function syncSelectionFrame() {
   await nextTick()
   if (isTransformingSelection.value) return
-  syncDiffOverlayHighlights()
   const measurement = measureSelection()
   const nextFrame = measurement?.frame ?? null
   if (!sameSelectionFrame(selectionFrame.value, nextFrame)) selectionFrame.value = nextFrame
@@ -2632,7 +2490,6 @@ defineExpose({
   getFocusedLayerBlockId,
   cycleLayerByInitial,
   flashStatus,
-  refreshDiffOverlay,
 })
 
 watch(
@@ -2648,24 +2505,6 @@ watch(
     }
     requestSelectionFrameSync()
   }
-)
-
-watch(
-  () => props.comparison,
-  async () => {
-    if (!props.comparison) {
-      diffOverlayVisible.value = false
-      diffOverlayHighlights.value = []
-      return
-    }
-
-    diffOverlayVisible.value = false
-    await nextTick()
-    syncDiffOverlayHighlights()
-    await nextTick()
-    diffOverlayVisible.value = true
-  },
-  { deep: true },
 )
 
 watch([translateX, translateY, scale], () => {
@@ -2686,76 +2525,6 @@ watch(
 
 <style scoped>
 .card-viewport--readonly .card-viewport-stage { pointer-events: none; }
-.card-diff-overlay-layer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 1;
-  transition: opacity var(--oc-duration-quick) var(--oc-ease);
-}
-
-.card-diff-overlay-layer.is-hidden {
-  opacity: 0;
-}
-
-.card-diff-overlay {
-  position: absolute;
-  z-index: var(--oc-z-overlay-toolbar);
-  box-sizing: border-box;
-  border: var(--oc-border-width) solid var(--oc-diff-changed-border);
-  border-radius: var(--oc-radius-control);
-  pointer-events: none;
-}
-.card-diff-overlay--added { border-color: var(--oc-diff-added-border); }
-.card-diff-overlay--removed { border-color: var(--oc-diff-removed-border); }
-.card-diff-overlay__label {
-  position: absolute;
-  top: calc(var(--oc-border-width) * -1);
-  left: calc(var(--oc-border-width) * -1);
-  display: grid;
-  width: var(--oc-icon-size-md);
-  height: var(--oc-icon-size-md);
-  place-items: center;
-  border-radius: var(--oc-radius-control) 0 var(--oc-radius-control) 0;
-  background: var(--oc-diff-changed-border);
-  color: var(--oc-fg-default);
-}
-.card-diff-overlay--added .card-diff-overlay__label { background: var(--oc-diff-added-border); }
-.card-diff-overlay--removed .card-diff-overlay__label { background: var(--oc-diff-removed-border); }
-.card-diff-overlay--after .card-diff-overlay__label {
-  right: calc(var(--oc-border-width) * -1);
-  left: auto;
-  border-radius: 0 var(--oc-radius-control) 0 var(--oc-radius-control);
-}
-.card-diff-overlay--before { border-top-left-radius: 0; }
-.card-diff-overlay--after { border-top-right-radius: 0; }
-.card-diff-overlay__label .oc-icon { flex: none; }
-
-.card-diff-hover-link {
-  position: absolute;
-  inset: 0;
-  z-index: var(--oc-z-overlay-toolbar);
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.card-diff-hover-link path {
-  fill: none;
-  stroke: var(--oc-diff-changed-border);
-  stroke-width: var(--oc-border-width);
-  stroke-linecap: round;
-  stroke-dasharray: var(--oc-space-2xs) var(--oc-space-2xs);
-  marker-end: url(#card-diff-hover-arrow);
-}
-
-.card-diff-hover-link marker path {
-  fill: var(--oc-diff-changed-border);
-  stroke: none;
-}
-
 .card-viewport-comparison-layer {
   position: absolute;
   inset: 0;
@@ -2775,7 +2544,7 @@ watch(
   position: absolute;
   inset: 0 auto auto 0;
   box-sizing: border-box;
-  border: calc(var(--oc-border-width) * var(--oc-viewport-inverse-scale, 1)) dashed var(--oc-fg-default);
+  border: var(--oc-border-width) dashed var(--oc-fg-default);
   background: transparent;
   pointer-events: none;
 }
@@ -3154,6 +2923,7 @@ watch(
   transition: box-shadow 100ms ease-out;
 }
 
+.card-viewport--face-flipping :is(.selection-frame, .selection-anchor-badge) { display: none; }
 .selection-frame-movable {
   pointer-events: auto;
   cursor: move;

@@ -14,6 +14,8 @@ export type InlineStyleSpec = {
   backgroundColor?: string
   fontSize?: string
   fontFamily?: string
+  /** 每个字后面追加的间距，绝对长度，可为负。 */
+  letterSpacing?: string
   stroke?: TextStroke
   shadow?: TextShadow
   fillSource?: string

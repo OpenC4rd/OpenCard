@@ -45,10 +45,12 @@ const paintedView = computed<CardFaceView>(() => props.view ?? {
   width: props.face.width,
   height: props.face.height,
   pixelScale: effectivePixelRatio.value,
+  screenScale: 1,
 })
 const canvasStyle = computed(() => {
   const view = props.view
-  // 舞台负责缩放；视图模式用 transform 抵消它，CSS 布局量化到 1/64px，放大后会偏出整像素
+  // 画布按屏幕尺寸布局，不靠缩放变换：WebKit 给嵌套缩放的图层按布局尺寸栅格化，放大后整张发糊。
+  // 位置用 transform 给：CSS 布局量化到 1/64px，变换不量化，位图才能 1:1 落在设备像素上。
   return {
     display: 'block',
     background: props.face.background,
@@ -56,13 +58,13 @@ const canvasStyle = computed(() => {
       position: 'absolute' as const,
       left: 0,
       top: 0,
-      width: `${view.width * view.pixelScale}px`,
-      height: `${view.height * view.pixelScale}px`,
-      transform: `translate(${view.left}px, ${view.top}px) scale(${1 / view.pixelScale})`,
+      width: `${view.width * view.screenScale}px`,
+      height: `${view.height * view.screenScale}px`,
+      transform: `translate(${view.left * view.screenScale}px, ${view.top * view.screenScale}px)`,
       transformOrigin: '0 0',
     } : {
-      width: `${props.face.width}px`,
-      height: `${props.face.height}px`,
+      width: `calc(${props.face.width}px * var(--oc-card-stage-scale, 1))`,
+      height: `calc(${props.face.height}px * var(--oc-card-stage-scale, 1))`,
     }),
   }
 })
@@ -95,6 +97,18 @@ function paint(): void {
     diffHighlights: props.diffHighlights,
     resourceContext: props.resourceContext,
   })
+  if (!props.view || !props.face.bleed) return
+  // 出血线（实线）与裁切线（虚线）：只在编辑视图里画，反色保证任何背景上都看得见。
+  const line = 1 / pixelScale
+  const outer = props.face.bleed - line / 2 // 线向内收半个线宽，不被画布边缘切掉
+  ctx.globalCompositeOperation = 'difference'
+  ctx.strokeStyle = '#FFFFFF'
+  ctx.lineWidth = line
+  ctx.strokeRect(-outer, -outer, props.face.width + outer * 2, props.face.height + outer * 2)
+  ctx.setLineDash([4 * line, 4 * line])
+  ctx.strokeRect(0, 0, props.face.width, props.face.height)
+  ctx.setLineDash([])
+  ctx.globalCompositeOperation = 'source-over'
 }
 
 function handleClick(event: MouseEvent): void {

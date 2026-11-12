@@ -72,14 +72,16 @@ describe('CardFaceRenderer resources', () => {
       props: {
         face,
         resourceContext: createCardRenderResourceContext({}),
-        view: { left: 10, top: 20, width: 50, height: 40, pixelScale: 8 },
+        view: { left: 10, top: 20, width: 50, height: 40, pixelScale: 8, screenScale: 4 },
       },
     })
 
     expect(wrapper.findAll('canvas')).toHaveLength(1)
     const canvas = wrapper.find('canvas').element as HTMLCanvasElement
     expect([canvas.width, canvas.height]).toEqual([400, 320])
-    expect(canvas.style.transform).toBe('translate(10px, 20px) scale(0.125)')
+    // 按屏幕尺寸布局，只平移不缩放
+    expect([canvas.style.width, canvas.style.height]).toEqual(['200px', '160px'])
+    expect(canvas.style.transform).toBe('translate(40px, 80px)')
   })
 
   it('maps clicks through the view back to face coordinates', async () => {
@@ -95,7 +97,7 @@ describe('CardFaceRenderer resources', () => {
       props: {
         face,
         resourceContext: createCardRenderResourceContext({}),
-        view: { left: 50, top: 50, width: 50, height: 50, pixelScale: 2 },
+        view: { left: 50, top: 50, width: 50, height: 50, pixelScale: 2, screenScale: 2 },
       },
     })
     const canvas = wrapper.find('canvas').element

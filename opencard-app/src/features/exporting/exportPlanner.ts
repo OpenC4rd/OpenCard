@@ -110,7 +110,8 @@ function planPdf(
   const place = (card: PlannedCard, faceKey: CardFaceKey): ExportSheetCard => {
     const face = card.render.document.faces[faceKey]
     entries.push({ sourcePath: card.sourcePath, outputPath, faceKey, render: card.render })
-    return { key: entries.length - 1, width: face.width, height: face.height }
+    const bleed = face.bleed ?? 0
+    return { key: entries.length - 1, width: face.width + bleed * 2, height: face.height + bleed * 2, bleed }
   }
   const printed = cards.flatMap(card => Array<PlannedCard>(copiesOf(card.instance, rule)).fill(card))
   const duplex = rule.faces === 'both' && rule.paper.duplex !== 'none'

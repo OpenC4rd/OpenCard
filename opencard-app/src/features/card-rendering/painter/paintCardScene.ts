@@ -25,7 +25,8 @@ import {
 import { parsePaintStyle, roundRectPath } from './paintStyle'
 import type { CanvasAssetStore, LoadedAsset } from './canvasAssetStore'
 import { formatProjectIconPath } from '../../../shared/rich-text/projectIconReference'
-import { createDeviceBuffer } from './deviceBuffer'
+import { createDeviceLayer } from './deviceBuffer'
+import { paintSilhouetteOutline, paintSilhouetteShadow } from './paintSilhouette'
 import { iconSize, iconSourceRect, type IconShape } from '../../../shared/model/iconGeometry'
 import {
   hasGlyphOutline,
@@ -61,9 +62,10 @@ export function paintCardScene(
     ctx.imageSmoothingQuality = 'high'
   }
   if (!options.onlyBlockId) {
-    ctx.clearRect(0, 0, width, height)
+    const bleed = face.bleed ?? 0
+    ctx.clearRect(0 - bleed, 0 - bleed, width + bleed * 2, height + bleed * 2)
     ctx.fillStyle = parsePaintStyle(face.background, ctx, { x: 0, y: 0, width, height })
-    ctx.fillRect(0, 0, width, height)
+    ctx.fillRect(0 - bleed, 0 - bleed, width + bleed * 2, height + bleed * 2)
   }
 
   // 2. 遍历渲染树中的绘制节点（已经按 z-index 排序）
@@ -356,26 +358,42 @@ function paintImageBlock(
   const maskImg = maskSrc ? assets.getImage(maskSrc) : null
   if (!img) return
 
-  ctx.save()
-  roundRectPath(ctx, 0, 0, w, h, borderRadius)
-  ctx.clip()
-
-  if (maskImg) {
-    const buffer = createDeviceBuffer(ctx, w, h)
-    if (buffer) {
-      const { offscreen, offCtx } = buffer
-      drawImageFitted(offCtx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined, sourceSampling)
-      offCtx.globalCompositeOperation = 'destination-in'
-      drawImageFitted(offCtx, maskImg, 0, 0, w, h, block.maskFit ?? 'cover', undefined, maskSampling)
-      ctx.drawImage(offscreen, 0, 0, w, h)
-      ctx.restore()
-      return
-    }
+  const paintImage = (target: CanvasRenderingContext2D): void => {
+    target.save()
+    roundRectPath(target, 0, 0, w, h, borderRadius)
+    target.clip()
+    drawImageFitted(target, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined, sourceSampling)
+    target.restore()
   }
+  const length = (value: string): number => evaluateRenderLength(value, Math.min(w, h))
+  const outlineWidth = block.outlineColor ? Math.max(0, length(block.outlineWidth)) : 0
+  // 遮罩、描边和投影都要先拿到内容的成品像素；都没有时直接画
+  const buffer = maskImg || outlineWidth > 0 || block.shadowColor ? createDeviceLayer(ctx, 0, 0, w, h) : null
+  if (!buffer) return paintImage(ctx)
 
-  // 无遮罩直接绘制
-  drawImageFitted(ctx, img, 0, 0, w, h, block.fit ?? 'cover', isContextIcon ? block.borderColor || '#000' : undefined, sourceSampling)
-  ctx.restore()
+  paintImage(buffer.offCtx)
+  if (maskImg) {
+    buffer.offCtx.globalCompositeOperation = 'destination-in'
+    drawImageFitted(buffer.offCtx, maskImg, 0, 0, w, h, block.maskFit ?? 'cover', undefined, maskSampling)
+  }
+  const bounds = { x: 0, y: 0, width: w, height: h }
+  const paintContent = (target: CanvasRenderingContext2D): void => buffer.draw(target)
+  const paintOutline = (target: CanvasRenderingContext2D): void => {
+    if (outlineWidth > 0) paintSilhouetteOutline(target, bounds, outlineWidth, parsePaintStyle(block.outlineColor, target, bounds), paintContent)
+  }
+  if (block.shadowColor) {
+    paintSilhouetteShadow(ctx, {
+      x: -outlineWidth, y: -outlineWidth, width: w + outlineWidth * 2, height: h + outlineWidth * 2,
+    }, {
+      shadowColor: block.shadowColor,
+      shadowBlur: Math.max(0, length(block.shadowBlur)),
+      shadowOffsetX: length(block.shadowOffsetX),
+      shadowOffsetY: length(block.shadowOffsetY),
+    }, (target) => { paintOutline(target); paintContent(target) })
+  }
+  paintOutline(ctx)
+  paintContent(ctx)
+  buffer.release()
 }
 
 /**
@@ -427,14 +445,14 @@ function drawImageFitted(
 
   if (contextColor) {
     // context tint 着色：在独立离屏画布上以超采样高分辨率渲染并 source-in 着色
-    const buffer = createDeviceBuffer(ctx, dw, dh)
+    const buffer = createDeviceLayer(ctx, dx, dy, dw, dh)
     if (buffer) {
-      const { offscreen, offCtx } = buffer
-      draw(offCtx, 0, 0)
-      offCtx.globalCompositeOperation = 'source-in'
-      offCtx.fillStyle = contextColor
-      offCtx.fillRect(0, 0, dw, dh)
-      ctx.drawImage(offscreen, dx, dy, dw, dh)
+      draw(buffer.offCtx, dx, dy)
+      buffer.offCtx.globalCompositeOperation = 'source-in'
+      buffer.offCtx.fillStyle = contextColor
+      buffer.offCtx.fillRect(dx, dy, dw, dh)
+      buffer.draw(ctx)
+      buffer.release()
     } else {
       ctx.save()
       draw(ctx, dx, dy)
@@ -543,15 +561,23 @@ function paintTextBlock(
     else if (run.kind === 'img') paintInlineImage(target, run, block.id, assets, options.resourceContext)
   }
 
-  // 2. 通道二：投影与文字圆角外描边
+  // 行内图标与图片没有路径，描边贴着它们的透明度轮廓生成
+  const paintRunOutline = (target: CanvasRenderingContext2D, run: PositionedTextRun): void => {
+    if (!hasGlyphOutline(run.style)) return
+    if (run.kind === 'glyph') paintGlyphPass(target, run, 'stroke', glyphPaint)
+    else paintSilhouetteOutline(target, run, run.style.strokeWidth, run.style.strokeColor!, shape => paintRunContent(shape, run))
+  }
+
+  // 2. 通道二：投影与外描边
   for (const run of textLayout.runs) {
     if (run.style.shadowColor) {
       paintRunShadow(ctx, run, target => {
-        if (run.kind === 'glyph') paintGlyphShape(target, run, glyphPaint)
-        else paintRunContent(target, run)
+        if (run.kind === 'glyph') return paintGlyphShape(target, run, glyphPaint)
+        paintRunOutline(target, run)
+        paintRunContent(target, run)
       })
     }
-    if (run.kind === 'glyph' && hasGlyphOutline(run.style)) paintGlyphPass(ctx, run, 'stroke', glyphPaint)
+    paintRunOutline(ctx, run)
   }
 
   // 3. 通道三：文字主填充 / 图片填充 / 内联图标 / 内联图片

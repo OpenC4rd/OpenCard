@@ -217,7 +217,7 @@
         </OcDock>
 
         <OcOverlayToolbar v-if="viewFace" data-oc-layout-anchor="bottom" class="card-design-editor__face-tools"
-          :class="{ 'is-resizing': isDockResizing }" orientation="vertical" :style="faceToolsStyle" :label="t('cardDesigner.canvas.controls')"
+          :class="{ 'is-resizing': isDockResizing }" orientation="horizontal" :style="faceToolsStyle" :label="t('cardDesigner.canvas.controls')"
           :items="editorState.mode === 'diff' ? diffFaceToolbarItems : faceToolbarItems" @select="handleFaceToolbarSelect" />
       </div>
     </div>
@@ -272,6 +272,7 @@ import OcTree from '../../components/standard/OcTree.vue'
 import type { OcActionBarItem, OcActionDefinition } from '../../shared/ui/action/action.types'
 import OcOverlayToolbar from '../../components/standard/OcOverlayToolbar.vue'
 import { useCdePreviewBackground } from './cdePreviewBackground'
+import { useCdeFaceFlip } from './useCdeFaceFlip'
 import { createViewportToolbarItems } from '../../components/standard/overlayToolbarItems'
 import OcDock from '../../components/standard/OcDock.vue'
 import {
@@ -404,7 +405,7 @@ const {
   commitLayout: layout => props.session.updateViewState('card-designer', { layout }),
 })
 const faceToolsStyle = computed(() => ({
-  right: `${(viewportInsets.value.right ?? 0) + overlayGeometryConfig.floatingGap}px`,
+  left: `calc(50% + ${((viewportInsets.value.left ?? 0) - (viewportInsets.value.right ?? 0)) / 2}px)`,
   bottom: `${overlayGeometryConfig.floatingGap}px`,
 }))
 const isDockResizing = ref(false)
@@ -566,16 +567,24 @@ function toggleAlignmentSnapping(): void {
   })
 }
 
+const faceFlip = useCdeFaceFlip({
+  getViewport: () => (cardViewportRef.value as unknown as { $el?: HTMLElement } | null)?.$el ?? null,
+})
+
 function toggleActiveFace(): void {
-  activeFaceKey.value = activeFaceKey.value === 'front' ? 'back' : 'front'
-  forceStructureTreeReveal.value = false
-  commitViewState()
-  cardViewportRef.value?.flashStatus?.({
-    icon: activeFaceKey.value === 'front' ? 'mdiFlipToFront' : 'mdiFlipToBack',
-    message: activeFaceKey.value === 'front'
-      ? t('cardDesigner.viewportStatus.switchedToFront')
-      : t('cardDesigner.viewportStatus.switchedToBack'),
-  })
+  const swapFace = (): void => {
+    activeFaceKey.value = activeFaceKey.value === 'front' ? 'back' : 'front'
+    forceStructureTreeReveal.value = false
+    commitViewState()
+    cardViewportRef.value?.flashStatus?.({
+      icon: activeFaceKey.value === 'front' ? 'mdiFlipToFront' : 'mdiFlipToBack',
+      message: activeFaceKey.value === 'front'
+        ? t('cardDesigner.viewportStatus.switchedToFront')
+        : t('cardDesigner.viewportStatus.switchedToBack'),
+    })
+  }
+  if (editorState.value.mode === 'diff' || workspaceMode.value !== 'design') swapFace()
+  else void faceFlip.flip(swapFace)
 }
 
 type CardViewportHandle = CdeViewportPort & CdeLayerViewPort & {
@@ -2125,10 +2134,11 @@ defineExpose({ canSave, navigate, presentation, headerActions, onHeaderAction })
 
 .card-design-editor__face-tools {
   position: absolute;
-  right: var(--oc-space-xs);
+  left: 50%;
   bottom: var(--oc-space-xs);
+  transform: translateX(-50%);
   z-index: 3;
-  transition: right var(--oc-duration) var(--oc-ease);
+  transition: left var(--oc-duration) var(--oc-ease);
 }
 
 .card-design-editor__face-tools.is-resizing {

@@ -25,6 +25,8 @@ export type ResolvedRunStyle = {
   underline: boolean
   strikethrough: boolean
   color: string
+  /** 每个字后面追加的间距，与字号同单位。 */
+  letterSpacing: number
   backgroundColor?: string
   strokeColor?: string
   strokeWidth: number

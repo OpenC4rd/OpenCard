@@ -1,7 +1,5 @@
 <template>
-  <MonacoEditor v-if="editorState.mode === 'diff'" :model-value="editorState.draftContent ?? ''" language="json"
-    :mode="editorState.mode" :comparison="props.comparison" :theme-id="themeId" :theme-overrides="themeOverrides" />
-  <ProjectRegistryEditorShell v-else content-mode="workspace" @keydown.ctrl.s.prevent="save">
+  <ProjectRegistryEditorShell content-mode="workspace" @keydown.ctrl.s.prevent="save">
     <ProjectIconRegistryWorkbench v-if="document" ref="workbenchRef" :series="document.iconSeries"
       :resolve-asset-src="source => projectStore.resolveResourceAssetSrcFromFile(filePath, source)"
       :default-open-path="iconDirectory" :import-busy="importBusy"
@@ -84,7 +82,6 @@ import OcDialog from '../standard/OcDialog.vue'
 import { toKeySlug } from '../../shared/model/keySlug'
 import { inspectProjectIconFile, PIXEL_ART_SHORT_SIDE } from '../../features/workspace/services/projectIconFileFacts'
 import { mapWithConcurrency } from '../../shared/async/mapWithConcurrency'
-import MonacoEditor from './MonacoEditor.vue'
 import ProjectIconRegistrationDialog, {
   type ProjectIconImport,
   type ProjectIconRegistrationRequest,

@@ -55,6 +55,13 @@ export type RenderReadyImageBlock = RenderReadyBaseBlock & {
   maskSource: string
   maskFit: 'cover' | 'contain' | 'fill'
   fit: 'cover' | 'contain' | 'fill'
+  /** 贴合图像透明度轮廓的外描边与投影；百分比相对块的短边，shadowColor 为空表示无投影。 */
+  outlineColor: string
+  outlineWidth: string
+  shadowColor: string
+  shadowBlur: string
+  shadowOffsetX: string
+  shadowOffsetY: string
 }
 
 export type RenderReadyQrCodeBlock = RenderReadyBaseBlock & {
@@ -141,6 +148,8 @@ export type RenderReadyCardFace = {
   faceKey: CardFaceKey
   width: number
   height: number
+  /** 成品尺寸之外四边外扩的出血；卡面坐标原点仍在成品左上角。 */
+  bleed?: number
   dpi?: number
   background: string
   children: RenderReadySimpleContainerChild[]

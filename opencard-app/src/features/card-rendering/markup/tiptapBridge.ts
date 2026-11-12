@@ -81,6 +81,7 @@ function styleToMarks(style: InlineStyleSpec): TiptapBridgeMark[] {
   if (style.color !== undefined) textStyleAttrs.color = style.color
   if (style.fontSize !== undefined) textStyleAttrs.fontSize = style.fontSize
   if (style.fontFamily !== undefined) textStyleAttrs.fontFamily = style.fontFamily
+  if (style.letterSpacing !== undefined) textStyleAttrs.letterSpacing = style.letterSpacing
   if (style.stroke) textStyleAttrs.textStroke = style.stroke
   if (style.shadow) textStyleAttrs.textShadow = style.shadow
   if (style.fillSource !== undefined) {
@@ -125,6 +126,8 @@ function marksToStyle(marks?: readonly TiptapBridgeMark[]): InlineStyleSpec {
         if (typeof attrs.color === 'string' && attrs.color) style.color = attrs.color
         if (typeof attrs.fontSize === 'string' && attrs.fontSize) style.fontSize = attrs.fontSize
         if (typeof attrs.fontFamily === 'string' && attrs.fontFamily) style.fontFamily = attrs.fontFamily
+        const letterSpacing = absoluteLength(attrs.letterSpacing)
+        if (letterSpacing) style.letterSpacing = letterSpacing
         const stroke = validStroke(attrs.textStroke)
         if (stroke) style.stroke = stroke
         const shadow = validShadow(attrs.textShadow)

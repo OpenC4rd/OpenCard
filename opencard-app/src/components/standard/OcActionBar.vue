@@ -267,7 +267,7 @@ function moveFocus(event: KeyboardEvent): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--oc-size-sm);
+  min-width: max(var(--oc-size-sm), 6ch);
   min-height: var(--oc-size-sm);
   color: var(--oc-fg-muted);
   font-size: var(--oc-text-xs);
