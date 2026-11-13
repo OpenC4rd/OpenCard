@@ -46,6 +46,8 @@ export const SETTINGS_CATEGORY_KEYS: readonly SettingsCategoryKey[] = [
 export function isSettingsCategoryKey(value: unknown): value is SettingsCategoryKey {
   return typeof value === 'string' && (SETTINGS_CATEGORY_KEYS as readonly string[]).includes(value)
 }
+const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(value as T) ? value as T : fallback
 /** 提交者邮箱留空时使用的域名：`<归一化后的提交者名称>@noreply.example`。 */
 const COMMITTER_EMAIL_DOMAIN = 'noreply.example'
 const MAX_COMMITTER_FIELD_LENGTH = 128
@@ -167,6 +169,7 @@ export type AppSettingKey =
   | 'rendering.customBlockMaxNodes'
   | 'workspace.structureTreeSelectionBehavior'
   | 'workspace.structureTreeScrollToSelection'
+  | 'workspace.dataTableFieldMenuMode'
   | 'workspace.hideDotFiles'
   | 'workspace.showWelcomeBackground'
   | 'workspace.showSelectionPositionOnMove'
@@ -230,6 +233,7 @@ export interface AppSettings {
     autoSaveIntervalSeconds: number
     structureTreeSelectionBehavior: StructureTreeSelectionBehavior
     structureTreeScrollToSelection: boolean
+    dataTableFieldMenuMode: 'category' | 'expanded'
     hideDotFiles: boolean
     /** 欢迎页的背景效果（桌游封面墙 + 引力背景）。 */
     showWelcomeBackground: boolean
@@ -327,6 +331,7 @@ export const DEFAULT_APP_SETTINGS: Readonly<AppSettings> = Object.freeze({
     autoSaveIntervalSeconds: 30,
     structureTreeSelectionBehavior: 'expand-exclusive',
     structureTreeScrollToSelection: true,
+    dataTableFieldMenuMode: 'category',
     hideDotFiles: true,
     showWelcomeBackground: true,
     showSelectionPositionOnMove: true,
@@ -666,10 +671,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       ),
       baseFontSize: clampBaseFontSize(appearance.baseFontSize),
       phaseImageSpeed: clampPhaseImageSpeed(appearance.phaseImageSpeed),
-      transitionSpeed: appearance.transitionSpeed === '0.5x' || appearance.transitionSpeed === '1x'
-        || appearance.transitionSpeed === '2x' || appearance.transitionSpeed === 'off'
-        ? appearance.transitionSpeed
-        : DEFAULT_APP_SETTINGS.appearance.transitionSpeed,
+      transitionSpeed: oneOf(appearance.transitionSpeed, ['0.5x', '1x', '2x', 'off'], DEFAULT_APP_SETTINGS.appearance.transitionSpeed),
       micaBackground: appearance.micaBackground === true,
       themes: {
         dark: normalizeThemeSettings('dark', themes.dark),
@@ -706,11 +708,9 @@ export function normalizeAppSettings(value: unknown): AppSettings {
         ? workspace.autoSave
         : DEFAULT_APP_SETTINGS.workspace.autoSave,
       autoSaveIntervalSeconds: clampAutoSaveIntervalSeconds(workspace.autoSaveIntervalSeconds),
-      structureTreeSelectionBehavior: workspace.structureTreeSelectionBehavior === 'none'
-        || workspace.structureTreeSelectionBehavior === 'expand'
-        || workspace.structureTreeSelectionBehavior === 'expand-exclusive'
-        ? workspace.structureTreeSelectionBehavior
-        : DEFAULT_APP_SETTINGS.workspace.structureTreeSelectionBehavior,
+      structureTreeSelectionBehavior: oneOf(workspace.structureTreeSelectionBehavior, ['none', 'expand', 'expand-exclusive'],
+        DEFAULT_APP_SETTINGS.workspace.structureTreeSelectionBehavior),
+      dataTableFieldMenuMode: oneOf(workspace.dataTableFieldMenuMode, ['category', 'expanded'], 'category'),
       structureTreeScrollToSelection: typeof workspace.structureTreeScrollToSelection === 'boolean'
         ? workspace.structureTreeScrollToSelection
         : DEFAULT_APP_SETTINGS.workspace.structureTreeScrollToSelection,

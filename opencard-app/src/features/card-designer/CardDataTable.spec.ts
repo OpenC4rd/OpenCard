@@ -115,6 +115,19 @@ describe('CardDataTable', () => {
     }])
   })
 
+  it('groups addable fields into category submenus, or lists them flat when expanded', () => {
+    const fieldKeys = (mode?: 'category' | 'expanded') => {
+      const wrapper = mount(CardDataTable, {
+        props: { columns, catalogFaceGroups, faceGroups, fieldMenuMode: mode },
+      })
+      const children = actionByKey(wrapper, 'manage-fields').props('action').children as { key: string, children?: { key: string }[] }[]
+      return children.map(entry => entry.children?.map(child => child.key) ?? entry.key)
+    }
+    // fontSize 没有分类，归入「未分类」；分隔线与「新建自定义属性」始终留在一级。
+    expect(fieldKeys()).toEqual([['include-field:fontSize'], 'create-field-divider', 'create-field'])
+    expect(fieldKeys('expanded')).toEqual(['include-field:fontSize', 'create-field-divider', 'create-field'])
+  })
+
   it('offers definition editing only for custom fields', async () => {
     const plain = mount(CardDataTable, {
       props: { columns, catalogFaceGroups, faceGroups },

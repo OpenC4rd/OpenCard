@@ -184,6 +184,7 @@ import {
   usePropertyFieldEditorModes,
 } from '../../shared/ui/property-editor/propertyFieldEditorMode'
 import { getPropertyFieldIcon } from '../../shared/ui/property-editor/propertyFieldRegistry'
+import { dataTableFieldMenuActions } from './dataTableFieldMenu'
 import { getBlockPresentation } from './blockPresentation'
 import type {
   CdeDataTableCell,
@@ -213,6 +214,7 @@ const props = defineProps<{
     cell: CdeDataTableCell,
   ) => PropertyEditorFieldDefinition
   readonly?: boolean
+  fieldMenuMode?: 'category' | 'expanded'
 }>()
 
 const emit = defineEmits<{
@@ -419,11 +421,7 @@ function blockFieldCommands(block: CdeDataTableBlockCatalogEntry): OcActionMenuE
     .find(candidate => candidate.key === block.key)
   const availableFields = catalogBlock?.fields.filter(field => !selectedFieldKeys.has(field.key)) ?? []
   return [
-    ...availableFields.map(field => ({
-      key: `${INCLUDE_FIELD_PREFIX}${field.key}`,
-      icon: getPropertyFieldIcon(field.definition),
-      title: field.title,
-    })),
+    ...dataTableFieldMenuActions(availableFields, props.fieldMenuMode, INCLUDE_FIELD_PREFIX, key => t(`propertyEditor.categories.${key}`)),
     ...(availableFields.length > 0 ? [{ type: 'divider' as const, key: 'create-field-divider' }] : []),
     {
       key: 'create-field',

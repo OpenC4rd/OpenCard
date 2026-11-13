@@ -96,7 +96,7 @@
           </div>
 
           <div class="card-design-editor__data-table-view" :class="{ 'is-active': workspaceMode === 'data-table' }">
-            <CardDataTable ref="cardDataTableRef" :readonly="editorState.mode === 'diff'" :columns="dataTableColumns"
+            <CardDataTable ref="cardDataTableRef" :readonly="editorState.mode === 'diff'" :columns="dataTableColumns" :field-menu-mode="settingsStore.settings.value.workspace.dataTableFieldMenuMode"
               :catalog-face-groups="dataTableCatalogFaceGroups" :face-groups="dataTableFaceGroups"
               :binding-interpreter="propertyBindingInterpreter" :capabilities="propertyCapabilities"
               :get-cell-definition="getDataTableCellDefinition"

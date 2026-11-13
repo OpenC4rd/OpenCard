@@ -1,153 +1,132 @@
-# OpenCard
+<p align="center">
+  <img src="docs/media/banner.png" alt="OpenCard" width="100%">
+</p>
 
-OpenCard 是一个面向桌游设计师和内容创作者的集成化桌面工作台，用于持续维护卡牌项目。
+<p align="center">
+  <strong>设计一次蓝图，批量填充卡牌｜字体、图标、文本集中管理｜导出图片与拼版 PDF</strong>
+</p>
 
-它延续了 **CardEditor → EzCardDotNet → OpenCard** 的完整迭代过程，并在这个过程中积累了上千名桌游设计师与自制桌游爱好者。
+<p align="center">
+  <a href="https://github.com/OpenC4rd/OpenCard/actions/workflows/verify.yml"><img src="https://github.com/OpenC4rd/OpenCard/actions/workflows/verify.yml/badge.svg" alt="Verify"></a>
+  <a href="https://github.com/OpenC4rd/OpenCard/releases/latest"><img src="https://img.shields.io/github/v/release/OpenC4rd/OpenCard?color=7b8cff" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-7b8cff" alt="Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-555" alt="Platform">
+</p>
 
-它把 **版式设计、卡牌内容和批量实例** 放在同一个项目里：先用蓝图定义一套可复用的卡牌结构，再创建多个实例填入不同内容，最后统一处理字体、图标和字典文本。
+<p align="center">
+  <img src="docs/media/hero.png" alt="OpenCard 的卡片设计器与版本图表" width="100%">
+</p>
 
-> **v0.5.0**：核心编辑工作流已经可用，发布、项目版本管理和协作能力持续完善，请在升级前备份项目文件。
+OpenCard 是面向桌游设计师的桌面工作台，把版式设计、卡牌内容和批量实例放在同一个项目里。它延续了 **CardEditor → EzCardDotNet → OpenCard** 的迭代，一路积累了上千名桌游设计师与自制桌游爱好者。
 
-## 你可以用 OpenCard 做什么
+> [!NOTE]
+> OpenCard 还在早期阶段，文件格式和交互细节可能在后续版本调整。升级前请备份项目，或用内置的存档点留一份可回退的版本。遇到问题欢迎[提 Issue](https://github.com/OpenC4rd/OpenCard/issues)。
 
-- 制作卡牌、角色卡、道具卡和其他固定版式的图文组件
-- 用一套蓝图生成多张内容不同、外观一致的卡牌
-- 在可视化编辑器中调整文字、图片、布局、颜色和字体
-- 注册项目字体与精灵图图标集，作为可复用资源
-- 用全局字典集中维护名称、描述和其他重复文本
+## 特性
 
-OpenCard 适合“同一套设计需要反复填充”的项目。它不是通用的图片编辑器，也不是在线协作平台；它更像一份能持续维护的卡牌项目文件。
+<table>
+  <tr>
+    <td width="40%" valign="top">
+      <h3>蓝图与实例</h3>
+      <p>蓝图定义一套卡牌共用的结构和版式，实例只填每张卡的差异。改一次蓝图，整套卡跟着变。</p>
+      <p>画布、结构树和属性面板协同编辑文字、图片、形状、二维码和容器，支持富文本、正反面与出血。</p>
+    </td>
+    <td width="60%"><img src="docs/media/feature-designer.png" alt="卡片设计器" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="40%" valign="top">
+      <h3>数据表</h3>
+      <p>把同一蓝图的所有实例摊成一张表，像填表格一样批量录入和修改内容，旁边实时预览。</p>
+    </td>
+    <td width="60%"><img src="docs/media/feature-table.png" alt="数据表视图" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="40%" valign="top">
+      <h3>版本管理</h3>
+      <p>基于 Git 的存档点和版本图表。卡牌可以和任意存档点并排对比，改动的块直接标出来；也可以撤销、回退，或单独恢复某个文件。</p>
+    </td>
+    <td width="60%"><img src="docs/media/feature-diff.png" alt="卡牌与存档点的差异对比" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="40%" valign="top">
+      <h3>拼版导出</h3>
+      <p>导出图片或拼版 PDF，带预览、水印、页面信息与出血。一个项目可以保存多份导出配置。</p>
+    </td>
+    <td width="60%"><img src="docs/media/feature-export.png" alt="导出空间" width="100%"></td>
+  </tr>
+</table>
 
-## 先理解三个概念
+另外还有：字体、图标集、自定义块和全局字典等项目资源，精灵图可以直接裁成图标；资源包的打包与安装；深浅色主题、中英文界面，以及内置的引导和教程。
 
-| 概念 | 解决的问题 | 对用户的意义 |
+OpenCard 适合“同一套设计需要反复填充”的项目。它不是通用的图片编辑器，也不是在线协作平台。
+
+## 下载
+
+在 [Releases](https://github.com/OpenC4rd/OpenCard/releases/latest) 下载对应平台的安装包：
+
+| 平台 | 安装包 |
+| --- | --- |
+| macOS（Apple 芯片） | `.dmg` |
+| Windows（x64） | `-setup.exe` 或 `.msi` |
+| Linux（x64） | `.AppImage`、`.deb` 或 `.rpm` |
+
+应用内可以检查并安装更新。
+
+## 快速开始
+
+1. 创建或打开项目。项目就是一个普通文件夹，左侧文件树定位文档，中间是编辑区。
+2. 新建卡牌文档，先在蓝图里搭好结构和版式。
+3. 从蓝图创建实例，在设计视图或数据表里填入每张卡的内容。
+4. 把字体、图标和重复文案登记为项目资源，在卡牌里引用。
+5. 在导出空间预览版面，导出图片或拼版 PDF。
+
+第一次打开时，应用里的“界面介绍”和“创建第一个项目”引导会带你走一遍。
+
+## 三个概念
+
+| 概念 | 解决的问题 | 对你的意义 |
 | --- | --- | --- |
-| **蓝图** | 哪些结构和版式应该共享 | 修改一次，可以影响同一套卡牌的共同设计 |
-| **实例** | 每张卡具体填入什么内容 | 在保持统一版式的同时，维护每张卡的差异 |
-| **项目资源** | 字体、图标和重复文本如何复用 | 把资源集中管理，减少重复导入和手工修改 |
+| **蓝图** | 哪些结构和版式应该共享 | 修改一次，影响同一套卡牌的共同设计 |
+| **实例** | 每张卡具体填入什么内容 | 保持统一版式的同时，维护每张卡的差异 |
+| **项目资源** | 字体、图标和重复文本如何复用 | 集中管理，减少重复导入和手工修改 |
 
-## 一次完整的工作流
-
-### 1. 创建或打开项目
-
-从工作区进入项目文件。项目树负责定位文档，主编辑区负责查看和修改当前内容。
-
-> **截图占位：工作区**
->
-> 待补一张能同时展示项目树、文档入口和主编辑区域的画面。截图应说明“打开项目后从哪里开始”，而不是只展示界面全貌。
-
-### 2. 设计卡牌蓝图
-
-先搭建卡牌的结构和共享版式，再决定哪些内容由实例提供。这样可以把“设计一次”和“填充很多次”分开。
-
-> **截图占位：蓝图编辑器**
->
-> 待补一张能看出结构树、画布和属性面板关系的画面，并在图注中解释用户下一步该做什么。
-
-### 3. 创建实例并填入内容
-
-从蓝图创建实例后，每张卡都可以单独选择和编辑。共享设计留在蓝图中，单卡差异留在实例中，适合批量制作同款卡牌。
-
-> **截图占位：实例列表与单卡编辑**
->
-> 待补一张能清楚展示“蓝图 → 实例”的关系和实例数量变化的画面。
-
-### 4. 整理资源和文本
-
-把项目字体、图标集和全局字典作为项目的一部分维护。精灵图可以在图标集编辑器中裁剪成可复用图标；重复出现的文案可以放入字典，后续集中修改。
-
-> **截图占位：项目资源工作流**
->
-> 待补一组经过策划的资源画面：图标集编辑器和全局字典各一张，图注要分别说明“资源如何登记”和“文本如何复用”。
-
-### 5. 检查并继续迭代
-
-完成一轮设计后，在导出空间里预览版面，导出图片或拼版 PDF；之后可以继续调整蓝图、实例和项目资源，再导出一次。
-
-## 当前能力
-
-### 已可体验
-
-- 卡牌文档与项目工作区
-- 蓝图、实例树和实例覆写
-- 画布、结构树和属性面板协同编辑
-- 文本、图片、布局、颜色和字体编辑
-- 项目字体登记与复用
-- 精灵图图标集的登记、裁剪和配置
-- 全局字典记录的查看与编辑
-- 图片与拼版 PDF 导出，带预览、水印和页面信息
-- 基于 Git 的项目存档点、历史与差异查看
-- 资源包的打包与安装
-- 深色和浅色主题
-
-### 仍在开发
+## 仍在开发
 
 - 面向最终使用者的发布流程
 - 网络联机式项目测试
 - 在线协作与云端同步
 
-这些项目不是 v0.5.x Beta 的隐藏承诺。重要项目请使用外部备份或 Git 等版本控制工具保存可回退副本。
+这些不是当前版本的隐藏承诺，项目目前以单机工作流为主。
 
-## Early Access 说明
+## 从源码构建
 
-v0.5.x Beta 的目标是把“组织项目 → 设计蓝图 → 创建实例 → 管理资源”这条主线持续打磨成稳定可用的桌面工作流。早期体验阶段意味着：
-
-- 文件格式和交互细节可能在后续版本调整
-- 现有功能可能继续收紧边界或改变入口
-- 发布与版本管理尚未形成完整的发行管线
-- 项目当前以单机工作流为主，不承诺在线协作和云端同步
-
-建议在体验新版本前复制项目目录，并保留可以重新打开的旧版本。
-
-## 开发者快速开始
-
-OpenCard 当前主要通过源码运行。需要 Node.js、npm，以及 Tauri 2 的本地开发环境。
+需要 Node.js、npm 和 [Tauri 2 的本地开发环境](https://tauri.app/start/prerequisites/)。
 
 ```bash
 git clone https://github.com/OpenC4rd/OpenCard.git
 cd OpenCard/opencard-app
 npm install
-npm run tauri dev
+npm run tauri dev     # 桌面应用
+npm run dev           # 只开 Vite 开发服务器
+npm run verify        # 提交前检查：架构与界面 lint、类型检查、测试
 ```
 
-常用命令：
-
-```bash
-# 启动 Vite 开发服务器
-npm run dev
-
-# 类型检查并构建前端
-npm run build
-
-# 提交前的完整检查：架构与界面 lint、类型检查、测试
-npm run verify
-
-# Rust 侧测试（在 src-tauri 目录下）
-cargo test
-```
-
-## 项目结构
+Rust 侧的测试在 `opencard-app/src-tauri` 下跑 `cargo test`。
 
 ```text
 OpenCard/
-├─ opencard-app/       # Vue + Tauri 应用
-├─ services/            # 反馈服务（Cloudflare Worker）
-├─ docs/                # 项目文档
-├─ AGENTS.md            # 给 agent 的协作规矩
-└─ README.md            # 项目入口说明
+├─ opencard-app/       # Vue 3 + Tauri 2 应用
+├─ services/           # 反馈服务（Cloudflare Worker）
+├─ docs/               # 项目文档
+└─ AGENTS.md           # 给 agent 的协作规矩
 ```
 
-## 文档和反馈
+## 社区
 
-- 版本变化：[`opencard-app/RELEASE_NOTES.md`](opencard-app/RELEASE_NOTES.md)
-- 最新发布：[Releases](https://github.com/OpenC4rd/OpenCard/releases)
-- 架构与分层：[`docs/架构地图.md`](docs/架构地图.md)
-- 错误码手册：[`docs/错误码.md`](docs/错误码.md)
-- UI 组件规范：[`docs/UI_RULES.md`](docs/UI_RULES.md)
 - 问题反馈：[GitHub Issues](https://github.com/OpenC4rd/OpenCard/issues)
-- 社群交流（QQ）：[OpenCard 桌游交流群（约 1200+ 人）](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=MJD18YzJxqft6Q6rKX-sSNiLrtmqVQmJ&authKey=TM3En%2BxxzFeqimSCUhG%2F5VLmfRDeXtnfm1h6P7cwfoGR6bVXkXk2cYm%2BOG0MHuJ8&noverify=0&group_code=567915181)
+- QQ 群：[OpenCard 桌游交流群](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=MJD18YzJxqft6Q6rKX-sSNiLrtmqVQmJ&authKey=TM3En%2BxxzFeqimSCUhG%2F5VLmfRDeXtnfm1h6P7cwfoGR6bVXkXk2cYm%2BOG0MHuJ8&noverify=0&group_code=567915181)（1200+ 人）
 - 开发者动态：[Bilibili](https://space.bilibili.com/271218438)
 
-## 许可证与项目状态
+## 许可
 
-OpenCard 目前以 Early Access 形式持续迭代。使用、修改或分发前，请以仓库中的许可证文件和最新发布说明为准。
+OpenCard 以 [Apache License 2.0](LICENSE) 发布。

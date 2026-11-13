@@ -883,6 +883,7 @@ export default {
       canvasAssist: 'Canvas assist',
       rendering: 'Rendering',
       cache: 'Cache',
+      dataTable: 'Data table',
     },
     fields: {
       seenTutorials: 'Viewed tutorials',
@@ -910,6 +911,7 @@ export default {
       micaBackground: 'Window material',
       projectWorkspaceState: 'Project workspace state',
       structureTreeSelectionBehavior: 'Structure tree selection',
+      dataTableFieldMenuMode: 'Add property menu',
       structureTreeScrollToSelection: 'Scroll to selection',
       hideDotFiles: 'Hide dot-files',
       cdeDotGridSpacingMm: 'Canvas dot grid',
@@ -946,6 +948,7 @@ export default {
       micaBackground: 'Uses the system window material; falls back to an opaque background elsewhere.',
       historyEntryLimit: 'How many steps each editor keeps; Monaco editors use their own undo history.',
       structureTreeSelectionBehavior: 'How the structure tree expands around the block you select.',
+      dataTableFieldMenuMode: 'How the data table lists properties you can add to a block.',
       structureTreeScrollToSelection: 'Scrolls the structure tree to the selected block.',
       hideDotFiles: 'Files and folders whose names start with a dot are hidden in the file tree.',
       cdeDotGridSpacingMm: 'Background dot grid spacing for the card design editor.',
@@ -986,6 +989,8 @@ export default {
       customTheme: 'Custom theme',
       systemFont: 'System default',
       expandExclusive: 'Expand and collapse others',
+      fieldMenuCategory: 'Group by category',
+      fieldMenuExpanded: 'Show all',
       expand: 'Expand ancestors',
       noAutoExpand: 'Do not expand',
       cdeDotGridSpacingMm: {

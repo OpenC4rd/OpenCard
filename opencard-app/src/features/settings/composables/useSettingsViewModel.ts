@@ -541,6 +541,18 @@ export function useSettingsViewModel(
           }, settings.workspace.alignmentSnappingEnabledByDefault,
           options.translate('settings.descriptions.alignmentSnappingEnabledByDefault', 'Whether a newly opened canvas starts with alignment snapping on.')),
         ], { icon: 'mdiArtboard' }),
+        card('data-table', options.translate('settings.cards.dataTable', 'Data table'), [
+          fieldItem('workspace.dataTableFieldMenuMode', {
+            title: options.translate('settings.fields.dataTableFieldMenuMode', 'Add property menu'),
+            fieldType: 'string', presentation: 'select',
+            options: ['category', 'expanded'],
+            optionLabels: {
+              category: options.translate('settings.values.fieldMenuCategory', 'Group by category'),
+              expanded: options.translate('settings.values.fieldMenuExpanded', 'Show all'),
+            },
+          }, settings.workspace.dataTableFieldMenuMode,
+          options.translate('settings.descriptions.dataTableFieldMenuMode', 'How the data table lists properties you can add to a block.')),
+        ], { icon: 'mdiTableLarge' }),
       ],
     }
   }

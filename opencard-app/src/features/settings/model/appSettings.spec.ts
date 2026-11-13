@@ -90,6 +90,16 @@ describe('appSettings', () => {
     expect(shellOf({ tipsEnabled: 'yes' }).tipsEnabled).toBe(true)
   })
 
+  it('keeps a valid data table field menu mode and falls back to category', () => {
+    const modeOf = (mode: unknown) =>
+      normalizeAppSettings({ version: APP_SETTINGS_VERSION, workspace: { dataTableFieldMenuMode: mode } })
+        .workspace.dataTableFieldMenuMode
+
+    expect(modeOf(undefined)).toBe('category')
+    expect(modeOf('expanded')).toBe('expanded')
+    expect(modeOf('flat')).toBe('category')
+  })
+
   it('normalizes each theme independently and fills missing or invalid fields', () => {
     const settings = normalizeAppSettings({
       appearance: {

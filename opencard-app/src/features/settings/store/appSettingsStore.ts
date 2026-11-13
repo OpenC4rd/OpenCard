@@ -132,6 +132,8 @@ export function createAppSettingsStore(
       candidate.rendering.customBlockMaxNodes = value as number
     } else if (key === 'workspace.structureTreeSelectionBehavior') {
       candidate.workspace.structureTreeSelectionBehavior = value as AppSettings['workspace']['structureTreeSelectionBehavior']
+    } else if (key === 'workspace.dataTableFieldMenuMode') {
+      candidate.workspace.dataTableFieldMenuMode = value as AppSettings['workspace']['dataTableFieldMenuMode']
     } else if (key === 'workspace.structureTreeScrollToSelection') {
       candidate.workspace.structureTreeScrollToSelection = value as boolean
     } else if (key === 'workspace.hideDotFiles') {

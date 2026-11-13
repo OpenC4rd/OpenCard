@@ -883,6 +883,7 @@ export default {
       canvasAssist: '画布辅助',
       rendering: '渲染',
       cache: '缓存',
+      dataTable: '数据表',
     },
     fields: {
       seenTutorials: '看过的教程',
@@ -910,6 +911,7 @@ export default {
       micaBackground: '窗口材质',
       projectWorkspaceState: '项目工作区状态',
       structureTreeSelectionBehavior: '结构树选中',
+      dataTableFieldMenuMode: '添加属性菜单',
       structureTreeScrollToSelection: '滚动定位',
       hideDotFiles: '隐藏点开头的文件',
       cdeDotGridSpacingMm: '画布点阵间距',
@@ -946,6 +948,7 @@ export default {
       micaBackground: '使用系统的窗口材质；系统不支持时保持不透明底色。',
       historyEntryLimit: '每个编辑器保留的历史步数；Monaco 编辑器使用自带的撤销历史。',
       structureTreeSelectionBehavior: '在结构树中选中块时，如何展开所在层级。',
+      dataTableFieldMenuMode: '数据表中为块添加属性时，属性列表的呈现方式。',
       structureTreeScrollToSelection: '选中块时把结构树滚动到该块的位置。',
       hideDotFiles: '名称以“.”开头的文件和文件夹不显示在文件树中。',
       cdeDotGridSpacingMm: '卡牌设计编辑器画布背景点阵的间距。',
@@ -986,6 +989,8 @@ export default {
       customTheme: '自定义主题',
       systemFont: '系统默认',
       expandExclusive: '展开并折叠其他',
+      fieldMenuCategory: '按分类分组',
+      fieldMenuExpanded: '全部展开',
       expand: '自动展开祖先',
       noAutoExpand: '不自动展开',
       cdeDotGridSpacingMm: {
